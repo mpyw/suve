@@ -51,9 +51,11 @@ The returned `provider.Store` is handed to the generic show / diff / list / log
 / tag / untag commands and the create / update / delete / restore commands. No
 command or usecase constructs a cloud SDK client or adapter directly.
 
-Staging is AWS-only. The AWS scope keys on-disk staging state (see
-`provider.Scope.Key`), so staged changes are partitioned per account/region
-under `~/.suve/staging/aws/<account>/<region>/`.
+Staging is available on AWS, Google Cloud, and Azure. Each provider's scope keys
+its on-disk staging state (see `provider.Scope.Key`), so staged changes are
+partitioned per scope — e.g. AWS by account/region under
+`~/.suve/staging/aws/<account>/<region>/`, Google Cloud by project, and Azure by
+App Configuration store / Key Vault vault.
 
 ## Enforced boundary
 

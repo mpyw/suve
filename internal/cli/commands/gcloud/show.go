@@ -121,7 +121,7 @@ Use --output=json for structured JSON output (cannot be used with --raw).
 
 VERSION SPECIFIERS:
   #VERSION  Specific version by integer number
-  ~SHIFT    N enabled versions ago; ~ alone means ~1
+  ~SHIFT    N versions ago (any state); ~ alone means ~1
 
 EXAMPLES:
   suve gcloud secret show my-secret                        Show latest version

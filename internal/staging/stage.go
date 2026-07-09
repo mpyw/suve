@@ -183,9 +183,10 @@ func (s *State) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// UnmarshalJSON reads a v3 (structured-record) state, migrating v1/v2 states
-// (NUL-composite string map keys) transparently on read so existing staged and
-// stashed state is never lost.
+// UnmarshalJSON reads a v3 (structured-record) state. Pre-v3 layouts
+// (NUL-composite string map keys) are intentionally NOT migrated: they are
+// treated as empty (see stateVersion) so a format bump never crashes commands —
+// stale local working state is dropped rather than converted.
 func (s *State) UnmarshalJSON(data []byte) error {
 	var head struct {
 		Version int `json:"version"`

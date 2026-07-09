@@ -48,8 +48,8 @@ Google Cloud secrets are integer-versioned. The version spec is:
 | Specifier | Description | Example |
 |-----------|-------------|---------|
 | `#VERSION` | Specific version by integer number | `#3` = version 3 |
-| `~` | One enabled version ago | `~` = latest - 1 |
-| `~N` | N enabled versions ago | `~2` = latest - 2 |
+| `~` | One version ago | `~` = latest - 1 |
+| `~N` | N versions ago | `~2` = latest - 2 |
 
 Specifiers can be combined: `my-secret#5~2` means "version 5, then 2 back".
 
@@ -57,7 +57,7 @@ Specifiers can be combined: `my-secret#5~2` means "version 5, then 2 back".
 > Unlike AWS Secrets Manager, Google Cloud Secret Manager has **no `:LABEL` syntax**. Versions are addressed only by integer number, `latest`, or shift.
 
 > [!TIP]
-> `~` without a number means `~1`. You can chain shifts: `~~` = `~1~1` = `~2`. Shift counts only **enabled** versions; disabled and destroyed versions are skipped.
+> `~` without a number means `~1`. You can chain shifts: `~~` = `~1~1` = `~2`. Shift counts **all** versions (any state, newest first) — the same anchor `latest` uses — so a `~N` never skips disabled or destroyed versions.
 
 ---
 

@@ -102,8 +102,10 @@ func (s *Store) versionPath(name, version string) string {
 
 // Resolve parses the version spec (generic) and resolves it to an opaque
 // VersionRef holding the integer version string (or "" for latest). A ~shift is
-// applied by walking the ENABLED versions newest-first; a "#<int>" without a
-// shift needs no listing. A ":LABEL" spec is rejected by gcloudversion.Parse.
+// applied by walking ALL versions (any state) newest-first — the same anchor a
+// bare name resolves to, so a `~N` never skips disabled/destroyed versions; a
+// "#<int>" without a shift needs no listing. A ":LABEL" spec is rejected by
+// gcloudversion.Parse.
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
 	parsed, err := gcloudversion.Parse(name + spec)
 	if err != nil {

@@ -17,7 +17,7 @@ Azure also supports the local **staging workflow** via `suve azure stage` (or th
 - `suve azure stage secret` — Key Vault secrets. Full workflow (`add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`stash`). Versions are immutable, so a staged `edit` applies as a new version.
 - `suve azure stage param` — App Configuration settings. Because App Configuration is **unversioned**, staging uses **last-write-wins** (no modified-after conflict check). Tags are writable via a GET-merge-PUT, so `tag`/`untag` are available. Workflow: `add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`stash`.
 
-Unlike `aws stage`, there is no cross-service `azure stage status`/`apply` aggregate — the two services have distinct staging scopes. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
+The two services keep distinct staging scopes, but provider-wide `azure stage status`/`diff`/`apply`/`reset` span both — each resolves its own scope and any service that is not configured (no `--store-name`/`--vault-name`) is skipped. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
 
 ## Authentication and Configuration
 
@@ -359,7 +359,20 @@ suve azure secret delete --yes my-secret --vault-name my-vault
 ```
 
 > [!NOTE]
-> When the vault has soft-delete enabled, the secret is recoverable within the vault's retention window via the Azure portal/CLI; otherwise deletion is permanent.
+> When the vault has soft-delete enabled, the secret is recoverable within the vault's retention window with `suve azure secret restore` (see below); otherwise deletion is permanent.
+
+---
+
+## suve azure secret restore
+
+Recover a soft-deleted Key Vault secret while it is still within the vault's soft-delete retention window (`RecoverDeletedSecret`), mirroring AWS Secrets Manager's `restore`.
+
+```ShellSession
+user@host:~$ suve azure secret restore my-secret --vault-name my-vault
+Restored secret my-secret
+```
+
+Deletes stay soft — suve does not expose force-delete/purge for Key Vault (retention is a vault-level property, not a per-delete option), so a recently deleted secret can always be restored until the retention window elapses.
 
 ---
 

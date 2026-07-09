@@ -62,7 +62,7 @@ type Result struct {
 	ParamActive  []provider.Provider
 	SecretActive []provider.Provider
 	// StageActive lists every staging-capable provider active, in stable order
-	// (AWS, GoogleCloud).
+	// (AWS, GoogleCloud, Azure).
 	StageActive []provider.Provider
 
 	// AWSViaFallback is true when AWS became active only through the

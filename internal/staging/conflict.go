@@ -8,11 +8,11 @@ import (
 	"github.com/mpyw/suve/internal/parallel"
 )
 
-// CheckConflicts checks if AWS resources were modified after staging.
-// Returns a map of names that have conflicts.
+// CheckConflicts checks if remote resources were modified after staging.
+// Returns the set of EntryKeys that have conflicts.
 //
 // For Create operations: conflicts if resource now exists (someone else created it).
-// For Update/Delete operations with BaseModifiedAt: conflicts if AWS was modified after base.
+// For Update/Delete operations with BaseModifiedAt: conflicts if the remote was modified after base.
 func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[EntryKey]Entry) map[EntryKey]struct{} {
 	conflicts := make(map[EntryKey]struct{})
 

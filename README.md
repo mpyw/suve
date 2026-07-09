@@ -587,7 +587,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 ### Azure App Configuration
 
 > [!NOTE]
-> Azure App Configuration is unversioned. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, and `log` reports that history is unsupported.
+> Azure App Configuration is unversioned. `#`, `~`, and `:` are valid key characters — the whole argument is the literal key name, not a version spec — and `log` reports that history is unsupported.
 
 ## Providers
 
@@ -601,7 +601,7 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 | [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | ✅ | ✅ | DefaultAzureCredential |
 | [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ✅ tags¹ | ✅² | ✅ | DefaultAzureCredential |
 
-Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is AWS Secrets Manager only; on Azure App Configuration `log` reports history unsupported; version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected on App Configuration. Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
+Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is available on AWS Secrets Manager and Azure Key Vault (soft-delete recovery); on Azure App Configuration `log` reports history unsupported and `#`/`~`/`:` are treated as literal key characters (not version specifiers). Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
 
 ¹ App Configuration's PUT replaces the whole key-value, so tag writes are a **GET-merge-PUT** with an ETag precondition (`azappconfig/v2`): `tag`/`untag` preserve the value and other tags, and a value write (`update`) preserves existing tags.
 
@@ -786,7 +786,8 @@ Secrets are versioned by opaque IDs and have no staging labels. Select the vault
 | [`suve azure secret list`](docs/azure.md#suve-azure-secret-list) | `--filter=<REGEX>`<br>`--show`<br>`--output=<FORMAT>` | List secrets |
 | [`suve azure secret create`](docs/azure.md#suve-azure-secret-create) | | Create new secret |
 | [`suve azure secret update`](docs/azure.md#suve-azure-secret-update) | `--yes` | Update existing secret |
-| [`suve azure secret delete`](docs/azure.md#suve-azure-secret-delete) | `--yes` | Delete secret |
+| [`suve azure secret delete`](docs/azure.md#suve-azure-secret-delete) | `--yes` | Delete secret (soft-delete) |
+| [`suve azure secret restore`](docs/azure.md#suve-azure-secret-restore) | | Recover a soft-deleted secret |
 | [`suve azure secret tag`](docs/azure.md#suve-azure-secret-tag) | `<KEY>=<VALUE>...` | Add or update tags |
 | [`suve azure secret untag`](docs/azure.md#suve-azure-secret-untag) | `<KEY>...` | Remove tags |
 
@@ -807,7 +808,7 @@ Secrets are versioned by opaque IDs and have no staging labels. Select the vault
 
 ### Azure App Configuration
 
-Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`) are rejected, `log` reports that history is unsupported, and `tag` / `untag` are unsupported (SDK limitation). Select the store with `--store-name` or the `AZURE_APPCONFIG_NAME` environment variable — the store name is a globally-unique endpoint, so no subscription or resource group is needed. See [docs/azure.md](docs/azure.md) for details.
+Unversioned key-value store. `#`, `~`, and `:` are valid key characters — the whole argument is the literal key name, not a version spec — and `log` reports that history is unsupported. `tag` / `untag` are supported via a GET-merge-PUT (see footnote ¹). Select the store with `--store-name` or the `AZURE_APPCONFIG_NAME` environment variable — the store name is a globally-unique endpoint, so no subscription or resource group is needed. See [docs/azure.md](docs/azure.md) for details.
 
 | Command | Options | Description |
 |---------|---------|-------------|
@@ -816,6 +817,8 @@ Unversioned key-value store. Version specifiers (`#VERSION`, `~SHIFT`, `:LABEL`)
 | [`suve azure param create`](docs/azure.md#suve-azure-param-create) | `--namespace`/`--ns` | Create a new key |
 | [`suve azure param update`](docs/azure.md#suve-azure-param-update) | `--namespace`/`--ns`<br>`--yes` | Update an existing key |
 | [`suve azure param delete`](docs/azure.md#suve-azure-param-delete) | `--namespace`/`--ns`<br>`--yes` | Delete a key |
+| [`suve azure param tag`](docs/azure.md#suve-azure-param-tag) | `--namespace`/`--ns` | Add or update tags (GET-merge-PUT) |
+| [`suve azure param untag`](docs/azure.md#suve-azure-param-untag) | `--namespace`/`--ns` | Remove tags |
 
 #### Namespaces
 
@@ -852,7 +855,7 @@ The value is interpreted by context:
 | `suve azure stage param stash` | `push`/`pop`/`show`/`drop` | Save/restore staged changes |
 
 > [!NOTE]
-> Azure staging is **per-service**: `suve azure stage secret` (Key Vault) and `suve azure stage param` (App Configuration) keep separate staging state, so there is no cross-service `azure stage status`/`apply` aggregate (unlike `aws stage`).
+> Azure staging is **per-service** under the hood: `suve azure stage secret` (Key Vault) and `suve azure stage param` (App Configuration) keep separate staging state. Provider-wide `azure stage status`/`diff`/`apply`/`reset` span both services, skipping whichever one is not configured.
 
 ### Global Stage Commands (AWS)
 
