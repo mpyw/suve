@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { ParamAddTag, ParamDelete, ParamDiff, ParamList, ParamLog, ParamRemoveTag, ParamSet, ParamShow, ParamTypeOptions, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
   import type { gui } from '../../wailsjs/go/models';
   import DiffDisplay from './DiffDisplay.svelte';
@@ -159,11 +159,15 @@
     withValue: boolean;
   }
 
-  // Reload when filter options change
+  // Reload when the checkboxes change. prefix/filter are intentionally NOT
+  // dependencies — the debounced oninput handlers own text-input reloads, so
+  // typing doesn't fire a backend list on every keystroke (AWS lists everything
+  // then filters client-side).
   $effect(() => {
-    const opts = { prefix, filter, recursive, withValue }; // read values to create dependencies
+    const trackedRecursive = recursive;
+    const trackedWithValue = withValue;
     if (initialLoadDone) {
-      loadParams(opts);
+      loadParams(untrack(() => ({ prefix, filter, recursive: trackedRecursive, withValue: trackedWithValue })));
     }
   });
 

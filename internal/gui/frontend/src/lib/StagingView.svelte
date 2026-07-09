@@ -193,7 +193,14 @@
     modalLoading = true;
     modalError = '';
     try {
-      await StagingReset(resetService);
+      // "Reset All" (resetService === 'all') resets every service with staged
+      // changes — each is a separate backend call (Azure App Configuration and
+      // Key Vault have independent scopes), mirroring "Apply All". Per-section
+      // reset passes a concrete service.
+      const targets = resetService === 'all' ? stagedServices() : [resetService];
+      for (const svc of targets) {
+        await StagingReset(svc);
+      }
       showResetModal = false;
       await loadStatus();
     } catch (e) {
@@ -557,10 +564,7 @@
       </button>
       <button
         class="btn-action btn-reset"
-        onclick={() => {
-          if (paramEntries.length > 0 || paramTagEntries.length > 0) openResetModal('param');
-          if (secretEntries.length > 0 || secretTagEntries.length > 0) openResetModal('secret');
-        }}
+        onclick={() => openResetModal('all')}
         disabled={paramEntries.length === 0 && secretEntries.length === 0 && paramTagEntries.length === 0 && secretTagEntries.length === 0}
       >
         Reset All
