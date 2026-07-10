@@ -885,11 +885,8 @@ Export writes the working staging area out to portable snapshot files (one per s
 | `suve stage import` | `<dir>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--force` | Import `param.json` / `secret.json` from `<dir>` (missing files skipped; nothing imported if both absent) |
 | `suve stage {param,secret} import` | `<file>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--force` | Import a single service from `<file>` (missing file or service mismatch is a hard error) |
 
-- **`export`** writes the working area out wholesale — there is no `--merge` / `--overwrite`. By default it clears the working staging area; `--keep` retains it. `--yes` / `--force` skip the overwrite confirmation.
+- **`export`** writes the working area out wholesale; there is no `--merge` / `--overwrite`. By default it clears the working staging area; `--keep` retains it. `--yes` / `--force` skip the overwrite confirmation.
 - **`import`** has no `--keep` (it is read-only on the file). `--merge` / `--overwrite` are mutually exclusive and only matter when the working area already holds changes; otherwise the file is applied directly. `--force` imports even when the file's embedded scope differs from the current scope.
-
-> [!WARNING]
-> **BREAKING CHANGE:** `stage stash` (`push` / `pop` / `show` / `drop`) has been removed — invoking it now fails as an unknown command (`Unknown command: stash`, exit 1). It is superseded by `stage export` / `stage import`, which use per-service files and explicit path arguments instead of a single hidden `stash.json`. Any existing `~/.suve/staging/{scope}/stash.json` files are **abandoned with no migration**; re-create the snapshot with `stage export` if you still need it.
 
 ## Environment Variables
 

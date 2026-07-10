@@ -34,8 +34,6 @@ This file provides guidance to Claude Code when working with code in this reposi
    - `export` flags: `--keep` (retain the working area; default clears it), `--yes`/`--force` (skip overwrite confirmation), `--passphrase-stdin`. NO `--merge`/`--overwrite`
    - `import` flags: `--merge`/`--overwrite` (mutually exclusive; only used when the working area already has changes), `--yes`, `--passphrase-stdin`, `--force` (override scope mismatch). NO `--keep`
 
-   > **BREAKING CHANGE:** `stage stash` (push/pop/show/drop) is **removed** (fails as an unknown command, exit 1); existing `~/.suve/staging/{scope}/stash.json` files are **abandoned with no migration**. `stage export` / `stage import` supersede it with per-service files and explicit path arguments.
-
 4. **Version Specification**: Git-like revision syntax
    ```
    # SSM Parameter Store
