@@ -12,7 +12,7 @@ Primary command: `gcloud secret`
 > [!NOTE]
 > Google Cloud secrets are integer-versioned (`1`, `2`, `3`, ... or `latest`) and have **no staging labels**.
 
-Google Cloud also supports the local **staging workflow** via `suve gcloud stage` (or the bare `suve stage` alias when Google Cloud is the only active staging backend). Because Google Cloud is secret-only, `gcloud stage` operates on secrets directly: `add`, `edit`, `delete`, `status`, `diff`, `apply`, `reset`, `tag`, `untag`, and `stash`. Since Secret Manager versions are immutable, a staged `edit` applies as a new version, and there are no force / recovery-window delete options. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
+Google Cloud also supports the local **staging workflow** via `suve gcloud stage` (or the bare `suve stage` alias when Google Cloud is the only active staging backend). Because Google Cloud is secret-only, `gcloud stage` operates on secrets directly: `add`, `edit`, `delete`, `status`, `diff`, `apply`, `reset`, `tag`, `untag`, `export`, and `import`. Since Secret Manager versions are immutable, a staged `edit` applies as a new version, and there are no force / recovery-window delete options. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
 
 ## Authentication and Configuration
 
