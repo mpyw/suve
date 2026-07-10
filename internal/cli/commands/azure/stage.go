@@ -64,7 +64,8 @@ func keyVaultStageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 		stgcli.NewResetCommand(cfg),
 		stgcli.NewTagCommand(cfg),
 		stgcli.NewUntagCommand(cfg),
-		stgcli.NewStashCommand(cfg),
+		stgcli.NewExportCommand(cfg),
+		stgcli.NewImportCommand(cfg),
 	}
 }
 
@@ -82,7 +83,8 @@ func appConfigStageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 		stgcli.NewResetCommand(cfg),
 		stgcli.NewTagCommand(cfg),
 		stgcli.NewUntagCommand(cfg),
-		stgcli.NewStashCommand(cfg),
+		stgcli.NewExportCommand(cfg),
+		stgcli.NewImportCommand(cfg),
 	}
 }
 

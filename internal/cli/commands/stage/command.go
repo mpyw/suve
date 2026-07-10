@@ -32,15 +32,16 @@ Global commands operate on all staged changes:
    diff      Show diff of all staged changes vs AWS
    apply     Apply all staged changes to AWS
    reset     Unstage all changes
-   stash     Save/restore staged changes to/from file
+   export    Export staged changes to a directory (one file per service)
+   import    Import staged changes from a directory
 
 EXAMPLES:
    suve stage param add /my/param       Stage a new SSM Parameter Store parameter
    suve stage secret edit my-secret     Edit and stage a secret
    suve stage status                    View all staged changes
    suve stage apply                     Apply all staged changes
-   suve stage stash                     Save staged changes to file
-   suve stage stash pop                 Restore staged changes from file`,
+   suve stage export ./backup           Export staged changes to a directory
+   suve stage import ./backup           Import staged changes from a directory`,
 		Commands: []*cli.Command{
 			param.Command(),
 			secret.Command(),
@@ -48,7 +49,8 @@ EXAMPLES:
 			diff.Command(gcfg),
 			apply.Command(gcfg),
 			reset.Command(gcfg),
-			stgcli.NewGlobalStashCommand(gcfg.ScopeResolver),
+			stgcli.NewGlobalExportCommand(gcfg.ScopeResolver),
+			stgcli.NewGlobalImportCommand(gcfg.ScopeResolver),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

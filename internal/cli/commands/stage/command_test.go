@@ -43,7 +43,8 @@ func TestCommand_HasExpectedSubcommands(t *testing.T) {
 		"diff",
 		"apply",
 		"reset",
-		"stash",
+		"export",
+		"import",
 	}
 
 	for _, expected := range expectedSubcommands {

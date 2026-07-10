@@ -23,6 +23,7 @@ const (
 	usagePassphraseStdin = "Read passphrase from stdin (for scripts/automation)"
 	flagMerge            = "merge"
 	flagOverwrite        = "overwrite"
+	flagForce            = "force"
 	cmdNamePush          = "push"
 	argsUsageName        = "[name]"
 )
