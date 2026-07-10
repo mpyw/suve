@@ -202,7 +202,7 @@ func TestExportUseCase_Execute_Errors(t *testing.T) {
 
 		var exportErr *stagingusecase.ExportError
 		require.ErrorAs(t, err, &exportErr)
-		assert.Equal(t, "load", exportErr.Op)
+		assert.Equal(t, stagingusecase.ExportOpLoad, exportErr.Op)
 	})
 
 	t.Run("error on target write", func(t *testing.T) {
@@ -218,7 +218,7 @@ func TestExportUseCase_Execute_Errors(t *testing.T) {
 
 		var exportErr *stagingusecase.ExportError
 		require.ErrorAs(t, err, &exportErr)
-		assert.Equal(t, "write", exportErr.Op)
+		assert.Equal(t, stagingusecase.ExportOpWrite, exportErr.Op)
 
 		// Working must not have been cleared: the export failed.
 		_, err = working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
@@ -243,7 +243,7 @@ func TestExportUseCase_Execute_Errors(t *testing.T) {
 
 		var exportErr *stagingusecase.ExportError
 		require.ErrorAs(t, err, &exportErr)
-		assert.Equal(t, "clear", exportErr.Op)
+		assert.Equal(t, stagingusecase.ExportOpClear, exportErr.Op)
 		assert.True(t, exportErr.NonFatal)
 
 		// The state was still exported.
@@ -257,7 +257,7 @@ func TestExportError(t *testing.T) {
 	t.Run("error message - load", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ExportError{Op: "load", Err: errors.New("boom")}
+		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOpLoad, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to read the working staging area")
 		assert.Contains(t, err.Error(), "boom")
 	})
@@ -265,14 +265,14 @@ func TestExportError(t *testing.T) {
 	t.Run("error message - write", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ExportError{Op: "write", Err: errors.New("boom")}
+		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOpWrite, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to write export file")
 	})
 
 	t.Run("error message - clear", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ExportError{Op: "clear", Err: errors.New("boom")}
+		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOpClear, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to clear the working staging area")
 	})
 
@@ -280,7 +280,7 @@ func TestExportError(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("something went wrong")
-		err := &stagingusecase.ExportError{Op: "unknown", Err: inner}
+		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOp("unknown"), Err: inner}
 		assert.Equal(t, "something went wrong", err.Error())
 	})
 
@@ -288,7 +288,7 @@ func TestExportError(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("inner")
-		err := &stagingusecase.ExportError{Op: "load", Err: inner}
+		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOpLoad, Err: inner}
 		assert.ErrorIs(t, err, inner)
 	})
 }

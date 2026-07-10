@@ -8,11 +8,14 @@ import (
 	"github.com/mpyw/suve/internal/staging/store"
 )
 
+// ImportOp identifies the stage of an import operation that failed.
+type ImportOp string
+
 // Import error Op codes.
 const (
-	importOpLoad        = "load"
-	importOpWrite       = "write"
-	importOpReadWorking = "read-working"
+	ImportOpLoad        ImportOp = "load"
+	ImportOpWrite       ImportOp = "write"
+	ImportOpReadWorking ImportOp = "read-working"
 )
 
 // EnvelopeReader reads a single service's staged state from an import source
@@ -62,7 +65,7 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 	// Read the imported state from the source (read-only; never mutated).
 	sourceState, err := u.readSource(ctx, input.Service)
 	if err != nil {
-		return nil, &ImportError{Op: importOpLoad, Err: err}
+		return nil, &ImportError{Op: ImportOpLoad, Err: err}
 	}
 
 	if sourceState.IsEmpty() {
@@ -75,7 +78,7 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 	// WriteState below would replace the working files with a partial view.
 	workingState, err := u.Working.Drain(ctx, "", true)
 	if err != nil {
-		return nil, &ImportError{Op: importOpReadWorking, Err: err}
+		return nil, &ImportError{Op: ImportOpReadWorking, Err: err}
 	}
 
 	// Capture whether the working area already held data BEFORE any mutation, for
@@ -122,7 +125,7 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 	}
 
 	if err := u.Working.WriteState(ctx, "", finalState); err != nil {
-		return nil, &ImportError{Op: importOpWrite, Err: err}
+		return nil, &ImportError{Op: ImportOpWrite, Err: err}
 	}
 
 	return &ImportOutput{
@@ -161,17 +164,17 @@ var (
 
 // ImportError represents an error during an import operation.
 type ImportError struct {
-	Op  string // "load", "write", "read-working"
+	Op  ImportOp
 	Err error
 }
 
 func (e *ImportError) Error() string {
 	switch e.Op {
-	case importOpLoad:
+	case ImportOpLoad:
 		return "failed to read export file: " + e.Err.Error()
-	case importOpWrite:
+	case ImportOpWrite:
 		return "failed to write the working staging area: " + e.Err.Error()
-	case importOpReadWorking:
+	case ImportOpReadWorking:
 		return "failed to read the working staging area: " + e.Err.Error()
 	default:
 		return e.Err.Error()
