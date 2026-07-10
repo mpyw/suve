@@ -291,7 +291,7 @@ func TestImportUseCase_Execute_Errors(t *testing.T) {
 
 		var importErr *stagingusecase.ImportError
 		require.ErrorAs(t, err, &importErr)
-		assert.Equal(t, "load", importErr.Op)
+		assert.Equal(t, stagingusecase.ImportOpLoad, importErr.Op)
 	})
 
 	t.Run("error on global source read", func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestImportUseCase_Execute_Errors(t *testing.T) {
 
 		var importErr *stagingusecase.ImportError
 		require.ErrorAs(t, err, &importErr)
-		assert.Equal(t, "load", importErr.Op)
+		assert.Equal(t, stagingusecase.ImportOpLoad, importErr.Op)
 	})
 
 	t.Run("error on working read", func(t *testing.T) {
@@ -325,7 +325,7 @@ func TestImportUseCase_Execute_Errors(t *testing.T) {
 
 		var importErr *stagingusecase.ImportError
 		require.ErrorAs(t, err, &importErr)
-		assert.Equal(t, "read-working", importErr.Op)
+		assert.Equal(t, stagingusecase.ImportOpReadWorking, importErr.Op)
 
 		// Working must not have been written.
 		_, err = working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
@@ -347,7 +347,7 @@ func TestImportUseCase_Execute_Errors(t *testing.T) {
 
 		var importErr *stagingusecase.ImportError
 		require.ErrorAs(t, err, &importErr)
-		assert.Equal(t, "write", importErr.Op)
+		assert.Equal(t, stagingusecase.ImportOpWrite, importErr.Op)
 	})
 }
 
@@ -357,7 +357,7 @@ func TestImportError(t *testing.T) {
 	t.Run("error message - load", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ImportError{Op: "load", Err: errors.New("boom")}
+		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOpLoad, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to read export file")
 		assert.Contains(t, err.Error(), "boom")
 	})
@@ -365,14 +365,14 @@ func TestImportError(t *testing.T) {
 	t.Run("error message - write", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ImportError{Op: "write", Err: errors.New("boom")}
+		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOpWrite, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to write the working staging area")
 	})
 
 	t.Run("error message - read-working", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ImportError{Op: "read-working", Err: errors.New("boom")}
+		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOpReadWorking, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to read the working staging area")
 	})
 
@@ -380,7 +380,7 @@ func TestImportError(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("something went wrong")
-		err := &stagingusecase.ImportError{Op: "unknown", Err: inner}
+		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOp("unknown"), Err: inner}
 		assert.Equal(t, "something went wrong", err.Error())
 	})
 
@@ -388,7 +388,7 @@ func TestImportError(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("inner")
-		err := &stagingusecase.ImportError{Op: "load", Err: inner}
+		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOpLoad, Err: inner}
 		assert.ErrorIs(t, err, inner)
 	})
 }
