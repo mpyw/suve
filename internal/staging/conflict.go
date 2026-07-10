@@ -8,12 +8,24 @@ import (
 	"github.com/mpyw/suve/internal/parallel"
 )
 
+// ApplyStrategyResolver resolves the ApplyStrategy for a given namespace. It
+// mirrors the per-namespace resolution the apply path uses so a namespaced
+// provider (Azure App Configuration) probes each entry against the remote state
+// of its OWN namespace rather than the default one.
+type ApplyStrategyResolver func(namespace string) (ApplyStrategy, error)
+
 // CheckConflicts checks if remote resources were modified after staging.
 // Returns the set of EntryKeys that have conflicts.
 //
+// Each entry is probed through the strategy resolved for its own namespace, so
+// the probe carries the full EntryKey (name + namespace) and never collapses
+// two same-named entries across namespaces onto one namespace's remote state.
+// For namespace-agnostic providers the resolver returns the single strategy and
+// the empty namespace, so behavior is unchanged.
+//
 // For Create operations: conflicts if resource now exists (someone else created it).
 // For Update/Delete operations with BaseModifiedAt: conflicts if the remote was modified after base.
-func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[EntryKey]Entry) map[EntryKey]struct{} {
+func CheckConflicts(ctx context.Context, resolve ApplyStrategyResolver, entries map[EntryKey]Entry) map[EntryKey]struct{} {
 	conflicts := make(map[EntryKey]struct{})
 
 	// Separate entries by check type:
@@ -41,8 +53,15 @@ func CheckConflicts(ctx context.Context, strategy ApplyStrategy, entries map[Ent
 	maps.Copy(allToCheck, toCheckCreate)
 	maps.Copy(allToCheck, toCheckModified)
 
-	// Fetch last modified times in parallel
+	// Fetch last modified times in parallel. Resolve the strategy per entry so the
+	// probe targets the entry's own namespace (App Configuration); other providers
+	// resolve the same single strategy under the empty namespace.
 	results := parallel.ExecuteMap(ctx, allToCheck, func(ctx context.Context, key EntryKey, _ Entry) (time.Time, error) {
+		strategy, err := resolve(key.Namespace)
+		if err != nil {
+			return time.Time{}, err
+		}
+
 		return strategy.FetchLastModified(ctx, key.Name)
 	})
 

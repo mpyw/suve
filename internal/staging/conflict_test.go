@@ -3,6 +3,7 @@ package staging_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,6 +49,15 @@ func (m *mockApplyStrategy) ApplyTags(_ context.Context, _ string, _ staging.Tag
 	return nil
 }
 
+// resolverFor wraps a single strategy as a namespace-agnostic resolver, matching
+// the behavior of a provider without a namespace axis (AWS/GCloud/Key Vault):
+// every namespace resolves to the same strategy.
+func resolverFor(s staging.ApplyStrategy) staging.ApplyStrategyResolver {
+	return func(string) (staging.ApplyStrategy, error) {
+		return s, nil
+	}
+}
+
 func TestCheckConflicts(t *testing.T) {
 	t.Parallel()
 
@@ -58,7 +68,7 @@ func TestCheckConflicts(t *testing.T) {
 		t.Parallel()
 
 		strategy := &mockApplyStrategy{}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, map[staging.EntryKey]staging.Entry{})
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), map[staging.EntryKey]staging.Entry{})
 		assert.Empty(t, conflicts)
 	})
 
@@ -70,7 +80,7 @@ func TestCheckConflicts(t *testing.T) {
 			{Name: "item1"}: {Operation: staging.OperationUpdate},
 			{Name: "item2"}: {Operation: staging.OperationDelete},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -85,7 +95,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "new-item"})
 	})
 
@@ -101,7 +111,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -116,7 +126,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -135,7 +145,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "existing-item"})
 	})
 
@@ -154,7 +164,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -173,7 +183,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -191,7 +201,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "delete-item"})
 	})
 
@@ -209,7 +219,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Empty(t, conflicts)
 	})
 
@@ -238,9 +248,71 @@ func TestCheckConflicts(t *testing.T) {
 			{Name: "delete-item"}:        {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
 			{Name: "update-no-conflict"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), strategy, entries)
+		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
 		assert.Len(t, conflicts, 2)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "create-item"})
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "update-item"})
 	})
+}
+
+// TestCheckConflicts_PerNamespace is a regression for #441: two same-named
+// entries under different namespaces must each be probed against their OWN
+// namespace's remote state, and the reported conflict must carry the namespace.
+// With the namespace dropped, a single bare-name probe would compare both
+// entries against one namespace's time and falsely flag or clear the other.
+func TestCheckConflicts_PerNamespace(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	laterTime := time.Date(2024, 1, 1, 13, 0, 0, 0, time.UTC)
+
+	// The "dev" namespace was modified after base (conflict); the default
+	// namespace was not (no conflict). Same name "k" in both.
+	remoteByNamespace := map[string]time.Time{
+		"":    baseTime,  // unchanged since base -> no conflict
+		"dev": laterTime, // modified after base -> conflict
+	}
+
+	var mu sync.Mutex
+
+	probed := map[string]string{} // namespace -> name probed against its strategy
+
+	resolve := func(namespace string) (staging.ApplyStrategy, error) {
+		return &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, name string) (time.Time, error) {
+				mu.Lock()
+				probed[namespace] = name
+				mu.Unlock()
+
+				return remoteByNamespace[namespace], nil
+			},
+		}, nil
+	}
+
+	entries := map[staging.EntryKey]staging.Entry{
+		{Name: "k", Namespace: ""}: {
+			Operation:      staging.OperationUpdate,
+			Value:          lo.ToPtr("v"),
+			BaseModifiedAt: &baseTime,
+		},
+		{Name: "k", Namespace: "dev"}: {
+			Operation:      staging.OperationUpdate,
+			Value:          lo.ToPtr("v"),
+			BaseModifiedAt: &baseTime,
+		},
+	}
+
+	conflicts := staging.CheckConflicts(t.Context(), resolve, entries)
+
+	// Only the "dev" entry conflicts, and the report carries its namespace.
+	assert.Len(t, conflicts, 1)
+	assert.Contains(t, conflicts, staging.EntryKey{Name: "k", Namespace: "dev"})
+	assert.NotContains(t, conflicts, staging.EntryKey{Name: "k", Namespace: ""})
+
+	// Each namespace's strategy was probed with the entry's own name — proving
+	// the namespace is threaded through to the probe, not dropped.
+	mu.Lock()
+	defer mu.Unlock()
+
+	assert.Equal(t, map[string]string{"": "k", "dev": "k"}, probed)
 }

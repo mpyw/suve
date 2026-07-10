@@ -46,11 +46,13 @@ func (s ServiceApply) strategyForNamespace(namespace string) (staging.ApplyStrat
 	return s.StrategyFor(namespace)
 }
 
-// serviceConflictCheck holds entries and strategy for a single service's conflict checking.
+// serviceConflictCheck holds entries and the per-namespace strategy resolver for
+// a single service's conflict checking. resolve mirrors the apply path so each
+// entry is probed against its own namespace's remote state.
 type serviceConflictCheck struct {
 	serviceName string
 	entries     map[staging.EntryKey]staging.Entry
-	strategy    staging.ApplyStrategy
+	resolve     staging.ApplyStrategyResolver
 }
 
 // conflictItem identifies a conflicting staged entry, qualified by its service.
@@ -246,7 +248,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				checks = append(checks, serviceConflictCheck{
 					serviceName: svc.Strategy.ServiceName(),
 					entries:     svc.Entries,
-					strategy:    svc.Strategy,
+					resolve:     svc.strategyForNamespace,
 				})
 			}
 		}
@@ -255,7 +257,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		if len(allConflicts) > 0 {
 			for _, c := range allConflicts {
 				output.Warning(r.Stderr, "conflict detected for %s (%s): %s was modified after staging",
-					keyLabel(c.key), c.serviceName, r.ProviderLabel)
+					c.key.Label(), c.serviceName, r.ProviderLabel)
 			}
 
 			return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(allConflicts))
@@ -397,21 +399,11 @@ func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflict
 	var all []conflictItem
 
 	for _, check := range checks {
-		conflicts := staging.CheckConflicts(ctx, check.strategy, check.entries)
+		conflicts := staging.CheckConflicts(ctx, check.resolve, check.entries)
 		for _, key := range staging.SortedEntryKeys(conflicts) {
 			all = append(all, conflictItem{serviceName: check.serviceName, key: key})
 		}
 	}
 
 	return all
-}
-
-// keyLabel renders an entry key for display, appending the namespace when
-// present (empty is the null/default namespace, shown bare).
-func keyLabel(key staging.EntryKey) string {
-	if key.Namespace == "" {
-		return key.Name
-	}
-
-	return fmt.Sprintf("%s [%s]", key.Name, key.Namespace)
 }

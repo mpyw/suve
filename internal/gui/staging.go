@@ -327,9 +327,16 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 		return nil, err
 	}
 
+	// Render each conflict's EntryKey with its namespace badge (bare name for the
+	// empty/default namespace, so AWS/GCloud/Key Vault output is unchanged).
+	conflicts := make([]string, 0, len(result.Conflicts))
+	for _, key := range result.Conflicts {
+		conflicts = append(conflicts, key.Label())
+	}
+
 	output := &StagingApplyResult{
 		ServiceName:    result.ServiceName,
-		Conflicts:      result.Conflicts,
+		Conflicts:      conflicts,
 		EntrySucceeded: result.EntrySucceeded,
 		EntryFailed:    result.EntryFailed,
 		TagSucceeded:   result.TagSucceeded,
