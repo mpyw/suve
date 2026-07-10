@@ -163,26 +163,3 @@ func runSubCommandWithStdin(
 
 	return outBuf.String(), errBuf.String(), err
 }
-
-// runStashSubCommandWithStdin executes a stash subcommand (e.g., "param stash pop") with custom stdin.
-func runStashSubCommandWithStdin(
-	t *testing.T, parentCmd *cli.Command, stdin io.Reader, stashSubCmd string, args ...string,
-) (stdout, stderr string, err error) {
-	t.Helper()
-
-	var outBuf, errBuf bytes.Buffer
-
-	app := &cli.Command{
-		Name:      "suve",
-		Reader:    stdin,
-		Writer:    &outBuf,
-		ErrWriter: &errBuf,
-		Commands:  []*cli.Command{parentCmd},
-	}
-
-	// Build full args: ["suve", "parent-name", "stash", "stash-sub-cmd", ...args]
-	fullArgs := append([]string{"suve", parentCmd.Name, "stash", stashSubCmd}, args...)
-	err = app.Run(t.Context(), fullArgs)
-
-	return outBuf.String(), errBuf.String(), err
-}

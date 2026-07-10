@@ -34,7 +34,8 @@ Google Cloud is secret-only, so 'suve gcloud stage' operates on secrets directly
    apply     Apply staged changes to Google Cloud
    reset     Unstage changes
    tag/untag Stage label changes
-   stash     Save/restore staged changes to/from file
+   export    Export staged changes to a directory
+   import    Import staged changes from a directory
 
 EXAMPLES:
    suve gcloud stage add my-secret       Stage a new secret
@@ -54,7 +55,8 @@ func stageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 		stgcli.NewResetCommand(cfg),
 		stgcli.NewTagCommand(cfg),
 		stgcli.NewUntagCommand(cfg),
-		stgcli.NewStashCommand(cfg),
+		stgcli.NewExportCommand(cfg),
+		stgcli.NewImportCommand(cfg),
 	}
 }
 

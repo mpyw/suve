@@ -47,7 +47,8 @@ func TestCommand_HasExpectedSubcommands(t *testing.T) {
 		"reset",
 		"tag",
 		"untag",
-		"stash",
+		"export",
+		"import",
 	}
 
 	for _, expected := range expectedSubcommands {
@@ -211,20 +212,22 @@ func TestCommand_UntagSubcommand(t *testing.T) {
 	assert.NotNil(t, untagCmd.Action)
 }
 
-func TestCommand_StashSubcommand(t *testing.T) {
+func TestCommand_ExportImportSubcommands(t *testing.T) {
 	t.Parallel()
 
 	cmd := param.Command()
 	require.NotNil(t, cmd)
 
-	// Find stash subcommand
-	stashCmd, found := lo.Find(cmd.Commands, func(c *cli.Command) bool {
-		return c.Name == "stash"
-	})
+	for _, name := range []string{"export", "import"} {
+		leaf, found := lo.Find(cmd.Commands, func(c *cli.Command) bool {
+			return c.Name == name
+		})
 
-	require.True(t, found, "should have stash subcommand")
-	require.NotNil(t, stashCmd)
-	assert.Equal(t, "stash", stashCmd.Name)
-	// Stash has nested subcommands (push, pop, apply, show, drop)
-	assert.NotEmpty(t, stashCmd.Commands)
+		require.True(t, found, "should have %s subcommand", name)
+		require.NotNil(t, leaf)
+		assert.Equal(t, name, leaf.Name)
+		// export/import are leaf commands taking a file path argument.
+		assert.NotNil(t, leaf.Action)
+		assert.Equal(t, "<file>", leaf.ArgsUsage)
+	}
 }

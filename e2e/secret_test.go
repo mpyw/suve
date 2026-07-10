@@ -17,7 +17,6 @@ import (
 	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
 	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
 	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
-	globalreset "github.com/mpyw/suve/internal/cli/commands/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -796,56 +795,4 @@ func TestSecret_ListJSON(t *testing.T) {
 	stdout, _, err := runCommand(t, cmdsecret.ListCommand(), "--output", "json")
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
-}
-
-// TestSecret_StashPushAndPop tests service-specific stash push and pop for secrets.
-func TestSecret_StashPushAndPop(t *testing.T) {
-	setupEnv(t)
-
-	secretName := "suve-e2e-secret-stash-push-pop/test"
-
-	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
-	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
-		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
-	})
-
-	// Stage a secret
-	t.Run("stage-secret", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
-		require.NoError(t, err)
-		t.Logf("stage add output: %s", stdout)
-	})
-
-	// Stash push only secret service to file
-	t.Run("stash-push-secret-only", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "push")
-		require.NoError(t, err)
-		t.Logf("stash push output: %s", stdout)
-		assert.Contains(t, stdout, "stashed to file")
-	})
-
-	// Agent should be empty for secret
-	t.Run("verify-agent-empty", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
-		require.NoError(t, err)
-		assert.NotContains(t, stdout, secretName)
-	})
-
-	// Stash pop secret service back from file
-	t.Run("stash-pop-secret-only", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, secretstage.Command(), "stash", "pop")
-		require.NoError(t, err)
-		t.Logf("stash pop output: %s", stdout)
-		assert.Contains(t, stdout, "restored")
-	})
-
-	// Secret should be back in agent
-	t.Run("verify-secret-restored", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
-		require.NoError(t, err)
-		assert.Contains(t, stdout, secretName)
-	})
 }

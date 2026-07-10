@@ -60,8 +60,8 @@ func AWSGlobalConfig(paramCfg, secretCfg CommandConfig) GlobalConfig {
 // AzureGlobalConfig builds the GlobalConfig for Azure. Unlike AWS, App
 // Configuration (param) and Key Vault (secret) are INDEPENDENT resources with
 // separate staging buckets, so each service carries its own ScopeResolver. The
-// top-level ScopeResolver keys the (single-file) global stash under App
-// Configuration; cross-resource stash is tracked separately (#435).
+// top-level ScopeResolver keys the global export/import scope under App
+// Configuration; cross-resource scoping is tracked separately (#435).
 func AzureGlobalConfig(paramCfg, secretCfg CommandConfig) GlobalConfig {
 	return GlobalConfig{
 		ProviderLabel: "Azure",
