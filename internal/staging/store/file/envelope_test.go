@@ -182,6 +182,35 @@ func TestDecodeState_ServiceMismatchDropsForeignData(t *testing.T) {
 	assert.Empty(t, got.Entries[staging.ServiceSecret], "foreign service must be dropped")
 }
 
+func TestWriteEnvelopeFile_WriteErrors(t *testing.T) {
+	t.Parallel()
+
+	scope := provider.AWSScope("1", "r")
+	state := paramState("/k", "v")
+
+	t.Run("mkdir fails when a parent path component is a file", func(t *testing.T) {
+		t.Parallel()
+
+		blocker := filepath.Join(t.TempDir(), "blocker")
+		require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600))
+
+		// The parent directory cannot be created because "blocker" is a file.
+		err := file.WriteEnvelopeFile(filepath.Join(blocker, "sub", "param.json"), scope, staging.ServiceParam, state, "")
+		require.Error(t, err)
+	})
+
+	t.Run("atomic write fails when the target path is a directory", func(t *testing.T) {
+		t.Parallel()
+
+		target := filepath.Join(t.TempDir(), "param.json")
+		require.NoError(t, os.Mkdir(target, 0o700))
+
+		// Renaming the temp file over an existing directory fails.
+		err := file.WriteEnvelopeFile(target, scope, staging.ServiceParam, state, "")
+		require.Error(t, err)
+	})
+}
+
 func TestWriteEnvelope_ScopesToService(t *testing.T) {
 	t.Parallel()
 
