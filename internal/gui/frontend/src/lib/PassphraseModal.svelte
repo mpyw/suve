@@ -89,7 +89,7 @@
   }
 </script>
 
-<Modal title={modalTitle} show={show} onclose={handleClose}>
+<Modal title={modalTitle} show={show} busy={loading} onclose={handleClose}>
   {#if showPlaintextWarning}
     <div class="plaintext-warning">
       <div class="warning-icon">!</div>

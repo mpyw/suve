@@ -79,7 +79,7 @@ func exportPassphrase(cmd *cli.Command, stdin *bufio.Reader) (pass string, cance
 		}
 
 		return pass, false, nil
-	case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
+	case terminal.IsTerminalWriter(cmd.Root().ErrWriter) && terminal.IsTerminalReader(cmd.Root().Reader):
 		pass, err = prompter.PromptForEncrypt()
 		if err != nil {
 			if errors.Is(err, passphrase.ErrCancelled) {
@@ -91,6 +91,9 @@ func exportPassphrase(cmd *cli.Command, stdin *bufio.Reader) (pass string, cance
 
 		return pass, false, nil
 	default:
+		// No interactive session (stderr not a TTY, or stdin is piped): do not
+		// prompt — reading a piped stdin here would consume a line meant as data.
+		// Fall back to plaintext with a warning, as in the fully non-TTY case.
 		prompter.WarnNonTTY()
 
 		return "", false, nil
@@ -139,9 +142,13 @@ func confirmExportOverwrite(cmd *cli.Command, paths []string, stdin *bufio.Reade
 
 	// With --passphrase-stdin, stdin carries the passphrase, not an interactive
 	// answer: prompting here would consume the passphrase line as the y/N reply
-	// and silently cancel (#471). Require --yes explicitly, mirroring the non-TTY
-	// branch, so a scripted overwrite fails loudly instead of no-op'ing at exit 0.
-	if cmd.Bool(flagPassphraseStdin) || !terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+	// and silently cancel (#471). Likewise a non-TTY stderr or a piped stdin has
+	// no interactive answer to read. Require --yes explicitly in all these cases,
+	// so a scripted overwrite fails loudly instead of no-op'ing at exit 0 or
+	// swallowing a piped data line.
+	if cmd.Bool(flagPassphraseStdin) ||
+		!terminal.IsTerminalWriter(cmd.Root().ErrWriter) ||
+		!terminal.IsTerminalReader(cmd.Root().Reader) {
 		return false, fmt.Errorf(
 			"export file(s) already exist: %v; re-run with --yes to overwrite",
 			existing,

@@ -169,9 +169,20 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 		return nil, fmt.Errorf("%w: %s", ErrInvalidEnvelope, err.Error())
 	}
 
-	if env.Version != EnvelopeVersion {
+	if env.Version < EnvelopeVersion {
+		// An older envelope: its format is gone from this build, so re-export it
+		// from a still-staged source with the current suve.
 		return nil, fmt.Errorf(
 			"%w: file is version %d, but this build only reads version %d; re-create it with `stage export`",
+			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
+		)
+	}
+
+	if env.Version > EnvelopeVersion {
+		// A newer envelope: this build cannot know its format, so upgrading suve
+		// is the fix rather than re-exporting.
+		return nil, fmt.Errorf(
+			"%w: file is version %d, but this build only reads version %d; it was written by a newer suve, upgrade suve",
 			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
 		)
 	}
@@ -231,9 +242,53 @@ func (e *Envelope) DecodeState(passphrase string) (*staging.State, error) {
 		return nil, fmt.Errorf("%w: %s", ErrInvalidEnvelope, err.Error())
 	}
 
-	// The payload is untrusted input, so return only the entries for the
-	// service the (plaintext) header declares: a mismatched or hostile payload
-	// carrying another service's data is dropped rather than trusted.
-	// ExtractService returns a state with fully initialized maps.
-	return state.ExtractService(staging.Service(e.Service)), nil
+	// The payload is untrusted input, so keep only the service the (plaintext)
+	// header declares: a mismatched or hostile payload carrying another service's
+	// data is dropped rather than trusted. ExtractService returns a state with
+	// fully initialized maps.
+	scoped := state.ExtractService(staging.Service(e.Service))
+
+	// A namespace (Azure App Configuration label) axis exists only for App
+	// Configuration; AWS, Google Cloud and Azure Key Vault are namespace-agnostic.
+	// Reject an envelope for such a provider that still carries namespace-bearing
+	// entries, mirroring the provider-mismatch guard: applying them would push a
+	// namespaced item to a provider that ignores namespaces.
+	if !e.namespaceAllowed() {
+		if key, found := firstNamespacedKey(scoped); found {
+			return nil, fmt.Errorf(
+				"%w: provider %q is namespace-agnostic but the payload carries item %q under namespace %q",
+				ErrInvalidEnvelope, e.Provider, key.Name, key.Namespace)
+		}
+	}
+
+	return scoped, nil
+}
+
+// namespaceAllowed reports whether entries in this envelope may carry a non-empty
+// Namespace. Only Azure App Configuration (provider "azure", param service) has
+// a namespace (label) axis.
+func (e *Envelope) namespaceAllowed() bool {
+	return e.Provider == string(provider.ProviderAzure) && e.Service == string(staging.ServiceParam)
+}
+
+// firstNamespacedKey returns the first entry or tag key in state that carries a
+// non-empty namespace, for reporting a namespace-agnostic violation.
+func firstNamespacedKey(state *staging.State) (staging.EntryKey, bool) {
+	for _, entries := range state.Entries {
+		for key := range entries {
+			if key.Namespace != "" {
+				return key, true
+			}
+		}
+	}
+
+	for _, tags := range state.Tags {
+		for key := range tags {
+			if key.Namespace != "" {
+				return key, true
+			}
+		}
+	}
+
+	return staging.EntryKey{}, false
 }

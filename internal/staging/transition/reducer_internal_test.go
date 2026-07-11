@@ -70,6 +70,18 @@ func TestReduceEntry_Add(t *testing.T) {
 			wantState: EntryStagedStateNotStaged{},
 			wantError: ErrCannotAddToExisting,
 		},
+		{
+			// #553: staged Delete with the remote still present must report the
+			// delete-specific remedy (reset first), not "already exists, use edit".
+			name: "Delete with remote present -> ERROR (reset first, not use edit)",
+			state: EntryState{
+				CurrentValue: lo.ToPtr("current"),
+				StagedState:  EntryStagedStateDelete{},
+			},
+			action:    EntryActionAdd{Value: "new-value"},
+			wantState: EntryStagedStateDelete{},
+			wantError: ErrCannotAddToDelete,
+		},
 	}
 
 	for _, tt := range tests {
@@ -685,6 +697,22 @@ func TestReduceEntry_Delete_NotFound(t *testing.T) {
 	result := ReduceEntry(state, EntryActionDelete{})
 	assert.Equal(t, ErrCannotDeleteNotFound, result.Error)
 	assert.Equal(t, EntryStagedStateNotStaged{}, result.NewState.StagedState)
+}
+
+func TestReduceEntry_Delete_StagedUpdateRemoteVanished(t *testing.T) {
+	t.Parallel()
+
+	// Test case: CurrentValue=nil + Update -> ERROR naming reset as the remedy.
+	// The staged Update can never apply once the remote is gone, so delete must
+	// point at reset instead of the generic not-found (#552).
+	state := EntryState{
+		CurrentValue: nil,
+		StagedState:  EntryStagedStateUpdate{DraftValue: "v2"},
+	}
+	result := ReduceEntry(state, EntryActionDelete{})
+	assert.Equal(t, ErrCannotDeleteStagedUpdateNotFound, result.Error)
+	assert.Contains(t, result.Error.Error(), "reset")
+	assert.Equal(t, EntryStagedStateUpdate{DraftValue: "v2"}, result.NewState.StagedState)
 }
 
 func TestReduceEntry_Delete_InconsistentState(t *testing.T) {

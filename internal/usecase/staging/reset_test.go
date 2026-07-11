@@ -24,6 +24,7 @@ type mockResetStrategy struct {
 	versionLabel      string
 	fetchErr          error
 	currentValue      string
+	currentModified   time.Time
 	fetchCurrentError error
 }
 
@@ -40,7 +41,7 @@ func (m *mockResetStrategy) FetchCurrentValue(_ context.Context, _ string) (*sta
 		return nil, m.fetchCurrentError
 	}
 
-	return &staging.EditFetchResult{Value: m.currentValue}, nil
+	return &staging.EditFetchResult{Value: m.currentValue, LastModified: m.currentModified}, nil
 }
 
 func newMockResetStrategy() *mockResetStrategy {
@@ -93,6 +94,38 @@ func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, usecasestaging.ResetResultNotStaged, output.Type)
+}
+
+// TestResetUseCase_Execute_UnstageTagOnly guards #522: named reset of an item
+// whose value is not staged but which carries a staged tag-only change must
+// cancel that tag change and report it, not misreport "not staged" while the
+// TagEntry silently survives to apply.
+func TestResetUseCase_Execute_UnstageTagOnly(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	key := staging.EntryKey{Name: "/app/config"}
+	// Only a tag change is staged; the entry value itself stays NotStaged.
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		Spec: "/app/config",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultUnstagedTag, output.Type)
+	assert.Equal(t, "/app/config", output.Name)
+
+	// The staged tag change must be gone.
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, key)
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
 func TestResetUseCase_Execute_UnstageCreate_DiscardsTags(t *testing.T) {
@@ -514,6 +547,116 @@ func TestResetUseCase_Execute_UnstageAll_WithTags(t *testing.T) {
 	tags, err := store.ListTags(t.Context(), staging.ServiceParam)
 	require.NoError(t, err)
 	assert.Empty(t, tags[staging.ServiceParam])
+}
+
+// stubApplyStrategy is a minimal ApplyStrategy that reports a fixed
+// last-modified time, used to drive CheckConflicts in the restore regression.
+type stubApplyStrategy struct {
+	lastModified time.Time
+}
+
+func (s *stubApplyStrategy) Service() staging.Service { return staging.ServiceParam }
+func (s *stubApplyStrategy) ServiceName() string      { return "Test" }
+func (s *stubApplyStrategy) ItemName() string         { return "item" }
+func (s *stubApplyStrategy) HasDeleteOptions() bool   { return false }
+func (s *stubApplyStrategy) Apply(context.Context, string, staging.Entry) error {
+	return nil
+}
+func (s *stubApplyStrategy) ApplyTags(context.Context, string, staging.TagEntry) error {
+	return nil
+}
+func (s *stubApplyStrategy) FetchLastModified(context.Context, string) (time.Time, error) {
+	return s.lastModified, nil
+}
+
+// TestResetUseCase_Execute_Restore_AnchorsConflictBase guards against the
+// silent lost-update regression (#546): restore must stage the Update with a
+// non-nil BaseModifiedAt so a subsequent apply still detects out-of-band
+// changes instead of overwriting them.
+func TestResetUseCase_Execute_Restore_AnchorsConflictBase(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	store := testutil.NewMockStore()
+	parser := &mockParserWithVersion{
+		mockParser: newMockParser(),
+		hasVersion: true,
+	}
+
+	fetcher := newMockResetStrategy()
+	fetcher.fetchValue = "old-version-value"
+	fetcher.currentValue = testCurrentValue // Different from fetched version -> staged
+	fetcher.currentModified = base
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser:  parser,
+		Fetcher: fetcher,
+		Store:   store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config#3"})
+	require.NoError(t, err)
+	require.Equal(t, usecasestaging.ResetResultRestored, output.Type)
+
+	key := staging.EntryKey{Name: "/app/config#3"}
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, key)
+	require.NoError(t, err)
+
+	// The restored Update must carry the AWS base time for conflict detection.
+	require.NotNil(t, entry.BaseModifiedAt)
+	assert.Equal(t, base, *entry.BaseModifiedAt)
+
+	// A far-future remote modification must now be flagged as a conflict.
+	strategy := &stubApplyStrategy{lastModified: base.Add(24 * time.Hour)}
+	conflicts := staging.CheckConflicts(
+		t.Context(),
+		func(string) (staging.ApplyStrategy, error) { return strategy, nil },
+		map[staging.EntryKey]staging.Entry{key: *entry},
+	)
+	assert.Contains(t, conflicts, key)
+}
+
+// TestResetUseCase_Execute_Restore_PreservesExistingBase verifies restore keeps
+// a conflict base established by a prior edit rather than dropping it (#546).
+func TestResetUseCase_Execute_Restore_PreservesExistingBase(t *testing.T) {
+	t.Parallel()
+
+	priorBase := time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	store := testutil.NewMockStore()
+	key := staging.EntryKey{Name: "/app/config#3"}
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
+		Operation:      staging.OperationUpdate,
+		Value:          lo.ToPtr("prior-edit"),
+		StagedAt:       time.Now(),
+		BaseModifiedAt: lo.ToPtr(priorBase),
+	}))
+
+	parser := &mockParserWithVersion{
+		mockParser: newMockParser(),
+		hasVersion: true,
+	}
+
+	fetcher := newMockResetStrategy()
+	fetcher.fetchValue = "old-version-value"
+	fetcher.currentValue = testCurrentValue
+	fetcher.currentModified = time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser:  parser,
+		Fetcher: fetcher,
+		Store:   store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.ResetInput{Spec: "/app/config#3"})
+	require.NoError(t, err)
+
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, key)
+	require.NoError(t, err)
+	require.NotNil(t, entry.BaseModifiedAt)
+	// The prior edit's base survives the restore (not overwritten by AWS time).
+	assert.Equal(t, priorBase, *entry.BaseModifiedAt)
 }
 
 func TestResetUseCase_Execute_ListTagsError(t *testing.T) {

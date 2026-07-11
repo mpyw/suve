@@ -182,6 +182,32 @@ func TestDecodeState_ServiceMismatchDropsForeignData(t *testing.T) {
 	assert.Empty(t, got.Entries[staging.ServiceSecret], "foreign service must be dropped")
 }
 
+func TestDecodeState_RejectsNamespaceForAgnosticProvider(t *testing.T) {
+	t.Parallel()
+
+	// An AWS (namespace-agnostic) envelope whose payload smuggles a
+	// namespace-bearing param entry must be rejected, not silently kept.
+	state := staging.NewEmptyState()
+	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/p", Namespace: "prod"}] = staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("v"),
+	}
+
+	raw, err := json.Marshal(state) //nolint:errchkjson // State has a custom MarshalJSON
+	require.NoError(t, err)
+
+	env := &file.Envelope{
+		Version:  file.EnvelopeVersion,
+		Provider: "aws",
+		Scope:    "aws/1/r",
+		Service:  "param",
+		Payload:  base64.StdEncoding.EncodeToString(raw),
+	}
+
+	_, err = env.DecodeState("")
+	require.ErrorIs(t, err, file.ErrInvalidEnvelope)
+	assert.Contains(t, err.Error(), "namespace")
+}
+
 func TestWriteEnvelopeFile_WriteErrors(t *testing.T) {
 	t.Parallel()
 
@@ -300,11 +326,19 @@ func TestReadEnvelopeFile_Errors(t *testing.T) {
 	t.Run("unsupported version", func(t *testing.T) {
 		t.Parallel()
 
-		// version 1 is the pre-AAD format that is deliberately no longer readable.
-		for _, ver := range []int{1, 99} {
+		// An older version (e.g. the pre-AAD v1 format) is guided to re-export;
+		// a newer version is guided to upgrade suve.
+		cases := []struct {
+			ver  int
+			want string
+		}{
+			{ver: 1, want: "stage export"},
+			{ver: 99, want: "upgrade suve"},
+		}
+		for _, tc := range cases {
 			path := filepath.Join(t.TempDir(), "old.json")
 			data, err := json.Marshal(file.Envelope{
-				Version:  ver,
+				Version:  tc.ver,
 				Provider: "aws",
 				Scope:    "aws/1/r",
 				Service:  "param",
@@ -315,8 +349,8 @@ func TestReadEnvelopeFile_Errors(t *testing.T) {
 
 			_, err = file.ReadEnvelopeFile(path)
 			require.ErrorIs(t, err, file.ErrUnsupportedEnvelopeVersion)
-			// The error must guide the user to re-create the file.
-			assert.Contains(t, err.Error(), "stage export")
+			// The error must guide the user to the right remedy for the direction.
+			assert.Contains(t, err.Error(), tc.want)
 		}
 	})
 

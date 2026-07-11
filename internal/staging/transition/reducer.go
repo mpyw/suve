@@ -5,14 +5,19 @@ import "errors"
 // Error definitions for transition failures.
 var (
 	ErrCannotAddToUpdate    = errors.New("cannot add: already staged for update")
-	ErrCannotAddToDelete    = errors.New("cannot add: already staged for deletion")
+	ErrCannotAddToDelete    = errors.New("cannot add: already staged for deletion, reset first")
 	ErrCannotAddToExisting  = errors.New("cannot add: resource already exists, use edit instead")
 	ErrCannotEditDelete     = errors.New("cannot edit: staged for deletion, reset first")
 	ErrCannotDeleteNotFound = errors.New("cannot delete: resource not found")
-	ErrCannotTagNotFound    = errors.New("cannot tag: resource not found")
-	ErrCannotTagDelete      = errors.New("cannot tag: resource staged for deletion")
-	ErrCannotUntagNotFound  = errors.New("cannot untag: resource not found")
-	ErrCannotUntagDelete    = errors.New("cannot untag: resource staged for deletion")
+	// ErrCannotDeleteStagedUpdateNotFound is returned when a staged Update points
+	// at a remote that was deleted out-of-band. The Update can never apply and
+	// delete cannot help, so the message names reset as the way out instead of a
+	// generic not-found that dead-ends the user.
+	ErrCannotDeleteStagedUpdateNotFound = errors.New("cannot delete: staged update targets a resource that no longer exists; use reset to discard it")
+	ErrCannotTagNotFound                = errors.New("cannot tag: resource not found")
+	ErrCannotTagDelete                  = errors.New("cannot tag: resource staged for deletion")
+	ErrCannotUntagNotFound              = errors.New("cannot untag: resource not found")
+	ErrCannotUntagDelete                = errors.New("cannot untag: resource staged for deletion")
 )
 
 // EntryTransitionResult holds the result of an entry state transition.
@@ -63,13 +68,21 @@ func ReduceTag(entryState EntryState, stagedTags StagedTags, action TagAction) T
 // reduceAdd handles the ADD action.
 //
 // Transition rules:
+//   - Delete (any CurrentValue)    → ERROR      (staged for deletion; reset first)
 //   - CurrentValue!=nil            → ERROR      (resource already exists)
 //   - CurrentValue=nil + NotStaged → Create     (stage as create)
 //   - CurrentValue=nil + Create    → Create     (update draft value)
 //   - CurrentValue=nil + Update    → ERROR      (cannot add to update)
-//   - CurrentValue=nil + Delete    → ERROR      (cannot add to delete)
 func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 	var err error
+
+	// A staged Delete is checked before the CurrentValue guard: an existing
+	// remote would otherwise make add report "already exists, use edit instead",
+	// but editing a staged delete is refused too. Surface the accurate remedy
+	// (reset first) regardless of whether the remote still exists.
+	if _, isDelete := state.StagedState.(EntryStagedStateDelete); isDelete {
+		return EntryTransitionResult{NewState: state, Error: ErrCannotAddToDelete}
+	}
 
 	// Check if resource already exists on AWS
 	if state.CurrentValue != nil {
@@ -127,7 +140,7 @@ func reduceEdit(state EntryState, action EntryActionEdit) EntryTransitionResult 
 // Transition rules:
 //   - CurrentValue=nil + NotStaged → ERROR      (resource not found)
 //   - CurrentValue=nil + Create    → NotStaged  (unstage, also unstage tags)
-//   - CurrentValue=nil + Update    → ERROR      (should not happen)
+//   - CurrentValue=nil + Update    → ERROR      (remote vanished out-of-band; names reset)
 //   - CurrentValue=nil + Delete    → ERROR      (should not happen)
 //   - CurrentValue!=nil + NotStaged → Delete    (stage for deletion, also unstage tags)
 //   - CurrentValue!=nil + Create    → NotStaged (unstage, also unstage tags) - should not happen
@@ -143,6 +156,13 @@ func reduceDelete(state EntryState) EntryTransitionResult {
 	// Check if resource exists on AWS or is staged for CREATE
 	_, isCreate := state.StagedState.(EntryStagedStateCreate)
 	if state.CurrentValue == nil && !isCreate {
+		// A staged Update whose remote was deleted out-of-band can never apply;
+		// point the user at reset rather than a generic not-found so they aren't
+		// dead-ended (delete refuses, apply keeps failing).
+		if _, isUpdate := state.StagedState.(EntryStagedStateUpdate); isUpdate {
+			return EntryTransitionResult{NewState: state, Error: ErrCannotDeleteStagedUpdateNotFound}
+		}
+
 		return EntryTransitionResult{NewState: state, Error: ErrCannotDeleteNotFound}
 	}
 

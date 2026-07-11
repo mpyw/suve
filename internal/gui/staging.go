@@ -198,6 +198,7 @@ var (
 		stagingusecase.ResetResultNotStaged:     "notStaged",
 		stagingusecase.ResetResultNothingStaged: "nothingStaged",
 		stagingusecase.ResetResultSkipped:       "skipped",
+		stagingusecase.ResetResultUnstagedTag:   "unstagedTag",
 	}
 
 	diffEntryTypeNames = map[stagingusecase.DiffEntryType]string{
@@ -907,13 +908,14 @@ type EnvelopeInfoResult struct {
 // file/mock stores).
 var errStoreNotFileStore = stringError("staging store does not support import/export")
 
-// getWorkingFileStore resolves the per-service working store as a WorkingStore
-// (bulk Drain plus the per-key unstage and atomic Update the export/import use
-// cases need). It goes through getStagingStore so the test seam and the
-// per-service scope resolution (the #445 fix: param → App Configuration bucket,
-// secret → Key Vault bucket) are shared with every other staging op.
-func (a *App) getWorkingFileStore(kind provider.Kind) (store.WorkingStore, error) {
-	s, err := a.getStagingStore(kind)
+// getWorkingFileStoreScoped resolves the per-service working store as a
+// WorkingStore (bulk Drain plus the per-key unstage and atomic Update the
+// export/import use cases need) from an already-snapshotted scope (#560). It
+// goes through getStagingStoreScoped so the test seam and the per-service scope
+// resolution (the #445 fix: param → App Configuration bucket, secret → Key
+// Vault bucket) are shared with every other staging op.
+func (a *App) getWorkingFileStoreScoped(sc provider.Scope, kind provider.Kind) (store.WorkingStore, error) {
+	s, err := a.getStagingStoreScoped(sc, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -1000,17 +1002,21 @@ func (a *App) PickImportPath() (string, error) {
 // Configuration param exports under the App Configuration bucket and a Key Vault
 // secret under the Key Vault bucket (#445).
 func (a *App) StagingExport(path, service, passphrase string, keep bool) (*StagingExportResult, error) {
+	// Snapshot the scope once so the envelope header and the working area bind to
+	// the same scope even if SelectScope lands mid-call (#560).
+	sc := a.currentScope()
+
 	svc, err := a.getService(service)
 	if err != nil {
 		return nil, err
 	}
 
-	scope, err := a.stagingScopeForKind(kindForService(service))
+	scope, err := a.stagingScopeForKindScoped(sc, kindForService(service))
 	if err != nil {
 		return nil, err
 	}
 
-	working, err := a.getWorkingFileStore(kindForService(service))
+	working, err := a.getWorkingFileStoreScoped(sc, kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -1127,6 +1133,10 @@ func (a *App) workingHasChangesForService(service string) (bool, error) {
 // area already holds changes for the service. The working store is resolved per
 // service via stagingScopeForKind (#445).
 func (a *App) StagingImport(path, service, passphrase, mode string, force bool) (*StagingImportResult, error) {
+	// Snapshot the scope once so the store, the working area, and the re-anchor
+	// resolver all bind to the same scope even if SelectScope lands mid-call (#560).
+	sc := a.currentScope()
+
 	svc, err := a.getService(service)
 	if err != nil {
 		return nil, err
@@ -1142,7 +1152,7 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 			"import file holds %q data but %q was selected; choose the matching service", env.Service, service)
 	}
 
-	scope, err := a.stagingScopeForKind(kindForService(service))
+	scope, err := a.stagingScopeForKindScoped(sc, kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -1159,7 +1169,7 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 			env.Scope, scope.Key())
 	}
 
-	working, err := a.getWorkingFileStore(kindForService(service))
+	working, err := a.getWorkingFileStoreScoped(sc, kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -1177,7 +1187,18 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 		Working: working,
 	}
 
-	result, err := uc.Execute(a.ctx, stagingusecase.ImportInput{Service: svc, Mode: importMode})
+	// A forced scope mismatch is a cross-scope import: the envelope's
+	// BaseModifiedAt values track the source scope's timeline, so re-anchor them
+	// against the target scope's current LastModified (mirrors the CLI).
+	reAnchor := force && env.Scope != scope.Key()
+	if reAnchor {
+		uc.ReAnchor, err = a.importReAnchorResolverScoped(sc, service)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	result, err := uc.Execute(a.ctx, stagingusecase.ImportInput{Service: svc, Mode: importMode, ReAnchor: reAnchor})
 	if err != nil {
 		return nil, err
 	}
@@ -1186,5 +1207,27 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 		Merged:     result.Merged,
 		EntryCount: result.EntryCount,
 		TagCount:   result.TagCount,
+	}, nil
+}
+
+// importReAnchorResolverScoped builds the resolver a cross-scope import uses to
+// fetch the target scope's current LastModified, from an already-snapshotted
+// scope (#560). App Configuration (param) keeps all namespaces in one staging
+// store, so it resolves a strategy per namespace like the apply path; every
+// other service resolves a single strategy built once.
+func (a *App) importReAnchorResolverScoped(sc provider.Scope, service string) (stagingusecase.ReAnchorResolver, error) {
+	if service == string(staging.ServiceParam) && isAppConfigParamScope(sc) {
+		return func(_ staging.Service, namespace string) (staging.ApplyStrategy, error) {
+			return a.appConfigParamStrategyForNamespaceScoped(sc, namespace)
+		}, nil
+	}
+
+	strategy, err := a.getApplyStrategyScoped(sc, service)
+	if err != nil {
+		return nil, err
+	}
+
+	return func(staging.Service, string) (staging.ApplyStrategy, error) {
+		return strategy, nil
 	}, nil
 }

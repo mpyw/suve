@@ -29,6 +29,11 @@
   let secretEntries: gui.StagingDiffEntry[] = $state([]);
   let paramTagEntries: gui.StagingDiffTagEntry[] = $state([]);
   let secretTagEntries: gui.StagingDiffTagEntry[] = $state([]);
+  // Entries StagingDiff auto-unstaged because their staged value already equals
+  // the remote current value. They are removed from the staged list/count, but
+  // surfaced as a dismissible info notice (carrying entry.warning) so the change
+  // does not silently vanish and the badge drop is explained — CLI parity (#567).
+  let autoUnstaged: gui.StagingDiffEntry[] = $state([]);
 
   // View mode: 'diff' (default) or 'value'
   let viewMode: 'diff' | 'value' = $state('diff');
@@ -89,7 +94,14 @@
   let importError = $state('');
   let importResult: gui.StagingImportResult | null = $state(null);
 
+  // Monotonic request id: loadStatus is fired from onMount, Refresh, and every
+  // action handler's finally block, so two runs can overlap. Only the latest run
+  // may assign state / fire oncountchange, otherwise a slow earlier snapshot
+  // resolving last could resurrect a just-unstaged entry and stale the badge (#566).
+  let loadSeq = 0;
+
   async function loadStatus() {
+    const seq = ++loadSeq;
     loading = true;
     error = '';
     try {
@@ -97,22 +109,28 @@
         paramSvc ? withRetry(() => StagingDiff('param', '')) : Promise.resolve(null),
         secretSvc ? withRetry(() => StagingDiff('secret', '')) : Promise.resolve(null),
       ]);
-      paramEntries = paramResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
-      secretEntries = secretResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      if (seq !== loadSeq) return; // superseded by a newer reload
+      const paramAll = paramResult?.entries || [];
+      const secretAll = secretResult?.entries || [];
+      paramEntries = paramAll.filter(e => e.type !== 'autoUnstaged');
+      secretEntries = secretAll.filter(e => e.type !== 'autoUnstaged');
+      autoUnstaged = [...paramAll, ...secretAll].filter(e => e.type === 'autoUnstaged');
       paramTagEntries = paramResult?.tagEntries || [];
       secretTagEntries = secretResult?.tagEntries || [];
       // Emit count change for sidebar badge
       const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
       oncountchange?.(totalCount);
     } catch (e) {
+      if (seq !== loadSeq) return; // superseded by a newer reload
       error = parseError(e);
       paramEntries = [];
       secretEntries = [];
+      autoUnstaged = [];
       paramTagEntries = [];
       secretTagEntries = [];
       oncountchange?.(0);
     } finally {
-      loading = false;
+      if (seq === loadSeq) loading = false;
     }
   }
 
@@ -440,7 +458,9 @@
   }
 
   function handleImportPassphrase(passphrase: string) {
-    showImportPassphrase = false;
+    // Keep the passphrase modal open across the attempt so a wrong passphrase can
+    // be re-entered inline (via the modal's error prop); runImport closes it on
+    // success. Mirrors the export flow.
     runImport(passphrase);
   }
 
@@ -459,9 +479,14 @@
       await loadStatus();
     } catch (e) {
       importError = parseError(e);
-      // Surface backend errors (e.g. wrong passphrase, service mismatch) in a
-      // modal since the transient chain modals are now closed.
-      showImportErrorModal = true;
+      // When the passphrase prompt is open (encrypted import), keep it open and
+      // show the error inline via the modal's error prop so a wrong passphrase can
+      // be retried without rebuilding the whole import chain (mirrors export).
+      // Only non-passphrase errors (the prompt is closed) fall back to the
+      // standalone Import Failed modal.
+      if (!showImportPassphrase) {
+        showImportErrorModal = true;
+      }
     } finally {
       importLoading = false;
     }
@@ -507,6 +532,26 @@
 
   {#if error}
     <div class="error-banner">{error}</div>
+  {/if}
+
+  {#if autoUnstaged.length > 0}
+    <div class="auto-unstaged-notice" data-testid="auto-unstaged-notice">
+      <div class="notice-body">
+        <span class="notice-title">
+          {autoUnstaged.length} staged {autoUnstaged.length === 1 ? 'change was' : 'changes were'} auto-unstaged (already identical to the remote):
+        </span>
+        <ul class="notice-list">
+          {#each autoUnstaged as entry}
+            <li>
+              {#if entry.namespace}<span class="notice-namespace">{entry.namespace}</span>{/if}
+              <span class="notice-name">{entry.name}</span>
+              {#if entry.warning}<span class="notice-warning">{entry.warning}</span>{/if}
+            </li>
+          {/each}
+        </ul>
+      </div>
+      <button type="button" class="notice-dismiss" aria-label="Dismiss" onclick={() => autoUnstaged = []}>×</button>
+    </div>
   {/if}
 
   <div class="staging-content">
@@ -635,7 +680,7 @@
 </div>
 
 <!-- Apply Modal -->
-<Modal title="Apply Staged Changes" show={showApplyModal} onclose={closeApplyModal}>
+<Modal title="Apply Staged Changes" show={showApplyModal} busy={modalLoading} onclose={closeApplyModal}>
   <div class="modal-apply">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -729,7 +774,7 @@
         <span>Ignore conflicts</span>
       </label>
       <div class="form-actions">
-        <button type="button" class="btn-secondary" onclick={closeApplyModal}>Cancel</button>
+        <button type="button" class="btn-secondary" onclick={closeApplyModal} disabled={modalLoading}>Cancel</button>
         <button type="button" class="btn-apply" onclick={handleApply} disabled={modalLoading}>
           {modalLoading ? 'Applying...' : 'Apply'}
         </button>
@@ -739,7 +784,7 @@
 </Modal>
 
 <!-- Reset Modal -->
-<Modal title="Reset Staged Changes" show={showResetModal} onclose={() => showResetModal = false}>
+<Modal title="Reset Staged Changes" show={showResetModal} busy={modalLoading} onclose={() => showResetModal = false}>
   <div class="modal-confirm">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -747,7 +792,7 @@
     <p>Reset all staged changes for {getServiceName(resetService)}?</p>
     <p class="warning">This will discard all staged changes without applying them.</p>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" onclick={() => showResetModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showResetModal = false} disabled={modalLoading}>Cancel</button>
       <button type="button" class="btn-danger" onclick={handleReset} disabled={modalLoading}>
         {modalLoading ? 'Resetting...' : 'Reset'}
       </button>
@@ -911,6 +956,17 @@
   error={importError}
 />
 
+<!-- Import Busy Modal: progress feedback + input blocking for the import paths
+     that show no passphrase modal (plaintext, and plaintext into a service with
+     no existing changes). The encrypted path already surfaces progress via the
+     passphrase modal's loading state, so this is suppressed while that is open.
+     It has no onclose, so its backdrop/Escape/× cannot dismiss it mid-flight. -->
+<Modal title="Importing {serviceLabel(importService)}" show={importLoading && !showImportPassphrase}>
+  <div class="modal-confirm">
+    <p>Importing staged changes…</p>
+  </div>
+</Modal>
+
 <!-- Import Result Modal -->
 {#if importResult}
 <Modal title="Import Complete" show={true} onclose={() => importResult = null}>
@@ -942,6 +998,68 @@
 </Modal>
 
 <style>
+  .auto-unstaged-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 12px 16px 0;
+    padding: 12px 14px;
+    background: rgba(255, 152, 0, 0.12);
+    border: 1px solid #ff9800;
+    border-radius: 6px;
+    color: #ffb74d;
+    font-size: 13px;
+  }
+
+  .auto-unstaged-notice .notice-body {
+    flex: 1;
+  }
+
+  .auto-unstaged-notice .notice-title {
+    font-weight: 500;
+  }
+
+  .auto-unstaged-notice .notice-list {
+    margin: 6px 0 0;
+    padding-left: 18px;
+  }
+
+  .auto-unstaged-notice .notice-list li {
+    margin-top: 2px;
+  }
+
+  .auto-unstaged-notice .notice-namespace {
+    padding: 1px 6px;
+    margin-right: 6px;
+    background: rgba(255, 152, 0, 0.2);
+    border-radius: 3px;
+    font-size: 11px;
+  }
+
+  .auto-unstaged-notice .notice-name {
+    color: #fff;
+  }
+
+  .auto-unstaged-notice .notice-warning {
+    margin-left: 8px;
+    color: #ffb74d;
+    opacity: 0.85;
+  }
+
+  .auto-unstaged-notice .notice-dismiss {
+    background: none;
+    border: none;
+    color: #ffb74d;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+
+  .auto-unstaged-notice .notice-dismiss:hover {
+    color: #fff;
+  }
+
   .header {
     display: flex;
     align-items: center;

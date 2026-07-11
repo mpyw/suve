@@ -1,0 +1,79 @@
+# Allowlist for the deadcode lint gate (.github/scripts/check-deadcode.sh).
+#
+# Each entry waives one finding from `deadcode ./...` (run WITHOUT -test), in the
+# stable "path/file.go: unreachable func: Name" form (line:col stripped). Blank
+# lines and '#' comments are ignored. Only add an entry if it is a genuine
+# test-only helper (mock / test seam) — production logic that merely happens to
+# have a test must be DELETED, not waived.
+
+# providermock.Store: an in-memory provider.Store double used exclusively by
+# tests (package internal/provider/providermock). Its methods are reached only
+# from test code, so they appear dead in a non-test build.
+internal/provider/providermock/mock.go: unreachable func: Store.Resolve
+internal/provider/providermock/mock.go: unreachable func: Store.Get
+internal/provider/providermock/mock.go: unreachable func: Store.History
+internal/provider/providermock/mock.go: unreachable func: Store.List
+internal/provider/providermock/mock.go: unreachable func: Store.Create
+internal/provider/providermock/mock.go: unreachable func: Store.Put
+internal/provider/providermock/mock.go: unreachable func: Store.Delete
+internal/provider/providermock/mock.go: unreachable func: Store.Tag
+internal/provider/providermock/mock.go: unreachable func: Store.Untag
+internal/provider/providermock/mock.go: unreachable func: Store.Restore
+
+# testutil.MockStore: an in-memory staging store double (package
+# internal/staging/store/testutil), plus its constructor and private deep-clone
+# helpers. Used only by tests.
+internal/staging/store/testutil/mock_store.go: unreachable func: NewMockStore
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.GetEntry
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.GetTag
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.StageEntry
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.StageTag
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.UnstageEntry
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.UnstageTag
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.UnstageAll
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.servicesFor
+internal/staging/store/testutil/mock_store.go: unreachable func: cloneEntry
+internal/staging/store/testutil/mock_store.go: unreachable func: cloneTagEntry
+internal/staging/store/testutil/mock_store.go: unreachable func: cloneEntryMap
+internal/staging/store/testutil/mock_store.go: unreachable func: cloneTagMap
+internal/staging/store/testutil/mock_store.go: unreachable func: clonePtr
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.ListEntries
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.ListTags
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.AddEntry
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.AddTag
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.Drain
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.WriteState
+internal/staging/store/testutil/mock_store.go: unreachable func: MockStore.Update
+
+# apptest.AWSApp: test-only CLI app builder (package
+# internal/cli/commands/internal/apptest) used across command tests to assemble
+# an app as if AWS were the sole active provider.
+internal/cli/commands/internal/apptest/apptest.go: unreachable func: AWSApp
+
+# crypt randomness / cipher test seams: setters/resetters that let tests inject
+# a deterministic RNG or cipher and restore the production default afterwards.
+internal/staging/store/file/internal/crypt/crypt.go: unreachable func: SetRandReader
+internal/staging/store/file/internal/crypt/crypt.go: unreachable func: ResetRandReader
+internal/staging/store/file/internal/crypt/crypt.go: unreachable func: SetCipherFuncs
+internal/staging/store/file/internal/crypt/crypt.go: unreachable func: ResetCipherFuncs
+
+# file store test seams: constructors that build a file-backed store at an
+# explicit path / passphrase for tests, bypassing the OS keychain resolution the
+# production constructor performs.
+internal/staging/store/file/store.go: unreachable func: NewStoreWithPath
+internal/staging/store/file/store.go: unreachable func: NewStoreWithPassphrase
+
+# timeutil.ResetLocationCache: test seam that clears the cached time.Location so
+# tests can re-exercise the lazy-load path.
+internal/timeutil/timeutil.go: unreachable func: ResetLocationCache
+
+# --- Not test helpers: GUI-only production callers ---------------------------
+# The two entries below are NOT test seams. They are live production code whose
+# only non-test caller is internal/gui (param.go / secret.go, both guarded by
+# `//go:build production || dev`). This gate runs deadcode with the default
+# build tags, which exclude the GUI, so the real callers are invisible and the
+# funcs look dead. Deleting them would break the GUI (`suve --gui`) build. Their
+# reachability from the GUI is already covered by the production golangci-lint
+# step, so they are waived here rather than deleted.
+internal/usecase/param/tag.go: unreachable func: TagUseCase.Execute
+internal/usecase/secret/tag.go: unreachable func: TagUseCase.Execute

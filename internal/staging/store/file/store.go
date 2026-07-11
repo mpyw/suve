@@ -12,6 +12,7 @@
 package file
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -122,6 +123,15 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Serialize key resolution and minting across processes under the scope
+	// flock. Without it, two concurrent first runs both observe an empty
+	// keychain, each mints a different random key, and the second store
+	// overwrites the first in the keychain — leaving state written under the
+	// first key permanently undecryptable. Holding the lock across
+	// Resolve/needsMint/Mint makes the loser observe the winner's freshly
+	// stored key via Resolve instead of minting its own.
+	defer s.lock()()
 
 	key, plaintext, needsMint, err := resolveKeyFunc()
 	if err != nil {
@@ -308,6 +318,14 @@ func (s *Store) readFile(path string) (*staging.State, error) {
 		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
 
+	// A trimmed-empty file (zero bytes or only whitespace) is treated like a
+	// missing file: an external truncation or an editor leaving an empty file
+	// behind must not hard-fail every command with a parse error. Genuinely
+	// non-empty garbage still surfaces a corruption error below.
+	if len(bytes.TrimSpace(data)) == 0 {
+		return staging.NewEmptyState(), nil
+	}
+
 	// Decrypt if encrypted. Reading an unencrypted (plaintext/legacy) file is
 	// always allowed so migration from an older/plaintext state works.
 	if crypt.IsEncrypted(data) {
@@ -327,6 +345,13 @@ func (s *Store) readFile(path string) (*staging.State, error) {
 
 	var state staging.State
 	if err := json.Unmarshal(data, &state); err != nil {
+		// A too-old on-disk layout is intentionally not migrated: it decodes as an
+		// empty state and the stale working area is silently reset (the diagnostic
+		// only matters to an importer, not to this migration path).
+		if errors.Is(err, staging.ErrStateVersionTooOld) {
+			return staging.NewEmptyState(), nil
+		}
+
 		return nil, fmt.Errorf("failed to parse state file: %w", err)
 	}
 

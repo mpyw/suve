@@ -20,28 +20,32 @@ import (
 	usestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// envelopeReadSource adapts file.ReadEnvelopeFile/DecodeState to the import use
-// case's EnvelopeReader port. A missing per-service file yields an empty state
-// with a nil error so a global dir holding only one file still imports cleanly.
+// envelopeReadSource adapts the already-validated import envelopes to the import
+// use case's EnvelopeReader port. It decodes the SAME envelope objects that
+// collectImportEnvelopes read and validated (header service/provider/scope),
+// rather than re-reading each file by path: a second read could observe a file
+// that changed after validation, so validation and decode would run on
+// different bytes. A service with no present envelope yields an empty state so a
+// global dir holding only one file still imports cleanly.
 type envelopeReadSource struct {
 	passphrase string
-	// pathFor resolves the per-service source path (the single file for a
-	// service-specific import, or <dir>/<service>.json for a global import).
-	pathFor func(staging.Service) string
+	// envelopes maps each present service to its validated envelope.
+	envelopes map[staging.Service]*file.Envelope
 }
 
-// ReadState reads and decodes svc's envelope. A missing file is skipped (empty
-// state); a present file is decoded (and decrypted when encrypted).
+// ReadState decodes svc's validated envelope (decrypting when encrypted). A
+// service with no present envelope is skipped (empty state).
 func (s *envelopeReadSource) ReadState(_ context.Context, svc staging.Service) (*staging.State, error) {
-	path := s.pathFor(svc)
-
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+	env, ok := s.envelopes[svc]
+	if !ok {
 		return staging.NewEmptyState(), nil
 	}
 
-	env, err := file.ReadEnvelopeFile(path)
-	if err != nil {
-		return nil, err
+	// Defense-in-depth: decode only an envelope whose validated header service
+	// matches the service being read, so a decode can never diverge from the
+	// service/scope collectImportEnvelopes already checked on this same object.
+	if env.Service != string(svc) {
+		return nil, fmt.Errorf("import envelope for %q service unexpectedly holds %q data", svc, env.Service)
 	}
 
 	return env.DecodeState(s.passphrase)
@@ -267,7 +271,7 @@ func importPassphrase(cmd *cli.Command, stdin *bufio.Reader) (string, error) {
 		}
 
 		return pass, nil
-	case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
+	case terminal.IsTerminalWriter(cmd.Root().ErrWriter) && terminal.IsTerminalReader(cmd.Root().Reader):
 		pass, err := prompter.PromptForDecrypt()
 		if err != nil {
 			return "", fmt.Errorf("failed to get passphrase: %w", err)
@@ -275,14 +279,60 @@ func importPassphrase(cmd *cli.Command, stdin *bufio.Reader) (string, error) {
 
 		return pass, nil
 	default:
+		// Prompting needs both a terminal to draw on and a terminal to read from:
+		// a piped stdin would be consumed as the passphrase instead of the data it
+		// carries. Refuse and point at the non-interactive flag.
 		return "", errors.New("encrypted file cannot be decrypted in non-TTY environment; use --passphrase-stdin")
+	}
+}
+
+// reAnchorSpec carries the per-service strategy plumbing needed to fetch the
+// target scope's current LastModified when re-anchoring a cross-scope import.
+type reAnchorSpec struct {
+	factory              staging.StrategyFactory
+	strategyForNamespace func(ctx context.Context, namespace string) (staging.FullStrategy, error)
+}
+
+// newReAnchorResolver adapts per-service strategy plumbing to the import use
+// case's ReAnchorResolver. The single non-namespaced strategy is built once and
+// cached (re-anchoring runs sequentially, so no locking is needed); namespaced
+// providers resolve a strategy per namespace like the apply/diff paths do.
+func newReAnchorResolver(ctx context.Context, specs map[staging.Service]reAnchorSpec) usestaging.ReAnchorResolver {
+	cache := make(map[staging.Service]staging.FullStrategy)
+
+	return func(svc staging.Service, namespace string) (staging.ApplyStrategy, error) {
+		spec, ok := specs[svc]
+		if !ok {
+			return nil, fmt.Errorf("no strategy configured for service %q", svc)
+		}
+
+		if spec.strategyForNamespace != nil {
+			return spec.strategyForNamespace(ctx, namespace)
+		}
+
+		if strategy, ok := cache[svc]; ok {
+			return strategy, nil
+		}
+
+		strategy, err := spec.factory(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		cache[svc] = strategy
+
+		return strategy, nil
 	}
 }
 
 // importAction builds the action for the import commands. dest is the single
 // source file for a service-specific import (service != "") or the source
-// directory for a global import (service == "").
-func importAction(service staging.Service, resolver staging.ScopeResolver) func(context.Context, *cli.Command) error {
+// directory for a global import (service == ""). reAnchorSpecs supplies the
+// per-service strategies used to re-base conflict-detection timestamps on a
+// cross-scope import; a nil map disables re-anchoring.
+func importAction(
+	service staging.Service, resolver staging.ScopeResolver, reAnchorSpecs map[staging.Service]reAnchorSpec,
+) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
 		if cmd.Args().Len() < 1 {
 			if service != "" {
@@ -320,6 +370,20 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 			}
 
 			return err
+		}
+
+		// A present envelope whose scope differs from the current scope means this
+		// is a cross-scope import (only reached under --allow-scope-mismatch, since
+		// collectImportEnvelopes refuses a mismatch otherwise). Its BaseModifiedAt
+		// values belong to the source scope's timeline, so re-anchor them.
+		crossScope := false
+
+		for _, p := range present {
+			if p.env.Scope != scope.Key() {
+				crossScope = true
+
+				break
+			}
 		}
 
 		encrypted, err := anyEncrypted(present)
@@ -371,7 +435,10 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 			PassphraseStdin: cmd.Bool(flagPassphraseStdin),
 			HasChanges:      !existing.IsEmpty(),
 			ItemCount:       existing.TotalCount(),
-			IsTTY:           terminal.IsTerminalWriter(cmd.Root().ErrWriter),
+			// Interactive only when there is both a terminal to draw the prompt on
+			// and a terminal to read the answer from; a piped stdin must not be
+			// consumed as the Merge/Overwrite reply.
+			IsTTY: terminal.IsTerminalWriter(cmd.Root().ErrWriter) && terminal.IsTerminalReader(cmd.Root().Reader),
 		})
 		if err != nil {
 			return err
@@ -383,15 +450,29 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 			return nil
 		}
 
+		// Decode the exact envelopes collectImportEnvelopes validated, keyed by
+		// their (validated) service, instead of re-reading each file by path.
+		envelopes := make(map[staging.Service]*file.Envelope, len(present))
+		for _, p := range present {
+			envelopes[staging.Service(p.env.Service)] = p.env
+		}
+
 		uc := &usestaging.ImportUseCase{
 			Source: &envelopeReadSource{
 				passphrase: pass,
-				pathFor:    pathFor,
+				envelopes:  envelopes,
 			},
 			Working: working,
 		}
 
-		result, err := uc.Execute(ctx, usestaging.ImportInput{Service: service, Mode: mode.Mode})
+		// Re-anchor only for a genuine cross-scope import, and only when the
+		// command wired per-service strategies to fetch the target LastModified.
+		reAnchor := crossScope && len(reAnchorSpecs) > 0
+		if reAnchor {
+			uc.ReAnchor = newReAnchorResolver(ctx, reAnchorSpecs)
+		}
+
+		result, err := uc.Execute(ctx, usestaging.ImportInput{Service: service, Mode: mode.Mode, ReAnchor: reAnchor})
 		if err != nil {
 			if errors.Is(err, usestaging.ErrNothingToImport) {
 				output.Info(cmd.Root().Writer, "No staged changes to import.")
@@ -400,6 +481,10 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 			}
 
 			return err
+		}
+
+		for _, warning := range result.Warnings {
+			output.Warning(cmd.Root().ErrWriter, "%s", warning)
 		}
 
 		if result.Merged {
@@ -412,11 +497,26 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 	}
 }
 
+// globalReAnchorSpecs builds the per-service strategy plumbing for re-anchoring
+// a global cross-scope import from the provider's GlobalConfig.
+func globalReAnchorSpecs(gcfg GlobalConfig) map[staging.Service]reAnchorSpec {
+	specs := make(map[staging.Service]reAnchorSpec, len(gcfg.Services))
+	for _, svc := range gcfg.Services {
+		specs[svc.Service] = reAnchorSpec{factory: svc.Factory, strategyForNamespace: svc.StrategyForNamespace}
+	}
+
+	return specs
+}
+
 // NewGlobalImportCommand creates the global `stage import <dir>` command. It
 // reads <dir>/param.json and <dir>/secret.json (missing files are skipped; an
-// error only when neither exists) into the working staging area. The resolver
-// determines the provider staging scope (nil defaults to AWS).
-func NewGlobalImportCommand(resolver staging.ScopeResolver) *cli.Command {
+// error only when neither exists) into the working staging area. The config's
+// ScopeResolver determines the provider staging scope (nil defaults to AWS); its
+// per-service factories re-anchor conflict-detection timestamps on a cross-scope
+// import.
+func NewGlobalImportCommand(gcfg GlobalConfig) *cli.Command {
+	resolver := gcfg.ScopeResolver
+
 	return &cli.Command{
 		Name:      "import",
 		Usage:     "Import staged changes from a directory (one file per service)",
@@ -439,7 +539,7 @@ EXAMPLES:
    echo "secret" | suve stage import ./backup --passphrase-stdin   Decrypt with passphrase from stdin`,
 		Flags:                  importFlags(),
 		MutuallyExclusiveFlags: importMutuallyExclusiveFlags(),
-		Action:                 importAction("", resolver),
+		Action:                 importAction("", resolver, globalReAnchorSpecs(gcfg)),
 	}
 }
 
@@ -477,6 +577,8 @@ EXAMPLES:
 			cfg.CommandName),
 		Flags:                  importFlags(),
 		MutuallyExclusiveFlags: importMutuallyExclusiveFlags(),
-		Action:                 importAction(service, cfg.ScopeResolver),
+		Action: importAction(service, cfg.ScopeResolver, map[staging.Service]reAnchorSpec{
+			service: {factory: cfg.Factory, strategyForNamespace: cfg.StrategyForNamespace},
+		}),
 	}
 }

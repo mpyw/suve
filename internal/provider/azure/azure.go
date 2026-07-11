@@ -235,11 +235,3 @@ func appConfigStore(ctx context.Context, scope provider.Scope) (provider.Store, 
 func Register(reg *provider.Registry) {
 	reg.Register(provider.ProviderAzure, Factory{})
 }
-
-// NewRegistry returns a provider.Registry with the Azure provider registered.
-func NewRegistry() *provider.Registry {
-	reg := provider.NewRegistry()
-	Register(reg)
-
-	return reg
-}

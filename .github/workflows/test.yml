@@ -230,11 +230,14 @@ jobs:
       - name: Set up toolchain (mise)
         uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
         with:
-          install_args: "go golangci-lint"
+          install_args: "go golangci-lint go:golang.org/x/tools/cmd/deadcode"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run golangci-lint (default build)
         run: golangci-lint run --timeout=5m
+
+      - name: Run deadcode
+        run: mise run deadcode
 
       - name: Create dummy frontend dist for production lint
         run: mkdir -p internal/gui/frontend/dist && touch internal/gui/frontend/dist/index.html

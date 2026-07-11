@@ -53,6 +53,17 @@ func TestIsTerminalWriter_NonFder(t *testing.T) {
 	assert.False(t, result)
 }
 
+func TestIsTerminalReader_NonFder(t *testing.T) {
+	t.Parallel()
+
+	// bytes.Buffer doesn't implement Fder, so a piped/buffered stdin is never
+	// mistaken for an interactive terminal.
+	var buf bytes.Buffer
+
+	result := terminal.IsTerminalReader(&buf)
+	assert.False(t, result)
+}
+
 func TestDefaultWidth(t *testing.T) {
 	t.Parallel()
 

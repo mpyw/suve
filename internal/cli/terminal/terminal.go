@@ -66,3 +66,16 @@ func IsTerminalWriter(w io.Writer) bool {
 
 	return IsTTY(f.Fd())
 }
+
+// IsTerminalReader returns true if the given reader is a terminal. It mirrors
+// IsTerminalWriter for stdin, so an interactive prompt can require BOTH a
+// terminal to draw on AND a terminal to read the answer from — a piped stdin
+// must never be consumed as if it were a typed reply.
+func IsTerminalReader(r io.Reader) bool {
+	f, ok := r.(Fder)
+	if !ok {
+		return false
+	}
+
+	return IsTTY(f.Fd())
+}

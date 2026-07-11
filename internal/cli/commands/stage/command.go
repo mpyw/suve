@@ -50,7 +50,7 @@ EXAMPLES:
 			apply.Command(gcfg),
 			reset.Command(gcfg),
 			stgcli.NewGlobalExportCommand(gcfg.ScopeResolver),
-			stgcli.NewGlobalImportCommand(gcfg.ScopeResolver),
+			stgcli.NewGlobalImportCommand(gcfg),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

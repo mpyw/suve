@@ -32,18 +32,6 @@ type ResolvedScope struct {
 // staging commands, never by read/write commands.
 type ScopeResolver func(ctx context.Context) (ResolvedScope, error)
 
-// ServiceToKind maps a staging Service to the equivalent provider Kind.
-func ServiceToKind(s Service) provider.Kind {
-	switch s {
-	case ServiceParam:
-		return provider.KindParam
-	case ServiceSecret:
-		return provider.KindSecret
-	default:
-		return provider.Kind(s)
-	}
-}
-
 // KindToService maps a provider Kind to the equivalent staging Service.
 func KindToService(k provider.Kind) Service {
 	switch k {

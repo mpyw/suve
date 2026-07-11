@@ -44,6 +44,8 @@ func (r *ResetRunner) Run(ctx context.Context, opts ResetOptions) error {
 		output.Warn(r.Stdout, "%s is not staged", result.Name)
 	case stagingusecase.ResetResultUnstaged:
 		output.Success(r.Stdout, "Unstaged %s", result.Name)
+	case stagingusecase.ResetResultUnstagedTag:
+		output.Success(r.Stdout, "Unstaged tag changes for %s", result.Name)
 	case stagingusecase.ResetResultRestored:
 		output.Success(r.Stdout, "Restored %s (staged from version %s)", result.Name, result.VersionLabel)
 	case stagingusecase.ResetResultSkipped:

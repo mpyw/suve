@@ -179,6 +179,38 @@ func TestDeleteUseCase_Execute_ResourceNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "resource not found")
 }
 
+func TestDeleteUseCase_Execute_StagedUpdate_RemoteVanished(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// A value was staged as an Update, then the remote was deleted out-of-band.
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/gone"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("v2"),
+		StagedAt:  time.Now(),
+	}))
+
+	strategy := newMockDeleteStrategy(false)
+	strategy.fetchErr = &staging.ResourceNotFoundError{} // Remote no longer exists
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	// Delete must not dead-end silently: it errors and names reset as the remedy.
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
+		Key: staging.EntryKey{Name: "/app/gone"},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reset")
+
+	// The staged Update must be left intact so reset can still discard it.
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/gone", Namespace: ""})
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationUpdate, entry.Operation)
+}
+
 func TestDeleteUseCase_Execute_ZeroLastModified_ResourceExists(t *testing.T) {
 	t.Parallel()
 
