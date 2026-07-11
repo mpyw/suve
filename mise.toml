@@ -92,12 +92,12 @@ set -euo pipefail
 project="suve-test-$$"
 compose="docker compose -f compose.test.yaml -p $project"
 cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 docker volume create suve-test-go-cache >/dev/null
 docker volume create suve-test-go-build-cache >/dev/null
 $compose --profile aws up -d localstack
 $compose run --rm --no-deps -e SUVE_LOCALSTACK_ENDPOINT=http://localstack:4566 test-runner bash -c '
-  until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do sleep 1; done
+  n=0; until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "localstack not ready after 120s" >&2; exit 1; }; sleep 1; done
   go test -tags=e2e -v ./e2e/...
 '
 '''
@@ -110,12 +110,12 @@ set -euo pipefail
 project="suve-test-$$"
 compose="docker compose -f compose.test.yaml -p $project"
 cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 docker volume create suve-test-go-cache >/dev/null
 docker volume create suve-test-go-build-cache >/dev/null
 $compose --profile gcloud up -d gcloud-secretmanager
 $compose run --rm --no-deps -e SUVE_GCLOUD_SECRETMANAGER_ENDPOINT=gcloud-secretmanager:9090 test-runner bash -c '
-  until (echo > /dev/tcp/gcloud-secretmanager/9090) 2>/dev/null; do sleep 1; done
+  n=0; until (echo > /dev/tcp/gcloud-secretmanager/9090) 2>/dev/null; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "gcloud-secretmanager not ready after 120s" >&2; exit 1; }; sleep 1; done
   go test -tags=e2e -v -run TestGoogleCloud ./e2e/...
 '
 '''
@@ -128,12 +128,12 @@ set -euo pipefail
 project="suve-test-$$"
 compose="docker compose -f compose.test.yaml -p $project"
 cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 docker volume create suve-test-go-cache >/dev/null
 docker volume create suve-test-go-build-cache >/dev/null
 $compose --profile azure up -d azure-appconfig
 $compose run --rm --no-deps -e "SUVE_AZURE_APPCONFIG_CONNECTION_STRING=Endpoint=http://azure-appconfig:8080;Id=abcd;Secret=c2VjcmV0" test-runner bash -c '
-  until (echo > /dev/tcp/azure-appconfig/8080) 2>/dev/null; do sleep 1; done
+  n=0; until (echo > /dev/tcp/azure-appconfig/8080) 2>/dev/null; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "azure-appconfig not ready after 120s" >&2; exit 1; }; sleep 1; done
   go test -tags=e2e -v -run "TestAzureAppConfig|TestAzureStageGlobal" ./e2e/...
 '
 '''
@@ -146,12 +146,12 @@ set -euo pipefail
 project="suve-test-$$"
 compose="docker compose -f compose.test.yaml -p $project"
 cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 docker volume create suve-test-go-cache >/dev/null
 docker volume create suve-test-go-build-cache >/dev/null
 $compose --profile azure up -d azure-keyvault
 $compose run --rm --no-deps -e SUVE_AZURE_KEYVAULT_ENDPOINT=https://azure-keyvault:8443 test-runner bash -c '
-  until curl -sk -o /dev/null "$SUVE_AZURE_KEYVAULT_ENDPOINT/ping" 2>/dev/null; do sleep 1; done
+  n=0; until curl -sk -o /dev/null "$SUVE_AZURE_KEYVAULT_ENDPOINT/ping" 2>/dev/null; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "azure-keyvault not ready after 120s" >&2; exit 1; }; sleep 1; done
   go test -tags=e2e -v -run "TestAzureKeyVault|TestAzureStageGlobal" ./e2e/...
 '
 '''
@@ -166,7 +166,7 @@ docker compose down -v 2>/dev/null || true
 # their shared external caches. --profile "*" so profiled emulator services
 # (localstack/gcloud/azure) are actually removed, not just non-profiled ones.
 for p in $(docker compose ls -aq 2>/dev/null | grep '^suve-test-' || true); do
-  docker compose -p "$p" --profile "*" down -v 2>/dev/null || true
+  docker compose -f compose.test.yaml -p "$p" --profile "*" down -v 2>/dev/null || true
 done
 docker compose -f compose.test.yaml --profile "*" down -v 2>/dev/null || true
 docker volume rm suve-test-go-cache suve-test-go-build-cache 2>/dev/null || true
@@ -195,7 +195,7 @@ set -euo pipefail
 project="suve-test-$$"
 compose="docker compose -f compose.test.yaml -p $project"
 cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 mkdir -p coverage
 docker volume create suve-test-go-cache >/dev/null
 docker volume create suve-test-go-build-cache >/dev/null
@@ -204,7 +204,7 @@ $compose run --rm --no-deps \
   -e SUVE_LOCALSTACK_ENDPOINT=http://localstack:4566 \
   -v "$PWD/coverage:/out" \
   test-runner bash -c '
-  until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do sleep 1; done
+  n=0; until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "localstack not ready after 120s" >&2; exit 1; }; sleep 1; done
   coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr "\n" ",")
   go test -tags=e2e -coverprofile=/out/coverage-e2e.out -coverpkg="$coverpkg" ./e2e/...
   go tool cover -func=/out/coverage-e2e.out | grep total
@@ -219,7 +219,7 @@ set -euo pipefail
 project="suve-test-$$"
 compose="docker compose -f compose.test.yaml -p $project"
 cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 mkdir -p coverage
 docker volume create suve-test-go-cache >/dev/null
 docker volume create suve-test-go-build-cache >/dev/null
@@ -228,7 +228,7 @@ $compose run --rm --no-deps \
   -e SUVE_LOCALSTACK_ENDPOINT=http://localstack:4566 \
   -v "$PWD/coverage:/out" \
   test-runner bash -c '
-  until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do sleep 1; done
+  n=0; until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "localstack not ready after 120s" >&2; exit 1; }; sleep 1; done
   coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr "\n" ",")
   echo "Running unit tests with coverage..."
   go test -coverprofile=/out/coverage-unit.out -covermode=atomic -coverpkg="$coverpkg" $(go list ./... | grep -v internal/gui | grep -v /cmd/)

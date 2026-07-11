@@ -14,8 +14,8 @@
 # so builds stay fast; `down -v` removes per-project volumes but leaves the
 # external caches intact.
 #
-# Emulator images/env mirror compose.yaml (and .github/workflows/test.yml)
-# exactly — only the `ports:` publishing is dropped.
+# Emulator images/env match compose.yaml (and .github/workflows/test.yml)
+# exactly; this file publishes no `ports:` at all.
 
 services:
   localstack:
@@ -59,6 +59,15 @@ services:
     profiles:
       - azure
     image: nagyesta/lowkey-vault:7.3.0
+    environment:
+      # lowkey-vault auto-registers a vault per authority. Out of the box it only
+      # serves localhost/127.0.0.1 (and the default.lowkey-vault names), which is
+      # what CI hits via https://localhost:8443. On the closed compose network the
+      # suite addresses it by service name (https://azure-keyvault:8443), for which
+      # no vault exists — so alias the default localhost vault onto that authority.
+      # Alias format: <auto-registered-vault-host>=<alias-host:port>. CI's
+      # localhost path is unaffected (the default registration still serves it).
+      - LOWKEY_ARGS=--LOWKEY_VAULT_ALIASES=localhost=azure-keyvault:8443
 
   test-runner:
     # Ephemeral Go test runner. Started only via explicit `docker compose run

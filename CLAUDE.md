@@ -214,14 +214,13 @@ mise generate-gui-bindings # Regenerate the GUI wailsjs bindings
 ### Running E2E Tests
 
 ```bash
-# Run E2E tests (starts the AWS emulator, localstack, automatically)
+# Run E2E tests fully inside Docker (starts the AWS emulator, localstack, on a
+# closed compose network with no host ports; the test suite runs in-container
+# and tears everything down on exit)
 mise e2e
 
-# Or with a custom port
-SUVE_LOCALSTACK_EXTERNAL_PORT=4599 mise e2e
-
-# Stop the emulator containers when done
-docker compose down   # or: mise run clean
+# Sweep any leftover test containers/volumes from a crashed run
+mise run clean
 ```
 
 ### Running GUI Tests
