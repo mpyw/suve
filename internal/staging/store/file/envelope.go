@@ -1,7 +1,9 @@
 package file
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +16,12 @@ import (
 )
 
 // EnvelopeVersion is the current export/import envelope schema version.
-const EnvelopeVersion = 1
+//
+// v2 binds the plaintext header (version/provider/scope/service) to the
+// encrypted payload as AES-GCM associated data (AAD). This is a breaking
+// change: v1 files (no AAD binding) are rejected on import and must be
+// re-created with `stage export`.
+const EnvelopeVersion = 2
 
 // Envelope is the on-disk format for `stage export` / `stage import` files.
 //
@@ -51,10 +58,44 @@ var (
 	ErrUnsupportedEnvelopeVersion = errors.New("unsupported export file version")
 )
 
+// aadDomain is a domain-separation prefix for the envelope AAD, so the bound
+// bytes can never be confused with any other AES-GCM associated data.
+const aadDomain = "suve/staging/export-envelope\x00"
+
+// associatedData returns the canonical AES-GCM associated data that binds the
+// envelope header (version/provider/scope/service) to the encrypted payload.
+//
+// The encoding is a fixed-order, length-prefixed concatenation so that no field
+// boundary is ambiguous: tampering with any single header field yields
+// different AAD, which makes DecryptWithAAD fail with crypt.ErrDecryptionFailed.
+func (e *Envelope) associatedData() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteString(aadDomain)
+
+	var num [8]byte
+
+	binary.BigEndian.PutUint64(num[:], uint64(e.Version)) //nolint:gosec // version is a small non-negative schema constant
+	buf.Write(num[:])
+
+	writeField := func(s string) {
+		binary.BigEndian.PutUint64(num[:], uint64(len(s)))
+		buf.Write(num[:])
+		buf.WriteString(s)
+	}
+
+	writeField(e.Provider)
+	writeField(e.Scope)
+	writeField(e.Service)
+
+	return buf.Bytes()
+}
+
 // encodePayload marshals a single-service state into the base64 payload. With an
 // empty passphrase the state JSON is stored as plaintext (base64 only, no
-// encryption); otherwise it is encrypted with the passphrase-based (v1) format.
-func encodePayload(state *staging.State, passphrase string) (string, error) {
+// encryption); otherwise it is encrypted with the passphrase-based (v1) format,
+// binding aad (the canonical envelope header) to the ciphertext.
+func encodePayload(state *staging.State, passphrase string, aad []byte) (string, error) {
 	// staging.State implements json.Marshaler (MarshalJSON), emitting its
 	// EntryKey-keyed maps as arrays of (name, namespace) records, so the static
 	// errchkjson "unsupported map key" warning is a false positive here.
@@ -64,7 +105,7 @@ func encodePayload(state *staging.State, passphrase string) (string, error) {
 	}
 
 	if passphrase != "" {
-		data, err = crypt.Encrypt(data, passphrase)
+		data, err = crypt.EncryptWithAAD(data, passphrase, aad)
 		if err != nil {
 			return "", fmt.Errorf("failed to encrypt payload: %w", err)
 		}
@@ -82,18 +123,21 @@ func encodePayload(state *staging.State, passphrase string) (string, error) {
 // WARNING: an empty passphrase writes the secret values UNENCRYPTED (base64
 // only); callers must warn the user first.
 func WriteEnvelopeFile(path string, scope provider.Scope, svc staging.Service, state *staging.State, passphrase string) error {
-	payload, err := encodePayload(state.ExtractService(svc), passphrase)
-	if err != nil {
-		return err
-	}
-
 	env := Envelope{
 		Version:  EnvelopeVersion,
 		Provider: string(scope.Provider),
 		Scope:    scope.Key(),
 		Service:  string(svc),
-		Payload:  payload,
 	}
+
+	// The header is bound to the ciphertext as AAD, so it must be filled in
+	// before the payload is encoded.
+	payload, err := encodePayload(state.ExtractService(svc), passphrase, env.associatedData())
+	if err != nil {
+		return err
+	}
+
+	env.Payload = payload
 
 	data, err := json.MarshalIndent(env, "", "  ")
 	if err != nil {
@@ -126,7 +170,10 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 	}
 
 	if env.Version != EnvelopeVersion {
-		return nil, fmt.Errorf("%w: %d", ErrUnsupportedEnvelopeVersion, env.Version)
+		return nil, fmt.Errorf(
+			"%w: file is version %d, but this build only reads version %d; re-create it with `stage export`",
+			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
+		)
 	}
 
 	if env.Provider == "" || env.Scope == "" || env.Service == "" || env.Payload == "" {
@@ -171,7 +218,9 @@ func (e *Envelope) DecodeState(passphrase string) (*staging.State, error) {
 			return nil, crypt.ErrDecryptionFailed
 		}
 
-		raw, err = crypt.Decrypt(raw, passphrase)
+		// The header is bound to the ciphertext as AAD: any tampering with
+		// version/provider/scope/service makes GCM authentication fail here.
+		raw, err = crypt.DecryptWithAAD(raw, passphrase, e.associatedData())
 		if err != nil {
 			return nil, err
 		}

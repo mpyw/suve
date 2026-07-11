@@ -300,19 +300,24 @@ func TestReadEnvelopeFile_Errors(t *testing.T) {
 	t.Run("unsupported version", func(t *testing.T) {
 		t.Parallel()
 
-		path := filepath.Join(t.TempDir(), "v99.json")
-		data, err := json.Marshal(file.Envelope{
-			Version:  99,
-			Provider: "aws",
-			Scope:    "aws/1/r",
-			Service:  "param",
-			Payload:  base64.StdEncoding.EncodeToString([]byte("{}")),
-		})
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
+		// version 1 is the pre-AAD format that is deliberately no longer readable.
+		for _, ver := range []int{1, 99} {
+			path := filepath.Join(t.TempDir(), "old.json")
+			data, err := json.Marshal(file.Envelope{
+				Version:  ver,
+				Provider: "aws",
+				Scope:    "aws/1/r",
+				Service:  "param",
+				Payload:  base64.StdEncoding.EncodeToString([]byte("{}")),
+			})
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(path, data, 0o600))
 
-		_, err = file.ReadEnvelopeFile(path)
-		require.ErrorIs(t, err, file.ErrUnsupportedEnvelopeVersion)
+			_, err = file.ReadEnvelopeFile(path)
+			require.ErrorIs(t, err, file.ErrUnsupportedEnvelopeVersion)
+			// The error must guide the user to re-create the file.
+			assert.Contains(t, err.Error(), "stage export")
+		}
 	})
 
 	t.Run("missing required fields", func(t *testing.T) {
@@ -370,18 +375,8 @@ func TestDecodeState_CorruptedPayload(t *testing.T) {
 		require.ErrorIs(t, err, file.ErrInvalidEnvelope)
 	})
 
-	t.Run("encrypted payload decrypts to invalid json", func(t *testing.T) {
-		t.Parallel()
-
-		blob, err := crypt.Encrypt([]byte("not json"), "pw")
-		require.NoError(t, err)
-
-		env := base
-		env.Payload = base64.StdEncoding.EncodeToString(blob)
-
-		_, err = env.DecodeState("pw")
-		require.ErrorIs(t, err, file.ErrInvalidEnvelope)
-	})
+	// The "encrypted payload decrypts to invalid json" case needs the exact AAD
+	// the header binds, so it lives in envelope_internal_test.go.
 }
 
 func TestIsEncryptedPayload_BadBase64(t *testing.T) {

@@ -93,6 +93,30 @@ func TestDecrypt_WrongPassphrase(t *testing.T) {
 	assert.ErrorIs(t, err, crypt.ErrDecryptionFailed)
 }
 
+func TestEncryptDecryptWithAAD(t *testing.T) {
+	t.Parallel()
+
+	data := []byte("secret data")
+	passphrase := "correct horse"
+	aad := []byte("bound-header")
+
+	encrypted, err := crypt.EncryptWithAAD(data, passphrase, aad)
+	require.NoError(t, err)
+
+	// Matching AAD round-trips.
+	decrypted, err := crypt.DecryptWithAAD(encrypted, passphrase, aad)
+	require.NoError(t, err)
+	assert.Equal(t, data, decrypted)
+
+	// A different AAD fails authentication.
+	_, err = crypt.DecryptWithAAD(encrypted, passphrase, []byte("other-header"))
+	require.ErrorIs(t, err, crypt.ErrDecryptionFailed)
+
+	// The no-AAD wrappers cannot decrypt an AAD-bound ciphertext.
+	_, err = crypt.Decrypt(encrypted, passphrase)
+	require.ErrorIs(t, err, crypt.ErrDecryptionFailed)
+}
+
 func TestDecrypt_NotEncrypted(t *testing.T) {
 	t.Parallel()
 

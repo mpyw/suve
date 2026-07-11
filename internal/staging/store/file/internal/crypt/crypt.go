@@ -123,7 +123,17 @@ func newGCM(key []byte) (cipher.AEAD, error) {
 
 // Encrypt encrypts data with the given passphrase using AES-256-GCM with Argon2id key derivation.
 // Returns encrypted data in format: magic header + version(1) + salt + nonce + ciphertext.
+//
+// It is a convenience wrapper around EncryptWithAAD with no associated data.
 func Encrypt(data []byte, passphrase string) ([]byte, error) {
+	return EncryptWithAAD(data, passphrase, nil)
+}
+
+// EncryptWithAAD is Encrypt with additional authenticated data (AAD) bound to
+// the ciphertext via AES-GCM. The AAD is authenticated but not encrypted; the
+// exact same aad must be supplied to DecryptWithAAD or authentication fails
+// with ErrDecryptionFailed. A nil aad is equivalent to Encrypt.
+func EncryptWithAAD(data []byte, passphrase string, aad []byte) ([]byte, error) {
 	params := kdfParamsByVersion[Version]
 
 	// Generate random salt
@@ -146,8 +156,8 @@ func Encrypt(data []byte, passphrase string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
-	// Encrypt data
-	ciphertext := gcm.Seal(nil, nonce, data, nil)
+	// Encrypt data, binding the AAD (if any) to the ciphertext.
+	ciphertext := gcm.Seal(nil, nonce, data, aad)
 
 	// Build output: header + salt + nonce + ciphertext
 	result := make([]byte, 0, headerLen+saltLen+nonceLen+len(ciphertext))
@@ -164,7 +174,17 @@ func Encrypt(data []byte, passphrase string) ([]byte, error) {
 // Returns ErrNotEncrypted if data doesn't have the encryption header.
 // Returns ErrInvalidFormat for raw-key (v2) or unknown-version data.
 // Returns ErrDecryptionFailed if the passphrase is wrong or data is corrupted.
+//
+// It is a convenience wrapper around DecryptWithAAD with no associated data.
 func Decrypt(data []byte, passphrase string) ([]byte, error) {
+	return DecryptWithAAD(data, passphrase, nil)
+}
+
+// DecryptWithAAD is Decrypt with additional authenticated data (AAD). The aad
+// must be byte-identical to the aad passed to EncryptWithAAD; otherwise GCM
+// authentication fails and ErrDecryptionFailed is returned. A nil aad is
+// equivalent to Decrypt.
+func DecryptWithAAD(data []byte, passphrase string, aad []byte) ([]byte, error) {
 	if !IsEncrypted(data) {
 		return nil, ErrNotEncrypted
 	}
@@ -205,7 +225,7 @@ func Decrypt(data []byte, passphrase string) ([]byte, error) {
 		return nil, err
 	}
 
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, aad)
 	if err != nil {
 		return nil, ErrDecryptionFailed
 	}
