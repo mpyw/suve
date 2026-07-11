@@ -15,20 +15,27 @@ import (
 	"testing"
 )
 
-// TestNoAWSSDKOutsideProviderAWS enforces that only internal/provider/aws (plus
-// the allowed low-level package internal/infra, which is not under the guarded
-// roots) imports the AWS service SDK, that only internal/provider/gcloud imports
-// the Google Cloud Secret Manager SDK, and that only internal/provider/azure
-// imports the Azure SDK. It fails loudly if a package under internal/cli,
-// internal/usecase, internal/staging, or internal/gui reintroduces a direct
-// cloud-SDK dependency, which would break provider pluggability.
+// TestNoAWSSDKOutsideProviderAWS enforces that only internal/provider (which
+// includes internal/provider/aws, .../gcloud, .../azure) and the allowed
+// low-level package internal/infra may import a cloud SDK. It walks the entire
+// internal/ tree plus cmd/ and fails loudly if any other non-test package
+// reintroduces a direct cloud-SDK dependency, which would break provider
+// pluggability.
 func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 	t.Parallel()
 
-	// guardedRoots are the internal subtrees (relative to this package dir) that
-	// must not import a cloud SDK, or the (now-removed) paramapi/secretapi
-	// aliases, directly.
-	guardedRoots := []string{"cli", "usecase", "staging", "gui"}
+	// guardedRoots are the trees (relative to this package dir) that are walked
+	// in full. Everything under them must not import a cloud SDK, or the
+	// (now-removed) paramapi/secretapi aliases, directly, except for the
+	// allowedRoots subtrees which are pruned from the walk.
+	guardedRoots := []string{".", "../cmd"}
+
+	// allowedRoots are the subtrees (relative to this package dir) that are
+	// permitted to import a cloud SDK and are therefore skipped during the walk.
+	allowedRoots := map[string]struct{}{
+		"provider": {},
+		"infra":    {},
+	}
 
 	// forbiddenPrefixes are import paths banned in non-test packages under a
 	// guarded root. SDK service packages are matched by prefix so their
@@ -61,7 +68,15 @@ func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 				return err
 			}
 
-			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			if d.IsDir() {
+				if _, ok := allowedRoots[path]; ok {
+					return filepath.SkipDir
+				}
+
+				return nil
+			}
+
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
 
