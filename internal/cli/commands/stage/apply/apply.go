@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -46,12 +47,13 @@ func (s ServiceApply) strategyForNamespace(namespace string) (staging.ApplyStrat
 	return s.StrategyFor(namespace)
 }
 
-// serviceConflictCheck holds entries and the per-namespace strategy resolver for
-// a single service's conflict checking. resolve mirrors the apply path so each
-// entry is probed against its own namespace's remote state.
+// serviceConflictCheck holds the staged entries and tags plus the per-namespace
+// strategy resolver for a single service's conflict checking. resolve mirrors the
+// apply path so each entry/tag is probed against its own namespace's remote state.
 type serviceConflictCheck struct {
 	serviceName string
 	entries     map[staging.EntryKey]staging.Entry
+	tags        map[staging.EntryKey]staging.TagEntry
 	resolve     staging.ApplyStrategyResolver
 }
 
@@ -244,13 +246,18 @@ func (r *Runner) Run(ctx context.Context) error {
 		var checks []serviceConflictCheck
 
 		for _, svc := range r.Services {
-			if len(svc.Entries) > 0 {
-				checks = append(checks, serviceConflictCheck{
-					serviceName: svc.Strategy.ServiceName(),
-					entries:     svc.Entries,
-					resolve:     svc.strategyForNamespace,
-				})
+			// Include a service if it has staged entries OR staged tags, so a
+			// tags-only service is still conflict-checked before apply.
+			if len(svc.Entries) == 0 && len(svc.Tags) == 0 {
+				continue
 			}
+
+			checks = append(checks, serviceConflictCheck{
+				serviceName: svc.Strategy.ServiceName(),
+				entries:     svc.Entries,
+				tags:        svc.Tags,
+				resolve:     svc.strategyForNamespace,
+			})
 		}
 
 		allConflicts := r.checkAllConflicts(ctx, checks)
@@ -392,15 +399,21 @@ func formatTagApplySummary(tagEntry staging.TagEntry) string {
 	return " [" + strings.Join(parts, ", ") + "]"
 }
 
-// checkAllConflicts checks all services for conflicts and returns them qualified
-// by service, in a stable (service order, then sorted key) order. Two services
-// with a conflict on the same (name, namespace) yield two distinct items.
+// checkAllConflicts checks all services for both value and tag conflicts and
+// returns them qualified by service, in a stable (service order, then sorted key)
+// order. Two services with a conflict on the same (name, namespace) yield two
+// distinct items; within one service a key that conflicts on both its value and
+// its tags is reported once.
 func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) []conflictItem {
-	var all []conflictItem
+	all := make([]conflictItem, 0, len(checks))
 
 	for _, check := range checks {
-		conflicts := staging.CheckConflicts(ctx, check.resolve, check.entries)
-		for _, key := range staging.SortedEntryKeys(conflicts) {
+		merged := make(map[staging.EntryKey]struct{})
+
+		maps.Copy(merged, staging.CheckConflicts(ctx, check.resolve, check.entries))
+		maps.Copy(merged, staging.CheckTagConflicts(ctx, check.resolve, check.tags))
+
+		for _, key := range staging.SortedEntryKeys(merged) {
 			all = append(all, conflictItem{serviceName: check.serviceName, key: key})
 		}
 	}

@@ -762,6 +762,51 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "conflict detected for my-secret")
 }
 
+func TestRun_ConflictDetection_TagConflict(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	baseTime := time.Now().Add(-1 * time.Hour)
+
+	// Stage a tags-only change (no value entry) with a BaseModifiedAt.
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
+		Add:            map[string]string{"env": "prod"},
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	})
+
+	applyTagsCalled := false
+	paramMock := newParamStrategy()
+	// Remote was modified after BaseModifiedAt (conflict).
+	paramMock.fetchLastModifiedVal = time.Now()
+	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
+		applyTagsCalled = true
+
+		return nil
+	}
+
+	var buf, errBuf bytes.Buffer
+
+	r := &apply.Runner{
+		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
+		ProviderLabel:   "AWS",
+		Stdout:          &buf,
+		Stderr:          &errBuf,
+		IgnoreConflicts: false,
+	}
+
+	err := r.Run(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflict(s) detected")
+	assert.Contains(t, errBuf.String(), "conflict detected for /app/config")
+	assert.False(t, applyTagsCalled, "ApplyTags must not be called when a tag conflict is detected")
+
+	// Tag must remain staged (apply rejected).
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
+	require.NoError(t, err)
+}
+
 func TestRun_ApplyCreate(t *testing.T) {
 	t.Parallel()
 
