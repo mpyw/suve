@@ -123,6 +123,15 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 		return nil, err
 	}
 
+	// Serialize key resolution and minting across processes under the scope
+	// flock. Without it, two concurrent first runs both observe an empty
+	// keychain, each mints a different random key, and the second store
+	// overwrites the first in the keychain — leaving state written under the
+	// first key permanently undecryptable. Holding the lock across
+	// Resolve/needsMint/Mint makes the loser observe the winner's freshly
+	// stored key via Resolve instead of minting its own.
+	defer s.lock()()
+
 	key, plaintext, needsMint, err := resolveKeyFunc()
 	if err != nil {
 		// A hard keychain failure (as opposed to a genuinely absent keyring
