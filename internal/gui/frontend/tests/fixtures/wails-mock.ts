@@ -182,6 +182,12 @@ export interface MockState {
     operation: string;
     message: string;
   };
+  // Per-service StagingApply failure: when set, StagingApply rejects for exactly
+  // this service ('param'/'secret') BEFORE unstaging it, leaving its entries
+  // staged — while other services still apply+unstage. Mirrors the real backend
+  // turning any Execute error (conflict / per-entry failure) into a rejected
+  // Wails promise, so "Apply All" can succeed for one service and fail another.
+  stagingApplyFailService?: Service;
 }
 
 // ============================================================================
@@ -1184,6 +1190,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
       StagingApply: async (service: string) => {
+        // Reject for the designated service WITHOUT unstaging it, mirroring the
+        // backend turning any Execute error into a rejected promise (#477).
+        if (state.stagingApplyFailService === service) {
+          throw new Error(`staging apply failed for ${service}`);
+        }
         const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         const entryCount = staged.length;

@@ -161,13 +161,16 @@
       }
 
       applyResult = merged;
-      if (merged.entryFailed === 0 && merged.tagFailed === 0 && merged.conflicts?.length === 0) {
-        await loadStatus();
-      }
     } catch (e) {
       modalError = parseError(e);
     } finally {
+      // Reconcile the view with the backend regardless of a mid-loop rejection.
+      // "Apply All" applies each service in a separate call, and every success
+      // unstages that service's entries on disk. If a later service rejects
+      // (conflict / per-entry failure), the already-applied entries must not keep
+      // rendering as pending with a stale badge until a manual Refresh (#477).
       modalLoading = false;
+      await loadStatus();
     }
   }
 
@@ -198,11 +201,14 @@
         await StagingReset(svc);
       }
       showResetModal = false;
-      await loadStatus();
     } catch (e) {
       modalError = parseError(e);
     } finally {
+      // Reconcile with the backend regardless of a mid-loop rejection: a later
+      // service failing must not leave already-reset services rendering as
+      // pending with a stale badge (#477).
       modalLoading = false;
+      await loadStatus();
     }
   }
 
