@@ -85,7 +85,7 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, maxValueLength int) {
 	// Compact one-line format: VERSION  DATE  VALUE_PREVIEW
 	dateStr := ""
 	if entry.LastModified != nil {
-		dateStr = entry.LastModified.Format("2006-01-02")
+		dateStr = timeutil.FormatDate(*entry.LastModified)
 	}
 
 	value := entry.Value
