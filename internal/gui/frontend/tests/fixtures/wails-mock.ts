@@ -1382,7 +1382,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       // Import ONE concrete service from a per-service envelope into the working
       // area. A service mismatch is a hard error; an encrypted payload needs a
       // passphrase. The working store is resolved per service (#445).
-      StagingImport: async (path: string, service: Service, passphrase: string, mode: string) => {
+      StagingImport: async (path: string, service: Service, passphrase: string, mode: string, force: boolean) => {
         if (state.simulateError?.operation === 'StagingImport') {
           throw new Error(state.simulateError.message);
         }
@@ -1392,6 +1392,17 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         }
         if (file.service !== service) {
           throw new Error(`import file holds "${file.service}" data but "${service}" was selected`);
+        }
+        // Mirror the backend provenance guards (#486): a provider mismatch is a
+        // hard error (never overridable); a scope mismatch is refused unless force.
+        const wantProvider = (state.currentScope || {}).provider || 'aws';
+        if (file.provider !== wantProvider) {
+          throw new Error(
+            `import file provider "${file.provider}" does not match the current provider "${wantProvider}"`);
+        }
+        if (file.scope !== expectedScopeKey(service) && !force) {
+          throw new Error(
+            `import file scope "${file.scope}" does not match the current scope "${expectedScopeKey(service)}"`);
         }
         if (file.encrypted && !passphrase) {
           throw new Error('passphrase required for encrypted file');

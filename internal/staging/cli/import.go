@@ -163,9 +163,10 @@ type presentEnvelope struct {
 // prompted. For a service-specific import the single file must exist and its
 // header service must match. For a global import it reads whichever of
 // param.json / secret.json exist (missing ones are skipped); neither present is
-// an error. Scope mismatches are refused unless --allow-scope-mismatch.
+// an error. Provider mismatches are ALWAYS refused (not overridable); scope
+// mismatches are refused unless --allow-scope-mismatch.
 func collectImportEnvelopes(
-	cmd *cli.Command, service staging.Service, pathFor func(staging.Service) string, wantScope string,
+	cmd *cli.Command, service staging.Service, pathFor func(staging.Service) string, wantProvider, wantScope string,
 ) ([]presentEnvelope, error) {
 	var services []staging.Service
 	if service != "" {
@@ -201,6 +202,17 @@ func collectImportEnvelopes(
 			return nil, fmt.Errorf(
 				"export file %s holds %q data but %q was expected; use the matching command/file",
 				path, env.Service, svc,
+			)
+		}
+
+		// A provider change is qualitatively different from an account/region/vault
+		// change: e.g. an Azure App Config envelope carries namespace-bearing entries
+		// that an AWS SSM working area would silently push to a provider that ignores
+		// namespaces. Refuse it outright, even under --allow-scope-mismatch.
+		if env.Provider != wantProvider {
+			return nil, fmt.Errorf(
+				"export file provider %q does not match the current provider %q; a provider change cannot be imported (not even with --allow-scope-mismatch)",
+				env.Provider, wantProvider,
 			)
 		}
 
@@ -299,7 +311,7 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 
 		// Validate scope/service on the plaintext headers before prompting for a
 		// passphrase.
-		present, err := collectImportEnvelopes(cmd, service, pathFor, scope.Key())
+		present, err := collectImportEnvelopes(cmd, service, pathFor, string(scope.Provider), scope.Key())
 		if err != nil {
 			if errors.Is(err, usestaging.ErrNothingToImport) {
 				output.Info(cmd.Root().Writer, "No staged changes to import.")

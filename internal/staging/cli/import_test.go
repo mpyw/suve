@@ -228,6 +228,36 @@ func TestGlobalImport(t *testing.T) {
 	})
 }
 
+// TestGlobalImport_ProviderMismatch covers the #486 guard: a provider change is
+// qualitatively different from an account/region change, so it must be refused
+// even under the --allow-scope-mismatch scope override. Kept as its own function
+// so TestGlobalImport stays under the funlen limit.
+//
+//nolint:paralleltest // uses t.Setenv (HOME/SUVE_STAGING_KEY); cannot run in parallel
+func TestGlobalImport_ProviderMismatch(t *testing.T) {
+	// Mirrors the failure scenario: an Azure App Config param envelope
+	// {Provider: azure} imported into an AWS SSM param working area.
+	setupExportImportEnv(t)
+
+	azureScope := provider.AzureAppConfigScope("mystore")
+	dir := exportDir(t, azureScope, func() {
+		stageEntry(t, azureScope, staging.ServiceParam, "/app/config", "pval")
+	})
+
+	awsScope := provider.AWSScope("123456789012", "us-east-1")
+
+	// --allow-scope-mismatch bypasses the scope check but the provider guard
+	// still refuses.
+	_, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(awsScope)), nil, dir, "--allow-scope-mismatch")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "provider")
+	assert.Contains(t, err.Error(), string(provider.ProviderAzure))
+	assert.Contains(t, err.Error(), string(provider.ProviderAWS))
+
+	// Nothing leaked into the AWS working area.
+	assert.True(t, workingState(t, awsScope).IsEmpty())
+}
+
 //nolint:paralleltest // uses t.Setenv (HOME/SUVE_STAGING_KEY); cannot run in parallel
 func TestServiceImport(t *testing.T) {
 	t.Run("service mismatch is a hard error", func(t *testing.T) {

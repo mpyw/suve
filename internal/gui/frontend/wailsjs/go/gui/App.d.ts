@@ -80,7 +80,7 @@ export function StagingEdit(arg1:string,arg2:string,arg3:string,arg4:string):Pro
 
 export function StagingExport(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<gui.StagingExportResult>;
 
-export function StagingImport(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingImportResult>;
+export function StagingImport(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<gui.StagingImportResult>;
 
 export function StagingRemoveTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingRemoveTagResult>;
 

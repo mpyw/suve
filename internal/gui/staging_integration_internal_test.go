@@ -569,7 +569,7 @@ func TestApp_ExportImport(t *testing.T) {
 		assert.Equal(t, "param", info.Service)
 
 		// Import restores it.
-		imp, err := app.StagingImport(path, "param", "", "merge")
+		imp, err := app.StagingImport(path, "param", "", "merge", false)
 		require.NoError(t, err)
 		assert.Equal(t, 1, imp.EntryCount)
 
@@ -620,7 +620,7 @@ func TestApp_ExportImport(t *testing.T) {
 		_, err := app.StagingExport(path, "secret", "", false)
 		require.NoError(t, err)
 
-		_, err = app.StagingImport(path, "param", "", "merge")
+		_, err = app.StagingImport(path, "param", "", "merge", false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "secret")
 		assert.Contains(t, err.Error(), "param")
@@ -633,8 +633,59 @@ func TestApp_ExportImport(t *testing.T) {
 		_, err := app.StagingExport(filepath.Join(t.TempDir(), "x.json"), "bogus", "", false)
 		require.ErrorIs(t, err, errInvalidService)
 
-		_, err = app.StagingImport(filepath.Join(t.TempDir(), "x.json"), "bogus", "", "merge")
+		_, err = app.StagingImport(filepath.Join(t.TempDir(), "x.json"), "bogus", "", "merge", false)
 		require.ErrorIs(t, err, errInvalidService)
+	})
+
+	// #486: the backend must refuse a scope mismatch when force is false, restoring
+	// defense-in-depth parity with the CLI (a frontend regression can no longer
+	// import cross-scope changes unchecked). force=true (the confirmed-warning path)
+	// still lets a same-provider scope change through.
+	t.Run("import refuses a scope mismatch unless force is passed", func(t *testing.T) {
+		t.Parallel()
+
+		// Craft a param envelope headed for a DIFFERENT AWS scope (same provider).
+		otherScope := provider.AWSScope("999999999999", "eu-west-1")
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] =
+			staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v")}
+
+		path := filepath.Join(t.TempDir(), "param.json")
+		require.NoError(t, file.WriteEnvelopeFile(path, otherScope, staging.ServiceParam, state, ""))
+
+		app := newTransferTestApp(t, awsScope)
+
+		// force=false: refused.
+		_, err := app.StagingImport(path, "param", "", "merge", false)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "scope")
+
+		// force=true: same-provider scope change is allowed.
+		imp, err := app.StagingImport(path, "param", "", "merge", true)
+		require.NoError(t, err)
+		assert.Equal(t, 1, imp.EntryCount)
+	})
+
+	// #486: a provider mismatch is qualitatively different from an account/region
+	// change and must be refused even when force is true.
+	t.Run("import refuses a provider mismatch even with force", func(t *testing.T) {
+		t.Parallel()
+
+		// Craft an Azure App Config param envelope, then import into an AWS scope.
+		azureScope := provider.AzureAppConfigScope("mystore")
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "app/flag"}] =
+			staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("on")}
+
+		path := filepath.Join(t.TempDir(), "param.json")
+		require.NoError(t, file.WriteEnvelopeFile(path, azureScope, staging.ServiceParam, state, ""))
+
+		app := newTransferTestApp(t, awsScope)
+
+		_, err := app.StagingImport(path, "param", "", "merge", true)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "provider")
+		assert.Contains(t, err.Error(), string(provider.ProviderAzure))
 	})
 
 	// #445: an Azure App Configuration param must export under the App

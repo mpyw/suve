@@ -225,6 +225,35 @@ test.describe('Import', () => {
     await expect(page.locator('.entry-name').filter({ hasText: '/foreign/param' })).toBeVisible();
   });
 
+  test('refuses a provider mismatch even after confirming the warning (#486)', async ({ page }) => {
+    // An Azure App Config param file imported into the default AWS scope. The
+    // frontend surfaces the scope warning; confirming it passes force=true, but
+    // the backend still refuses a provider change (defense-in-depth parity).
+    await setupWailsMocks(page, createImportFileState('/mock/azure.json', {
+      service: 'param',
+      entries: [createStagedValue('/foreign/param', 'create', 'v')],
+      provider: 'azure',
+      scope: 'azure/appconfig/mystore',
+    }));
+    await page.goto('/');
+    await navigateTo(page, 'Staging');
+    await page.getByTestId('transfer-menu').waitFor();
+
+    await openTransferMenu(page);
+    await page.getByTestId('import-param').click();
+
+    await expect(page.locator('.modal-title')).toHaveText(/Scope Mismatch/);
+    await page.getByTestId('import-warn-continue').click();
+
+    // The backend refuses the provider change; an error modal appears.
+    await expect(page.locator('.modal-title')).toHaveText(/Import Failed/);
+    await expect(page.getByTestId('import-error')).toContainText('provider');
+
+    // Nothing was imported.
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('.entry-item')).toHaveCount(0);
+  });
+
   test('refuses a service mismatch (file holds another service)', async ({ page }) => {
     // A secret file, but the user picked "Import Param".
     await setupWailsMocks(page, createImportFileState('/mock/secret.json', {

@@ -158,8 +158,8 @@ export function StagingExport(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['StagingExport'](arg1, arg2, arg3, arg4);
 }
 
-export function StagingImport(arg1, arg2, arg3, arg4) {
-  return window['go']['gui']['App']['StagingImport'](arg1, arg2, arg3, arg4);
+export function StagingImport(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['gui']['App']['StagingImport'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function StagingRemoveTag(arg1, arg2, arg3, arg4) {
