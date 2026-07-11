@@ -148,5 +148,5 @@ func (p *Prompter) readPassword() (string, error) {
 		return "", err
 	}
 
-	return strings.TrimSuffix(line, "\n"), nil
+	return strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), nil
 }
