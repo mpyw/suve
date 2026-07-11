@@ -216,6 +216,83 @@ func TestNotice_FetchError_SuppressesRetriesWithinTTL(t *testing.T) {
 	assert.Equal(t, 1, fetches, "a failed probe must be attempted at most once within the TTL")
 }
 
+func TestNotice_UnwritableCache_InProcessFallbackLimitsProbing(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	// A cache path whose parent is a regular file: writeCache always fails and
+	// readCache never finds a fresh entry, so only the in-process fallback can
+	// bound probing.
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600))
+	path := filepath.Join(blocker, "update-check.json")
+
+	var (
+		memo      cacheEntry
+		memoValid bool
+	)
+
+	fetches := 0
+	c := &checker{
+		now:       fixedNow(now),
+		lookupEnv: noEnv,
+		cachePath: func() (string, error) { return path, nil },
+		fetchLatest: func(context.Context) (string, error) {
+			fetches++
+
+			return "", errors.New("boom")
+		},
+		readMemo:  func() (cacheEntry, bool) { return memo, memoValid },
+		writeMemo: func(e cacheEntry) { memo, memoValid = e, true },
+	}
+
+	const calls = 5
+	for range calls {
+		assert.Empty(t, c.notice(context.Background(), "v1.2.3"))
+	}
+
+	// The on-disk marker never persisted, but the in-process fallback still
+	// suppresses retries after the first probe.
+	_, ok := readCache(path)
+	assert.False(t, ok, "unwritable cache must not persist a marker")
+	assert.Equal(t, 1, fetches, "in-process fallback must bound probing to once per process")
+}
+
+func TestDefaultChecker_Wired(t *testing.T) {
+	t.Parallel()
+
+	c := defaultChecker()
+	require.NotNil(t, c)
+	assert.NotNil(t, c.now)
+	assert.NotNil(t, c.lookupEnv)
+	assert.NotNil(t, c.cachePath)
+	assert.NotNil(t, c.fetchLatest)
+	assert.NotNil(t, c.readMemo, "production wires the in-process fallback")
+	assert.NotNil(t, c.writeMemo, "production wires the in-process fallback")
+}
+
+func TestProcMemo_RoundTrip(t *testing.T) { //nolint:paralleltest // mutates process-wide procMemo
+	t.Cleanup(func() {
+		procMemoMu.Lock()
+		procMemo, procMemoValid = cacheEntry{}, false
+		procMemoMu.Unlock()
+	})
+
+	if _, ok := readProcMemo(); ok {
+		procMemoMu.Lock()
+		procMemo, procMemoValid = cacheEntry{}, false
+		procMemoMu.Unlock()
+	}
+
+	entry := cacheEntry{CheckedAt: time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC), LatestVersion: "v1.2.3"}
+	writeProcMemo(entry)
+
+	got, ok := readProcMemo()
+	require.True(t, ok)
+	assert.Equal(t, entry, got)
+}
+
 func TestNotice_CachePathError_StillFetches(t *testing.T) {
 	t.Parallel()
 
