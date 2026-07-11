@@ -12,6 +12,14 @@ on:
 permissions:
   contents: read
 
+# Deterministic staging data key for the whole test workflow, mirroring what
+# `mise test` sets locally. The staging working store is encrypted with this
+# instead of falling back to plaintext on the keychain-less CI runners — a
+# fallback that non-interactive writes now refuse without consent. Not a secret:
+# a fixed base64 of 32 zero bytes.
+env:
+  SUVE_STAGING_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+
 jobs:
   test:
     name: Unit Test
