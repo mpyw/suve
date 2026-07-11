@@ -135,6 +135,51 @@ func TestApplyUseCase_Execute_MultipleOperations(t *testing.T) {
 	assert.Equal(t, 0, output.EntryFailed)
 }
 
+func TestApplyUseCase_Execute_ResultsSorted(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// Stage in non-sorted name order; results must come back sorted regardless.
+	for _, name := range []string{"/app/charlie", "/app/alpha", "/app/bravo"} {
+		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name}, staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("v"),
+			StagedAt:  time.Now(),
+		}))
+	}
+
+	for _, name := range []string{"/tag/zulu", "/tag/mike", "/tag/delta"} {
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name}, staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		}))
+	}
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: newMockApplyStrategy(),
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
+		IgnoreConflicts: true,
+	})
+	require.NoError(t, err)
+
+	entryNames := make([]string, len(output.EntryResults))
+	for i, r := range output.EntryResults {
+		entryNames[i] = r.Name
+	}
+
+	assert.Equal(t, []string{"/app/alpha", "/app/bravo", "/app/charlie"}, entryNames)
+
+	tagNames := make([]string, len(output.TagResults))
+	for i, r := range output.TagResults {
+		tagNames[i] = r.Name
+	}
+
+	assert.Equal(t, []string{"/tag/delta", "/tag/mike", "/tag/zulu"}, tagNames)
+}
+
 func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 
