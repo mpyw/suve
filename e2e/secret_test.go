@@ -4,6 +4,8 @@
 package e2e_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -795,4 +797,54 @@ func TestSecret_ListJSON(t *testing.T) {
 	stdout, _, err := runCommand(t, cmdsecret.ListCommand(), "--output", "json")
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
+}
+
+// =============================================================================
+// Service-Specific Export / Import Tests
+// =============================================================================
+
+// TestSecret_ExportImport restores the round-trip coverage previously provided
+// by TestSecret_StashPushAndPop, expressed through `stage secret export <file>`
+// / `import <file>`. It runs against an isolated temp HOME so the working
+// staging area starts empty.
+func TestSecret_ExportImport(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	secretName := "suve-e2e-secret-export-import/test"
+	exportPath := filepath.Join(t.TempDir(), "secret.json")
+
+	// Stage a secret in the working staging area.
+	_, _, err := runSubCommand(t, secretstage.Command(), "add", secretName, "secret-value")
+	require.NoError(t, err)
+
+	// Export writes the file and clears the working area.
+	t.Run("export", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "export", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "exported")
+
+		_, statErr := os.Stat(exportPath)
+		require.NoError(t, statErr)
+	})
+
+	// The working area is now empty.
+	t.Run("working-cleared", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, secretName)
+	})
+
+	// Import restores the working area.
+	t.Run("import", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "import", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "imported")
+	})
+
+	t.Run("working-restored", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, secretstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, secretName)
+	})
 }

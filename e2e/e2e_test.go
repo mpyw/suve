@@ -28,9 +28,10 @@ import (
 
 // TestMain sets up the environment before running tests.
 func TestMain(m *testing.M) {
-	// Create an isolated temp directory. The staging area and stash files live
-	// under HOME (set per-test via setupTempHome), but keep the platform's
-	// runtime-dir env vars pinned to a short, isolated path for consistency.
+	// Create an isolated temp directory. The working staging area lives under
+	// HOME (set per-test via setupTempHome) and export/import files are written
+	// to per-test t.TempDir()s, but keep the platform's runtime-dir env vars
+	// pinned to a short, isolated path for consistency.
 	// Use /tmp directly to avoid path length limit issues on macOS.
 	tmpDir, err := os.MkdirTemp("/tmp", "suve-e2e-")
 	if err != nil {

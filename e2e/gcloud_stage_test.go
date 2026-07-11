@@ -4,6 +4,8 @@
 package e2e_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -146,4 +148,49 @@ func TestGoogleCloudStage_FlatAliasReachesEmulator(t *testing.T) {
 	stdout, err := runGcloud(t, "stage", "status")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "suve-e2e-gcloud-flat/secret")
+}
+
+// TestGoogleCloudStage_ExportImport exercises the service-specific
+// `gcloud stage export <file>` / `import <file>` round-trip (Google Cloud is
+// secret-only, so the operation lives directly under `gcloud stage`). It uses an
+// isolated temp HOME so the working staging area starts empty.
+func TestGoogleCloudStage_ExportImport(t *testing.T) {
+	setupGoogleCloud(t)
+	setupTempHome(t)
+
+	const name = "suve-e2e-gcloud-stage-export-import/secret"
+
+	exportPath := filepath.Join(t.TempDir(), "secret.json")
+
+	// Stage a create in the working staging area.
+	_, err := runGcloud(t, "stage", "add", name, "exported-value")
+	require.NoError(t, err)
+
+	t.Run("export", func(t *testing.T) {
+		stdout, err := runGcloud(t, "stage", "export", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "exported")
+
+		_, statErr := os.Stat(exportPath)
+		require.NoError(t, statErr)
+	})
+
+	t.Run("working-cleared", func(t *testing.T) {
+		stdout, err := runGcloud(t, "stage", "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, name)
+	})
+
+	t.Run("import", func(t *testing.T) {
+		stdout, err := runGcloud(t, "stage", "import", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "imported")
+	})
+
+	t.Run("working-restored", func(t *testing.T) {
+		stdout, err := runGcloud(t, "stage", "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Secret Manager")
+		assert.Contains(t, stdout, name)
+	})
 }

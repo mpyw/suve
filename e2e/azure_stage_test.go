@@ -5,6 +5,8 @@ package e2e_test
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -464,5 +466,114 @@ func TestAzureAppConfigStage_NamespacedTags(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, devShow, "tier")
 		assert.Contains(t, devShow, "dev")
+	})
+}
+
+// TestAzureKeyVaultStage_ExportImport exercises the service-specific
+// `azure stage secret export <file>` / `import <file>` round-trip against the
+// Key Vault emulator. It uses an isolated temp HOME so the working staging area
+// starts empty.
+func TestAzureKeyVaultStage_ExportImport(t *testing.T) {
+	setupAzureKeyVault(t)
+	setupTempHome(t)
+
+	const name = "suve-e2e-az-kv-stage-export-import"
+
+	exportPath := filepath.Join(t.TempDir(), "secret.json")
+
+	// Stage a create in the working staging area.
+	_, err := runAzureStage(t, "secret", "add", name, "exported-value")
+	require.NoError(t, err)
+
+	t.Run("export", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "secret", "export", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "exported")
+
+		_, statErr := os.Stat(exportPath)
+		require.NoError(t, statErr)
+	})
+
+	t.Run("working-cleared", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "secret", "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, name)
+	})
+
+	t.Run("import", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "secret", "import", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "imported")
+	})
+
+	t.Run("working-restored", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "secret", "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Key Vault")
+		assert.Contains(t, stdout, name)
+	})
+}
+
+// TestAzureAppConfigStage_ExportImport exercises the service-specific
+// `azure stage param export <file>` / `import <file>` round-trip against the App
+// Configuration emulator. Beyond restoring the working area, it applies the
+// re-imported staged param and reads the real setting back: this is the e2e
+// guard for #445 (a staged App Config param must survive export -> import in the
+// PARAM bucket, not be misrouted/dropped into the secret bucket).
+func TestAzureAppConfigStage_ExportImport(t *testing.T) {
+	setupAzureAppConfig(t)
+	setupTempHome(t)
+
+	const name = "suve/e2e/az/ac/stage/export-import"
+
+	exportPath := filepath.Join(t.TempDir(), "param.json")
+
+	cleanup := func() { _, _ = runAzureParam(t, "delete", "--yes", name) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// Stage a create of an App Configuration setting.
+	_, err := runAzureStage(t, "param", "add", name, "exported-value")
+	require.NoError(t, err)
+
+	t.Run("export", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "export", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "exported")
+
+		_, statErr := os.Stat(exportPath)
+		require.NoError(t, statErr)
+	})
+
+	t.Run("working-cleared", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, name)
+	})
+
+	t.Run("import", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "import", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "imported")
+	})
+
+	// The re-imported staged param must land back in the param (App Config)
+	// bucket: status attributes it to App Configuration and shows the key.
+	t.Run("working-restored", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "App Configuration")
+		assert.Contains(t, stdout, name)
+	})
+
+	// Applying the re-imported staged param writes the real setting, proving the
+	// value and per-service bucket survived the round-trip end to end (#445).
+	t.Run("apply-after-roundtrip", func(t *testing.T) {
+		_, err := runAzureStage(t, "param", "apply", "--yes")
+		require.NoError(t, err)
+
+		stdout, err := runAzureParam(t, "show", "--raw", name)
+		require.NoError(t, err)
+		assert.Equal(t, "exported-value", stdout)
 	})
 }
