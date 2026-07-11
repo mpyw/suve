@@ -1162,7 +1162,18 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 		Working: working,
 	}
 
-	result, err := uc.Execute(a.ctx, stagingusecase.ImportInput{Service: svc, Mode: importMode})
+	// A forced scope mismatch is a cross-scope import: the envelope's
+	// BaseModifiedAt values track the source scope's timeline, so re-anchor them
+	// against the target scope's current LastModified (mirrors the CLI).
+	reAnchor := force && env.Scope != scope.Key()
+	if reAnchor {
+		uc.ReAnchor, err = a.importReAnchorResolver(service)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	result, err := uc.Execute(a.ctx, stagingusecase.ImportInput{Service: svc, Mode: importMode, ReAnchor: reAnchor})
 	if err != nil {
 		return nil, err
 	}
@@ -1171,5 +1182,26 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 		Merged:     result.Merged,
 		EntryCount: result.EntryCount,
 		TagCount:   result.TagCount,
+	}, nil
+}
+
+// importReAnchorResolver builds the resolver a cross-scope import uses to fetch
+// the target scope's current LastModified. App Configuration (param) keeps all
+// namespaces in one staging store, so it resolves a strategy per namespace like
+// the apply path; every other service resolves a single strategy built once.
+func (a *App) importReAnchorResolver(service string) (stagingusecase.ReAnchorResolver, error) {
+	if service == string(staging.ServiceParam) && a.isAppConfigParam() {
+		return func(_ staging.Service, namespace string) (staging.ApplyStrategy, error) {
+			return a.appConfigParamStrategyForNamespace(namespace)
+		}, nil
+	}
+
+	strategy, err := a.getApplyStrategy(service)
+	if err != nil {
+		return nil, err
+	}
+
+	return func(staging.Service, string) (staging.ApplyStrategy, error) {
+		return strategy, nil
 	}, nil
 }
