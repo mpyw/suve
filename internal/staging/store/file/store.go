@@ -19,7 +19,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
+
+	"github.com/mattn/go-isatty"
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
@@ -31,7 +34,22 @@ import (
 const (
 	baseDirName = ".suve"
 	stagingDir  = "staging"
+
+	// EnvAllowPlaintext names the env var that, when set to a truthy value, lets
+	// the working store write UNENCRYPTED staging state in a non-interactive
+	// session (see writeFile). It is the explicit opt-in for automation that
+	// genuinely cannot provide a key; SUVE_STAGING_KEY (which actually encrypts)
+	// is preferred.
+	EnvAllowPlaintext = "SUVE_STAGING_ALLOW_PLAINTEXT"
 )
+
+// ErrPlaintextConsentRequired is returned when the working store would write
+// unencrypted staging state in a non-interactive session without the operator
+// having opted in. It is exported so callers can errors.Is against it.
+var ErrPlaintextConsentRequired = errors.New(
+	"refusing to write unencrypted staging state in a non-interactive session: " +
+		"no staging encryption key is available. Set SUVE_STAGING_KEY (base64 32-byte key) " +
+		"to encrypt — recommended — or " + EnvAllowPlaintext + "=1 to store it unencrypted")
 
 // fileMu protects concurrent access to the state files within a process.
 //
@@ -60,6 +78,23 @@ var mintKeyFunc = keyprovider.Mint
 //nolint:gochecknoglobals // process-wide one-time warning guard.
 var plaintextWarnOnce sync.Once
 
+// isInteractiveFunc reports whether the process is attached to an interactive
+// terminal. It gates the unencrypted-write guard: an interactive session keeps
+// the historical warn-and-proceed behavior, while a non-interactive one
+// (CI/pipes/GUI) must opt in explicitly. Keyed on stdin being a TTY, matching
+// how the CLI gates its other prompts. Overridable for testing.
+//
+//nolint:gochecknoglobals // test hook for dependency injection
+var isInteractiveFunc = func() bool {
+	return isatty.IsTerminal(os.Stdin.Fd())
+}
+
+// lookupEnvFunc reads process environment. Overridable so tests can drive the
+// plaintext-consent env var without mutating the real environment.
+//
+//nolint:gochecknoglobals // test hook for dependency injection
+var lookupEnvFunc = os.LookupEnv
+
 // Store manages the staging state using the filesystem.
 // It implements StateIO interface for drain/persist operations.
 //
@@ -81,6 +116,11 @@ type Store struct {
 	// key, when non-nil, is a 32-byte AES-256 key used for raw-key (v2)
 	// encryption of the working store. It takes precedence over passphrase.
 	key []byte
+	// plaintextFallback marks a WORKING store that resolved no encryption key and
+	// fell back to unencrypted storage. It is what distinguishes this dangerous
+	// case from a deliberately plaintext export envelope (empty passphrase), so
+	// the unencrypted-write guard in writeFile only fires for the former.
+	plaintextFallback bool
 }
 
 // scopeDir returns the scope directory ~/.suve/staging/{scope.Key()}.
@@ -155,6 +195,8 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 
 			warnPlaintextOnce(err)
 
+			s.plaintextFallback = true
+
 			return s, nil
 		}
 
@@ -197,6 +239,8 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 		}
 
 		warnPlaintextOnce(nil)
+
+		s.plaintextFallback = true
 
 		return s, nil
 	}
@@ -244,6 +288,23 @@ func warnPlaintextOnce(cause error) {
 		//nolint:forbidigo // one-time operator warning to stderr.
 		fmt.Fprintln(os.Stderr, msg)
 	})
+}
+
+// plaintextConsentGranted reports whether EnvAllowPlaintext opts the caller in
+// to unencrypted staging writes. Parsed leniently: unset/empty is false, a
+// parseable bool is honored (so "0"/"false" stay off), and any other non-empty
+// value counts as consent.
+func plaintextConsentGranted() bool {
+	v, ok := lookupEnvFunc(EnvAllowPlaintext)
+	if !ok || v == "" {
+		return false
+	}
+
+	if b, err := strconv.ParseBool(v); err == nil {
+		return b
+	}
+
+	return true
 }
 
 // NewStoreWithPath creates a new single-file Store with a custom state file path.
@@ -402,6 +463,12 @@ func (s *Store) writeFile(path string, state *staging.State) error {
 		if err != nil {
 			return fmt.Errorf("failed to encrypt state: %w", err)
 		}
+	case s.plaintextFallback && !isInteractiveFunc() && !plaintextConsentGranted():
+		// A working store with no key, about to persist secrets UNENCRYPTED, in a
+		// non-interactive session (CI/pipes/GUI) without an explicit opt-in. An
+		// interactive run keeps the historical warn-and-proceed; automation must
+		// choose encryption (SUVE_STAGING_KEY) or consent (EnvAllowPlaintext).
+		return ErrPlaintextConsentRequired
 	}
 
 	if err := writeFileAtomic(path, data); err != nil {
