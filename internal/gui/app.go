@@ -280,7 +280,13 @@ func selectionFromScope(s provider.Scope) *ScopeSelection {
 // strategy from this one scope keeps them structurally in sync — the invariant
 // that replaces #276's interim non-AWS guard.
 func (a *App) stagingScope() (provider.Scope, error) {
-	sc := a.currentScope()
+	return a.stagingScopeScoped(a.currentScope())
+}
+
+// stagingScopeScoped is stagingScope resolved from an already-snapshotted scope,
+// so a staging binding can pair its store and strategy against the SAME scope
+// even if SelectScope lands between the two resolutions (#560).
+func (a *App) stagingScopeScoped(sc provider.Scope) (provider.Scope, error) {
 	// Non-AWS scopes already carry their keying fields — no network call.
 	if sc.Provider != provider.ProviderAWS {
 		return sc, nil
@@ -310,8 +316,12 @@ func (a *App) stagingScope() (provider.Scope, error) {
 // same on-disk key. AWS keeps one account scope for both services (they share
 // it); Google Cloud has only the secret service.
 func (a *App) stagingScopeForKind(kind provider.Kind) (provider.Scope, error) {
-	sc := a.currentScope()
+	return a.stagingScopeForKindScoped(a.currentScope(), kind)
+}
 
+// stagingScopeForKindScoped is stagingScopeForKind resolved from an
+// already-snapshotted scope (#560).
+func (a *App) stagingScopeForKindScoped(sc provider.Scope, kind provider.Kind) (provider.Scope, error) {
 	if sc.Provider == provider.ProviderAzure {
 		if kind == provider.KindParam {
 			scope := provider.AzureAppConfigScope(sc.StoreName)
@@ -324,7 +334,7 @@ func (a *App) stagingScopeForKind(kind provider.Kind) (provider.Scope, error) {
 	}
 
 	// AWS (both services share the account scope) and Google Cloud (secret only).
-	return a.stagingScope()
+	return a.stagingScopeScoped(sc)
 }
 
 // =============================================================================
@@ -345,13 +355,23 @@ func (e stringError) Error() string { return string(e) }
 // paramStore resolves a provider.Store for the parameter service via the
 // registry (AWS by default).
 func (a *App) paramStore() (provider.Store, error) {
-	return registry.Store(a.ctx, a.currentScope(), provider.KindParam)
+	return a.paramStoreScoped(a.currentScope())
+}
+
+// paramStoreScoped is paramStore resolved from an already-snapshotted scope (#560).
+func (a *App) paramStoreScoped(sc provider.Scope) (provider.Store, error) {
+	return registry.Store(a.ctx, sc, provider.KindParam)
 }
 
 // secretStore resolves a provider.Store for the secret service via the
 // registry (AWS by default).
 func (a *App) secretStore() (provider.Store, error) {
-	return registry.Store(a.ctx, a.currentScope(), provider.KindSecret)
+	return a.secretStoreScoped(a.currentScope())
+}
+
+// secretStoreScoped is secretStore resolved from an already-snapshotted scope (#560).
+func (a *App) secretStoreScoped(sc provider.Scope) (provider.Store, error) {
+	return registry.Store(a.ctx, sc, provider.KindSecret)
 }
 
 // effectiveParamScope returns the active param scope with the App Configuration
@@ -359,7 +379,12 @@ func (a *App) secretStore() (provider.Store, error) {
 // (key, namespace) without mutating the shared read scope. It is a no-op for
 // non-App-Configuration scopes (which have no namespace axis).
 func (a *App) effectiveParamScope(ns string) provider.Scope {
-	sc := a.currentScope()
+	return a.effectiveParamScopeScoped(a.currentScope(), ns)
+}
+
+// effectiveParamScopeScoped is effectiveParamScope applied to an
+// already-snapshotted scope (#560).
+func (a *App) effectiveParamScopeScoped(sc provider.Scope, ns string) provider.Scope {
 	if sc.Provider == provider.ProviderAzure && sc.StoreName != "" {
 		sc.AppConfigNamespace = ns
 	}
@@ -372,7 +397,12 @@ func (a *App) effectiveParamScope(ns string) provider.Scope {
 // exactly one (key, namespace). It is a no-op for non-App-Configuration scopes
 // and for the null/default namespace. Returns the decoded literal namespace.
 func (a *App) validateParamNamespace(ns string) (string, error) {
-	sc := a.currentScope()
+	return a.validateParamNamespaceScoped(a.currentScope(), ns)
+}
+
+// validateParamNamespaceScoped is validateParamNamespace resolved from an
+// already-snapshotted scope (#560).
+func (a *App) validateParamNamespaceScoped(sc provider.Scope, ns string) (string, error) {
 	if sc.Provider != provider.ProviderAzure || sc.StoreName == "" {
 		return ns, nil
 	}
@@ -383,7 +413,13 @@ func (a *App) validateParamNamespace(ns string) (string, error) {
 // paramStoreForNamespace resolves a param provider.Store scoped to the given App
 // Configuration namespace (no-op namespace for other providers).
 func (a *App) paramStoreForNamespace(ns string) (provider.Store, error) {
-	return registry.Store(a.ctx, a.effectiveParamScope(ns), provider.KindParam)
+	return a.paramStoreForNamespaceScoped(a.currentScope(), ns)
+}
+
+// paramStoreForNamespaceScoped is paramStoreForNamespace resolved from an
+// already-snapshotted scope (#560).
+func (a *App) paramStoreForNamespaceScoped(sc provider.Scope, ns string) (provider.Store, error) {
+	return registry.Store(a.ctx, a.effectiveParamScopeScoped(sc, ns), provider.KindParam)
 }
 
 // appConfigParamStrategyForNamespace builds the App Configuration staging
@@ -391,7 +427,13 @@ func (a *App) paramStoreForNamespace(ns string) (provider.Store, error) {
 // apply runs against its own namespace (the per-namespace resolver #431 threads
 // into the apply/diff use cases).
 func (a *App) appConfigParamStrategyForNamespace(ns string) (staging.FullStrategy, error) {
-	s, err := a.paramStoreForNamespace(ns)
+	return a.appConfigParamStrategyForNamespaceScoped(a.currentScope(), ns)
+}
+
+// appConfigParamStrategyForNamespaceScoped is appConfigParamStrategyForNamespace
+// resolved from an already-snapshotted scope (#560).
+func (a *App) appConfigParamStrategyForNamespaceScoped(sc provider.Scope, ns string) (staging.FullStrategy, error) {
+	s, err := a.paramStoreForNamespaceScoped(sc, ns)
 	if err != nil {
 		return nil, err
 	}
@@ -402,8 +444,12 @@ func (a *App) appConfigParamStrategyForNamespace(ns string) (staging.FullStrateg
 // isAppConfigParam reports whether the active param scope is Azure App
 // Configuration (the only param service with a namespace axis).
 func (a *App) isAppConfigParam() bool {
-	sc := a.currentScope()
+	return isAppConfigParamScope(a.currentScope())
+}
 
+// isAppConfigParamScope reports whether an already-snapshotted scope is Azure App
+// Configuration (the only param service with a namespace axis) (#560).
+func isAppConfigParamScope(sc provider.Scope) bool {
 	return sc.Provider == provider.ProviderAzure && sc.StoreName != ""
 }
 
@@ -419,6 +465,12 @@ func kindForService(service string) provider.Kind {
 }
 
 func (a *App) getStagingStore(kind provider.Kind) (store.ReadWriteOperator, error) {
+	return a.getStagingStoreScoped(a.currentScope(), kind)
+}
+
+// getStagingStoreScoped is getStagingStore resolved from an already-snapshotted
+// scope, so a binding pairs its store and strategy against the SAME scope (#560).
+func (a *App) getStagingStoreScoped(sc provider.Scope, kind provider.Kind) (store.ReadWriteOperator, error) {
 	// Test seam: an injected store bypasses scope resolution (and any STS call).
 	a.stagingStoreMu.Lock()
 	if a.stagingStore != nil {
@@ -428,7 +480,7 @@ func (a *App) getStagingStore(kind provider.Kind) (store.ReadWriteOperator, erro
 	}
 	a.stagingStoreMu.Unlock()
 
-	scope, err := a.stagingScopeForKind(kind)
+	scope, err := a.stagingScopeForKindScoped(sc, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -472,15 +524,20 @@ func (a *App) getService(service string) (staging.Service, error) {
 // semantics match the active provider (e.g. Azure "App Configuration"/"setting",
 // no delete options). Selection is by the active provider + service.
 func (a *App) getParser(service string) (staging.Parser, error) {
+	return a.getParserScoped(a.currentScope(), service)
+}
+
+// getParserScoped is getParser resolved from an already-snapshotted scope (#560).
+func (a *App) getParserScoped(sc provider.Scope, service string) (staging.Parser, error) {
 	switch service {
 	case string(staging.ServiceParam):
-		if a.currentScope().Provider == provider.ProviderAzure {
+		if sc.Provider == provider.ProviderAzure {
 			return &staging.AzureAppConfigParamStrategy{}, nil
 		}
 
 		return &staging.ParamStrategy{}, nil
 	case string(staging.ServiceSecret):
-		switch a.currentScope().Provider {
+		switch sc.Provider {
 		case provider.ProviderGoogleCloud:
 			return &staging.GoogleCloudSecretStrategy{}, nil
 		case provider.ProviderAzure:
@@ -501,25 +558,31 @@ func (a *App) getParser(service string) (staging.Parser, error) {
 // It shares the active scope with getStagingStore (see stagingScope), so a
 // staged entry can only ever apply to the provider it was staged against.
 func (a *App) serviceStrategy(service string) (staging.FullStrategy, error) {
+	return a.serviceStrategyScoped(a.currentScope(), service)
+}
+
+// serviceStrategyScoped is serviceStrategy resolved from an already-snapshotted
+// scope, so a binding pairs its strategy and store against the SAME scope (#560).
+func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.FullStrategy, error) {
 	switch service {
 	case string(staging.ServiceParam):
-		s, err := a.paramStore()
+		s, err := a.paramStoreScoped(sc)
 		if err != nil {
 			return nil, err
 		}
 
-		if a.currentScope().Provider == provider.ProviderAzure {
+		if sc.Provider == provider.ProviderAzure {
 			return staging.NewAzureAppConfigParamStrategy(s), nil
 		}
 
 		return staging.NewParamStrategy(s), nil
 	case string(staging.ServiceSecret):
-		s, err := a.secretStore()
+		s, err := a.secretStoreScoped(sc)
 		if err != nil {
 			return nil, err
 		}
 
-		switch a.currentScope().Provider {
+		switch sc.Provider {
 		case provider.ProviderGoogleCloud:
 			return staging.NewGoogleCloudSecretStrategy(s), nil
 		case provider.ProviderAzure:
@@ -539,9 +602,14 @@ func (a *App) serviceStrategy(service string) (staging.FullStrategy, error) {
 // DeleteStrategy (which it does not embed but the concrete types implement).
 // It is a free function because Go methods cannot declare type parameters.
 func strategyAs[T any](a *App, service string) (T, error) {
+	return strategyAsScoped[T](a, a.currentScope(), service)
+}
+
+// strategyAsScoped is strategyAs resolved from an already-snapshotted scope (#560).
+func strategyAsScoped[T any](a *App, sc provider.Scope, service string) (T, error) {
 	var zero T
 
-	strategy, err := a.serviceStrategy(service)
+	strategy, err := a.serviceStrategyScoped(sc, service)
 	if err != nil {
 		return zero, err
 	}
@@ -554,20 +622,20 @@ func strategyAs[T any](a *App, service string) (T, error) {
 	return narrowed, nil
 }
 
-func (a *App) getEditStrategy(service string) (staging.EditStrategy, error) {
-	return strategyAs[staging.EditStrategy](a, service)
+func (a *App) getEditStrategyScoped(sc provider.Scope, service string) (staging.EditStrategy, error) {
+	return strategyAsScoped[staging.EditStrategy](a, sc, service)
 }
 
-func (a *App) getDeleteStrategy(service string) (staging.DeleteStrategy, error) {
-	return strategyAs[staging.DeleteStrategy](a, service)
+func (a *App) getDeleteStrategyScoped(sc provider.Scope, service string) (staging.DeleteStrategy, error) {
+	return strategyAsScoped[staging.DeleteStrategy](a, sc, service)
 }
 
-func (a *App) getApplyStrategy(service string) (staging.ApplyStrategy, error) {
-	return strategyAs[staging.ApplyStrategy](a, service)
+func (a *App) getApplyStrategyScoped(sc provider.Scope, service string) (staging.ApplyStrategy, error) {
+	return strategyAsScoped[staging.ApplyStrategy](a, sc, service)
 }
 
-func (a *App) getDiffStrategy(service string) (staging.DiffStrategy, error) {
-	return strategyAs[staging.DiffStrategy](a, service)
+func (a *App) getDiffStrategyScoped(sc provider.Scope, service string) (staging.DiffStrategy, error) {
+	return strategyAsScoped[staging.DiffStrategy](a, sc, service)
 }
 
 // =============================================================================
