@@ -300,11 +300,19 @@ func TestReadEnvelopeFile_Errors(t *testing.T) {
 	t.Run("unsupported version", func(t *testing.T) {
 		t.Parallel()
 
-		// version 1 is the pre-AAD format that is deliberately no longer readable.
-		for _, ver := range []int{1, 99} {
+		// An older version (e.g. the pre-AAD v1 format) is guided to re-export;
+		// a newer version is guided to upgrade suve.
+		cases := []struct {
+			ver  int
+			want string
+		}{
+			{ver: 1, want: "stage export"},
+			{ver: 99, want: "upgrade suve"},
+		}
+		for _, tc := range cases {
 			path := filepath.Join(t.TempDir(), "old.json")
 			data, err := json.Marshal(file.Envelope{
-				Version:  ver,
+				Version:  tc.ver,
 				Provider: "aws",
 				Scope:    "aws/1/r",
 				Service:  "param",
@@ -315,8 +323,8 @@ func TestReadEnvelopeFile_Errors(t *testing.T) {
 
 			_, err = file.ReadEnvelopeFile(path)
 			require.ErrorIs(t, err, file.ErrUnsupportedEnvelopeVersion)
-			// The error must guide the user to re-create the file.
-			assert.Contains(t, err.Error(), "stage export")
+			// The error must guide the user to the right remedy for the direction.
+			assert.Contains(t, err.Error(), tc.want)
 		}
 	})
 
