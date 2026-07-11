@@ -12,6 +12,7 @@
 package file
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -306,6 +307,14 @@ func (s *Store) readFile(path string) (*staging.State, error) {
 		}
 
 		return nil, fmt.Errorf("failed to read state file: %w", err)
+	}
+
+	// A trimmed-empty file (zero bytes or only whitespace) is treated like a
+	// missing file: an external truncation or an editor leaving an empty file
+	// behind must not hard-fail every command with a parse error. Genuinely
+	// non-empty garbage still surfaces a corruption error below.
+	if len(bytes.TrimSpace(data)) == 0 {
+		return staging.NewEmptyState(), nil
 	}
 
 	// Decrypt if encrypted. Reading an unencrypted (plaintext/legacy) file is
