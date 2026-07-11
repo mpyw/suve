@@ -253,6 +253,57 @@ func TestDiffUseCase_Execute_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestDiffUseCase_Execute_UnstageError verifies the auto-unstage branches surface
+// a store write failure instead of reporting the entry as auto-unstaged while it
+// is in fact still staged (#447).
+func TestDiffUseCase_Execute_UnstageError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("identical value", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/same"}, staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("same-value"),
+			StagedAt:  time.Now(),
+		}))
+		store.UnstageEntryErr = errors.New("keychain locked")
+
+		strategy := newMockDiffStrategy()
+		strategy.fetchResults["/app/same"] = &staging.FetchResult{Value: "same-value", Identifier: "#1"}
+
+		uc := &usecasestaging.DiffUseCase{Strategy: strategy, Store: store}
+
+		_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unstage /app/same")
+		assert.Contains(t, err.Error(), "keychain locked")
+	})
+
+	t.Run("update no longer exists", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/gone"}, staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("v"),
+			StagedAt:  time.Now(),
+		}))
+		store.UnstageEntryErr = errors.New("disk full")
+
+		strategy := newMockDiffStrategy()
+		strategy.fetchErrors["/app/gone"] = fmt.Errorf("%w: not found", provider.ErrNotFound)
+
+		uc := &usecasestaging.DiffUseCase{Strategy: strategy, Store: store}
+
+		_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unstage /app/gone")
+		assert.Contains(t, err.Error(), "disk full")
+	})
+}
+
 func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 	t.Parallel()
 

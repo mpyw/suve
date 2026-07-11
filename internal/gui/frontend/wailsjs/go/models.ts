@@ -651,6 +651,7 @@ export namespace gui {
 	    name: string;
 	    status: string;
 	    error?: string;
+	    unstageError?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new StagingApplyEntryResult(source);
@@ -661,6 +662,7 @@ export namespace gui {
 	        this.name = source["name"];
 	        this.status = source["status"];
 	        this.error = source["error"];
+	        this.unstageError = source["unstageError"];
 	    }
 	}
 	export class StagingApplyTagResult {
@@ -668,6 +670,7 @@ export namespace gui {
 	    addTags?: Record<string, string>;
 	    removeTags?: string[];
 	    error?: string;
+	    unstageError?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new StagingApplyTagResult(source);
@@ -679,6 +682,7 @@ export namespace gui {
 	        this.addTags = source["addTags"];
 	        this.removeTags = source["removeTags"];
 	        this.error = source["error"];
+	        this.unstageError = source["unstageError"];
 	    }
 	}
 	export class StagingApplyResult {

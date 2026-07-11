@@ -1317,6 +1317,45 @@ func TestApp_StagingApply_ExecuteError(t *testing.T) {
 	assert.Contains(t, err.Error(), "list boom")
 }
 
+// TestNewStagingApplyResult_UnstageError verifies the GUI apply-result mapping
+// carries a post-apply UnstageError (cloud write succeeded but the entry/tag
+// could not be cleared from staging) into the DTO so the frontend can warn,
+// rather than silently dropping it (#447).
+func TestNewStagingApplyResult_UnstageError(t *testing.T) {
+	t.Parallel()
+
+	out := &stagingusecase.ApplyOutput{
+		ServiceName:    "parameter",
+		EntrySucceeded: 1,
+		TagSucceeded:   1,
+		EntryResults: []stagingusecase.ApplyEntryResult{
+			{
+				Name:         "/app/config",
+				Status:       stagingusecase.ApplyResultCreated,
+				UnstageError: errors.New("keychain locked"),
+			},
+		},
+		TagResults: []stagingusecase.ApplyTagResult{
+			{
+				Name:         "/app/tagged",
+				AddTags:      map[string]string{"env": "prod"},
+				UnstageError: errors.New("disk full"),
+			},
+		},
+	}
+
+	result := newStagingApplyResult(out)
+
+	require.Len(t, result.EntryResults, 1)
+	assert.Equal(t, "created", result.EntryResults[0].Status)
+	assert.Empty(t, result.EntryResults[0].Error)
+	assert.Equal(t, "keychain locked", result.EntryResults[0].UnstageError)
+
+	require.Len(t, result.TagResults, 1)
+	assert.Empty(t, result.TagResults[0].Error)
+	assert.Equal(t, "disk full", result.TagResults[0].UnstageError)
+}
+
 // TestApp_StagingApply_NoStagedChanges covers the success return of StagingApply
 // (nothing staged -> the use case returns early with no error), which exercises
 // the EntryKey->label mapping for result.Conflicts on the happy path. With no

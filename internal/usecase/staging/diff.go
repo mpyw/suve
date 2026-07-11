@@ -3,6 +3,7 @@ package staging
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/samber/lo"
 
@@ -156,7 +157,12 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 		// Process results
 		for key, entry := range entries {
 			result := results[key]
-			diffEntry := u.processDiffResult(ctx, key, entry, result)
+
+			diffEntry, err := u.processDiffResult(ctx, key, entry, result)
+			if err != nil {
+				return nil, err
+			}
+
 			output.Entries = append(output.Entries, diffEntry)
 		}
 	}
@@ -202,7 +208,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 }
 
 //nolint:lll // function parameters are descriptive for clarity
-func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKey, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) DiffEntry {
+func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKey, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) (DiffEntry, error) {
 	service := u.Strategy.Service()
 
 	if result.Err != nil {
@@ -223,14 +229,18 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 	// to be the empty string (legal in Azure App Configuration / Key Vault /
 	// Google Cloud), so an empty-valued delete must not be silently cancelled.
 	if entry.Operation != staging.OperationDelete && awsValue == stagedValue {
-		_ = u.Store.UnstageEntry(ctx, service, key)
+		// A failed unstage would leave the entry staged while we report it as
+		// auto-unstaged, so surface the error rather than discarding it.
+		if err := u.Store.UnstageEntry(ctx, service, key); err != nil {
+			return DiffEntry{}, fmt.Errorf("failed to unstage %s: %w", key.Name, err)
+		}
 
 		return DiffEntry{
 			Name:      key.Name,
 			Namespace: key.Namespace,
 			Type:      DiffEntryAutoUnstaged,
 			Warning:   "identical to AWS current",
-		}
+		}, nil
 	}
 
 	return DiffEntry{
@@ -242,10 +252,10 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 		AWSIdentifier: fetchResult.Identifier,
 		StagedValue:   stagedValue,
 		Description:   entry.Description,
-	}
+	}, nil
 }
 
-func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey, entry staging.Entry, err error) DiffEntry {
+func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey, entry staging.Entry, err error) (DiffEntry, error) {
 	service := u.Strategy.Service()
 
 	// Only a genuine "not found" justifies auto-unstaging a staged delete or
@@ -257,14 +267,16 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 	switch entry.Operation {
 	case staging.OperationDelete:
 		if notFound {
-			_ = u.Store.UnstageEntry(ctx, service, key)
+			if uerr := u.Store.UnstageEntry(ctx, service, key); uerr != nil {
+				return DiffEntry{}, fmt.Errorf("failed to unstage %s: %w", key.Name, uerr)
+			}
 
 			return DiffEntry{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
 				Warning:   "already deleted in AWS",
-			}
+			}, nil
 		}
 
 	case staging.OperationCreate:
@@ -275,18 +287,20 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 			Operation:   entry.Operation,
 			StagedValue: lo.FromPtr(entry.Value),
 			Description: entry.Description,
-		}
+		}, nil
 
 	case staging.OperationUpdate:
 		if notFound {
-			_ = u.Store.UnstageEntry(ctx, service, key)
+			if uerr := u.Store.UnstageEntry(ctx, service, key); uerr != nil {
+				return DiffEntry{}, fmt.Errorf("failed to unstage %s: %w", key.Name, uerr)
+			}
 
 			return DiffEntry{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
 				Warning:   "item no longer exists in AWS",
-			}
+			}, nil
 		}
 	}
 
@@ -295,5 +309,5 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 		Namespace: key.Namespace,
 		Type:      DiffEntryWarning,
 		Warning:   err.Error(),
-	}
+	}, nil
 }

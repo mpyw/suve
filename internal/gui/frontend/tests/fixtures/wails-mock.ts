@@ -188,6 +188,12 @@ export interface MockState {
   // turning any Execute error (conflict / per-entry failure) into a rejected
   // Wails promise, so "Apply All" can succeed for one service and fail another.
   stagingApplyFailService?: Service;
+  // Per-service post-apply unstage failure: when set, StagingApply for this
+  // service reports each entry/tag as successfully applied but carries an
+  // unstageError (the cloud write landed but the staged entry could not be
+  // cleared). The bucket is NOT emptied, so the entries remain staged — exactly
+  // the drift the GUI must now surface as a warning (#447).
+  stagingApplyUnstageErrorService?: Service;
 }
 
 // ============================================================================
@@ -1199,6 +1205,20 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         const entryCount = staged.length;
         const tagCount = tagStaged.length;
+        // The cloud write landed but clearing the staged entries failed: report
+        // each result with an unstageError and leave the bucket populated (#447).
+        if (state.stagingApplyUnstageErrorService === service) {
+          return {
+            serviceName: service,
+            entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated', unstageError: 'keychain locked' })) : null,
+            tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, status: 'updated', unstageError: 'keychain locked' })) : null,
+            conflicts: null,
+            entrySucceeded: entryCount,
+            entryFailed: 0,
+            tagSucceeded: tagCount,
+            tagFailed: 0,
+          };
+        }
         if (service === 'param') {
           currentBucket().param = [];
           currentBucket().paramTags = [];

@@ -28,13 +28,20 @@ func ExecuteMap[K comparable, V any, R any](
 	return ExecuteMapWithLimit(ctx, entries, DefaultLimit, fn)
 }
 
-// ExecuteMapWithLimit is like ExecuteMap but with a custom concurrency limit.
+// ExecuteMapWithLimit is like ExecuteMap but with a custom concurrency limit. A
+// non-positive limit falls back to DefaultLimit: errgroup.SetLimit(0) uses a
+// zero-capacity semaphore that would block the first g.Go forever (a deadlock),
+// so it is never passed through.
 func ExecuteMapWithLimit[K comparable, V any, R any](
 	ctx context.Context,
 	entries map[K]V,
 	limit int,
 	fn func(ctx context.Context, key K, value V) (R, error),
 ) map[K]*Result[R] {
+	if limit <= 0 {
+		limit = DefaultLimit
+	}
+
 	results := make(map[K]*Result[R], len(entries))
 
 	var mu sync.Mutex

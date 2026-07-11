@@ -672,6 +672,11 @@
                   {#if result.error}
                     <span class="result-error">{result.error}</span>
                   {/if}
+                  {#if result.unstageError}
+                    <span class="result-warning" data-testid="unstage-warning">
+                      Applied, but still staged (failed to clear): {result.unstageError}
+                    </span>
+                  {/if}
                 </li>
               {/each}
             </ul>
@@ -687,6 +692,11 @@
                   <span class="result-status status-updated">tags</span>
                   {#if result.error}
                     <span class="result-error">{result.error}</span>
+                  {/if}
+                  {#if result.unstageError}
+                    <span class="result-warning" data-testid="unstage-warning">
+                      Applied, but still staged (failed to clear): {result.unstageError}
+                    </span>
                   {/if}
                 </li>
               {/each}
@@ -1347,6 +1357,13 @@
   .result-error {
     font-size: 12px;
     color: #f44336;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .result-warning {
+    font-size: 12px;
+    color: #ff9800;
     width: 100%;
     margin-top: 4px;
   }
