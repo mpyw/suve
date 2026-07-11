@@ -169,9 +169,20 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 		return nil, fmt.Errorf("%w: %s", ErrInvalidEnvelope, err.Error())
 	}
 
-	if env.Version != EnvelopeVersion {
+	if env.Version < EnvelopeVersion {
+		// An older envelope: its format is gone from this build, so re-export it
+		// from a still-staged source with the current suve.
 		return nil, fmt.Errorf(
 			"%w: file is version %d, but this build only reads version %d; re-create it with `stage export`",
+			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
+		)
+	}
+
+	if env.Version > EnvelopeVersion {
+		// A newer envelope: this build cannot know its format, so upgrading suve
+		// is the fix rather than re-exporting.
+		return nil, fmt.Errorf(
+			"%w: file is version %d, but this build only reads version %d; it was written by a newer suve, upgrade suve",
 			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
 		)
 	}
