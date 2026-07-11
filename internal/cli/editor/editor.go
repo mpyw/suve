@@ -58,11 +58,31 @@ func Open(ctx context.Context, content string) (string, error) {
 		return "", err
 	}
 
-	// Trim trailing newline that editors often add
-	// Handle both Unix (\n) and Windows (\r\n) line endings
-	result := string(data)
-	result = strings.TrimSuffix(result, "\r\n")
-	result = strings.TrimSuffix(result, "\n")
+	return normalize(content, string(data)), nil
+}
 
-	return result, nil
+// normalize applies the round-trip-lossless rule to the editor's read-back
+// (result) given the exact content that was written into the tmpfile.
+//
+// Editors typically auto-append a single trailing newline to a buffer that did
+// not already end with one. We reverse ONLY that editor-added newline: if the
+// original content did not end with a newline, a single trailing newline (Unix
+// "\n" or Windows "\r\n") is stripped from the read-back. A trailing newline the
+// value carried in (PEM keys, JSON, ...) is preserved, so opening a value and
+// saving it untouched is byte-identical — which the callers then detect and
+// report as a no-op change.
+func normalize(content, result string) string {
+	// The value already carried a trailing newline: the editor did not add one,
+	// so keep the read-back verbatim to stay lossless.
+	if strings.HasSuffix(content, "\n") {
+		return result
+	}
+
+	// Strip the single line ending the editor auto-appended, handling both Unix
+	// (\n) and Windows (\r\n) endings.
+	if trimmed, ok := strings.CutSuffix(result, "\r\n"); ok {
+		return trimmed
+	}
+
+	return strings.TrimSuffix(result, "\n")
 }

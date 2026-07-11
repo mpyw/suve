@@ -102,6 +102,51 @@ echo "with-newline" > "$1"
 	assert.Equal(t, "with-newline", result)
 }
 
+func TestOpen_PreservesTrailingNewlineWhenUntouched(t *testing.T) {
+	if runtime.GOOS == goosWindows {
+		t.Skip("Skipping on Windows - requires Unix shell")
+	}
+
+	// Use 'true' as editor (no-op command): the file is saved untouched.
+	t.Setenv("EDITOR", "true")
+	t.Setenv("VISUAL", "")
+
+	// A value that already ends in a newline (e.g. a PEM key or JSON document)
+	// must round-trip byte-identically: the trailing newline is the value's own,
+	// not one the editor auto-appended, so it must be preserved.
+	const content = "-----BEGIN KEY-----\nabc\n-----END KEY-----\n"
+
+	result, err := editor.Open(t.Context(), content)
+	require.NoError(t, err)
+	assert.Equal(t, content, result, "trailing newline the value already had must be preserved")
+}
+
+func TestOpen_TrimsEditorAppendedNewlineOnNonNewlineValue(t *testing.T) {
+	if runtime.GOOS == goosWindows {
+		t.Skip("Skipping on Windows - requires Unix shell")
+	}
+
+	// A script that mimics an editor auto-appending a single trailing newline to
+	// a value that did not already end with one.
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "test-editor.sh")
+	script := `#!/bin/sh
+content=$(cat "$1")
+printf '%s\n' "$content" > "$1"
+`
+	//nolint:gosec // G306: executable permission required for test shell script
+	require.NoError(t, os.WriteFile(scriptPath, []byte(script), 0o755))
+
+	t.Setenv("EDITOR", scriptPath)
+	t.Setenv("VISUAL", "")
+
+	// The input has no trailing newline; the editor-appended newline must be
+	// trimmed so the stored value matches the original bytes.
+	result, err := editor.Open(t.Context(), "no-trailing-newline")
+	require.NoError(t, err)
+	assert.Equal(t, "no-trailing-newline", result)
+}
+
 func TestOpen_TrimsCRLF(t *testing.T) {
 	if runtime.GOOS == goosWindows {
 		t.Skip("Skipping on Windows - requires Unix shell")

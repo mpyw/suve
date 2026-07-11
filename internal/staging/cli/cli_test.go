@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/cli/confirm"
+	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/cli"
@@ -707,6 +709,41 @@ func TestDiffRunner_Run(t *testing.T) {
 // =============================================================================
 // EditRunner Tests
 // =============================================================================
+
+// TestEditRunner_RoundTripLossless exercises the real editor.Open (not a mock)
+// so the round-trip-lossless normalization is covered end to end: a baseline
+// value that already ends in a newline, opened and saved untouched, must be
+// reported as "No changes made." and leave nothing staged.
+func TestEditRunner_RoundTripLossless(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping on Windows - requires Unix shell")
+	}
+
+	// 'true' is a no-op editor: it saves the tmpfile untouched.
+	t.Setenv("EDITOR", "true")
+	t.Setenv("VISUAL", "")
+
+	store := testutil.NewMockStore()
+
+	var stdout, stderr bytes.Buffer
+
+	r := &cli.EditRunner{
+		UseCase: &stagingusecase.EditUseCase{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "line1\nline2\n"},
+			Store:    store,
+		},
+		Stdout:     &stdout,
+		Stderr:     &stderr,
+		OpenEditor: editor.Open,
+	}
+
+	err := r.Run(t.Context(), cli.EditOptions{Name: "/app/config"})
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "No changes made")
+
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
+	require.ErrorIs(t, err, staging.ErrNotStaged, "a lossless no-op edit must not stage anything")
+}
 
 func TestEditRunner_Run(t *testing.T) {
 	t.Parallel()
