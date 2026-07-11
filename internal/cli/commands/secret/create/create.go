@@ -3,7 +3,7 @@ package create
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 
 	"github.com/urfave/cli/v3"
@@ -32,7 +32,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "create",
 		Usage:     "Create a new secret",
-		ArgsUsage: "<name> <value>",
+		ArgsUsage: "<name> [<value>]",
 		Description: `Create a new secret in AWS Secrets Manager.
 
 Use this command for new secrets only. To update an existing secret,
@@ -41,25 +41,49 @@ use 'suve secret update' instead.
 Secret values are automatically encrypted by Secrets Manager using
 the default KMS key or a custom KMS key configured in the account.
 
+The value may be given as a positional argument, read from stdin with
+--value-stdin (so it never appears in argv/ps or shell history), or, when
+omitted, typed into $EDITOR.
+
 To add tags after creation, use 'suve secret tag' command.
 
 EXAMPLES:
    suve secret create my-api-key "sk-12345"                    Create simple secret
    suve secret create --description "API Key for X" my-key "..." With description
-   suve secret create my-config '{"host":"db.example.com"}'    Create JSON secret`,
+   suve secret create my-config '{"host":"db.example.com"}'    Create JSON secret
+   printf '%s' "$VALUE" | suve secret create my-key --value-stdin  Read value from stdin
+   suve secret create my-key                                   Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
 				Usage: "Description for the secret",
 			},
+			internal.ValueStdinFlag(),
 		},
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
-		return fmt.Errorf("usage: suve secret create <name> <value>")
+	args := cmd.Args()
+	if args.Len() < 1 {
+		return errors.New("usage: suve secret create <name> [<value>]")
+	}
+
+	value, proceed, err := internal.ResolveValue(ctx, internal.ValueSource{
+		FromStdin: cmd.Bool(internal.FlagValueStdin),
+		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
+		Arg:       args.Get(1),
+		Stdin:     internal.Stdin(cmd),
+	})
+	if err != nil {
+		return err
+	}
+
+	if !proceed {
+		output.Info(cmd.Root().Writer, "Empty value, nothing to create.")
+
+		return nil
 	}
 
 	store, err := internal.SecretStore(ctx)
@@ -74,8 +98,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return r.Run(ctx, Options{
-		Name:        cmd.Args().Get(0),
-		Value:       cmd.Args().Get(1),
+		Name:        args.Get(0),
+		Value:       value,
 		Description: cmd.String("description"),
 	})
 }

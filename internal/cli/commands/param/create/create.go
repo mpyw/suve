@@ -38,7 +38,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "create",
 		Usage:     "Create a new parameter",
-		ArgsUsage: "<name> <value>",
+		ArgsUsage: "<name> [<value>]",
 		Description: `Create a new parameter in AWS Systems Manager Parameter Store.
 
 Use this command for new parameters only. To update an existing parameter,
@@ -52,13 +52,19 @@ PARAMETER TYPES:
 The --secure flag is a shorthand for --type SecureString.
 You cannot use both --secure and --type together.
 
+The value may be given as a positional argument, read from stdin with
+--value-stdin (so it never appears in argv/ps or shell history), or, when
+omitted, typed into $EDITOR.
+
 To add tags after creation, use 'suve param tag' command.
 
 EXAMPLES:
    suve param create /app/config/db-url "postgres://..."       Create String parameter
    suve param create --secure /app/config/api-key "secret123"  Create SecureString
    suve param create --type StringList /app/hosts "a.com,b.com" Create StringList
-   suve param create --description "DB URL" /app/db-url "..."  With description`,
+   suve param create --description "DB URL" /app/db-url "..."  With description
+   printf '%s' "$V" | suve param create --secure /app/key --value-stdin  Read value from stdin
+   suve param create --secure /app/key                         Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -89,14 +95,16 @@ EXAMPLES:
 				Name:  "policies",
 				Usage: "Parameter policies as a JSON document",
 			},
+			internal.ValueStdinFlag(),
 		},
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
-		return errors.New("usage: suve param create <name> <value>")
+	args := cmd.Args()
+	if args.Len() < 1 {
+		return errors.New("usage: suve param create <name> [<value>]")
 	}
 
 	secure := cmd.Bool("secure")
@@ -119,6 +127,22 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
+	value, proceed, err := internal.ResolveValue(ctx, internal.ValueSource{
+		FromStdin: cmd.Bool(internal.FlagValueStdin),
+		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
+		Arg:       args.Get(1),
+		Stdin:     internal.Stdin(cmd),
+	})
+	if err != nil {
+		return err
+	}
+
+	if !proceed {
+		output.Info(cmd.Root().Writer, "Empty value, nothing to create.")
+
+		return nil
+	}
+
 	store, err := internal.ParamStore(ctx)
 	if err != nil {
 		return err
@@ -131,8 +155,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return r.Run(ctx, Options{
-		Name:        cmd.Args().Get(0),
-		Value:       cmd.Args().Get(1),
+		Name:        args.Get(0),
+		Value:       value,
 		Type:        paramType,
 		Description: cmd.String("description"),
 		ParamOpts: paramopts.Values{

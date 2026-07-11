@@ -261,7 +261,7 @@ suve gcloud secret list --output=json prod
 Create a new secret. The secret is created with automatic replication, and the given value becomes its first version.
 
 ```
-suve gcloud secret create [options] <name> <value>
+suve gcloud secret create [options] <name> [<value>]
 ```
 
 **Arguments:**
@@ -269,7 +269,16 @@ suve gcloud secret create [options] <name> <value>
 | Argument | Description |
 |----------|-------------|
 | `name` | Secret name |
-| `value` | Secret value |
+| `value` | Secret value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 **Examples:**
 
@@ -291,7 +300,7 @@ suve gcloud secret create my-config '{"host":"db"}'
 Update a secret's value by adding a new version. The new version becomes the latest; prior versions remain accessible by number.
 
 ```
-suve gcloud secret update [options] <name> <value>
+suve gcloud secret update [options] <name> [<value>]
 ```
 
 **Arguments:**
@@ -299,13 +308,17 @@ suve gcloud secret update [options] <name> <value>
 | Argument | Description |
 |----------|-------------|
 | `name` | Secret name |
-| `value` | New secret value |
+| `value` | New secret value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
 
 **Options:**
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--yes` | - | `false` | Skip confirmation prompt |
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 **Examples:**
 

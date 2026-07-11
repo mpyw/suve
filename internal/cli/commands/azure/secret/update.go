@@ -2,9 +2,8 @@ package secret
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
-	"os"
 
 	"github.com/urfave/cli/v3"
 
@@ -33,33 +32,56 @@ func UpdateCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "update",
 		Usage:     "Update a secret value",
-		ArgsUsage: "<name> <value>",
+		ArgsUsage: "<name> [<value>]",
 		Description: `Update the value of an existing secret by adding a new version.
 
 The new version becomes the current one; prior versions remain accessible by id.
 Use 'suve azure secret create' to create a new secret.
 
+The value may be given as a positional argument, read from stdin with
+--value-stdin (so it never appears in argv/ps or shell history), or, when
+omitted, typed into $EDITOR.
+
 EXAMPLES:
   suve azure secret update my-api-key "new-value"       Add a new version
-  suve azure secret update --yes my-api-key "new-value" Update without confirmation`,
+  suve azure secret update --yes my-api-key "new-value" Update without confirmation
+  printf '%s' "$V" | suve azure secret update --yes my-key --value-stdin  Read value from stdin
+  suve azure secret update my-key                       Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "yes",
 				Usage: "Skip confirmation prompt",
 			},
+			cliinternal.ValueStdinFlag(),
 		},
 		Action: updateAction,
 	}
 }
 
 func updateAction(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
-		return fmt.Errorf("usage: suve azure secret update <name> <value>")
+	args := cmd.Args()
+	if args.Len() < 1 {
+		return errors.New("usage: suve azure secret update <name> [<value>]")
 	}
 
-	name := cmd.Args().Get(0)
-	newValue := cmd.Args().Get(1)
+	name := args.Get(0)
 	skipConfirm := cmd.Bool("yes")
+
+	newValue, proceed, err := cliinternal.ResolveValue(ctx, cliinternal.ValueSource{
+		FromStdin: cmd.Bool(cliinternal.FlagValueStdin),
+		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
+		Arg:       args.Get(1),
+		Stdin:     cliinternal.Stdin(cmd),
+	})
+	if err != nil {
+		return err
+	}
+
+	if !proceed {
+		output.Info(cmd.Root().Writer, "Empty value, nothing to update.")
+
+		return nil
+	}
 
 	store, err := cliinternal.AzureKeyVaultStore(ctx)
 	if err != nil {
@@ -78,7 +100,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		prompter := &confirm.Prompter{
-			Stdin:  os.Stdin,
+			Stdin:  cliinternal.Stdin(cmd),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}

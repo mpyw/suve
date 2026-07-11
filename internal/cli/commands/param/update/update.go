@@ -3,9 +3,8 @@ package update
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
-	"os"
 
 	"github.com/urfave/cli/v3"
 
@@ -41,7 +40,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "update",
 		Usage:     "Update a parameter value",
-		ArgsUsage: "<name> <value>",
+		ArgsUsage: "<name> [<value>]",
 		Description: `Update the value of an existing parameter.
 
 This creates a new version of the parameter in AWS Systems Manager Parameter Store.
@@ -57,10 +56,16 @@ PARAMETER TYPES:
 The --secure flag is a shorthand for --type SecureString.
 You cannot use both --secure and --type together.
 
+The value may be given as a positional argument, read from stdin with
+--value-stdin (so it never appears in argv/ps or shell history), or, when
+omitted, typed into $EDITOR.
+
 EXAMPLES:
    suve param update /app/config/db-url "postgres://..."       Update parameter
    suve param update --secure /app/config/api-key "secret123"  Update as SecureString
-   suve param update --yes /app/config/db-url "postgres://..." Update without confirmation`,
+   suve param update --yes /app/config/db-url "postgres://..." Update without confirmation
+   printf '%s' "$V" | suve param update --yes --secure /app/key --value-stdin  Read value from stdin
+   suve param update --secure /app/key                         Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -95,14 +100,16 @@ EXAMPLES:
 				Name:  "yes",
 				Usage: "Skip confirmation prompt",
 			},
+			internal.ValueStdinFlag(),
 		},
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
-		return fmt.Errorf("usage: suve param update <name> <value>")
+	args := cmd.Args()
+	if args.Len() < 1 {
+		return errors.New("usage: suve param update <name> [<value>]")
 	}
 
 	secure := cmd.Bool("secure")
@@ -110,7 +117,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	// Check for conflicting flags
 	if secure && cmd.IsSet("type") {
-		return fmt.Errorf("cannot use --secure with --type; use one or the other")
+		return errors.New("cannot use --secure with --type; use one or the other")
 	}
 
 	if secure {
@@ -125,8 +132,24 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	name := cmd.Args().Get(0)
+	name := args.Get(0)
 	skipConfirm := cmd.Bool("yes")
+
+	newValue, proceed, err := internal.ResolveValue(ctx, internal.ValueSource{
+		FromStdin: cmd.Bool(internal.FlagValueStdin),
+		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
+		Arg:       args.Get(1),
+		Stdin:     internal.Stdin(cmd),
+	})
+	if err != nil {
+		return err
+	}
+
+	if !proceed {
+		output.Info(cmd.Root().Writer, "Empty value, nothing to update.")
+
+		return nil
+	}
 
 	store, err := internal.ParamStore(ctx)
 	if err != nil {
@@ -134,7 +157,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	uc := &param.UpdateUseCase{Store: store}
-	newValue := cmd.Args().Get(1)
 
 	// Fetch current value and show diff before confirming
 	if !skipConfirm {
@@ -148,7 +170,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 		// Confirm operation
 		prompter := &confirm.Prompter{
-			Stdin:  os.Stdin,
+			Stdin:  internal.Stdin(cmd),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}

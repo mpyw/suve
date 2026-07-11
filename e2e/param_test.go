@@ -2283,3 +2283,40 @@ func TestParam_ImportMissingFile(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
+
+// TestParam_ValueStdin proves the direct create/update commands accept the
+// value from stdin (--value-stdin) instead of a positional argument, so the
+// secret never lands in argv/ps or shell history (issue #478). It verifies the
+// value round-trips end to end and that no positional value is required.
+func TestParam_ValueStdin(t *testing.T) {
+	setupEnv(t)
+
+	paramName := "/suve-e2e-test/value-stdin/param"
+
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create with the value supplied on stdin (no positional value argument).
+	t.Run("create via --value-stdin", func(t *testing.T) {
+		stdin := strings.NewReader("stdin-created-value\n")
+		stdout, stderr, err := runCommandWithStdin(t, paramcreate.Command(), stdin, "--secure", paramName, "--value-stdin")
+		require.NoError(t, err, "create failed: stdout=%s stderr=%s", stdout, stderr)
+
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "stdin-created-value", strings.TrimSpace(stdout))
+	})
+
+	// Update with the value supplied on stdin (no positional value argument).
+	t.Run("update via --value-stdin", func(t *testing.T) {
+		stdin := strings.NewReader("stdin-updated-value\n")
+		stdout, stderr, err := runCommandWithStdin(t, paramupdate.Command(), stdin, "--yes", "--secure", paramName, "--value-stdin")
+		require.NoError(t, err, "update failed: stdout=%s stderr=%s", stdout, stderr)
+
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "stdin-updated-value", strings.TrimSpace(stdout))
+	})
+}

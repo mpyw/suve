@@ -265,7 +265,7 @@ suve azure secret list --output=json prod --vault-name my-vault
 Create a new secret. The given value becomes the secret's first version.
 
 ```
-suve azure secret create [options] <name> <value>
+suve azure secret create [options] <name> [<value>]
 ```
 
 **Arguments:**
@@ -273,7 +273,16 @@ suve azure secret create [options] <name> <value>
 | Argument | Description |
 |----------|-------------|
 | `name` | Secret name |
-| `value` | Secret value |
+| `value` | Secret value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 **Examples:**
 
@@ -295,7 +304,7 @@ suve azure secret create my-config '{"host":"db"}' --vault-name my-vault
 Update a secret's value by adding a new version. The new version becomes the current one; prior versions remain accessible by id.
 
 ```
-suve azure secret update [options] <name> <value>
+suve azure secret update [options] <name> [<value>]
 ```
 
 **Arguments:**
@@ -303,13 +312,17 @@ suve azure secret update [options] <name> <value>
 | Argument | Description |
 |----------|-------------|
 | `name` | Secret name |
-| `value` | New secret value |
+| `value` | New secret value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
 
 **Options:**
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--yes` | - | `false` | Skip confirmation prompt |
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 **Examples:**
 
@@ -601,7 +614,7 @@ suve azure param list --output=json app/ --store-name my-store
 Create a new setting (key-value).
 
 ```
-suve azure param create [options] <key> <value>
+suve azure param create [options] <key> [<value>]
 ```
 
 **Arguments:**
@@ -609,7 +622,16 @@ suve azure param create [options] <key> <value>
 | Argument | Description |
 |----------|-------------|
 | `key` | Setting key |
-| `value` | Setting value |
+| `value` | Setting value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
+
+**Options:**
+
+| Option | Alias | Default | Description |
+|--------|-------|---------|-------------|
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 **Examples:**
 
@@ -631,7 +653,7 @@ suve azure param create app/config '{"host":"db"}' --store-name my-store
 Update a setting's value. App Configuration is unversioned, so the value is replaced in place.
 
 ```
-suve azure param update [options] <key> <value>
+suve azure param update [options] <key> [<value>]
 ```
 
 **Arguments:**
@@ -639,13 +661,17 @@ suve azure param update [options] <key> <value>
 | Argument | Description |
 |----------|-------------|
 | `key` | Setting key |
-| `value` | New value |
+| `value` | New value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
 
 **Options:**
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--yes` | - | `false` | Skip confirmation prompt |
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 **Examples:**
 
