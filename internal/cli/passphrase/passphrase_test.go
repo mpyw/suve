@@ -104,6 +104,26 @@ func TestPrompter_PromptForDecrypt(t *testing.T) {
 	assert.Equal(t, "mypassword", pass)
 }
 
+func TestPrompter_PromptForDecrypt_CRLF(t *testing.T) {
+	t.Parallel()
+
+	// strings.NewReader is not a terminal.Fder, so readPassword takes the
+	// non-TTY fallback. CRLF input must be normalized the same as ReadFromStdin.
+	stdin := strings.NewReader("pass\r\n")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+
+	p := &passphrase.Prompter{
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+	}
+
+	pass, err := p.PromptForDecrypt()
+	require.NoError(t, err)
+	assert.Equal(t, "pass", pass)
+}
+
 func TestPrompter_WarnNonTTY(t *testing.T) {
 	t.Parallel()
 
