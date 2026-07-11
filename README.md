@@ -624,20 +624,19 @@ Group aliases are interchangeable with the group name (e.g. `suve az kv show`). 
 
 ### Services
 
-Each service runs under its group (`aws param`, `azure secret`, …) and carries its own aliases:
+Each backend is a service under its provider group, with its own aliases:
 
 | Backend | Command | Aliases |
 |---------|---------|---------|
 | [AWS SSM Parameter Store](docs/aws.md) | `aws param` | `ssm`, `ps` |
 | [AWS Secrets Manager](docs/aws.md) | `aws secret` | `sm`, `secretsmanager` |
-| AWS Staging | `aws stage` | `stg` |
 | [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | `secrets`, `sm` |
-| Google Cloud Staging | `gcloud stage` | `stg` |
 | [Azure Key Vault](docs/azure.md) | `azure secret` | `kv`, `keyvault` |
 | [Azure App Configuration](docs/azure.md) | `azure param` | `appconfig`, `ac`, `appcfg` |
-| Azure Staging | `azure stage` | `stg` |
 
-When exactly one backend is active for a service (see [Provider selection](#provider-selection)), that service command is also available **bare**, without the group prefix — and every alias works bare too. So `suve param` / `suve ssm` / `suve ps`, `suve secret` / `suve sm` / `suve kv`, `suve stage` / `suve stg`, etc. all resolve to the uniquely-active backend.
+**Staging** is the same for every backend — `<group> stage` (alias `stg`), i.e. `aws stage`, `gcloud stage`, `azure stage`.
+
+**Bare form:** when exactly one backend is active for a service (see [Provider selection](#provider-selection)), drop the group prefix — every alias still works. So `suve param` / `suve ssm`, `suve secret` / `suve kv`, `suve stage` / `suve stg`, … resolve to the uniquely-active backend.
 
 ### Provider selection
 
