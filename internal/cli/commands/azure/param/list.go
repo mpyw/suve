@@ -2,7 +2,9 @@ package param
 
 import (
 	"context"
+	"errors"
 	"io"
+	"slices"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -30,6 +32,10 @@ type ListOptions struct {
 	Show   bool
 	HideNS bool
 	Output output.Format
+	// Namespace is the raw --namespace value (the label axis). It is needed only
+	// to tell a single literal namespace (per-key Get can fetch values) from a
+	// wildcard/OR/prefix one (it cannot — see runKeyOnly).
+	Namespace string
 }
 
 // ListRunner renders the Azure App Configuration listing. When Namespace is set
@@ -59,22 +65,8 @@ func (r *ListRunner) Run(ctx context.Context, opts ListOptions) error {
 // runKeyOnly reuses the shared generic list renderer so --hide-namespace output
 // is byte-for-byte the neutral listing.
 func (r *ListRunner) runKeyOnly(ctx context.Context, opts ListOptions) error {
-	input := azure.ListInput{Prefix: opts.Prefix, Filter: opts.Filter, WithValue: opts.Show}
-
 	runner := &genericlist.Runner{
-		List: func(ctx context.Context) ([]genericlist.Entry, error) {
-			result, err := r.KeyOnly.Execute(ctx, input)
-			if err != nil {
-				return nil, err
-			}
-
-			entries := make([]genericlist.Entry, len(result.Entries))
-			for i, e := range result.Entries {
-				entries[i] = genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
-			}
-
-			return entries, nil
-		},
+		List:    r.keyOnlyEntries(opts),
 		Options: genericlist.Options{Show: opts.Show, Output: opts.Output},
 		Stdout:  r.Stdout,
 		Stderr:  r.Stderr,
@@ -82,6 +74,106 @@ func (r *ListRunner) runKeyOnly(ctx context.Context, opts ListOptions) error {
 
 	return runner.Run(ctx)
 }
+
+// keyOnlyEntries picks how the key-only rows are produced. Values (with --show)
+// are normally fetched per key via the neutral use case, but that needs a
+// single literal namespace: under a wildcard/OR/prefix --namespace every per-key
+// Get fails (Get cannot address all/multiple namespaces), so the whole listing
+// would be error rows. In that case source the values from the namespaced list
+// — whose response already carries them — and collapse it to key-only rows.
+func (r *ListRunner) keyOnlyEntries(opts ListOptions) func(context.Context) ([]genericlist.Entry, error) {
+	if opts.Show && r.Namespace != nil {
+		if _, err := aznamespace.Literal(opts.Namespace); err != nil {
+			return r.keyOnlyEntriesFromNamespaced(opts)
+		}
+	}
+
+	return r.keyOnlyEntriesFromReader(opts)
+}
+
+// keyOnlyEntriesFromReader is the neutral path: keys (and, with --show, values)
+// come from the provider-neutral use case, byte-for-byte the shared listing.
+func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Context) ([]genericlist.Entry, error) {
+	return func(ctx context.Context) ([]genericlist.Entry, error) {
+		result, err := r.KeyOnly.Execute(ctx, azure.ListInput{
+			Prefix: opts.Prefix, Filter: opts.Filter, WithValue: opts.Show,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		entries := make([]genericlist.Entry, len(result.Entries))
+		for i, e := range result.Entries {
+			entries[i] = genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
+		}
+
+		return entries, nil
+	}
+}
+
+// keyOnlyEntriesFromNamespaced sources values from the namespaced list (which
+// already carries them) and collapses the per-(key, namespace) rows to the
+// deduped key-only rows the --hide-namespace listing shows.
+func (r *ListRunner) keyOnlyEntriesFromNamespaced(opts ListOptions) func(context.Context) ([]genericlist.Entry, error) {
+	return func(ctx context.Context) ([]genericlist.Entry, error) {
+		result, err := r.Namespace.Execute(ctx, azure.ListNamespacesInput{
+			Prefix: opts.Prefix, Filter: opts.Filter, WithValue: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return collapseToKeyOnly(result.Entries), nil
+	}
+}
+
+// collapseToKeyOnly reduces per-(key, namespace) rows to the deduped, sorted
+// key-only rows the --hide-namespace listing shows, carrying each key's value.
+// A key that resolves to different values across namespaces cannot be shown as
+// one value, so it becomes an error row rather than an arbitrary pick.
+func collapseToKeyOnly(rows []azure.ListNamespacesEntry) []genericlist.Entry {
+	type collapsed struct {
+		value     string
+		ambiguous bool
+	}
+
+	byName := make(map[string]*collapsed, len(rows))
+
+	names := make([]string, 0, len(rows))
+
+	for _, row := range rows {
+		value := lo.FromPtr(row.Value)
+
+		if existing, ok := byName[row.Name]; ok {
+			if existing.value != value {
+				existing.ambiguous = true
+			}
+
+			continue
+		}
+
+		byName[row.Name] = &collapsed{value: value}
+		names = append(names, row.Name)
+	}
+
+	slices.Sort(names)
+
+	entries := make([]genericlist.Entry, 0, len(names))
+
+	for _, name := range names {
+		if c := byName[name]; c.ambiguous {
+			entries = append(entries, genericlist.Entry{Name: name, Error: errAmbiguousValue})
+		} else {
+			entries = append(entries, genericlist.Entry{Name: name, Value: lo.ToPtr(c.value)})
+		}
+	}
+
+	return entries
+}
+
+// errAmbiguousValue marks a key whose value differs across the namespaces a
+// wildcard --namespace matched, so --hide-namespace cannot show one value.
+var errAmbiguousValue = errors.New("value differs across namespaces; drop --hide-namespace to see each")
 
 // runNamespaced renders the NAMESPACE column (text: <namespace>TAB<key>[TAB<value>];
 // json: {namespace, name, value?}). The null namespace shows as "(NULL)" in text
@@ -202,11 +294,12 @@ EXAMPLES:
 			}
 
 			return runner.Run(ctx, ListOptions{
-				Prefix: cmd.Args().First(),
-				Filter: cmd.String("filter"),
-				Show:   cmd.Bool("show"),
-				HideNS: cmd.Bool("hide-namespace"),
-				Output: outputFormat,
+				Prefix:    cmd.Args().First(),
+				Filter:    cmd.String("filter"),
+				Show:      cmd.Bool("show"),
+				HideNS:    cmd.Bool("hide-namespace"),
+				Output:    outputFormat,
+				Namespace: cliinternal.AzureAppConfigNamespace(ctx),
 			})
 		},
 	}
