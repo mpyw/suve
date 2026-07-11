@@ -12,6 +12,8 @@
 
 # Output of the go coverage tool
 *.out
+# Writable coverage output mount for the Dockerized coverage-e2e/coverage-all tasks
+/coverage/
 
 # Dependency directories
 vendor/

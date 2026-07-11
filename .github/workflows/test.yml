@@ -116,8 +116,6 @@ jobs:
         run: |
           COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
           go test -v -race -tags e2e -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
-        env:
-          SUVE_LOCALSTACK_EXTERNAL_PORT: 4566
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0

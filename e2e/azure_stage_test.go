@@ -69,7 +69,7 @@ func TestAzureKeyVaultStage_Workflow(t *testing.T) {
 
 	// The Key Vault staging scope is keyed by the globally-unique vault name
 	// alone; the emulator setup pins it to "suve-e2e".
-	store, err := file.NewStore(provider.AzureKeyVaultScope("suve-e2e"))
+	store, err := file.NewWorkingStore(provider.AzureKeyVaultScope("suve-e2e"))
 	require.NoError(t, err)
 
 	now := time.Now()
@@ -151,7 +151,7 @@ func TestAzureAppConfigStage_Workflow(t *testing.T) {
 	_, err := runAzureParam(t, "create", updateName, "original")
 	require.NoError(t, err)
 
-	store, err := file.NewStore(provider.AzureAppConfigScope("suve-e2e"))
+	store, err := file.NewWorkingStore(provider.AzureAppConfigScope("suve-e2e"))
 	require.NoError(t, err)
 
 	now := time.Now()
@@ -266,7 +266,7 @@ func TestAzureStageGlobal_KeyVaultOnly(t *testing.T) {
 	cleanup()
 	t.Cleanup(cleanup)
 
-	store, err := file.NewStore(provider.AzureKeyVaultScope("suve-e2e"))
+	store, err := file.NewWorkingStore(provider.AzureKeyVaultScope("suve-e2e"))
 	require.NoError(t, err)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: name}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("kv-only-value"), StagedAt: time.Now(),
@@ -314,7 +314,7 @@ func TestAzureStageGlobal_AppConfigOnly(t *testing.T) {
 	cleanup()
 	t.Cleanup(cleanup)
 
-	store, err := file.NewStore(provider.AzureAppConfigScope("suve-e2e"))
+	store, err := file.NewWorkingStore(provider.AzureAppConfigScope("suve-e2e"))
 	require.NoError(t, err)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("ac-only-value"), StagedAt: time.Now(),
@@ -367,13 +367,13 @@ func TestAzureStageGlobal_BothConnected(t *testing.T) {
 	cleanup()
 	t.Cleanup(cleanup)
 
-	kvStore, err := file.NewStore(provider.AzureKeyVaultScope("suve-e2e"))
+	kvStore, err := file.NewWorkingStore(provider.AzureKeyVaultScope("suve-e2e"))
 	require.NoError(t, err)
 	require.NoError(t, kvStore.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: kvName}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("both-secret-value"), StagedAt: time.Now(),
 	}))
 
-	acStore, err := file.NewStore(provider.AzureAppConfigScope("suve-e2e"))
+	acStore, err := file.NewWorkingStore(provider.AzureAppConfigScope("suve-e2e"))
 	require.NoError(t, err)
 	require.NoError(t, acStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: acName}, staging.Entry{
 		Operation: staging.OperationCreate, Value: lo.ToPtr("both-param-value"), StagedAt: time.Now(),

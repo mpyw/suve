@@ -21,7 +21,7 @@ import (
 // newGoogleCloudStore creates a working staging store keyed by the given Google
 // Cloud project, matching the scope the `gcloud stage` commands resolve.
 func newGoogleCloudStore(project string) *file.Store {
-	s, err := file.NewStore(provider.GoogleCloudScope(project))
+	s, err := file.NewWorkingStore(provider.GoogleCloudScope(project))
 	if err != nil {
 		panic(err)
 	}
