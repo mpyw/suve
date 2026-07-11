@@ -5,12 +5,10 @@
 //
 //	~/.suve/staging/{scope.Key()}/param.json    (working, param service)
 //	~/.suve/staging/{scope.Key()}/secret.json   (working, secret service)
-//	~/.suve/staging/{scope.Key()}/stash.json    (stash, single file, all services)
 //
-// Working files are encrypted with the keychain-resolved data key (raw-key v2);
-// the stash file is encrypted with a passphrase (v1). Plaintext/legacy files
-// remain readable. A path-based single-file mode is retained for testing and
-// for the stash file.
+// Working files are encrypted with the keychain-resolved data key (raw-key v2).
+// Plaintext/legacy files remain readable. A path-based single-file mode is
+// retained for testing.
 package file
 
 import (
@@ -30,9 +28,8 @@ import (
 )
 
 const (
-	stashFileName = "stash.json"
-	baseDirName   = ".suve"
-	stagingDir    = "staging"
+	baseDirName = ".suve"
+	stagingDir  = "staging"
 )
 
 // fileMu protects concurrent access to the state files within a process.
@@ -64,7 +61,7 @@ var plaintextWarnOnce sync.Once
 //     is split into param.json / secret.json under stateDir; service=="" ops
 //     iterate the scope's supported services.
 //   - Single-file mode: stateFilePath is set. The whole state lives in one file
-//     (used for the stash file and for path-based tests).
+//     (retained for path-based tests).
 type Store struct {
 	// stateDir is the scope directory for split (working) mode.
 	stateDir string
@@ -113,7 +110,7 @@ func NewStore(scope provider.Scope) (*Store, error) {
 // When falling back to plaintext, a one-time warning is emitted to stderr.
 // This is the constructor to use for all working-area operations
 // (stage add/edit/delete/status/diff/apply/reset and the working side of
-// stash push/pop). The stash file (stash.json) keeps its passphrase flow.
+// export/import).
 func NewWorkingStore(scope provider.Scope) (*Store, error) {
 	s, err := NewStore(scope)
 	if err != nil {
@@ -192,34 +189,6 @@ func NewStoreWithPath(path string) *Store {
 // scope with a passphrase for encryption. Primarily for testing.
 func NewStoreWithPassphrase(scope provider.Scope, passphrase string) (*Store, error) {
 	s, err := NewStore(scope)
-	if err != nil {
-		return nil, err
-	}
-
-	s.passphrase = passphrase
-
-	return s, nil
-}
-
-// NewStashStore creates a new single-file Store backed by the stash file.
-// The stash file is stored under ~/.suve/staging/{scope.Key()}/stash.json
-// and is used by stage stash push/pop/show/drop. Unlike the working store,
-// the stash file is NOT split: it holds the whole state (all services).
-func NewStashStore(scope provider.Scope) (*Store, error) {
-	dir, err := scopeDir(scope)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Store{
-		stateFilePath: filepath.Join(dir, stashFileName),
-		scope:         scope,
-	}, nil
-}
-
-// NewStashStoreWithPassphrase creates a new stash Store with a passphrase for encryption.
-func NewStashStoreWithPassphrase(scope provider.Scope, passphrase string) (*Store, error) {
-	s, err := NewStashStore(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -776,7 +745,7 @@ func initializeStateMaps(state *staging.State) {
 }
 
 // Delete removes all backing state files without reading their contents.
-// This is useful for dropping stash when decryption is not needed.
+// This is useful for discarding state when decryption is not needed.
 func (s *Store) Delete() error {
 	defer s.lock()()
 

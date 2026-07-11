@@ -269,7 +269,7 @@ func TestLockPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(split.stateDir, ".lock"), split.lockPath())
 
-	single := NewStoreWithPath(filepath.Join(t.TempDir(), "stash.json"))
+	single := NewStoreWithPath(filepath.Join(t.TempDir(), "single.json"))
 	assert.Equal(t, filepath.Join(filepath.Dir(single.stateFilePath), ".lock"), single.lockPath())
 }
 

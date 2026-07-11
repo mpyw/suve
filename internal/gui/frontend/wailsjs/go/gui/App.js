@@ -26,6 +26,10 @@ export function InitialService() {
   return window['go']['gui']['App']['InitialService']();
 }
 
+export function InspectImportFile(arg1) {
+  return window['go']['gui']['App']['InspectImportFile'](arg1);
+}
+
 export function ParamAddTag(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['ParamAddTag'](arg1, arg2, arg3, arg4);
 }
@@ -60,6 +64,14 @@ export function ParamShow(arg1, arg2) {
 
 export function ParamTypeOptions() {
   return window['go']['gui']['App']['ParamTypeOptions']();
+}
+
+export function PickExportPath(arg1) {
+  return window['go']['gui']['App']['PickExportPath'](arg1);
+}
+
+export function PickImportPath() {
+  return window['go']['gui']['App']['PickImportPath']();
 }
 
 export function SecretAddTag(arg1, arg2, arg3) {
@@ -138,24 +150,16 @@ export function StagingDiff(arg1, arg2) {
   return window['go']['gui']['App']['StagingDiff'](arg1, arg2);
 }
 
-export function StagingDrain(arg1, arg2, arg3, arg4) {
-  return window['go']['gui']['App']['StagingDrain'](arg1, arg2, arg3, arg4);
-}
-
-export function StagingDrop() {
-  return window['go']['gui']['App']['StagingDrop']();
-}
-
 export function StagingEdit(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['StagingEdit'](arg1, arg2, arg3, arg4);
 }
 
-export function StagingFileStatus() {
-  return window['go']['gui']['App']['StagingFileStatus']();
+export function StagingExport(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingExport'](arg1, arg2, arg3, arg4);
 }
 
-export function StagingPersist(arg1, arg2, arg3, arg4) {
-  return window['go']['gui']['App']['StagingPersist'](arg1, arg2, arg3, arg4);
+export function StagingImport(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['StagingImport'](arg1, arg2, arg3, arg4);
 }
 
 export function StagingRemoveTag(arg1, arg2, arg3, arg4) {

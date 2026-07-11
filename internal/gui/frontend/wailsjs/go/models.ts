@@ -38,6 +38,26 @@ export namespace gui {
 	        this.stageActive = source["stageActive"];
 	    }
 	}
+	export class EnvelopeInfoResult {
+	    encrypted: boolean;
+	    provider: string;
+	    scope: string;
+	    service: string;
+	    scopeMatches: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new EnvelopeInfoResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.encrypted = source["encrypted"];
+	        this.provider = source["provider"];
+	        this.scope = source["scope"];
+	        this.service = source["service"];
+	        this.scopeMatches = source["scopeMatches"];
+	    }
+	}
 	export class ParamDeleteResult {
 	    name: string;
 	
@@ -837,34 +857,6 @@ export namespace gui {
 		}
 	}
 	
-	export class StagingDrainResult {
-	    merged: boolean;
-	    entryCount: number;
-	    tagCount: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new StagingDrainResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.merged = source["merged"];
-	        this.entryCount = source["entryCount"];
-	        this.tagCount = source["tagCount"];
-	    }
-	}
-	export class StagingDropResult {
-	    dropped: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new StagingDropResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.dropped = source["dropped"];
-	    }
-	}
 	export class StagingEditResult {
 	    name: string;
 	
@@ -897,30 +889,32 @@ export namespace gui {
 	        this.stagedAt = source["stagedAt"];
 	    }
 	}
-	export class StagingFileStatusResult {
-	    exists: boolean;
-	    encrypted: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new StagingFileStatusResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.exists = source["exists"];
-	        this.encrypted = source["encrypted"];
-	    }
-	}
-	export class StagingPersistResult {
+	export class StagingExportResult {
 	    entryCount: number;
 	    tagCount: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new StagingPersistResult(source);
+	        return new StagingExportResult(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entryCount = source["entryCount"];
+	        this.tagCount = source["tagCount"];
+	    }
+	}
+	export class StagingImportResult {
+	    merged: boolean;
+	    entryCount: number;
+	    tagCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.merged = source["merged"];
 	        this.entryCount = source["entryCount"];
 	        this.tagCount = source["tagCount"];
 	    }

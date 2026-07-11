@@ -14,6 +14,8 @@ export function InitialProvider():Promise<string>;
 
 export function InitialService():Promise<string>;
 
+export function InspectImportFile(arg1:string):Promise<gui.EnvelopeInfoResult>;
+
 export function ParamAddTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function ParamDelete(arg1:string,arg2:string):Promise<gui.ParamDeleteResult>;
@@ -31,6 +33,10 @@ export function ParamSet(arg1:string,arg2:string,arg3:string,arg4:string):Promis
 export function ParamShow(arg1:string,arg2:string):Promise<gui.ParamShowResult>;
 
 export function ParamTypeOptions():Promise<Array<string>>;
+
+export function PickExportPath(arg1:string):Promise<string>;
+
+export function PickImportPath():Promise<string>;
 
 export function SecretAddTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
@@ -70,15 +76,11 @@ export function StagingDelete(arg1:string,arg2:string,arg3:boolean,arg4:number,a
 
 export function StagingDiff(arg1:string,arg2:string):Promise<gui.StagingDiffResult>;
 
-export function StagingDrain(arg1:string,arg2:string,arg3:boolean,arg4:string):Promise<gui.StagingDrainResult>;
-
-export function StagingDrop():Promise<gui.StagingDropResult>;
-
 export function StagingEdit(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingEditResult>;
 
-export function StagingFileStatus():Promise<gui.StagingFileStatusResult>;
+export function StagingExport(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<gui.StagingExportResult>;
 
-export function StagingPersist(arg1:string,arg2:string,arg3:boolean,arg4:string):Promise<gui.StagingPersistResult>;
+export function StagingImport(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingImportResult>;
 
 export function StagingRemoveTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingRemoveTagResult>;
 

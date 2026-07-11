@@ -41,8 +41,8 @@ func dtoContract() []any {
 		StagingDeleteResult{}, StagingUnstageResult{}, StagingAddTagResult{},
 		StagingRemoveTagResult{}, StagingCancelAddTagResult{}, StagingCancelRemoveTagResult{},
 		StagingDiffResult{}, StagingDiffEntry{}, StagingDiffTagEntry{},
-		StagingCheckStatusResult{}, StagingDrainResult{}, StagingPersistResult{},
-		StagingFileStatusResult{}, StagingDropResult{},
+		StagingCheckStatusResult{}, StagingExportResult{}, StagingImportResult{},
+		EnvelopeInfoResult{},
 	}
 }
 

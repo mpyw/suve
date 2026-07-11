@@ -5,7 +5,7 @@ import {
   createAzureState,
   createAmbiguousProviderState,
   createNoActiveProviderState,
-  createStagedForPushState,
+  createStagedForExportState,
   getRecordedCalls,
   waitForItemList,
   waitForViewLoaded,
@@ -174,7 +174,7 @@ test.describe('Provider selection', () => {
     });
 
     test('staging badge is scope-keyed (AWS count does not leak to Google Cloud)', async ({ page }) => {
-      await setupWailsMocks(page, createStagedForPushState());
+      await setupWailsMocks(page, createStagedForExportState());
       await page.goto('/');
       await waitForItemList(page);
 

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingDrain, StagingDrop, StagingEdit, StagingFileStatus, StagingPersist, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
+  import { InspectImportFile, PickExportPath, PickImportPath, StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
   import { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
@@ -60,50 +60,46 @@
   let tagEditValue = $state('');
   let tagEditIsNew = $state(false);
 
-  // Persist/Drain modal states
-  let showPersistModal = $state(false);
-  let showDrainModal = $state(false);
-  let showDrainOptionsModal = $state(false);
-  let persistLoading = $state(false);
-  let drainLoading = $state(false);
-  let persistError = $state('');
-  let drainError = $state('');
-  let persistResult: gui.StagingPersistResult | null = $state(null);
-  let drainResult: gui.StagingDrainResult | null = $state(null);
-  let fileStatus: gui.StagingFileStatusResult | null = $state(null);
+  // Export / Import: per-service transfer to/from a file. Files are per-service
+  // (one service per envelope), so every flow carries a concrete service — never
+  // the combined scope — which keeps Azure App Configuration (param) and Key
+  // Vault (secret) in their own on-disk buckets (#445).
+  let showTransferDropdown = $state(false);
 
-  // Drain options
-  let drainKeep = $state(false);
-  let drainMode: 'merge' | 'overwrite' = $state('merge');
+  // Export flow
+  let showExportPassphrase = $state(false);
+  let exportService = $state('');
+  let exportPath = $state('');
+  let exportLoading = $state(false);
+  let exportError = $state('');
+  let exportResult: gui.StagingExportResult | null = $state(null);
 
-  // Push options modal (when file exists)
-  let showPushOptionsModal = $state(false);
-  let pushPassphrase = $state('');
-  let pushMode: 'overwrite' | 'merge' = $state('merge');
-
-  // Drop confirmation modal
-  let showDropModal = $state(false);
-  let dropLoading = $state(false);
-  let dropError = $state('');
-
-  // Stash dropdown state
-  let showStashDropdown = $state(false);
+  // Import flow
+  let importService = $state('');
+  let importPath = $state('');
+  let importInfo: gui.EnvelopeInfoResult | null = $state(null);
+  let importPassphrase = $state('');
+  let importMode: 'merge' | 'overwrite' = $state('merge');
+  let showImportWarnModal = $state(false);
+  let showImportModeModal = $state(false);
+  let showImportPassphrase = $state(false);
+  let showImportErrorModal = $state(false);
+  let importLoading = $state(false);
+  let importError = $state('');
+  let importResult: gui.StagingImportResult | null = $state(null);
 
   async function loadStatus() {
     loading = true;
     error = '';
     try {
-      // Load diff data and file status in parallel
-      const [paramResult, secretResult, fileStatusResult] = await Promise.all([
+      const [paramResult, secretResult] = await Promise.all([
         paramSvc ? withRetry(() => StagingDiff('param', '')) : Promise.resolve(null),
         secretSvc ? withRetry(() => StagingDiff('secret', '')) : Promise.resolve(null),
-        StagingFileStatus().catch(() => null) // Don't fail if file status check fails
       ]);
       paramEntries = paramResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
       secretEntries = secretResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
       paramTagEntries = paramResult?.tagEntries || [];
       secretTagEntries = secretResult?.tagEntries || [];
-      fileStatus = fileStatusResult;
       // Emit count change for sidebar badge
       const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
       oncountchange?.(totalCount);
@@ -113,7 +109,6 @@
       secretEntries = [];
       paramTagEntries = [];
       secretTagEntries = [];
-      fileStatus = null;
       oncountchange?.(0);
     } finally {
       loading = false;
@@ -326,153 +321,141 @@
     }
   }
 
-  // Persist modal handlers
-  async function openPersistModal() {
-    persistError = '';
-    persistResult = null;
-    pushPassphrase = '';
-    pushMode = 'merge';
-
-    try {
-      // Check if file exists first
-      fileStatus = await StagingFileStatus();
-      if (fileStatus?.exists) {
-        // File exists, show options modal for merge/overwrite
-        showPushOptionsModal = true;
-      } else {
-        // No existing file, go straight to passphrase modal
-        showPersistModal = true;
-      }
-    } catch (e) {
-      // If can't check, just show passphrase modal
-      showPersistModal = true;
-    }
+  // Does the given service currently have staged changes (entries or tags)?
+  // Drives the import merge/overwrite prompt and the export enable state.
+  function serviceHasChanges(service: string): boolean {
+    if (service === 'param') return paramEntries.length > 0 || paramTagEntries.length > 0;
+    return secretEntries.length > 0 || secretTagEntries.length > 0;
   }
 
-  async function handlePersist(passphrase: string) {
-    persistLoading = true;
-    persistError = '';
-    try {
-      const result = await StagingPersist('', passphrase, false, pushMode); // service='', keep=false
-      persistResult = result;
-      showPersistModal = false;
-      await loadStatus();
-    } catch (e) {
-      persistError = parseError(e);
-    } finally {
-      persistLoading = false;
-    }
+  function serviceLabel(service: string): string {
+    return service === 'param' ? paramLabel : secretLabel;
   }
 
-  async function handlePersistWithOptions() {
-    persistLoading = true;
-    persistError = '';
+  // ---- Export flow -------------------------------------------------------
+  // Pick a destination file (native Save dialog), then collect a passphrase
+  // (optional) before writing a single-service envelope.
+  async function startExport(service: string) {
+    showTransferDropdown = false;
+    exportError = '';
+    exportResult = null;
+    exportService = service;
     try {
-      const result = await StagingPersist('', pushPassphrase, false, pushMode);
-      persistResult = result;
-      showPushOptionsModal = false;
-      await loadStatus();
-    } catch (e) {
-      persistError = parseError(e);
-    } finally {
-      persistLoading = false;
-    }
-  }
-
-  function closePersistModal() {
-    showPersistModal = false;
-    showPushOptionsModal = false;
-    persistResult = null;
-  }
-
-  // Drain modal handlers
-  async function openDrainModal() {
-    drainError = '';
-    drainResult = null;
-    drainKeep = false;
-    drainMode = 'merge';
-
-    try {
-      // Check file status first
-      fileStatus = await StagingFileStatus();
-      if (!fileStatus.exists) {
-        error = 'No staging file found. Nothing to drain.';
-        return;
-      }
-
-      // Always show options modal first (for both encrypted and unencrypted)
-      showDrainOptionsModal = true;
+      const path = await PickExportPath(`${service}.json`);
+      if (!path) return; // dialog cancelled
+      exportPath = path;
+      showExportPassphrase = true;
     } catch (e) {
       error = parseError(e);
     }
   }
 
-  async function handleDrainWithPassphrase(passphrase: string) {
-    drainLoading = true;
-    drainError = '';
+  async function handleExport(passphrase: string) {
+    exportLoading = true;
+    exportError = '';
     try {
-      const result = await StagingDrain('', passphrase, drainKeep, drainMode);
-      drainResult = result;
-      showDrainModal = false;
+      const result = await StagingExport(exportPath, exportService, passphrase, false);
+      exportResult = result;
+      showExportPassphrase = false;
       await loadStatus();
     } catch (e) {
-      drainError = parseError(e);
+      exportError = parseError(e);
     } finally {
-      drainLoading = false;
+      exportLoading = false;
     }
   }
 
-  async function handleDrainWithOptions() {
-    // If encrypted, we need to get passphrase first
-    if (fileStatus?.encrypted) {
-      showDrainOptionsModal = false;
-      showDrainModal = true;
+  function closeExportModal() {
+    showExportPassphrase = false;
+  }
+
+  // ---- Import flow -------------------------------------------------------
+  // Pick a source file (native Open dialog), inspect its plaintext header
+  // (no passphrase yet), then chain: service-mismatch refusal → scope warning
+  // → merge/overwrite (only when the target already has changes) → passphrase
+  // (only when encrypted) → import.
+  async function startImport(service: string) {
+    showTransferDropdown = false;
+    importError = '';
+    importResult = null;
+    importInfo = null;
+    importPassphrase = '';
+    importMode = 'merge';
+    importService = service;
+    try {
+      const path = await PickImportPath();
+      if (!path) return; // dialog cancelled
+      importPath = path;
+
+      const info = await InspectImportFile(path);
+      importInfo = info;
+
+      if (info.service !== service) {
+        importError = `This file holds ${info.service} data, not ${serviceLabel(service)}. Choose the matching Import action.`;
+        showImportErrorModal = true;
+        return;
+      }
+
+      if (!info.scopeMatches) {
+        showImportWarnModal = true;
+        return;
+      }
+
+      proceedImportAfterWarn();
+    } catch (e) {
+      importError = parseError(e);
+      showImportErrorModal = true;
+    }
+  }
+
+  function proceedImportAfterWarn() {
+    showImportWarnModal = false;
+    if (serviceHasChanges(importService)) {
+      importMode = 'merge';
+      showImportModeModal = true;
       return;
     }
+    afterModeChosen();
+  }
 
-    // Unencrypted file - proceed directly
-    drainLoading = true;
-    drainError = '';
+  function afterModeChosen() {
+    showImportModeModal = false;
+    if (importInfo?.encrypted) {
+      showImportPassphrase = true;
+      return;
+    }
+    runImport('');
+  }
+
+  function handleImportPassphrase(passphrase: string) {
+    showImportPassphrase = false;
+    runImport(passphrase);
+  }
+
+  async function runImport(passphrase: string) {
+    importLoading = true;
+    importError = '';
     try {
-      const result = await StagingDrain('', '', drainKeep, drainMode);
-      drainResult = result;
-      showDrainOptionsModal = false;
+      const result = await StagingImport(importPath, importService, passphrase, importMode);
+      importResult = result;
+      showImportModeModal = false;
+      showImportPassphrase = false;
       await loadStatus();
     } catch (e) {
-      drainError = parseError(e);
+      importError = parseError(e);
+      // Surface backend errors (e.g. wrong passphrase, service mismatch) in a
+      // modal since the transient chain modals are now closed.
+      showImportErrorModal = true;
     } finally {
-      drainLoading = false;
+      importLoading = false;
     }
   }
 
-  function closeDrainModal() {
-    showDrainModal = false;
-    showDrainOptionsModal = false;
-    drainResult = null;
-  }
-
-  // Drop modal handlers
-  function openDropModal() {
-    dropError = '';
-    showDropModal = true;
-  }
-
-  async function handleDrop() {
-    dropLoading = true;
-    dropError = '';
-    try {
-      await StagingDrop();
-      showDropModal = false;
-      await loadStatus();
-    } catch (e) {
-      dropError = parseError(e);
-    } finally {
-      dropLoading = false;
-    }
-  }
-
-  function closeDropModal() {
-    showDropModal = false;
+  function closeImportModals() {
+    showImportWarnModal = false;
+    showImportModeModal = false;
+    showImportPassphrase = false;
+    showImportErrorModal = false;
   }
 
   onMount(() => {
@@ -570,46 +553,65 @@
         Reset All
       </button>
     </div>
-    <div class="stash-dropdown">
+    <div class="transfer-dropdown">
       <button
-        class="btn-stash"
-        class:has-file={fileStatus?.exists}
-        onclick={() => showStashDropdown = !showStashDropdown}
+        class="btn-transfer"
+        data-testid="transfer-menu"
+        onclick={() => showTransferDropdown = !showTransferDropdown}
       >
-        Stash
-        {#if fileStatus?.exists}
-          <span class="stash-indicator">●</span>
-        {/if}
+        Export / Import
         <span class="dropdown-arrow">▾</span>
       </button>
-      {#if showStashDropdown}
-        <button type="button" class="dropdown-backdrop" aria-label="Dismiss menu" onclick={() => showStashDropdown = false}></button>
+      {#if showTransferDropdown}
+        <button type="button" class="dropdown-backdrop" aria-label="Dismiss menu" onclick={() => showTransferDropdown = false}></button>
         <div class="dropdown-menu">
-          <button
-            class="dropdown-item"
-            onclick={() => { showStashDropdown = false; openPersistModal(); }}
-            disabled={loading || (paramEntries.length === 0 && secretEntries.length === 0 && paramTagEntries.length === 0 && secretTagEntries.length === 0)}
-          >
-            <span class="dropdown-icon">⏏️</span>
-            Push <span class="dropdown-desc">(Persist)</span>
-          </button>
-          <button
-            class="dropdown-item"
-            onclick={() => { showStashDropdown = false; openDrainModal(); }}
-            disabled={loading || !fileStatus?.exists}
-          >
-            <span class="dropdown-icon">▶️</span>
-            Pop <span class="dropdown-desc">(Drain)</span>
-          </button>
+          <div class="dropdown-heading">Export</div>
+          {#if paramSvc}
+            <button
+              class="dropdown-item"
+              data-testid="export-param"
+              onclick={() => startExport('param')}
+              disabled={loading || !serviceHasChanges('param')}
+            >
+              <span class="dropdown-icon">⏏️</span>
+              Export {paramLabel}
+            </button>
+          {/if}
+          {#if secretSvc}
+            <button
+              class="dropdown-item"
+              data-testid="export-secret"
+              onclick={() => startExport('secret')}
+              disabled={loading || !serviceHasChanges('secret')}
+            >
+              <span class="dropdown-icon">⏏️</span>
+              Export {secretLabel}
+            </button>
+          {/if}
           <div class="dropdown-divider"></div>
-          <button
-            class="dropdown-item dropdown-item-danger"
-            onclick={() => { showStashDropdown = false; openDropModal(); }}
-            disabled={loading || !fileStatus?.exists}
-          >
-            <span class="dropdown-icon">🗑️</span>
-            Drop <span class="dropdown-desc">(Trash)</span>
-          </button>
+          <div class="dropdown-heading">Import</div>
+          {#if paramSvc}
+            <button
+              class="dropdown-item"
+              data-testid="import-param"
+              onclick={() => startImport('param')}
+              disabled={loading}
+            >
+              <span class="dropdown-icon">▶️</span>
+              Import {paramLabel}
+            </button>
+          {/if}
+          {#if secretSvc}
+            <button
+              class="dropdown-item"
+              data-testid="import-secret"
+              onclick={() => startImport('secret')}
+              disabled={loading}
+            >
+              <span class="dropdown-icon">▶️</span>
+              Import {secretLabel}
+            </button>
+          {/if}
         </div>
       {/if}
     </div>
@@ -791,155 +793,116 @@
   </form>
 </Modal>
 
-<!-- Persist Modal (uses PassphraseModal for encryption) -->
+<!-- Export Passphrase Modal (encrypt; empty passphrase = plain text) -->
 <PassphraseModal
-  show={showPersistModal}
+  show={showExportPassphrase}
   mode="encrypt"
-  title="Persist to File"
-  onsubmit={handlePersist}
-  oncancel={closePersistModal}
-  loading={persistLoading}
-  error={persistError}
+  title="Export {serviceLabel(exportService)}"
+  onsubmit={handleExport}
+  oncancel={closeExportModal}
+  loading={exportLoading}
+  error={exportError}
 />
 
-<!-- Drain Modal (uses PassphraseModal for decryption when encrypted) -->
-<PassphraseModal
-  show={showDrainModal}
-  mode="decrypt"
-  title="Drain from File"
-  onsubmit={handleDrainWithPassphrase}
-  oncancel={closeDrainModal}
-  loading={drainLoading}
-  error={drainError}
-/>
-
-<!-- Drain Options Modal (for unencrypted files) -->
-<Modal title="Drain from File" show={showDrainOptionsModal} onclose={closeDrainModal}>
-  <div class="drain-options">
-    {#if drainError}
-      <div class="modal-error">{drainError}</div>
-    {/if}
-
-    {#if drainResult}
-      <div class="drain-result">
-        <div class="result-icon success">✓</div>
-        <h4>Successfully loaded from file</h4>
-        <div class="result-stats">
-          <span class="stat">{drainResult.entryCount} entries</span>
-          <span class="stat">{drainResult.tagCount} tag changes</span>
-          {#if drainResult.merged}
-            <span class="stat merged">(merged)</span>
-          {/if}
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn-primary" onclick={closeDrainModal}>Close</button>
-        </div>
-      </div>
-    {:else}
-      <p>Load staged changes from file into memory?</p>
-      <p class="info">This will load changes from the staging file ({fileStatus?.encrypted ? 'encrypted' : 'plain text'}).</p>
-
-      <div class="options-group">
-        <label class="checkbox-label">
-          <input type="checkbox" bind:checked={drainKeep} />
-          <span>Keep file after loading</span>
-        </label>
-      </div>
-      <div class="options-group">
-        <label class="radio-label">
-          <input type="radio" name="drainMode" value="merge" bind:group={drainMode} />
-          <span>Merge</span>
-          <span class="option-desc">Combine with existing staged changes</span>
-        </label>
-        <label class="radio-label">
-          <input type="radio" name="drainMode" value="overwrite" bind:group={drainMode} />
-          <span>Overwrite</span>
-          <span class="option-desc">Replace existing staged changes</span>
-        </label>
-      </div>
-
-      <div class="form-actions">
-        <button type="button" class="btn-secondary" onclick={closeDrainModal}>Cancel</button>
-        <button type="button" class="btn-drain-action" onclick={handleDrainWithOptions} disabled={drainLoading}>
-          {drainLoading ? 'Loading...' : (fileStatus?.encrypted ? 'Next (Enter Passphrase)' : 'Load from File')}
-        </button>
-      </div>
-    {/if}
-  </div>
-</Modal>
-
-<!-- Persist Result Modal -->
-{#if persistResult}
-<Modal title="Push Complete" show={true} onclose={() => persistResult = null}>
+<!-- Export Result Modal -->
+{#if exportResult}
+<Modal title="Export Complete" show={true} onclose={() => exportResult = null}>
   <div class="persist-result">
     <div class="result-icon success">✓</div>
-    <h4>Successfully saved to file</h4>
+    <h4>Exported {serviceLabel(exportService)} to file</h4>
     <div class="result-stats">
-      <span class="stat">{persistResult.entryCount} entries</span>
-      <span class="stat">{persistResult.tagCount} tag changes</span>
+      <span class="stat">{exportResult.entryCount} entries</span>
+      <span class="stat">{exportResult.tagCount} tag changes</span>
     </div>
     <div class="form-actions">
-      <button type="button" class="btn-primary" onclick={() => persistResult = null}>Close</button>
+      <button type="button" class="btn-primary" onclick={() => exportResult = null}>Close</button>
     </div>
   </div>
 </Modal>
 {/if}
 
-<!-- Push Options Modal (when stash file already exists) -->
-<Modal title="Stash File Exists" show={showPushOptionsModal} onclose={closePersistModal}>
-  <div class="push-options">
-    {#if persistError}
-      <div class="modal-error">{persistError}</div>
-    {/if}
-
-    <p>A stash file already exists. How do you want to proceed?</p>
-
-    <div class="options-group">
-      <label class="radio-label">
-        <input type="radio" name="pushMode" value="merge" bind:group={pushMode} />
-        <span>Merge</span>
-        <span class="option-desc">Combine with existing stash file</span>
-      </label>
-      <label class="radio-label">
-        <input type="radio" name="pushMode" value="overwrite" bind:group={pushMode} />
-        <span>Overwrite</span>
-        <span class="option-desc">Replace existing stash file</span>
-      </label>
-    </div>
-
-    <div class="form-group">
-      <label for="push-passphrase">Passphrase (optional, for encryption)</label>
-      <input
-        id="push-passphrase"
-        type="password"
-        class="form-input"
-        bind:value={pushPassphrase}
-        placeholder="Leave empty for no encryption"
-      />
-    </div>
-
+<!-- Import Scope-Mismatch Warning Modal -->
+<Modal title="Scope Mismatch" show={showImportWarnModal} onclose={closeImportModals}>
+  <div class="modal-confirm">
+    <p>The file was exported from a different scope.</p>
+    <p class="warning">
+      File scope: <code>{importInfo?.scope}</code><br />
+      Importing it here may not match the current provider/scope.
+    </p>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" onclick={closePersistModal}>Cancel</button>
-      <button type="button" class="btn-push-action" onclick={handlePersistWithOptions} disabled={persistLoading}>
-        {persistLoading ? 'Pushing...' : 'Push'}
+      <button type="button" class="btn-secondary" onclick={closeImportModals}>Cancel</button>
+      <button type="button" class="btn-warning" data-testid="import-warn-continue" onclick={proceedImportAfterWarn}>
+        Import anyway
       </button>
     </div>
   </div>
 </Modal>
 
-<!-- Drop Confirmation Modal -->
-<Modal title="Drop Stash" show={showDropModal} onclose={closeDropModal}>
-  <div class="modal-confirm">
-    {#if dropError}
-      <div class="modal-error">{dropError}</div>
+<!-- Import Mode Modal (merge/overwrite; only when the target has changes) -->
+<Modal title="Import {serviceLabel(importService)}" show={showImportModeModal} onclose={closeImportModals}>
+  <div class="push-options">
+    {#if importError}
+      <div class="modal-error">{importError}</div>
     {/if}
-    <p>Delete the stash file without loading?</p>
-    <p class="warning">This will permanently delete the stash file. This action cannot be undone.</p>
+    <p>The staging area already has {serviceLabel(importService)} changes. How do you want to proceed?</p>
+    <div class="options-group">
+      <label class="radio-label">
+        <input type="radio" name="importMode" value="merge" bind:group={importMode} />
+        <span>Merge</span>
+        <span class="option-desc">Combine imported changes with existing</span>
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="importMode" value="overwrite" bind:group={importMode} />
+        <span>Overwrite</span>
+        <span class="option-desc">Replace existing with imported changes</span>
+      </label>
+    </div>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" onclick={closeDropModal}>Cancel</button>
-      <button type="button" class="btn-danger" onclick={handleDrop} disabled={dropLoading}>
-        {dropLoading ? 'Dropping...' : 'Drop'}
+      <button type="button" class="btn-secondary" onclick={closeImportModals}>Cancel</button>
+      <button type="button" class="btn-push-action" data-testid="import-mode-continue" onclick={afterModeChosen}>
+        Continue
       </button>
+    </div>
+  </div>
+</Modal>
+
+<!-- Import Passphrase Modal (decrypt; only when the payload is encrypted) -->
+<PassphraseModal
+  show={showImportPassphrase}
+  mode="decrypt"
+  title="Import {serviceLabel(importService)}"
+  onsubmit={handleImportPassphrase}
+  oncancel={closeImportModals}
+  loading={importLoading}
+  error={importError}
+/>
+
+<!-- Import Result Modal -->
+{#if importResult}
+<Modal title="Import Complete" show={true} onclose={() => importResult = null}>
+  <div class="drain-result">
+    <div class="result-icon success">✓</div>
+    <h4>Imported {serviceLabel(importService)} into the staging area</h4>
+    <div class="result-stats">
+      <span class="stat">{importResult.entryCount} entries</span>
+      <span class="stat">{importResult.tagCount} tag changes</span>
+      {#if importResult.merged}
+        <span class="stat merged">(merged)</span>
+      {/if}
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-primary" onclick={() => importResult = null}>Close</button>
+    </div>
+  </div>
+</Modal>
+{/if}
+
+<!-- Import Error Modal (service mismatch, inspect failure, backend error) -->
+<Modal title="Import Failed" show={showImportErrorModal} onclose={closeImportModals}>
+  <div class="modal-confirm">
+    <div class="modal-error" data-testid="import-error">{importError}</div>
+    <div class="form-actions">
+      <button type="button" class="btn-primary" onclick={closeImportModals}>Close</button>
     </div>
   </div>
 </Modal>
@@ -1057,29 +1020,29 @@
     cursor: not-allowed;
   }
 
-  /* Stash dropdown */
-  .stash-dropdown {
+  /* Export / Import dropdown */
+  .transfer-dropdown {
     position: absolute;
     right: 16px;
     top: 50%;
     transform: translateY(-50%);
   }
 
-  /* Narrow viewport: Stash wraps below and aligns right */
+  /* Narrow viewport: the Export / Import menu wraps below and aligns right */
   @media (max-width: 800px) {
     .actions {
       flex-direction: column;
       gap: 12px;
     }
 
-    .stash-dropdown {
+    .transfer-dropdown {
       position: static;
       transform: none;
       align-self: flex-end;
     }
   }
 
-  .btn-stash {
+  .btn-transfer {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1093,17 +1056,8 @@
     transition: background 0.2s;
   }
 
-  .btn-stash:hover {
+  .btn-transfer:hover {
     background: #3d3d54;
-  }
-
-  .btn-stash.has-file {
-    background: #3d3d54;
-  }
-
-  .stash-indicator {
-    color: #4fc3f7;
-    font-size: 10px;
   }
 
   .dropdown-arrow {
@@ -1139,6 +1093,30 @@
     overflow: hidden;
   }
 
+  .dropdown-heading {
+    padding: 8px 16px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #888;
+  }
+
+  .btn-warning {
+    padding: 8px 16px;
+    background: #ff9800;
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .btn-warning:hover {
+    background: #f57c00;
+  }
+
   .dropdown-item {
     display: flex;
     align-items: center;
@@ -1165,18 +1143,8 @@
     cursor: not-allowed;
   }
 
-  .dropdown-item-danger:hover:not(:disabled) {
-    background: rgba(244, 67, 54, 0.2);
-  }
-
   .dropdown-icon {
     font-size: 16px;
-  }
-
-  .dropdown-desc {
-    font-size: 12px;
-    font-weight: 400;
-    color: #888;
   }
 
   .dropdown-divider {
@@ -1499,16 +1467,6 @@
     margin-left: auto;
   }
 
-  /* Drain options modal styles */
-  .drain-options {
-    text-align: center;
-  }
-
-  .drain-options p {
-    color: #ccc;
-    margin: 0 0 12px 0;
-  }
-
   .options-group {
     display: flex;
     flex-direction: column;
@@ -1518,25 +1476,6 @@
     background: #0f0f1a;
     padding: 16px;
     border-radius: 4px;
-  }
-
-  .btn-drain-action {
-    padding: 8px 16px;
-    background: #9c27b0;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-
-  .btn-drain-action:hover:not(:disabled) {
-    background: #7b1fa2;
-  }
-
-  .btn-drain-action:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
   }
 
   /* Result modal styles */

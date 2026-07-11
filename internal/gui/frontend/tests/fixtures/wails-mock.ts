@@ -44,10 +44,9 @@ export interface StagedEntry {
   name: string;
   operation: StagedOperation;
   value?: string;
-  // Optional service classifier. When present, stash drain routes the entry by
-  // this field; otherwise it falls back to the AWS name-shape heuristic (a
-  // leading '/' means param). Google Cloud/Azure names have no such convention, so
-  // provider-aware fixtures should set this explicitly.
+  // Optional service classifier. Export/import stamp this onto each entry so a
+  // per-service envelope round-trips back into the same service regardless of
+  // the name shape (Google Cloud/Azure names carry no leading '/').
   service?: Service;
 }
 
@@ -130,10 +129,15 @@ export interface ProviderCapability {
   services: ServiceCapability[];
 }
 
-export interface StashFileState {
-  exists: boolean;
+// ExportFile is a single-service export envelope in the mock's virtual file
+// system (keyed by path). It mirrors the Go file.Envelope: the provider/scope/
+// service header stays in the clear, and the payload (entries/tags) is only
+// gated by `encrypted` (a passphrase is required to read it back).
+export interface ExportFile {
+  provider: string;
+  scope: string;
+  service: Service;
   encrypted: boolean;
-  // Stored entries (for pop/drain)
   entries: StagedEntry[];
   tags: StagedTagEntry[];
 }
@@ -155,8 +159,15 @@ export interface MockState {
   pageSize: number;
   // AWS Identity
   awsIdentity: AWSIdentity;
-  // Stash file state
-  stashFile: StashFileState;
+  // Virtual file system for export/import, keyed by path. Import tests seed
+  // entries here; export writes to state.savePath.
+  files: Record<string, ExportFile>;
+  // savePath is what PickExportPath returns (a chosen destination path); ''
+  // simulates the user cancelling the native Save dialog.
+  savePath: string;
+  // openPath is what PickImportPath returns (a chosen source path); ''
+  // simulates the user cancelling the native Open dialog.
+  openPath: string;
   // Provider selection (multi-cloud). Defaults describe an AWS-only environment
   // so existing AWS specs are unaffected.
   initialProvider: string;
@@ -323,12 +334,9 @@ export const defaultMockState: MockState = {
     region: 'ap-northeast-1',
     profile: 'production',
   },
-  stashFile: {
-    exists: false,
-    encrypted: false,
-    entries: [],
-    tags: [],
-  },
+  files: {},
+  savePath: '/mock/exports/export.json',
+  openPath: '',
   initialProvider: 'aws',
   initialService: '',
   currentScope: awsScopeSelection,
@@ -503,52 +511,44 @@ export function createErrorState(operation: string, message: string): Partial<Mo
   };
 }
 
+/** Default AWS scope key (mirrors provider.AWSScope(...).Key() in the mock). */
+export const awsScopeKey = 'aws/123456789012/ap-northeast-1';
+
 /**
- * State with existing stash file (unencrypted)
+ * Seed a single-service export file at path, so an Import flow can read it back.
+ * scope defaults to the AWS scope key (a matching scope); pass a different value
+ * to exercise the scope-mismatch warning.
  */
-export function createStashFileState(
-  entries: StagedEntry[] = [],
-  tags: StagedTagEntry[] = [],
-  encrypted: boolean = false
+export function createImportFileState(
+  path: string,
+  file: {
+    service: Service;
+    entries?: StagedEntry[];
+    tags?: StagedTagEntry[];
+    encrypted?: boolean;
+    provider?: string;
+    scope?: string;
+  }
 ): Partial<MockState> {
   return {
-    stashFile: {
-      exists: true,
-      encrypted,
-      entries,
-      tags,
+    openPath: path,
+    files: {
+      [path]: {
+        provider: file.provider ?? 'aws',
+        scope: file.scope ?? awsScopeKey,
+        service: file.service,
+        encrypted: file.encrypted ?? false,
+        entries: file.entries ?? [],
+        tags: file.tags ?? [],
+      },
     },
   };
 }
 
 /**
- * State with encrypted stash file
+ * State with staged changes ready to export (both services).
  */
-export function createEncryptedStashFileState(
-  entries: StagedEntry[] = [],
-  tags: StagedTagEntry[] = []
-): Partial<MockState> {
-  return createStashFileState(entries, tags, true);
-}
-
-/**
- * State with no stash file
- */
-export function createNoStashFileState(): Partial<MockState> {
-  return {
-    stashFile: {
-      exists: false,
-      encrypted: false,
-      entries: [],
-      tags: [],
-    },
-  };
-}
-
-/**
- * State with staged changes ready to push
- */
-export function createStagedForPushState(): Partial<MockState> {
+export function createStagedForExportState(): Partial<MockState> {
   return {
     stagedParam: [
       createStagedValue('/test/param', 'create', 'new-value'),
@@ -556,32 +556,7 @@ export function createStagedForPushState(): Partial<MockState> {
     stagedSecret: [
       createStagedValue('test-secret', 'update', 'updated-value'),
     ],
-    stashFile: {
-      exists: false,
-      encrypted: false,
-      entries: [],
-      tags: [],
-    },
-  };
-}
-
-/**
- * State with both agent staged and file staged (for merge/overwrite tests)
- */
-export function createBothStagedState(): Partial<MockState> {
-  return {
-    stagedParam: [
-      createStagedValue('/agent/param', 'create', 'agent-value'),
-    ],
-    stagedSecret: [],
-    stashFile: {
-      exists: true,
-      encrypted: false,
-      entries: [
-        createStagedValue('/file/param', 'update', 'file-value'),
-      ],
-      tags: [],
-    },
+    savePath: '/mock/exports/export.json',
   };
 }
 
@@ -795,6 +770,28 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       }
       return stagedBuckets[p];
     }
+
+    // expectedScopeKey mirrors provider.Scope.Key() PER SERVICE (the #445 fix):
+    // Azure param resolves to the App Configuration bucket and Azure secret to
+    // the Key Vault bucket — never the combined scope. Used by InspectImportFile
+    // (scopeMatches) and StagingExport (the header scope it writes).
+    function expectedScopeKey(service: Service): string {
+      const s = state.currentScope || {};
+      switch (s.provider) {
+        case 'googlecloud':
+          return `googlecloud/${s.projectId}`;
+        case 'azure':
+          return service === 'param'
+            ? `azure/appconfig/${s.storeName}`
+            : `azure/keyvault/${s.vaultName}`;
+        default:
+          return `aws/${state.awsIdentity.accountId}/${state.awsIdentity.region}`;
+      }
+    }
+
+    // Expose the virtual export file system so specs can assert what an export
+    // wrote (path, header, payload) without a real backend.
+    (window as any).__exportFiles = () => state.files;
 
     const mockApp = {
       // Provider selection / capabilities (multi-cloud)
@@ -1298,126 +1295,116 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         }
         return { name };
       },
-      StagingFileStatus: async () => {
-        if (state.simulateError?.operation === 'StagingFileStatus') {
+      // Native Save dialog: returns the chosen path, or '' when cancelled.
+      PickExportPath: async (_defaultName: string) => {
+        if (state.simulateError?.operation === 'PickExportPath') {
           throw new Error(state.simulateError.message);
         }
-        return { exists: state.stashFile.exists, encrypted: state.stashFile.encrypted };
+        return state.savePath;
       },
-      StagingPersist: async (_service: string, passphrase: string, keep: boolean, mode: string) => {
-        if (state.simulateError?.operation === 'StagingPersist') {
+      // Native Open dialog: returns the chosen path, or '' when cancelled.
+      PickImportPath: async () => {
+        if (state.simulateError?.operation === 'PickImportPath') {
           throw new Error(state.simulateError.message);
         }
-        // Count entries and tags to persist
-        const entryCount = currentBucket().param.length + currentBucket().secret.length;
-        const tagCount = currentBucket().paramTags.length + currentBucket().secretTags.length;
-
-        if (entryCount === 0 && tagCount === 0) {
-          throw new Error('nothing to stash');
+        return state.openPath;
+      },
+      // Export ONE concrete service to a per-service envelope at path, resolving
+      // the header scope per service (#445): Azure param → App Configuration,
+      // Azure secret → Key Vault. The working area for that service is cleared
+      // unless keep=true.
+      StagingExport: async (path: string, service: Service, passphrase: string, keep: boolean) => {
+        if (state.simulateError?.operation === 'StagingExport') {
+          throw new Error(state.simulateError.message);
         }
 
-        // Tag each entry/tag with its originating service so drain can route
-        // without inferring from the name shape (which fails for Google Cloud/Azure).
-        const persistParamEntries = currentBucket().param.map((e: any) => ({ ...e, service: 'param' }));
-        const persistSecretEntries = currentBucket().secret.map((e: any) => ({ ...e, service: 'secret' }));
-        const persistParamTags = currentBucket().paramTags.map((t: any) => ({ ...t, service: 'param' }));
-        const persistSecretTags = currentBucket().secretTags.map((t: any) => ({ ...t, service: 'secret' }));
+        const b = currentBucket();
+        const entries = service === 'param' ? b.param : b.secret;
+        const tags = service === 'param' ? b.paramTags : b.secretTags;
 
-        // Merge or overwrite file based on mode
-        if (mode === 'merge' && state.stashFile.exists) {
-          // Merge: combine with existing
-          state.stashFile.entries = [...state.stashFile.entries, ...persistParamEntries, ...persistSecretEntries];
-          state.stashFile.tags = [...state.stashFile.tags, ...persistParamTags, ...persistSecretTags];
-        } else {
-          // Overwrite: replace
-          state.stashFile.entries = [...persistParamEntries, ...persistSecretEntries];
-          state.stashFile.tags = [...persistParamTags, ...persistSecretTags];
+        if (entries.length === 0 && tags.length === 0) {
+          throw new Error('no staged changes to export');
         }
 
-        // Update file state
-        state.stashFile.exists = true;
-        state.stashFile.encrypted = passphrase !== '';
+        state.files[path] = {
+          provider: state.currentScope?.provider || 'aws',
+          scope: expectedScopeKey(service),
+          service,
+          encrypted: passphrase !== '',
+          entries: entries.map((e: any) => ({ ...e, service })),
+          tags: tags.map((t: any) => ({ ...t, service })),
+        };
 
-        // Clear agent memory unless keep=true
+        const result = { entryCount: entries.length, tagCount: tags.length };
+
         if (!keep) {
-          currentBucket().param = [];
-          currentBucket().secret = [];
-          currentBucket().paramTags = [];
-          currentBucket().secretTags = [];
+          if (service === 'param') {
+            b.param = [];
+            b.paramTags = [];
+          } else {
+            b.secret = [];
+            b.secretTags = [];
+          }
         }
 
-        return { entryCount, tagCount };
+        return result;
       },
-      StagingDrain: async (_service: string, passphrase: string, keep: boolean, mode: string) => {
-        if (state.simulateError?.operation === 'StagingDrain') {
+      // Inspect the plaintext envelope header WITHOUT decoding the payload, so
+      // the frontend prompts for a passphrase only when encrypted and warns on a
+      // scope/service mismatch.
+      InspectImportFile: async (path: string) => {
+        if (state.simulateError?.operation === 'InspectImportFile') {
           throw new Error(state.simulateError.message);
         }
-
-        if (!state.stashFile.exists) {
-          throw new Error('no staged changes in file to drain');
+        const file = state.files[path];
+        if (!file) {
+          throw new Error('failed to read export file');
         }
-
-        // Check passphrase for encrypted files
-        if (state.stashFile.encrypted && !passphrase) {
+        return {
+          encrypted: file.encrypted,
+          provider: file.provider,
+          scope: file.scope,
+          service: file.service,
+          scopeMatches: file.scope === expectedScopeKey(file.service),
+        };
+      },
+      // Import ONE concrete service from a per-service envelope into the working
+      // area. A service mismatch is a hard error; an encrypted payload needs a
+      // passphrase. The working store is resolved per service (#445).
+      StagingImport: async (path: string, service: Service, passphrase: string, mode: string) => {
+        if (state.simulateError?.operation === 'StagingImport') {
+          throw new Error(state.simulateError.message);
+        }
+        const file = state.files[path];
+        if (!file) {
+          throw new Error('failed to read export file');
+        }
+        if (file.service !== service) {
+          throw new Error(`import file holds "${file.service}" data but "${service}" was selected`);
+        }
+        if (file.encrypted && !passphrase) {
           throw new Error('passphrase required for encrypted file');
         }
 
-        // Check if agent has existing changes
-        const agentHasChanges = currentBucket().param.length > 0 || currentBucket().secret.length > 0 ||
-                               currentBucket().paramTags.length > 0 || currentBucket().secretTags.length > 0;
+        const b = currentBucket();
+        const existing = service === 'param'
+          ? (b.param.length > 0 || b.paramTags.length > 0)
+          : (b.secret.length > 0 || b.secretTags.length > 0);
 
-        const fileEntries = state.stashFile.entries;
-        const fileTags = state.stashFile.tags;
+        const merged = mode !== 'overwrite' && existing;
 
-        // Route each entry/tag by its explicit service when present, falling
-        // back to the AWS name-shape heuristic (leading '/' means param) for
-        // fixtures that predate the service field. This keeps AWS specs
-        // unchanged while working for Google Cloud/Azure names, which carry no '/'.
-        const isParam = (item: any) => (item.service ? item.service === 'param' : item.name.startsWith('/'));
-
-        // Apply mode
-        let merged = false;
-        if (mode === 'merge' && agentHasChanges) {
-          // Merge: combine file with agent
-          currentBucket().param = [...currentBucket().param, ...fileEntries.filter(isParam)];
-          currentBucket().secret = [...currentBucket().secret, ...fileEntries.filter((e: any) => !isParam(e))];
-          currentBucket().paramTags = [...currentBucket().paramTags, ...fileTags.filter(isParam)];
-          currentBucket().secretTags = [...currentBucket().secretTags, ...fileTags.filter((t: any) => !isParam(t))];
-          merged = true;
+        if (service === 'param') {
+          b.param = mode === 'overwrite' ? [...file.entries] : [...b.param, ...file.entries];
+          b.paramTags = mode === 'overwrite' ? [...file.tags] : [...b.paramTags, ...file.tags];
         } else {
-          // Overwrite: replace agent with file
-          currentBucket().param = fileEntries.filter(isParam);
-          currentBucket().secret = fileEntries.filter((e: any) => !isParam(e));
-          currentBucket().paramTags = fileTags.filter(isParam);
-          currentBucket().secretTags = fileTags.filter((t: any) => !isParam(t));
+          b.secret = mode === 'overwrite' ? [...file.entries] : [...b.secret, ...file.entries];
+          b.secretTags = mode === 'overwrite' ? [...file.tags] : [...b.secretTags, ...file.tags];
         }
 
-        // Delete file unless keep=true
-        if (!keep) {
-          state.stashFile.exists = false;
-          state.stashFile.encrypted = false;
-          state.stashFile.entries = [];
-          state.stashFile.tags = [];
-        }
+        const entryCount = service === 'param' ? b.param.length : b.secret.length;
+        const tagCount = service === 'param' ? b.paramTags.length : b.secretTags.length;
 
-        return { entryCount: fileEntries.length, tagCount: fileTags.length, merged };
-      },
-      StagingDrop: async () => {
-        if (state.simulateError?.operation === 'StagingDrop') {
-          throw new Error(state.simulateError.message);
-        }
-
-        if (!state.stashFile.exists) {
-          throw new Error('no stashed changes to drop');
-        }
-
-        // Delete file directly (works even for encrypted files)
-        state.stashFile.exists = false;
-        state.stashFile.encrypted = false;
-        state.stashFile.entries = [];
-        state.stashFile.tags = [];
-
-        return { dropped: true };
+        return { merged, entryCount, tagCount };
       },
       StagingCheckStatus: async (service: string, name: string, namespace?: string) => {
         const staged = service === 'param' ? currentBucket().param : currentBucket().secret;

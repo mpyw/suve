@@ -3,7 +3,7 @@ import {
   setupWailsMocks,
   createGoogleCloudState,
   createAzureState,
-  createStagedForPushState,
+  createStagedForExportState,
   waitForItemList,
   navigateTo,
   clickItemByName,
@@ -20,7 +20,7 @@ async function switchToGoogleCloud(page: Page, project = 'proj') {
 
 test.describe('Multi-provider staging (#270)', () => {
   test('staging is scope-isolated across providers (sidebar badge)', async ({ page }) => {
-    await setupWailsMocks(page, createStagedForPushState()); // AWS: 1 param + 1 secret staged
+    await setupWailsMocks(page, createStagedForExportState()); // AWS: 1 param + 1 secret staged
     await page.goto('/');
     await waitForItemList(page);
 
