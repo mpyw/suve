@@ -95,6 +95,41 @@ func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 	assert.Equal(t, usecasestaging.ResetResultNotStaged, output.Type)
 }
 
+func TestResetUseCase_Execute_UnstageCreate_DiscardsTags(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// A CREATE was staged for a not-yet-existing resource, then tagged.
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("value"),
+		StagedAt:  time.Now(),
+	}))
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	// Resetting the CREATE must discard the orphan tags too - the resource never
+	// existed, so a tag-only change would wedge apply (#470).
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		Spec: "/app/new",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultUnstaged, output.Type)
+
+	// Both entry and tags must be gone.
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
 func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	t.Parallel()
 
