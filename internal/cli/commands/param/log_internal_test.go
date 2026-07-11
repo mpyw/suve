@@ -2,6 +2,7 @@ package param
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -67,6 +68,9 @@ func TestRenderOnelineDateHonorsTZ(t *testing.T) {
 
 	assert.Contains(t, buf.String(), "2024-01-16")
 	assert.NotContains(t, buf.String(), "2024-01-15")
+	// The version number leads the line (no empty prefix segment, #531).
+	assert.True(t, strings.HasPrefix(buf.String(), "1"),
+		"oneline output should start with the version number, got %q", buf.String())
 }
 
 func TestSanitizeControl(t *testing.T) {
