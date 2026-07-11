@@ -65,9 +65,15 @@ services:
     environment:
       - DISPLAY=${HOST_DISPLAY:-host.docker.internal:0}
     volumes:
-      - .:/app
-      - go-cache:/root/go
-      - go-build-cache:/root/.cache/go-build
+      - type: bind
+        source: .
+        target: /app
+      - type: volume
+        source: go-cache
+        target: /root/go
+      - type: volume
+        source: go-build-cache
+        target: /root/.cache/go-build
     working_dir: /app
     stdin_open: true
     tty: true
@@ -83,9 +89,15 @@ services:
     environment:
       - DISPLAY=${HOST_DISPLAY:-host.docker.internal:0}
     volumes:
-      - .:/app
-      - go-cache:/root/go
-      - go-build-cache:/root/.cache/go-build
+      - type: bind
+        source: .
+        target: /app
+      - type: volume
+        source: go-cache
+        target: /root/go
+      - type: volume
+        source: go-build-cache
+        target: /root/.cache/go-build
     working_dir: /app
     stdin_open: true
     tty: true

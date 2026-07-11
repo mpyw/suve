@@ -8,17 +8,17 @@
 // Run with: make e2e
 //
 // Environment variables:
-//   - SUVE_LOCALSTACK_EXTERNAL_PORT: Custom localstack port (default: 4566)
+//   - SUVE_LOCALSTACK_ENDPOINT: Full localstack URL (default:
+//     http://localhost:4566). Host runs use the default; the in-container
+//     (compose.test.yaml) runner points it at http://localstack:4566.
 package e2e_test
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/output"
@@ -56,10 +56,14 @@ func TestMain(m *testing.M) {
 }
 
 func getEndpoint() string {
-	return fmt.Sprintf(
-		"http://127.0.0.1:%s",
-		lo.CoalesceOrEmpty(os.Getenv("SUVE_LOCALSTACK_EXTERNAL_PORT"), "4566"),
-	)
+	// Single full-URL knob. Host/manual runs get the default localhost URL; the
+	// in-container (compose.test.yaml) runner sets it to http://localstack:4566
+	// to reach the emulator by service name over the closed compose network.
+	if endpoint := os.Getenv("SUVE_LOCALSTACK_ENDPOINT"); endpoint != "" {
+		return endpoint
+	}
+
+	return "http://localhost:4566"
 }
 
 // setupEnv sets up environment variables for localstack and returns a cleanup function.
@@ -83,8 +87,14 @@ func setupTempHome(t *testing.T) {
 
 // newStore creates a new staging store for E2E tests.
 // localstack uses account ID "000000000000" and region "us-east-1".
+//
+// It uses NewWorkingStore (not NewStore) so the read path shares the exact key
+// resolution the CLI uses when it writes: SUVE_STAGING_KEY env var -> OS
+// keychain -> plaintext. Under the Dockerized runner SUVE_STAGING_KEY is set,
+// so the working store is encrypted and this must decrypt with the same key; on
+// keyless/no-keychain environments both sides fall back to plaintext.
 func newStore() *file.Store {
-	s, err := file.NewStore(provider.AWSScope("000000000000", "us-east-1"))
+	s, err := file.NewWorkingStore(provider.AWSScope("000000000000", "us-east-1"))
 	if err != nil {
 		panic(err)
 	}
@@ -94,7 +104,7 @@ func newStore() *file.Store {
 
 // newStoreForAccount creates a staging store for a specific account and region.
 func newStoreForAccount(accountID, region string) *file.Store {
-	s, err := file.NewStore(provider.AWSScope(accountID, region))
+	s, err := file.NewWorkingStore(provider.AWSScope(accountID, region))
 	if err != nil {
 		panic(err)
 	}

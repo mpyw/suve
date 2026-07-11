@@ -1,0 +1,117 @@
+# compose.test.yaml — fully closed, Docker-internal test story.
+#
+# Unlike compose.yaml (the local-verification / dev-shell file, which publishes
+# emulator ports to 127.0.0.1 so you can poke them from the host), this file
+# publishes NOTHING to the host. Every service is reachable only on the
+# project's internal compose network, addressed by service name. The Go test
+# suite runs INSIDE the `test-runner` container, so `mise e2e*` never touches a
+# host port or the OS keychain.
+#
+# Used by the `mise e2e*` tasks, which give each invocation a unique
+# COMPOSE_PROJECT_NAME so concurrent/repeat runs get independent containers and
+# networks, and always `down -v` on exit. The Go module + build caches live in
+# EXTERNAL named volumes (suve-test-go-*), shared across those per-run projects
+# so builds stay fast; `down -v` removes per-project volumes but leaves the
+# external caches intact.
+#
+# Emulator images/env match compose.yaml (and .github/workflows/test.yml)
+# exactly; this file publishes no `ports:` at all.
+
+services:
+  localstack:
+    # AWS emulator (SSM + Secrets Manager). Reachable in-network as
+    # http://localstack:4566.
+    profiles:
+      - aws
+    image: localstack/localstack:4
+    environment:
+      - SERVICES=ssm,secretsmanager,events
+      - DEBUG=0
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  gcloud-secretmanager:
+    # Google Cloud Secret Manager emulator (gRPC :9090, REST :8080), no auth,
+    # offline. Reachable in-network as gcloud-secretmanager:9090.
+    profiles:
+      - gcloud
+    image: ghcr.io/blackwell-systems/gcp-secret-manager-emulator-dual:latest
+
+  azure-appconfig:
+    # Azure App Configuration emulator (HTTP :8080, HMAC over plain HTTP),
+    # offline. Reachable in-network as http://azure-appconfig:8080.
+    # Fork of tnc1997/azure-app-configuration-emulator patched for the official
+    # Azure SDKs — https://github.com/mpyw/azure-app-configuration-emulator.
+    profiles:
+      - azure
+    image: ghcr.io/mpyw/azure-app-configuration-emulator:latest
+    environment:
+      - ASPNETCORE_HTTP_PORTS=8080
+
+  azure-keyvault:
+    # Azure Key Vault emulator (lowkey-vault, HTTPS :8443, self-signed cert,
+    # auth present-but-ignored), offline. Reachable in-network as
+    # https://azure-keyvault:8443.
+    profiles:
+      - azure
+    image: nagyesta/lowkey-vault:7.3.0
+    environment:
+      # lowkey-vault auto-registers a vault per authority. Out of the box it only
+      # serves localhost/127.0.0.1 (and the default.lowkey-vault names), which is
+      # what CI hits via https://localhost:8443. On the closed compose network the
+      # suite addresses it by service name (https://azure-keyvault:8443), for which
+      # no vault exists — so alias the default localhost vault onto that authority.
+      # Alias format: <auto-registered-vault-host>=<alias-host:port>. CI's
+      # localhost path is unaffected (the default registration still serves it).
+      - LOWKEY_ARGS=--LOWKEY_VAULT_ALIASES=localhost=azure-keyvault:8443
+
+  test-runner:
+    # Ephemeral Go test runner. Started only via explicit `docker compose run
+    # --rm test-runner <cmd>` with the actual `go test` command supplied by the
+    # mise task; it reaches the emulators by service name. No `ports:`, so
+    # nothing is exposed to the host. The mise tasks start the specific
+    # emulator(s) by name (with their profile) before running it, and inject the
+    # matching endpoint env var(s) with `docker compose run -e` — the per-provider
+    # endpoints are deliberately NOT baked in here, so a provider's e2e tests
+    # skip (their endpoint env unset) unless that provider's task set them.
+    image: golang:1.25.11
+    working_dir: /app
+    volumes:
+      # Source is READ-ONLY: the suite writes nothing into the repo (TestMain
+      # uses /tmp). Go caches live on writable named volumes below, pointed at
+      # by GOMODCACHE/GOCACHE; GOFLAGS=-mod=readonly makes Go fail loudly rather
+      # than attempt to write go.mod/go.sum onto the ro mount.
+      - type: bind
+        source: .
+        target: /app
+        read_only: true
+      - type: volume
+        source: go-cache
+        target: /root/go
+      - type: volume
+        source: go-build-cache
+        target: /root/.cache/go-build
+    environment:
+      # Keychain bypass: fixed base64-encoded 32 zero bytes, so the staging
+      # file store never touches an OS keychain inside the container. Needed by
+      # every provider's suite.
+      - SUVE_STAGING_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      - GOFLAGS=-mod=readonly
+      - GOMODCACHE=/root/go/pkg/mod
+      - GOCACHE=/root/.cache/go-build
+    command: ["go", "test", "-tags=e2e", "-v", "./e2e/..."]
+
+volumes:
+  # External so the Go caches survive per-run teardown (`down -v` never removes
+  # external volumes) and are shared across the per-invocation projects. The
+  # mise tasks `docker volume create` them (idempotent) before each run.
+  go-cache:
+    external: true
+    name: suve-test-go-cache
+  go-build-cache:
+    external: true
+    name: suve-test-go-build-cache

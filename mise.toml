@@ -60,7 +60,10 @@ echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."
 
 [tasks.test]
 description = "Run unit tests (excludes GUI + cmd)"
-run = "go test $(go list ./... | grep -v internal/gui | grep -v /cmd/)"
+# SUVE_STAGING_KEY pins a deterministic working-store data key (base64 of 32
+# zero bytes) so local runs never block on the macOS keychain. CI sets no key
+# and falls back to plaintext, which is fine — this only affects local runs.
+run = "SUVE_STAGING_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= go test $(go list ./... | grep -v internal/gui | grep -v /cmd/)"
 
 [tasks.lint]
 description = "Run golangci-lint on the host OS with all build tags"
@@ -68,92 +71,173 @@ description = "Run golangci-lint on the host OS with all build tags"
 # against the host platform's build tags.
 run = "GOOS=$(go env GOHOSTOS) golangci-lint run --build-tags=e2e,production ./..."
 
+# -----------------------------------------------------------------------------
+# E2E tasks: fully closed, Docker-internal runs (compose.test.yaml).
+#
+# Each invocation gets a UNIQUE compose project (suve-test-$$) so concurrent /
+# repeated runs are isolated and never collide, and ALWAYS tears down on exit
+# (trap) even on failure. Nothing is published to the host: the Go test suite
+# runs inside the `test-runner` container and reaches the emulator(s) by service
+# name over the closed compose network. The Go module + build caches live in
+# external volumes (created idempotently below) so they survive `down -v` and
+# stay shared across runs. The keychain is bypassed via SUVE_STAGING_KEY, set on
+# the runner service in compose.test.yaml.
+# -----------------------------------------------------------------------------
+
 [tasks.e2e]
-description = "Run E2E tests against localstack (starts the AWS emulator)"
+description = "Run E2E tests against localstack, fully inside Docker (no host ports)"
+shell = "bash -c"
 run = '''
-port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
-SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
-echo "Waiting for localstack to be ready on port $port..."
-until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
-echo "localstack is ready"
-SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -v ./e2e/...
+set -euo pipefail
+project="suve-test-$$"
+compose="docker compose -f compose.test.yaml -p $project"
+cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
+trap cleanup EXIT INT TERM
+docker volume create suve-test-go-cache >/dev/null
+docker volume create suve-test-go-build-cache >/dev/null
+$compose --profile aws up -d localstack
+$compose run --rm --no-deps -e SUVE_LOCALSTACK_ENDPOINT=http://localstack:4566 test-runner bash -c '
+  n=0; until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "localstack not ready after 120s" >&2; exit 1; }; sleep 1; done
+  go test -tags=e2e -v ./e2e/...
+'
 '''
 
 [tasks.e2e-gcloud]
-description = "Run Google Cloud Secret Manager E2E tests (starts the emulator)"
+description = "Run Google Cloud Secret Manager E2E tests, fully inside Docker (no host ports)"
 shell = "bash -c"
 run = '''
-port="${SUVE_GCLOUD_EMULATOR_PORT:-9090}"
-SUVE_GCLOUD_EMULATOR_PORT="$port" docker compose --profile gcloud up -d gcloud-secretmanager
-echo "Waiting for the Google Cloud Secret Manager emulator on port $port..."
-until bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; do sleep 1; done
-echo "emulator is ready"
-SUVE_GCLOUD_SECRETMANAGER_ENDPOINT="127.0.0.1:$port" go test -tags=e2e -v -run TestGoogleCloud ./e2e/...
+set -euo pipefail
+project="suve-test-$$"
+compose="docker compose -f compose.test.yaml -p $project"
+cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
+trap cleanup EXIT INT TERM
+docker volume create suve-test-go-cache >/dev/null
+docker volume create suve-test-go-build-cache >/dev/null
+$compose --profile gcloud up -d gcloud-secretmanager
+$compose run --rm --no-deps -e SUVE_GCLOUD_SECRETMANAGER_ENDPOINT=gcloud-secretmanager:9090 test-runner bash -c '
+  n=0; until (echo > /dev/tcp/gcloud-secretmanager/9090) 2>/dev/null; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "gcloud-secretmanager not ready after 120s" >&2; exit 1; }; sleep 1; done
+  go test -tags=e2e -v -run TestGoogleCloud ./e2e/...
+'
 '''
 
 [tasks.e2e-azure-appconfig]
-description = "Run Azure App Configuration E2E tests (starts the emulator)"
+description = "Run Azure App Configuration E2E tests, fully inside Docker (no host ports)"
 shell = "bash -c"
 run = '''
-port="${SUVE_AZURE_APPCONFIG_PORT:-8080}"
-SUVE_AZURE_APPCONFIG_PORT="$port" docker compose --profile azure up -d azure-appconfig
-echo "Waiting for the Azure App Configuration emulator on port $port..."
-until bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; do sleep 1; done
-echo "emulator is ready"
-SUVE_AZURE_APPCONFIG_CONNECTION_STRING="Endpoint=http://127.0.0.1:$port;Id=abcd;Secret=c2VjcmV0" go test -tags=e2e -v -run 'TestAzureAppConfig|TestAzureStageGlobal' ./e2e/...
+set -euo pipefail
+project="suve-test-$$"
+compose="docker compose -f compose.test.yaml -p $project"
+cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
+trap cleanup EXIT INT TERM
+docker volume create suve-test-go-cache >/dev/null
+docker volume create suve-test-go-build-cache >/dev/null
+$compose --profile azure up -d azure-appconfig
+$compose run --rm --no-deps -e "SUVE_AZURE_APPCONFIG_CONNECTION_STRING=Endpoint=http://azure-appconfig:8080;Id=abcd;Secret=c2VjcmV0" test-runner bash -c '
+  n=0; until (echo > /dev/tcp/azure-appconfig/8080) 2>/dev/null; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "azure-appconfig not ready after 120s" >&2; exit 1; }; sleep 1; done
+  go test -tags=e2e -v -run "TestAzureAppConfig|TestAzureStageGlobal" ./e2e/...
+'
 '''
 
 [tasks.e2e-azure-keyvault]
-description = "Run Azure Key Vault E2E tests (starts the lowkey-vault emulator)"
+description = "Run Azure Key Vault E2E tests, fully inside Docker (no host ports)"
+shell = "bash -c"
 run = '''
-port="${SUVE_AZURE_KEYVAULT_PORT:-8443}"
-SUVE_AZURE_KEYVAULT_PORT="$port" docker compose --profile azure up -d azure-keyvault
-echo "Waiting for the Key Vault emulator on port $port..."
-until curl -sk -o /dev/null "https://127.0.0.1:$port/ping" 2>/dev/null; do sleep 1; done
-echo "emulator is ready"
-SUVE_AZURE_KEYVAULT_ENDPOINT="https://127.0.0.1:$port" go test -tags=e2e -v -run 'TestAzureKeyVault|TestAzureStageGlobal' ./e2e/...
+set -euo pipefail
+project="suve-test-$$"
+compose="docker compose -f compose.test.yaml -p $project"
+cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
+trap cleanup EXIT INT TERM
+docker volume create suve-test-go-cache >/dev/null
+docker volume create suve-test-go-build-cache >/dev/null
+$compose --profile azure up -d azure-keyvault
+$compose run --rm --no-deps -e SUVE_AZURE_KEYVAULT_ENDPOINT=https://azure-keyvault:8443 test-runner bash -c '
+  n=0; until curl -sk -o /dev/null "$SUVE_AZURE_KEYVAULT_ENDPOINT/ping" 2>/dev/null; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "azure-keyvault not ready after 120s" >&2; exit 1; }; sleep 1; done
+  go test -tags=e2e -v -run "TestAzureKeyVault|TestAzureStageGlobal" ./e2e/...
+'
 '''
 
 [tasks.clean]
 description = "Remove build artifacts and stop containers (incl. volumes)"
+shell = "bash -c"
 run = '''
-rm -rf bin/ *.out
+rm -rf bin/ *.out coverage/
 docker compose down -v 2>/dev/null || true
+# Sweep any leftover closed-test projects (suve-test-*) from crashed runs, plus
+# their shared external caches. --profile "*" so profiled emulator services
+# (localstack/gcloud/azure) are actually removed, not just non-profiled ones.
+for p in $(docker compose ls -aq 2>/dev/null | grep '^suve-test-' || true); do
+  docker compose -f compose.test.yaml -p "$p" --profile "*" down -v 2>/dev/null || true
+done
+docker compose -f compose.test.yaml --profile "*" down -v 2>/dev/null || true
+docker volume rm suve-test-go-cache suve-test-go-build-cache 2>/dev/null || true
 '''
 
 [tasks.coverage]
 description = "Run unit tests with coverage"
+# Host-based (no emulator). SUVE_STAGING_KEY bypasses the macOS keychain, matching `test`.
 run = '''
+export SUVE_STAGING_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
 go test -coverprofile=coverage.out -coverpkg="$coverpkg" $(go list ./... | grep -v internal/gui | grep -v /cmd/)
 go tool cover -func=coverage.out | grep total
 '''
 
+# coverage-e2e / coverage-all use the AWS emulator, so they run in the same
+# closed Docker model as the e2e tasks (unique per-run project, guaranteed
+# teardown, no host ports, keychain bypass via the runner). The runner's /app
+# source mount is read-only, so coverage profiles are written to a dedicated
+# writable bind mount (host ./coverage -> container /out).
 [tasks.coverage-e2e]
-description = "Run E2E tests with coverage (starts the AWS emulator)"
+description = "Run E2E tests with coverage, fully inside Docker (no host ports)"
+shell = "bash -c"
 run = '''
-port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
-SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
-until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
-coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
-SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -coverprofile=coverage-e2e.out -coverpkg="$coverpkg" ./e2e/...
-go tool cover -func=coverage-e2e.out | grep total
+set -euo pipefail
+project="suve-test-$$"
+compose="docker compose -f compose.test.yaml -p $project"
+cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
+trap cleanup EXIT INT TERM
+mkdir -p coverage
+docker volume create suve-test-go-cache >/dev/null
+docker volume create suve-test-go-build-cache >/dev/null
+$compose --profile aws up -d localstack
+$compose run --rm --no-deps \
+  -e SUVE_LOCALSTACK_ENDPOINT=http://localstack:4566 \
+  -v "$PWD/coverage:/out" \
+  test-runner bash -c '
+  n=0; until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "localstack not ready after 120s" >&2; exit 1; }; sleep 1; done
+  coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr "\n" ",")
+  go test -tags=e2e -coverprofile=/out/coverage-e2e.out -coverpkg="$coverpkg" ./e2e/...
+  go tool cover -func=/out/coverage-e2e.out | grep total
+'
 '''
 
 [tasks.coverage-all]
-description = "Run unit + E2E tests and report merged coverage (starts the AWS emulator)"
+description = "Run unit + E2E tests and report merged coverage, fully inside Docker (no host ports)"
+shell = "bash -c"
 run = '''
-port="${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}"
-SUVE_LOCALSTACK_EXTERNAL_PORT="$port" docker compose --profile aws up -d localstack
-until curl -sf "http://127.0.0.1:$port/_localstack/health" > /dev/null 2>&1; do sleep 1; done
-coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
-echo "Running unit tests with coverage..."
-go test -coverprofile=coverage-unit.out -covermode=atomic -coverpkg="$coverpkg" $(go list ./... | grep -v internal/gui | grep -v /cmd/)
-echo "Running E2E tests with coverage..."
-SUVE_LOCALSTACK_EXTERNAL_PORT="$port" go test -tags=e2e -coverprofile=coverage-e2e.out -covermode=atomic -coverpkg="$coverpkg" ./e2e/...
-echo "Merging coverage profiles..."
-go run github.com/wadey/gocovmerge@latest coverage-unit.out coverage-e2e.out > coverage-all.out
-go tool cover -func=coverage-all.out | grep total
+set -euo pipefail
+project="suve-test-$$"
+compose="docker compose -f compose.test.yaml -p $project"
+cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
+trap cleanup EXIT INT TERM
+mkdir -p coverage
+docker volume create suve-test-go-cache >/dev/null
+docker volume create suve-test-go-build-cache >/dev/null
+$compose --profile aws up -d localstack
+$compose run --rm --no-deps \
+  -e SUVE_LOCALSTACK_ENDPOINT=http://localstack:4566 \
+  -v "$PWD/coverage:/out" \
+  test-runner bash -c '
+  n=0; until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "localstack not ready after 120s" >&2; exit 1; }; sleep 1; done
+  coverpkg=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr "\n" ",")
+  echo "Running unit tests with coverage..."
+  go test -coverprofile=/out/coverage-unit.out -covermode=atomic -coverpkg="$coverpkg" $(go list ./... | grep -v internal/gui | grep -v /cmd/)
+  echo "Running E2E tests with coverage..."
+  go test -tags=e2e -coverprofile=/out/coverage-e2e.out -covermode=atomic -coverpkg="$coverpkg" ./e2e/...
+  echo "Merging coverage profiles..."
+  go run github.com/wadey/gocovmerge@latest /out/coverage-unit.out /out/coverage-e2e.out > /out/coverage-all.out
+  go tool cover -func=/out/coverage-all.out | grep total
+'
 '''
 
 # Linux GUI test environment (requires XQuartz on macOS).
