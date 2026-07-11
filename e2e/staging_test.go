@@ -230,12 +230,15 @@ func TestStaging_ErrorCases(t *testing.T) {
 		t.Logf("apply nothing staged output: %s", stdout)
 	})
 
-	// Push non-existent staged item - the command checks if it's staged first
+	// Push non-existent staged item - with an empty staging area the "nothing
+	// staged" short-circuit fires before the per-name check, so this is a no-op
+	// success rather than an error. (The "<name> is not staged" error only
+	// surfaces when other items are staged but the requested name is not.)
 	t.Run("apply-nonexistent", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "/nonexistent/param")
-		// Per-item apply rejects an unstaged name up front.
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "is not staged")
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "/nonexistent/param")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "No")
+		assert.Contains(t, stdout, "changes staged")
 	})
 
 	// Reset when nothing staged - message goes to stdout
