@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"time"
+	"unicode/utf8"
 
 	"github.com/samber/lo"
 
@@ -37,6 +38,11 @@ type EditUseCase struct {
 // Execute runs the edit use case.
 func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput, error) {
 	service := u.Strategy.Service()
+
+	// Reject non-UTF-8 values at ingestion (argv, $EDITOR, provider prefill)
+	if !utf8.ValidString(input.Value) {
+		return nil, ErrValueNotUTF8
+	}
 
 	// Check staged state first to avoid unnecessary AWS fetch
 	var stagedEntry *staging.Entry

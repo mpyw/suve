@@ -73,6 +73,26 @@ func TestEditUseCase_Execute(t *testing.T) {
 	assert.NotNil(t, entry.BaseModifiedAt)
 }
 
+func TestEditUseCase_Execute_RejectsNonUTF8Value(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Key:   staging.EntryKey{Name: "/app/config"},
+		Value: "\xff\xfe",
+	})
+	require.ErrorIs(t, err, usecasestaging.ErrValueNotUTF8)
+
+	// Nothing should have been staged
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
 func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	t.Parallel()
 
