@@ -11,4 +11,8 @@ var (
 	// ErrAlreadyExists indicates a create was attempted on an entry that
 	// already exists.
 	ErrAlreadyExists = errors.New("provider: entry already exists")
+	// ErrBinaryValue indicates the entry holds a binary value that suve cannot
+	// represent as text (e.g. an AWS Secrets Manager SecretBinary secret).
+	// Callers must not treat such an entry as an empty-string value.
+	ErrBinaryValue = errors.New("binary value is not supported")
 )

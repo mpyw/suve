@@ -254,6 +254,14 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		return nil, fmt.Errorf("failed to get secret value: %w", err)
 	}
 
+	// A secret stored via SecretBinary (SecretString nil) has no text form. Mapping
+	// it through aws.ToString would silently yield an empty value with no error,
+	// which misrepresents a non-empty secret and lets a staged string edit clobber
+	// it on apply. Reject it explicitly instead (#469).
+	if out.SecretString == nil && len(out.SecretBinary) > 0 {
+		return nil, fmt.Errorf("%w: %s", provider.ErrBinaryValue, name)
+	}
+
 	entry := &domain.Entry{
 		Name:  aws.ToString(out.Name),
 		Value: aws.ToString(out.SecretString),
