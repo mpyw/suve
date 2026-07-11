@@ -76,6 +76,15 @@ func (s *SecretStrategy) applyUpdate(ctx context.Context, name string, entry Ent
 		return nil
 	}
 
+	// Overwrite guard: applying a staged string edit issues UpdateSecret with
+	// SecretString, which silently drops a current SecretBinary value. Probe the
+	// current value and refuse when it is binary (#469). Any other probe failure
+	// is left for Put to surface, so the guard never turns a transient read error
+	// into a spurious apply failure.
+	if _, err := s.store.Get(ctx, name, provider.VersionRef{}); errors.Is(err, provider.ErrBinaryValue) {
+		return fmt.Errorf("refusing to overwrite binary secret %q with a string value: %w", name, err)
+	}
+
 	// Put overwrites the existing secret with a new version and, when provided,
 	// updates the description in the same operation.
 	if _, err := s.store.Put(ctx, name, *entry.Value, domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {

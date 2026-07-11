@@ -730,6 +730,30 @@ func TestGet_NotFoundMapsSentinel(t *testing.T) {
 	assert.ErrorIs(t, err, provider.ErrNotFound)
 }
 
+// TestGet_BinarySecretRejected guards #469: a secret stored via SecretBinary
+// (SecretString nil) must NOT be mapped to an empty value with a nil error, as
+// that misrepresents a non-empty secret and lets a staged string edit clobber it
+// on apply. Get must fail with provider.ErrBinaryValue instead.
+func TestGet_BinarySecretRejected(t *testing.T) {
+	t.Parallel()
+
+	store := secret.New(&mockClient{
+		getValue: func(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+			return &secretsmanager.GetSecretValueOutput{
+				Name:         aws.String("my-secret"),
+				SecretBinary: []byte{0x00, 0x01},
+				SecretString: nil,
+				VersionId:    aws.String("id-1"),
+			}, nil
+		},
+	})
+
+	entry, err := store.Get(t.Context(), "my-secret", provider.VersionRef{})
+	require.Error(t, err)
+	require.ErrorIs(t, err, provider.ErrBinaryValue)
+	assert.Nil(t, entry)
+}
+
 func TestDescribe_NotFoundMapsSentinel(t *testing.T) {
 	t.Parallel()
 

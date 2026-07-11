@@ -232,6 +232,41 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	})
 }
 
+// TestSecretStrategy_Apply_RefusesBinaryOverwrite guards #469: applying a staged
+// string edit onto a secret whose current version is binary would issue
+// UpdateSecret with SecretString and silently drop the binary value. The update
+// path must probe the current value and refuse when it is binary, without ever
+// calling Put.
+func TestSecretStrategy_Apply_RefusesBinaryOverwrite(t *testing.T) {
+	t.Parallel()
+
+	putCalled := false
+	mock := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			assert.Equal(t, "my-secret", name)
+
+			return nil, fmt.Errorf("%w: %s", provider.ErrBinaryValue, name)
+		},
+		PutFunc: func(
+			_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+		) (domain.Version, error) {
+			putCalled = true
+
+			return domain.Version{}, nil
+		},
+	}
+
+	s := staging.NewSecretStrategy(mock)
+	err := s.Apply(t.Context(), "my-secret", staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("string-value"),
+	})
+	require.Error(t, err)
+	require.ErrorIs(t, err, provider.ErrBinaryValue)
+	assert.Contains(t, err.Error(), "refusing to overwrite binary secret")
+	assert.False(t, putCalled, "Put must not be called when the current secret is binary")
+}
+
 func TestSecretStrategy_FetchCurrent(t *testing.T) {
 	t.Parallel()
 
