@@ -89,7 +89,14 @@
   let importError = $state('');
   let importResult: gui.StagingImportResult | null = $state(null);
 
+  // Monotonic request id: loadStatus is fired from onMount, Refresh, and every
+  // action handler's finally block, so two runs can overlap. Only the latest run
+  // may assign state / fire oncountchange, otherwise a slow earlier snapshot
+  // resolving last could resurrect a just-unstaged entry and stale the badge (#566).
+  let loadSeq = 0;
+
   async function loadStatus() {
+    const seq = ++loadSeq;
     loading = true;
     error = '';
     try {
@@ -97,6 +104,7 @@
         paramSvc ? withRetry(() => StagingDiff('param', '')) : Promise.resolve(null),
         secretSvc ? withRetry(() => StagingDiff('secret', '')) : Promise.resolve(null),
       ]);
+      if (seq !== loadSeq) return; // superseded by a newer reload
       paramEntries = paramResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
       secretEntries = secretResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
       paramTagEntries = paramResult?.tagEntries || [];
@@ -105,6 +113,7 @@
       const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
       oncountchange?.(totalCount);
     } catch (e) {
+      if (seq !== loadSeq) return; // superseded by a newer reload
       error = parseError(e);
       paramEntries = [];
       secretEntries = [];
@@ -112,7 +121,7 @@
       secretTagEntries = [];
       oncountchange?.(0);
     } finally {
-      loading = false;
+      if (seq === loadSeq) loading = false;
     }
   }
 
