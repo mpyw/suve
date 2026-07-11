@@ -20,28 +20,32 @@ import (
 	usestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// envelopeReadSource adapts file.ReadEnvelopeFile/DecodeState to the import use
-// case's EnvelopeReader port. A missing per-service file yields an empty state
-// with a nil error so a global dir holding only one file still imports cleanly.
+// envelopeReadSource adapts the already-validated import envelopes to the import
+// use case's EnvelopeReader port. It decodes the SAME envelope objects that
+// collectImportEnvelopes read and validated (header service/provider/scope),
+// rather than re-reading each file by path: a second read could observe a file
+// that changed after validation, so validation and decode would run on
+// different bytes. A service with no present envelope yields an empty state so a
+// global dir holding only one file still imports cleanly.
 type envelopeReadSource struct {
 	passphrase string
-	// pathFor resolves the per-service source path (the single file for a
-	// service-specific import, or <dir>/<service>.json for a global import).
-	pathFor func(staging.Service) string
+	// envelopes maps each present service to its validated envelope.
+	envelopes map[staging.Service]*file.Envelope
 }
 
-// ReadState reads and decodes svc's envelope. A missing file is skipped (empty
-// state); a present file is decoded (and decrypted when encrypted).
+// ReadState decodes svc's validated envelope (decrypting when encrypted). A
+// service with no present envelope is skipped (empty state).
 func (s *envelopeReadSource) ReadState(_ context.Context, svc staging.Service) (*staging.State, error) {
-	path := s.pathFor(svc)
-
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+	env, ok := s.envelopes[svc]
+	if !ok {
 		return staging.NewEmptyState(), nil
 	}
 
-	env, err := file.ReadEnvelopeFile(path)
-	if err != nil {
-		return nil, err
+	// Defense-in-depth: decode only an envelope whose validated header service
+	// matches the service being read, so a decode can never diverge from the
+	// service/scope collectImportEnvelopes already checked on this same object.
+	if env.Service != string(svc) {
+		return nil, fmt.Errorf("import envelope for %q service unexpectedly holds %q data", svc, env.Service)
 	}
 
 	return env.DecodeState(s.passphrase)
@@ -383,10 +387,17 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 			return nil
 		}
 
+		// Decode the exact envelopes collectImportEnvelopes validated, keyed by
+		// their (validated) service, instead of re-reading each file by path.
+		envelopes := make(map[staging.Service]*file.Envelope, len(present))
+		for _, p := range present {
+			envelopes[staging.Service(p.env.Service)] = p.env
+		}
+
 		uc := &usestaging.ImportUseCase{
 			Source: &envelopeReadSource{
 				passphrase: pass,
-				pathFor:    pathFor,
+				envelopes:  envelopes,
 			},
 			Working: working,
 		}
