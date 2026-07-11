@@ -49,7 +49,7 @@ func paramExportImportConfig(resolver staging.ScopeResolver) stgcli.CommandConfi
 	return stgcli.CommandConfig{
 		CommandName:   "param",
 		ItemName:      "parameter",
-		ParserFactory: staging.ParamParserFactory,
+		ParserFactory: staging.AWSParamParserFactory,
 		ScopeResolver: resolver,
 	}
 }
@@ -60,7 +60,7 @@ func secretExportImportConfig(resolver staging.ScopeResolver) stgcli.CommandConf
 	return stgcli.CommandConfig{
 		CommandName:   "secret",
 		ItemName:      "secret",
-		ParserFactory: staging.SecretParserFactory,
+		ParserFactory: staging.AWSSecretParserFactory,
 		ScopeResolver: resolver,
 	}
 }

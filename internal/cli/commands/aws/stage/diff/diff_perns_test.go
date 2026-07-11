@@ -39,9 +39,9 @@ func TestRun_DiffsEntriesUnderTheirNamespace(t *testing.T) {
 	svc := stagediff.ServiceStrategy{
 		Service:  staging.ServiceParam,
 		Store:    st,
-		Strategy: staging.NewParamStrategy(storeReturning("cur-a", "1")),
+		Strategy: staging.NewAWSParamStrategy(storeReturning("cur-a", "1")),
 		StrategyFor: func(ns string) (staging.DiffStrategy, error) {
-			return staging.NewParamStrategy(storeReturning(nsCurrent[ns], "1")), nil
+			return staging.NewAWSParamStrategy(storeReturning(nsCurrent[ns], "1")), nil
 		},
 		Entries: entries[staging.ServiceParam],
 	}

@@ -16,8 +16,8 @@ const nounSecret = "secret"
 var config = stgcli.CommandConfig{
 	CommandName:   nounSecret,
 	ItemName:      nounSecret,
-	Factory:       cliinternal.SecretStrategyFactory,
-	ParserFactory: staging.SecretParserFactory,
+	Factory:       cliinternal.AWSSecretStrategyFactory,
+	ParserFactory: staging.AWSSecretParserFactory,
 }
 
 // Config returns the AWS Secrets Manager staging command config. It is used by

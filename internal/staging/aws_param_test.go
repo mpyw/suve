@@ -25,7 +25,7 @@ func paramNotFound(name string) error {
 func TestParamStrategy_BasicMethods(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewParamStrategy(nil)
+	s := staging.NewAWSParamStrategy(nil)
 
 	t.Run("Service", func(t *testing.T) {
 		t.Parallel()
@@ -67,7 +67,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("new-value"),
@@ -92,7 +92,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated-value"),
@@ -111,7 +111,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
@@ -121,7 +121,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewParamStrategy(&providermock.Store{})
+		s := staging.NewAWSParamStrategy(&providermock.Store{})
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.Operation("unknown"),
 		})
@@ -138,7 +138,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
@@ -156,7 +156,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
@@ -176,7 +176,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("value"),
@@ -199,7 +199,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("value"),
@@ -217,7 +217,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
@@ -238,7 +238,7 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		result, err := s.FetchCurrent(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, "current-value", result.Value)
@@ -254,7 +254,7 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		_, err := s.FetchCurrent(t.Context(), "/app/param")
 		require.Error(t, err)
 	})
@@ -263,7 +263,7 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 func TestParamStrategy_ParseName(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewParamStrategy(nil)
+	s := staging.NewAWSParamStrategy(nil)
 
 	t.Run("valid name", func(t *testing.T) {
 		t.Parallel()
@@ -319,7 +319,7 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		result, err := s.FetchCurrentValue(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, "fetched-value", result.Value)
@@ -335,7 +335,7 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		_, err := s.FetchCurrentValue(t.Context(), "/app/param")
 		require.Error(t, err)
 
@@ -352,7 +352,7 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		_, err := s.FetchCurrentValue(t.Context(), "/app/param")
 		require.Error(t, err)
 	})
@@ -361,7 +361,7 @@ func TestParamStrategy_FetchCurrentValue(t *testing.T) {
 func TestParamStrategy_ParseSpec(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewParamStrategy(nil)
+	s := staging.NewAWSParamStrategy(nil)
 
 	t.Run("name only", func(t *testing.T) {
 		t.Parallel()
@@ -418,7 +418,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		value, label, err := s.FetchVersion(t.Context(), "/app/param#2")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", value)
@@ -440,7 +440,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		value, label, err := s.FetchVersion(t.Context(), "/app/param~1")
 		require.NoError(t, err)
 		assert.Equal(t, "v2", value)
@@ -450,7 +450,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 	t.Run("parse error - invalid version format", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewParamStrategy(&providermock.Store{})
+		s := staging.NewAWSParamStrategy(&providermock.Store{})
 		_, _, err := s.FetchVersion(t.Context(), "/app/param#abc")
 		require.Error(t, err)
 	})
@@ -464,7 +464,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		_, _, err := s.FetchVersion(t.Context(), "/app/param#2")
 		require.Error(t, err)
 	})
@@ -473,7 +473,7 @@ func TestParamStrategy_FetchVersion(t *testing.T) {
 func TestParamParserFactory(t *testing.T) {
 	t.Parallel()
 
-	parser := staging.ParamParserFactory()
+	parser := staging.AWSParamParserFactory()
 	require.NotNil(t, parser)
 	assert.Equal(t, staging.ServiceParam, parser.Service())
 }
@@ -492,7 +492,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		result, err := s.FetchLastModified(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, now, result)
@@ -507,7 +507,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		_, err := s.FetchLastModified(t.Context(), "/app/param")
 		notFoundErr := (*staging.ResourceNotFoundError)(nil)
 		require.ErrorAs(t, err, &notFoundErr)
@@ -523,7 +523,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		_, err := s.FetchLastModified(t.Context(), "/app/param")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get parameter")
@@ -538,7 +538,7 @@ func TestParamStrategy_FetchLastModified(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		result, err := s.FetchLastModified(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.True(t, result.IsZero())
@@ -561,7 +561,7 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation:   staging.OperationCreate,
 			Value:       lo.ToPtr("value"),
@@ -586,7 +586,7 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation:   staging.OperationUpdate,
 			Value:       lo.ToPtr("value"),
@@ -605,7 +605,7 @@ func TestParamStrategy_Apply_DeleteAlreadyDeleted(t *testing.T) {
 		},
 	}
 
-	s := staging.NewParamStrategy(mock)
+	s := staging.NewAWSParamStrategy(mock)
 	err := s.Apply(t.Context(), "/app/param", staging.Entry{
 		Operation: staging.OperationDelete,
 	})
@@ -629,7 +629,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
@@ -651,7 +651,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Remove: maputil.NewSet("old-tag"),
 		})
@@ -681,7 +681,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Add:    map[string]string{"env": "prod"},
 			Remove: maputil.NewSet("deprecated"),
@@ -700,7 +700,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Add: map[string]string{"env": "test"},
 		})
@@ -716,7 +716,7 @@ func TestParamStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		err := s.ApplyTags(t.Context(), "/app/param", staging.TagEntry{
 			Remove: maputil.NewSet("old-tag"),
 		})
@@ -733,7 +733,7 @@ func TestParamStrategy_FetchCurrentValue_NoLastModified(t *testing.T) {
 		},
 	}
 
-	s := staging.NewParamStrategy(mock)
+	s := staging.NewAWSParamStrategy(mock)
 	result, err := s.FetchCurrentValue(t.Context(), "/app/param")
 	require.NoError(t, err)
 	assert.Equal(t, "value", result.Value)
@@ -757,7 +757,7 @@ func TestParamStrategy_FetchCurrentTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		tags, err := s.FetchCurrentTags(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Equal(t, map[string]string{"env": "prod", "team": "backend"}, tags)
@@ -772,7 +772,7 @@ func TestParamStrategy_FetchCurrentTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		tags, err := s.FetchCurrentTags(t.Context(), "/app/nonexistent")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
@@ -787,7 +787,7 @@ func TestParamStrategy_FetchCurrentTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		tags, err := s.FetchCurrentTags(t.Context(), "/app/param")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get tags")
@@ -803,7 +803,7 @@ func TestParamStrategy_FetchCurrentTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewParamStrategy(mock)
+		s := staging.NewAWSParamStrategy(mock)
 		tags, err := s.FetchCurrentTags(t.Context(), "/app/param")
 		require.NoError(t, err)
 		assert.Nil(t, tags)

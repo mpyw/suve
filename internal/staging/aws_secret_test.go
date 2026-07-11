@@ -26,7 +26,7 @@ func secretNotFound(name string) error {
 func TestSecretStrategy_BasicMethods(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewSecretStrategy(nil)
+	s := staging.NewAWSSecretStrategy(nil)
 
 	t.Run("Service", func(t *testing.T) {
 		t.Parallel()
@@ -67,7 +67,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
@@ -86,7 +86,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
 			Value:     lo.ToPtr("secret-value"),
@@ -110,7 +110,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated-value"),
@@ -129,7 +129,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
 			Value:     lo.ToPtr("updated-value"),
@@ -150,7 +150,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
@@ -169,7 +169,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 			DeleteOptions: &staging.DeleteOptions{
@@ -193,7 +193,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 			DeleteOptions: &staging.DeleteOptions{
@@ -212,7 +212,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
@@ -223,7 +223,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 	t.Run("unknown operation", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewSecretStrategy(&providermock.Store{})
+		s := staging.NewAWSSecretStrategy(&providermock.Store{})
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.Operation("unknown"),
 		})
@@ -256,7 +256,7 @@ func TestSecretStrategy_Apply_RefusesBinaryOverwrite(t *testing.T) {
 		},
 	}
 
-	s := staging.NewSecretStrategy(mock)
+	s := staging.NewAWSSecretStrategy(mock)
 	err := s.Apply(t.Context(), "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("string-value"),
@@ -282,7 +282,7 @@ func TestSecretStrategy_FetchCurrent(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		result, err := s.FetchCurrent(t.Context(), "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, "secret-value", result.Value)
@@ -298,7 +298,7 @@ func TestSecretStrategy_FetchCurrent(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		_, err := s.FetchCurrent(t.Context(), "my-secret")
 		require.Error(t, err)
 	})
@@ -307,7 +307,7 @@ func TestSecretStrategy_FetchCurrent(t *testing.T) {
 func TestSecretStrategy_ParseName(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewSecretStrategy(nil)
+	s := staging.NewAWSSecretStrategy(nil)
 
 	t.Run("valid name", func(t *testing.T) {
 		t.Parallel()
@@ -370,7 +370,7 @@ func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		result, err := s.FetchCurrentValue(t.Context(), "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, "fetched-secret", result.Value)
@@ -386,7 +386,7 @@ func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		_, err := s.FetchCurrentValue(t.Context(), "my-secret")
 		require.Error(t, err)
 
@@ -403,7 +403,7 @@ func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		_, err := s.FetchCurrentValue(t.Context(), "my-secret")
 		require.Error(t, err)
 	})
@@ -412,7 +412,7 @@ func TestSecretStrategy_FetchCurrentValue(t *testing.T) {
 func TestSecretStrategy_ParseSpec(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewSecretStrategy(nil)
+	s := staging.NewAWSSecretStrategy(nil)
 
 	t.Run("name only", func(t *testing.T) {
 		t.Parallel()
@@ -486,7 +486,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		value, label, err := s.FetchVersion(t.Context(), "my-secret:AWSPREVIOUS")
 		require.NoError(t, err)
 		assert.Equal(t, "previous-value", value)
@@ -511,7 +511,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		value, label, err := s.FetchVersion(t.Context(), "my-secret~1")
 		require.NoError(t, err)
 		assert.Equal(t, "shifted-value", value)
@@ -521,7 +521,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 	t.Run("parse error", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewSecretStrategy(&providermock.Store{})
+		s := staging.NewAWSSecretStrategy(&providermock.Store{})
 		_, _, err := s.FetchVersion(t.Context(), "")
 		require.Error(t, err)
 	})
@@ -535,7 +535,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		_, _, err := s.FetchVersion(t.Context(), "my-secret:AWSCURRENT")
 		require.Error(t, err)
 	})
@@ -544,7 +544,7 @@ func TestSecretStrategy_FetchVersion(t *testing.T) {
 func TestSecretParserFactory(t *testing.T) {
 	t.Parallel()
 
-	parser := staging.SecretParserFactory()
+	parser := staging.AWSSecretParserFactory()
 	require.NotNil(t, parser)
 	assert.Equal(t, staging.ServiceSecret, parser.Service())
 }
@@ -563,7 +563,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		result, err := s.FetchLastModified(t.Context(), "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, now, result)
@@ -578,7 +578,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		_, err := s.FetchLastModified(t.Context(), "my-secret")
 		notFoundErr := (*staging.ResourceNotFoundError)(nil)
 		require.ErrorAs(t, err, &notFoundErr)
@@ -594,7 +594,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		_, err := s.FetchLastModified(t.Context(), "my-secret")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get secret")
@@ -609,7 +609,7 @@ func TestSecretStrategy_FetchLastModified(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		result, err := s.FetchLastModified(t.Context(), "my-secret")
 		require.NoError(t, err)
 		assert.True(t, result.IsZero())
@@ -632,7 +632,7 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation:   staging.OperationCreate,
 			Value:       lo.ToPtr("secret-value"),
@@ -659,7 +659,7 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation:   staging.OperationUpdate,
 			Value:       lo.ToPtr("updated-value"),
@@ -680,7 +680,7 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation:   staging.OperationUpdate,
 			Value:       lo.ToPtr("updated-value"),
@@ -699,7 +699,7 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationDelete,
 		})
@@ -716,7 +716,7 @@ func TestSecretStrategy_FetchCurrentValue_NoCreatedDate(t *testing.T) {
 		},
 	}
 
-	s := staging.NewSecretStrategy(mock)
+	s := staging.NewAWSSecretStrategy(mock)
 	result, err := s.FetchCurrentValue(t.Context(), "my-secret")
 	require.NoError(t, err)
 	assert.Equal(t, "secret-value", result.Value)
@@ -741,7 +741,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.ApplyTags(t.Context(), "my-secret", staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
 		})
@@ -764,7 +764,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.ApplyTags(t.Context(), "my-secret", staging.TagEntry{
 			Remove: maputil.NewSet("old-tag"),
 		})
@@ -794,7 +794,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.ApplyTags(t.Context(), "my-secret", staging.TagEntry{
 			Add:    map[string]string{"env": "prod"},
 			Remove: maputil.NewSet("deprecated"),
@@ -813,7 +813,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.ApplyTags(t.Context(), "my-secret", staging.TagEntry{
 			Add: map[string]string{"env": "test"},
 		})
@@ -829,7 +829,7 @@ func TestSecretStrategy_ApplyTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		err := s.ApplyTags(t.Context(), "my-secret", staging.TagEntry{
 			Remove: maputil.NewSet("old-tag"),
 		})
@@ -854,7 +854,7 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
 		require.NoError(t, err)
 		assert.Equal(t, map[string]string{"env": "prod", "team": "backend"}, tags)
@@ -869,7 +869,7 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		tags, err := s.FetchCurrentTags(t.Context(), "nonexistent-secret")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
@@ -884,7 +884,7 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to describe secret")
@@ -900,7 +900,7 @@ func TestSecretStrategy_FetchCurrentTags(t *testing.T) {
 			},
 		}
 
-		s := staging.NewSecretStrategy(mock)
+		s := staging.NewAWSSecretStrategy(mock)
 		tags, err := s.FetchCurrentTags(t.Context(), "my-secret")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
