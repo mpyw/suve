@@ -207,7 +207,7 @@ mise generate-gui-bindings # Regenerate the GUI wailsjs bindings
 ## Testing Strategy
 
 - **Unit tests**: Each command package has `*_test.go` with provider-neutral mocking via `internal/provider/providermock`
-- **E2E tests**: `e2e/e2e_test.go` runs against localstack (SSM only, SM requires Pro)
+- **E2E tests**: `e2e/aws_*_test.go` runs against localstack (SSM only, SM requires Pro)
 - **GUI tests**: `internal/gui/frontend/tests/` uses Playwright for component/integration testing
 - **Test dependencies**: Uses `github.com/samber/lo` for pointer helpers and `github.com/stretchr/testify` for assertions
 
