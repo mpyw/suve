@@ -233,10 +233,9 @@ func TestStaging_ErrorCases(t *testing.T) {
 	// Push non-existent staged item - the command checks if it's staged first
 	t.Run("apply-nonexistent", func(t *testing.T) {
 		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "/nonexistent/param")
-		// Should error with "not staged" message
-		if err == nil {
-			t.Log("Note: apply with non-staged param didn't error (may be expected behavior)")
-		}
+		// Per-item apply rejects an unstaged name up front.
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "is not staged")
 	})
 
 	// Reset when nothing staged - message goes to stdout
@@ -250,11 +249,10 @@ func TestStaging_ErrorCases(t *testing.T) {
 
 	// Diff with non-staged parameter
 	t.Run("diff-not-staged", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "diff", "/nonexistent/param")
-		// Should error with "not staged" message
-		if err == nil {
-			t.Log("Note: diff with non-staged param didn't error (may be expected behavior)")
-		}
+		_, stderr, err := runSubCommand(t, paramstage.Command(), "diff", "/nonexistent/param")
+		// Per-item diff does not error for an unstaged name; it warns on stderr.
+		require.NoError(t, err)
+		assert.Contains(t, stderr, "not staged")
 	})
 }
 
