@@ -84,6 +84,7 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 
 	err = u.Working.Update(ctx, "", func(workingState *staging.State) error {
 		reconcileImport(workingState, sourceState, input, output)
+
 		reconciled = true
 
 		return nil

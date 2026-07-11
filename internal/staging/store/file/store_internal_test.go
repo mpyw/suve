@@ -36,6 +36,7 @@ func TestStore_Update_ReadModifyWrite(t *testing.T) {
 	require.NoError(t, s.StageEntry(t.Context(), staging.ServiceParam, keyA, updateTestEntry("a")))
 
 	keyB := staging.EntryKey{Name: "/b"}
+
 	require.NoError(t, s.Update(t.Context(), "", func(st *staging.State) error {
 		st.Entries[staging.ServiceParam][keyB] = updateTestEntry("b")
 
@@ -77,6 +78,8 @@ func TestStore_Update_FnErrorLeavesStateUnchanged(t *testing.T) {
 // neither the Update's change nor the concurrent stage is lost. Under the old
 // Drain + WriteState(stale snapshot) pattern the concurrent entry was silently
 // clobbered.
+//
+//nolint:paralleltest // mutates the package-level updateMidHook; must run serially
 func TestStore_Update_AtomicAgainstConcurrentStage(t *testing.T) {
 	// Not parallel: it sets the package-level updateMidHook.
 	dir := t.TempDir()
@@ -101,6 +104,7 @@ func TestStore_Update_AtomicAgainstConcurrentStage(t *testing.T) {
 			close(stageStarted)
 			// Blocks on the store lock (held by Update) until the cycle completes.
 			stageErr = stager.StageEntry(context.Background(), staging.ServiceParam, keyC, updateTestEntry("c"))
+
 			close(stageDone)
 		}()
 
@@ -110,9 +114,10 @@ func TestStore_Update_AtomicAgainstConcurrentStage(t *testing.T) {
 		select {
 		case <-stageDone:
 			t.Error("concurrent StageEntry completed while Update held the store lock")
-		case <-time.After(50 * time.Millisecond): //nolint:mnd // generous wait for the blocked goroutine
+		case <-time.After(50 * time.Millisecond):
 		}
 	}
+
 	t.Cleanup(func() { updateMidHook = nil })
 
 	require.NoError(t, writer.Update(t.Context(), "", func(st *staging.State) error {
