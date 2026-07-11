@@ -182,6 +182,32 @@ func TestDecodeState_ServiceMismatchDropsForeignData(t *testing.T) {
 	assert.Empty(t, got.Entries[staging.ServiceSecret], "foreign service must be dropped")
 }
 
+func TestDecodeState_RejectsNamespaceForAgnosticProvider(t *testing.T) {
+	t.Parallel()
+
+	// An AWS (namespace-agnostic) envelope whose payload smuggles a
+	// namespace-bearing param entry must be rejected, not silently kept.
+	state := staging.NewEmptyState()
+	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/p", Namespace: "prod"}] = staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("v"),
+	}
+
+	raw, err := json.Marshal(state) //nolint:errchkjson // State has a custom MarshalJSON
+	require.NoError(t, err)
+
+	env := &file.Envelope{
+		Version:  file.EnvelopeVersion,
+		Provider: "aws",
+		Scope:    "aws/1/r",
+		Service:  "param",
+		Payload:  base64.StdEncoding.EncodeToString(raw),
+	}
+
+	_, err = env.DecodeState("")
+	require.ErrorIs(t, err, file.ErrInvalidEnvelope)
+	assert.Contains(t, err.Error(), "namespace")
+}
+
 func TestWriteEnvelopeFile_WriteErrors(t *testing.T) {
 	t.Parallel()
 
