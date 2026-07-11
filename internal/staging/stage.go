@@ -217,6 +217,17 @@ func (s *State) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
+	if head.Version > stateVersion {
+		// A newer suve wrote this state in a format this build does not understand.
+		// Silently rewriting it as v3 would strip fields the newer build relies on,
+		// so refuse instead. This mirrors the envelope's two-directional version
+		// check (see file.ReadEnvelopeFile).
+		return fmt.Errorf(
+			"%w: on-disk state is version %d but this build only supports version %d",
+			ErrStateVersionTooNew, head.Version, stateVersion,
+		)
+	}
+
 	var in stateJSON
 	if err := json.Unmarshal(data, &in); err != nil {
 		return err
@@ -492,4 +503,9 @@ const (
 var (
 	// ErrNotStaged is returned when a parameter/secret is not staged.
 	ErrNotStaged = errors.New("not staged")
+	// ErrStateVersionTooNew is returned by UnmarshalJSON when the on-disk staging
+	// state was written by a newer suve than this build can read. The caller must
+	// upgrade suve; the state is left untouched rather than rewritten as an older
+	// version.
+	ErrStateVersionTooNew = errors.New("staging state was written by a newer suve; upgrade suve")
 )
