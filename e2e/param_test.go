@@ -4,6 +4,8 @@
 package e2e_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -2110,4 +2112,174 @@ func TestParam_ListJSON(t *testing.T) {
 	stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--output", "json", basePath)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(strings.TrimSpace(stdout), "[") || strings.HasPrefix(strings.TrimSpace(stdout), "{"))
+}
+
+// =============================================================================
+// Service-Specific Export / Import Tests
+//
+// These restore the round-trip coverage that the removed service-specific stash
+// tests (TestParam_StashPushAndPop / StashPushWithKeep / StashPopWithMerge)
+// provided, expressed through `stage param export <file>` / `import <file>`.
+// Each test runs against an isolated temp HOME, so the on-disk working staging
+// area is empty at the start and no cross-test cleanup is required.
+// =============================================================================
+
+// TestParam_ExportImport tests the service-specific export -> clear -> import
+// round-trip for parameters.
+func TestParam_ExportImport(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-param-export-import/test"
+	exportPath := filepath.Join(t.TempDir(), "param.json")
+
+	// Stage a parameter in the working staging area.
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "test-value")
+	require.NoError(t, err)
+
+	// Export writes the file and clears the working area.
+	t.Run("export", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "export", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "exported")
+
+		_, statErr := os.Stat(exportPath)
+		require.NoError(t, statErr)
+	})
+
+	// The working area is now empty.
+	t.Run("working-cleared", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+	})
+
+	// Import restores the working area.
+	t.Run("import", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "import", exportPath)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "imported")
+	})
+
+	t.Run("working-restored", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, paramName)
+	})
+}
+
+// TestParam_ExportKeep tests that `export --keep` retains the working area.
+func TestParam_ExportKeep(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-param-export-keep/test"
+	exportPath := filepath.Join(t.TempDir(), "param.json")
+
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "keep-value")
+	require.NoError(t, err)
+
+	stdout, _, err := runSubCommand(t, paramstage.Command(), "export", exportPath, "--keep")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "kept in the working staging area")
+
+	// The file was written...
+	_, statErr := os.Stat(exportPath)
+	require.NoError(t, statErr)
+
+	// ...and the parameter is still staged.
+	stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, paramName)
+}
+
+// TestParam_ImportMerge tests that `import --merge` combines the imported file
+// with an existing working entry.
+func TestParam_ImportMerge(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName1 := "/suve-e2e-param-import-merge/param1"
+	paramName2 := "/suve-e2e-param-import-merge/param2"
+	exportPath := filepath.Join(t.TempDir(), "param.json")
+
+	// Stage param1 and export it (this clears the working area).
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, paramstage.Command(), "export", exportPath)
+	require.NoError(t, err)
+
+	// Stage param2 in the working area.
+	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	require.NoError(t, err)
+
+	// Import merges param1 back in alongside param2.
+	stdout, _, err := runSubCommand(t, paramstage.Command(), "import", exportPath, "--merge")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "merged")
+
+	stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, paramName1)
+	assert.Contains(t, stdout, paramName2)
+}
+
+// TestParam_ExportImportEncrypted tests a service-level encrypted round-trip via
+// --passphrase-stdin: the payload is encrypted on export and decrypted with the
+// same passphrase on import.
+func TestParam_ExportImportEncrypted(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-param-export-encrypted/test"
+	exportPath := filepath.Join(t.TempDir(), "param.json")
+
+	// Cleanup: the round-trip is proven end to end by applying to localstack.
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "secret-value")
+	require.NoError(t, err)
+
+	// Export encrypted.
+	stdout, stderr, err := runSubCommandWithStdin(
+		t, paramstage.Command(), strings.NewReader("testpass\n"), "export", exportPath, "--passphrase-stdin",
+	)
+	require.NoError(t, err, "export failed: stdout=%s stderr=%s", stdout, stderr)
+	assert.Contains(t, stdout, "encrypted")
+
+	// Import back with the same passphrase.
+	stdout, stderr, err = runSubCommandWithStdin(
+		t, paramstage.Command(), strings.NewReader("testpass\n"), "import", exportPath, "--passphrase-stdin",
+	)
+	require.NoError(t, err, "import failed: stdout=%s stderr=%s", stdout, stderr)
+	assert.Contains(t, stdout, "imported")
+
+	stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, paramName)
+
+	// Prove the VALUE (not just the key) survived the encrypt -> decrypt
+	// round-trip: apply the re-imported staged create and read it back.
+	_, _, err = runSubCommand(t, paramstage.Command(), "apply", "--yes")
+	require.NoError(t, err)
+
+	stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
+	require.NoError(t, err)
+	assert.Equal(t, "secret-value", strings.TrimSpace(stdout))
+}
+
+// TestParam_ImportMissingFile tests that a service-specific import of a
+// non-existent file is a hard error.
+func TestParam_ImportMissingFile(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	_, _, err := runSubCommand(
+		t, paramstage.Command(), "import", filepath.Join(t.TempDir(), "does-not-exist.json"),
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
 }
