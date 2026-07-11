@@ -642,7 +642,7 @@
 </div>
 
 <!-- Apply Modal -->
-<Modal title="Apply Staged Changes" show={showApplyModal} onclose={closeApplyModal}>
+<Modal title="Apply Staged Changes" show={showApplyModal} busy={modalLoading} onclose={closeApplyModal}>
   <div class="modal-apply">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -736,7 +736,7 @@
         <span>Ignore conflicts</span>
       </label>
       <div class="form-actions">
-        <button type="button" class="btn-secondary" onclick={closeApplyModal}>Cancel</button>
+        <button type="button" class="btn-secondary" onclick={closeApplyModal} disabled={modalLoading}>Cancel</button>
         <button type="button" class="btn-apply" onclick={handleApply} disabled={modalLoading}>
           {modalLoading ? 'Applying...' : 'Apply'}
         </button>
@@ -746,7 +746,7 @@
 </Modal>
 
 <!-- Reset Modal -->
-<Modal title="Reset Staged Changes" show={showResetModal} onclose={() => showResetModal = false}>
+<Modal title="Reset Staged Changes" show={showResetModal} busy={modalLoading} onclose={() => showResetModal = false}>
   <div class="modal-confirm">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -754,7 +754,7 @@
     <p>Reset all staged changes for {getServiceName(resetService)}?</p>
     <p class="warning">This will discard all staged changes without applying them.</p>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" onclick={() => showResetModal = false}>Cancel</button>
+      <button type="button" class="btn-secondary" onclick={() => showResetModal = false} disabled={modalLoading}>Cancel</button>
       <button type="button" class="btn-danger" onclick={handleReset} disabled={modalLoading}>
         {modalLoading ? 'Resetting...' : 'Reset'}
       </button>
