@@ -16,6 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/provider"
 	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -221,7 +222,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 
 	output.Success(r.Stdout, "Scheduled deletion of secret %s (deletion date: %s)",
 		result.Name,
-		deletionDate.Format("2006-01-02"),
+		timeutil.FormatDate(deletionDate),
 	)
 
 	return nil
