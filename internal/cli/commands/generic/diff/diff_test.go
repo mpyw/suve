@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
+	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
 	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
 	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
-	cmdparam "github.com/mpyw/suve/internal/cli/commands/param"
-	cmdsecret "github.com/mpyw/suve/internal/cli/commands/secret"
 	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"

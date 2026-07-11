@@ -10,10 +10,10 @@ package aws
 import (
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/commands/aws/param"
+	"github.com/mpyw/suve/internal/cli/commands/aws/secret"
+	"github.com/mpyw/suve/internal/cli/commands/aws/stage"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
-	"github.com/mpyw/suve/internal/cli/commands/param"
-	"github.com/mpyw/suve/internal/cli/commands/secret"
-	"github.com/mpyw/suve/internal/cli/commands/stage"
 )
 
 // Command returns the aws command group with the param (Parameter Store),

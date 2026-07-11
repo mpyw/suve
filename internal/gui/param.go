@@ -9,7 +9,7 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
+	"github.com/mpyw/suve/internal/cli/commands/aws/param/paramtype"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"

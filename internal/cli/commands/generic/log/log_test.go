@@ -16,10 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
+	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
 	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
 	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
-	cmdparam "github.com/mpyw/suve/internal/cli/commands/param"
-	cmdsecret "github.com/mpyw/suve/internal/cli/commands/secret"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"

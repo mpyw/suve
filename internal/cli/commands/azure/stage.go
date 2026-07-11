@@ -5,11 +5,11 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/commands/aws/stage/apply"
+	"github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
+	"github.com/mpyw/suve/internal/cli/commands/aws/stage/reset"
+	"github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
-	"github.com/mpyw/suve/internal/cli/commands/stage/apply"
-	"github.com/mpyw/suve/internal/cli/commands/stage/diff"
-	"github.com/mpyw/suve/internal/cli/commands/stage/reset"
-	"github.com/mpyw/suve/internal/cli/commands/stage/status"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )

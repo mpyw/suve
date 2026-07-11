@@ -14,12 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cmdsecret "github.com/mpyw/suve/internal/cli/commands/secret"
-	secretcreate "github.com/mpyw/suve/internal/cli/commands/secret/create"
-	secretdelete "github.com/mpyw/suve/internal/cli/commands/secret/delete"
-	secretrestore "github.com/mpyw/suve/internal/cli/commands/secret/restore"
-	secretupdate "github.com/mpyw/suve/internal/cli/commands/secret/update"
-	secretstage "github.com/mpyw/suve/internal/cli/commands/stage/secret"
+	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
+	secretcreate "github.com/mpyw/suve/internal/cli/commands/aws/secret/create"
+	secretdelete "github.com/mpyw/suve/internal/cli/commands/aws/secret/delete"
+	secretrestore "github.com/mpyw/suve/internal/cli/commands/aws/secret/restore"
+	secretupdate "github.com/mpyw/suve/internal/cli/commands/aws/secret/update"
+	secretstage "github.com/mpyw/suve/internal/cli/commands/aws/stage/secret"
 	"github.com/mpyw/suve/internal/staging"
 )
 
