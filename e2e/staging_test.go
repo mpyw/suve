@@ -319,6 +319,64 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 	})
 }
 
+// TestGlobal_TagConflictDetection covers #483: a staged tag whose remote was
+// modified after the recorded BaseModifiedAt is rejected as a conflict at apply
+// time, and --ignore-conflicts forces it through. Staging the tag with a
+// BaseModifiedAt in the past simulates the remote being changed out-of-band
+// since the tags were fetched — the real FetchLastModified returns the
+// parameter's actual (newer) modified time.
+func TestGlobal_TagConflictDetection(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-global/tag-conflict/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create a parameter; its LastModified is now.
+	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	require.NoError(t, err)
+
+	// Stage a tag change whose BaseModifiedAt predates the parameter — as if the
+	// remote had been modified since the tags were fetched.
+	past := time.Now().Add(-24 * time.Hour)
+	store := newStore()
+	err = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.TagEntry{
+		Add:            map[string]string{"env": "test"},
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &past,
+	})
+	require.NoError(t, err)
+
+	// Apply without --ignore-conflicts: rejected as a conflict; tag stays staged.
+	t.Run("apply-rejected-on-conflict", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "conflict")
+
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
+		require.NoError(t, err)
+	})
+
+	// Apply with --ignore-conflicts: forced through and unstaged.
+	t.Run("apply-forced-with-ignore-conflicts", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Tagged")
+
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
+		require.ErrorIs(t, err, staging.ErrNotStaged)
+
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "env: test")
+	})
+}
+
 // TestGlobal_ResetWithTags tests the global reset command with tag entries.
 func TestGlobal_ResetWithTags(t *testing.T) {
 	setupEnv(t)

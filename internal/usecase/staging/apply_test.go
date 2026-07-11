@@ -513,6 +513,113 @@ func TestApplyUseCase_Execute_ListTagsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "list tags error")
 }
 
+// TestApplyUseCase_Execute_TagConflictDetection verifies that a staged tag whose
+// remote was modified after its BaseModifiedAt is reported as a conflict and the
+// apply is rejected (#483).
+func TestApplyUseCase_Execute_TagConflictDetection(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	awsTime := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC) // modified after staging
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
+		Add:            map[string]string{"env": "prod"},
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	}))
+
+	strategy := newMockApplyTagStrategy()
+	strategy.lastModified["/app/config"] = awsTime
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
+		IgnoreConflicts: false,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflict")
+	assert.Len(t, output.Conflicts, 1)
+	assert.Equal(t, staging.EntryKey{Name: "/app/config"}, output.Conflicts[0])
+
+	// The tag must NOT be applied or unstaged when a conflict is detected.
+	assert.Equal(t, 0, output.TagSucceeded)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
+	require.NoError(t, err)
+}
+
+// TestApplyUseCase_Execute_TagConflictIgnored verifies that --ignore-conflicts
+// bypasses tag conflict detection and applies the staged tag regardless (#483).
+func TestApplyUseCase_Execute_TagConflictIgnored(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	awsTime := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC) // modified after staging
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
+		Add:            map[string]string{"env": "prod"},
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	}))
+
+	strategy := newMockApplyTagStrategy()
+	strategy.lastModified["/app/config"] = awsTime
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
+		IgnoreConflicts: true,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, output.Conflicts)
+	assert.Equal(t, 1, output.TagSucceeded)
+
+	// Applied cleanly, so the tag is unstaged.
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+// TestApplyUseCase_Execute_TagNoConflict verifies that a staged tag whose remote
+// is unchanged since its BaseModifiedAt applies cleanly without --ignore-conflicts.
+func TestApplyUseCase_Execute_TagNoConflict(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
+		Add:            map[string]string{"env": "prod"},
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	}))
+
+	strategy := newMockApplyTagStrategy()
+	strategy.lastModified["/app/config"] = baseTime // unchanged since base
+
+	uc := &usecasestaging.ApplyUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{
+		IgnoreConflicts: false,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, output.Conflicts)
+	assert.Equal(t, 1, output.TagSucceeded)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
 // TestApplyUseCase_Execute_PerNamespaceResolver covers the App Configuration
 // path (#431): the same key staged under two namespaces lives in one store as
 // two entries, each applied through the strategy resolved for its own namespace,
