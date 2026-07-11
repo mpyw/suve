@@ -102,7 +102,7 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, _ int) {
 
 	dateStr := ""
 	if entry.CreatedDate != nil {
-		dateStr = entry.CreatedDate.Format("2006-01-02")
+		dateStr = timeutil.FormatDate(*entry.CreatedDate)
 	}
 
 	stateStr := ""

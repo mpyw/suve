@@ -103,7 +103,7 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, _ int) {
 	// Compact one-line format: VERSION_ID  DATE  [LABELS]
 	dateStr := ""
 	if entry.CreatedDate != nil {
-		dateStr = entry.CreatedDate.Format("2006-01-02")
+		dateStr = timeutil.FormatDate(*entry.CreatedDate)
 	}
 
 	labelsStr := ""

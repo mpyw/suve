@@ -1,10 +1,15 @@
 package param
 
 import (
+	"bytes"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mpyw/suve/internal/timeutil"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 func TestTruncateRunes(t *testing.T) {
@@ -36,6 +41,32 @@ func TestTruncateRunes(t *testing.T) {
 			assert.True(t, utf8.ValidString(got), "result must be valid UTF-8")
 		})
 	}
+}
+
+// TestRenderOnelineDateHonorsTZ ensures the oneline date column is converted
+// into the TZ location like every other date, rather than formatting the raw
+// UTC instant. Near a UTC midnight boundary these disagree by a full day (#492).
+func TestRenderOnelineDateHonorsTZ(t *testing.T) {
+	// 2024-01-15T21:30:45Z is still 2024-01-15 in UTC but 2024-01-16 in Tokyo.
+	modified := time.Date(2024, 1, 15, 21, 30, 45, 0, time.UTC)
+
+	timeutil.ResetLocationCache()
+	t.Setenv("TZ", "Asia/Tokyo")
+	t.Cleanup(timeutil.ResetLocationCache)
+
+	p := &logPresenter{
+		result: &param.LogOutput{
+			Entries: []param.LogEntry{
+				{Version: 1, Value: "v", LastModified: &modified},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	p.RenderOneline(&buf, 0, 0)
+
+	assert.Contains(t, buf.String(), "2024-01-16")
+	assert.NotContains(t, buf.String(), "2024-01-15")
 }
 
 func TestSanitizeControl(t *testing.T) {
