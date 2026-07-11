@@ -90,8 +90,10 @@ func TestGoogleCloudSecret_FullWorkflow(t *testing.T) {
 		stdout, err := runGcloud(t, "secret", "log", name)
 		require.NoError(t, err)
 		// Google Cloud versions are integers; after one update there are two.
-		assert.Contains(t, stdout, "1")
-		assert.Contains(t, stdout, "2")
+		// Match the "Version N" header rather than a bare digit (which any
+		// timestamp would satisfy) so a missing version is actually caught.
+		assert.Contains(t, stdout, "Version 1")
+		assert.Contains(t, stdout, "Version 2")
 	})
 
 	t.Run("show-specific-version", func(t *testing.T) {
