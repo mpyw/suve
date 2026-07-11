@@ -111,6 +111,20 @@ func TestResolveValue_EditorFallback(t *testing.T) {
 		assert.Empty(t, value)
 	})
 
+	t.Run("non-interactive stdin without a value fails instead of hanging on the editor", func(t *testing.T) {
+		t.Parallel()
+
+		// No OpenEditor override: the real editor.Open would be selected, but a
+		// non-TTY stdin (here strings.Reader) must short-circuit to an error
+		// rather than block waiting on an interactive editor.
+		_, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+			Stdin: strings.NewReader(""),
+		})
+		require.Error(t, err)
+		assert.False(t, proceed)
+		assert.ErrorIs(t, err, cliinternal.ErrValueRequired)
+	})
+
 	t.Run("editor errors are surfaced", func(t *testing.T) {
 		t.Parallel()
 

@@ -1501,10 +1501,12 @@ func TestParam_UpdateMissingArgs(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// Only name, no value
+	// Only name, no value: with a non-interactive stdin the editor fallback must
+	// NOT be launched (it would hang); it must fail fast with an actionable error.
 	t.Run("no-value", func(t *testing.T) {
-		_, _, err := runCommand(t, paramupdate.Command(), "/test/param")
-		assert.Error(t, err)
+		_, _, err := runCommandWithStdin(t, paramupdate.Command(), strings.NewReader(""), "/test/param")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "value is required")
 	})
 }
 
@@ -2000,10 +2002,12 @@ func TestParam_CreateMissingArgs(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// Only name, no value
+	// Only name, no value: with a non-interactive stdin the editor fallback must
+	// NOT be launched (it would hang); it must fail fast with an actionable error.
 	t.Run("no-value", func(t *testing.T) {
-		_, _, err := runCommand(t, paramcreate.Command(), "/test/param")
-		assert.Error(t, err)
+		_, _, err := runCommandWithStdin(t, paramcreate.Command(), strings.NewReader(""), "/test/param")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "value is required")
 	})
 }
 

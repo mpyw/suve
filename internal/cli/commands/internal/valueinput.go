@@ -11,6 +11,15 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/editor"
+	"github.com/mpyw/suve/internal/cli/terminal"
+)
+
+// ErrValueRequired is returned when no value was provided and the editor
+// fallback is unavailable because the session is non-interactive (a pipe, CI,
+// or any non-TTY stdin). It never hangs waiting on an editor.
+var ErrValueRequired = errors.New(
+	"value is required: pass it as an argument, pipe it in with --" + FlagValueStdin +
+		", or run interactively to edit it in $EDITOR",
 )
 
 // FlagValueStdin is the name of the flag that reads a create/update value from
@@ -36,6 +45,16 @@ func Stdin(cmd *cli.Command) io.Reader {
 	}
 
 	return os.Stdin
+}
+
+// interactiveReader reports whether r is a terminal, i.e. whether it is safe to
+// fall back to $EDITOR. os.Stdin is a terminal in an interactive shell but not
+// under a pipe or CI, so this prevents the editor fallback from hanging in a
+// non-interactive session. A nil reader (unset) is treated as non-interactive.
+func interactiveReader(r io.Reader) bool {
+	f, ok := r.(terminal.Fder)
+
+	return ok && terminal.IsTTY(f.Fd())
 }
 
 // ValueSource describes where a create/update value may come from. Exactly one
@@ -89,6 +108,14 @@ func ResolveValue(ctx context.Context, src ValueSource) (value string, proceed b
 	default:
 		openEditor := src.OpenEditor
 		if openEditor == nil {
+			// The real $EDITOR is a blocking, interactive program: launching it
+			// under a pipe or in CI would hang forever. Only fall back to it when
+			// stdin is a TTY; otherwise fail with an actionable error. Tests inject
+			// a non-blocking OpenEditor and are therefore exempt from this guard.
+			if !interactiveReader(src.Stdin) {
+				return "", false, ErrValueRequired
+			}
+
 			openEditor = editor.Open
 		}
 
