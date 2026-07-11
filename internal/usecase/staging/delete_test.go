@@ -357,6 +357,38 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
 }
 
+func TestDeleteUseCase_Execute_ExistingWithStagedTags_UnstagesTags(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// A tag was staged against an existing resource (entry NotStaged, tag staged).
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/to-delete"}, staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.DeleteUseCase{
+		Strategy: newMockDeleteStrategy(false),
+		Store:    store,
+	}
+
+	// Deleting the resource must stage a DELETE and discard the orphan tags so
+	// they don't fail against a resource that no longer exists (#470).
+	output, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{
+		Key: staging.EntryKey{Name: "/app/to-delete"},
+	})
+	require.NoError(t, err)
+	assert.False(t, output.Unstaged)
+
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/to-delete", Namespace: ""})
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationDelete, entry.Operation)
+
+	// Tags must be gone.
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/to-delete", Namespace: ""})
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
 func TestDeleteUseCase_Execute_UnstageTagError(t *testing.T) {
 	t.Parallel()
 

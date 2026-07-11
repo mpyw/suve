@@ -183,12 +183,13 @@ func TestReduceEntry_Delete(t *testing.T) {
 		wantDiscardTags bool
 	}{
 		{
-			name: "NotStaged -> Delete",
+			name: "NotStaged -> Delete (also unstage tags)",
 			state: EntryState{
 				CurrentValue: lo.ToPtr("current"),
 				StagedState:  EntryStagedStateNotStaged{},
 			},
-			wantState: EntryStagedStateDelete{},
+			wantState:       EntryStagedStateDelete{},
+			wantDiscardTags: true,
 		},
 		{
 			name: "Create -> NotStaged (unstage, also unstage tags)",
@@ -200,12 +201,13 @@ func TestReduceEntry_Delete(t *testing.T) {
 			wantDiscardTags: true,
 		},
 		{
-			name: "Update -> Delete",
+			name: "Update -> Delete (also unstage tags)",
 			state: EntryState{
 				CurrentValue: lo.ToPtr("current"),
 				StagedState:  EntryStagedStateUpdate{DraftValue: "updated"},
 			},
-			wantState: EntryStagedStateDelete{},
+			wantState:       EntryStagedStateDelete{},
+			wantDiscardTags: true,
 		},
 		{
 			name: "Delete -> Delete (no-op)",
@@ -233,9 +235,10 @@ func TestReduceEntry_Reset(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		state     EntryState
-		wantState EntryStagedState
+		name            string
+		state           EntryState
+		wantState       EntryStagedState
+		wantDiscardTags bool
 	}{
 		{
 			name: "NotStaged -> NotStaged",
@@ -246,12 +249,13 @@ func TestReduceEntry_Reset(t *testing.T) {
 			wantState: EntryStagedStateNotStaged{},
 		},
 		{
-			name: "Create -> NotStaged",
+			name: "Create -> NotStaged (also unstage tags)",
 			state: EntryState{
 				CurrentValue: nil,
 				StagedState:  EntryStagedStateCreate{DraftValue: "draft"},
 			},
-			wantState: EntryStagedStateNotStaged{},
+			wantState:       EntryStagedStateNotStaged{},
+			wantDiscardTags: true,
 		},
 		{
 			name: "Update -> NotStaged",
@@ -277,7 +281,7 @@ func TestReduceEntry_Reset(t *testing.T) {
 
 			result := ReduceEntry(tt.state, EntryActionReset{})
 			assert.Equal(t, tt.wantState, result.NewState.StagedState)
-			assert.False(t, result.DiscardTags)
+			assert.Equal(t, tt.wantDiscardTags, result.DiscardTags)
 			assert.NoError(t, result.Error)
 		})
 	}

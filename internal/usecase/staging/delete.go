@@ -88,28 +88,37 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		return nil, result.Error
 	}
 
-	// Check if we should unstage a CREATE
-	if result.DiscardTags {
-		// CREATE -> NotStaged: unstage entry and tags
+	// A CREATE reduces to NotStaged (nothing to delete on AWS); anything else
+	// stages a DELETE. In both cases DiscardTags may be set, and the resource
+	// ends up gone, so orphan staged tags must be unstaged too.
+	_, unstaged := result.NewState.StagedState.(transition.EntryStagedStateNotStaged)
+
+	if unstaged {
+		// CREATE -> NotStaged: unstage the entry.
 		if err := u.Store.UnstageEntry(ctx, service, key); err != nil {
 			return nil, err
 		}
-		// Unstage tags too (ignore ErrNotStaged)
+	} else {
+		// Stage delete with options (single persist)
+		if err := u.stageDeleteWithOptions(
+			ctx, service, key, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	// Discard orphan staged tags (ignore ErrNotStaged) - the resource is gone.
+	if result.DiscardTags {
 		if err := u.Store.UnstageTag(ctx, service, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
 			return nil, err
 		}
+	}
 
+	if unstaged {
 		return &DeleteOutput{
 			Name:     input.Key.Name,
 			Unstaged: true,
 		}, nil
-	}
-
-	// Stage delete with options (single persist)
-	if err := u.stageDeleteWithOptions(
-		ctx, service, key, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow,
-	); err != nil {
-		return nil, err
 	}
 
 	output := &DeleteOutput{

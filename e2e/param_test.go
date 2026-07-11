@@ -373,6 +373,60 @@ func TestParam_StagingWorkflow(t *testing.T) {
 	})
 }
 
+// TestParam_StagingTagThenDeleteApply reproduces the #470 wedge: staging a tag
+// on an existing parameter and then staging its deletion must NOT leave an
+// orphan tag change. Applying must delete the parameter and finish clean rather
+// than persistently failing when ApplyTags runs against the deleted resource.
+func TestParam_StagingTagThenDeleteApply(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/tag-delete/param"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// 1. Create the parameter.
+	t.Run("setup", func(t *testing.T) {
+		_, _, err := runCommand(t, paramcreate.Command(), paramName, "original-value")
+		require.NoError(t, err)
+	})
+
+	// 2. Stage a tag against the existing parameter.
+	t.Run("stage-tag", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "tag", paramName, "env=prod")
+		require.NoError(t, err)
+	})
+
+	// 3. Stage the parameter for deletion - this must discard the staged tag.
+	t.Run("stage-delete", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
+		require.NoError(t, err)
+	})
+
+	// 4. Apply - must succeed (not wedge on the orphan tag) and delete the param.
+	t.Run("apply", func(t *testing.T) {
+		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
+		require.NoError(t, err)
+	})
+
+	// 5. Status must be empty - nothing left staged.
+	t.Run("status-after-apply", func(t *testing.T) {
+		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, paramName)
+	})
+
+	// 6. Parameter must be gone.
+	t.Run("verify-deleted", func(t *testing.T) {
+		_, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
+		assert.Error(t, err, "expected error after deletion")
+	})
+}
+
 // TestParam_StagingAdd tests staging a new parameter (create operation).
 func TestParam_StagingAdd(t *testing.T) {
 	setupEnv(t)

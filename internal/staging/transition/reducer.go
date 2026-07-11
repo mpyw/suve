@@ -129,10 +129,14 @@ func reduceEdit(state EntryState, action EntryActionEdit) EntryTransitionResult 
 //   - CurrentValue=nil + Create    → NotStaged  (unstage, also unstage tags)
 //   - CurrentValue=nil + Update    → ERROR      (should not happen)
 //   - CurrentValue=nil + Delete    → ERROR      (should not happen)
-//   - CurrentValue!=nil + NotStaged → Delete    (stage for deletion)
+//   - CurrentValue!=nil + NotStaged → Delete    (stage for deletion, also unstage tags)
 //   - CurrentValue!=nil + Create    → NotStaged (unstage, also unstage tags) - should not happen
-//   - CurrentValue!=nil + Update    → Delete    (convert to delete)
+//   - CurrentValue!=nil + Update    → Delete    (convert to delete, also unstage tags)
 //   - CurrentValue!=nil + Delete    → Delete    (no-op)
+//
+// Tags are always discarded when the resource ends up gone (Create unstaged, or
+// staged for deletion): a staged tag change against an absent resource would
+// orphan and permanently wedge apply.
 func reduceDelete(state EntryState) EntryTransitionResult {
 	var discardTags bool
 
@@ -144,7 +148,10 @@ func reduceDelete(state EntryState) EntryTransitionResult {
 
 	switch state.StagedState.(type) {
 	case EntryStagedStateNotStaged, EntryStagedStateUpdate:
+		// Discard tags too - the resource is being deleted, so staged tags would
+		// orphan and fail at apply time.
 		state.StagedState = EntryStagedStateDelete{}
+		discardTags = true
 	case EntryStagedStateCreate:
 		// Discard tags too - resource was never created
 		state.StagedState = EntryStagedStateNotStaged{}
@@ -159,11 +166,16 @@ func reduceDelete(state EntryState) EntryTransitionResult {
 // reduceReset handles the RESET action.
 //
 // Transition rules:
-//   - Any → NotStaged  (unstage entry only, tags preserved)
+//   - Create → NotStaged  (unstage entry, also unstage tags - resource was never created)
+//   - Any    → NotStaged  (unstage entry only, tags preserved)
 func reduceReset(state EntryState) EntryTransitionResult {
+	// Discard tags when resetting a staged CREATE: the resource never existed, so
+	// any staged tag change would orphan and wedge apply.
+	_, isCreate := state.StagedState.(EntryStagedStateCreate)
+
 	state.StagedState = EntryStagedStateNotStaged{}
 
-	return EntryTransitionResult{NewState: state}
+	return EntryTransitionResult{NewState: state, DiscardTags: isCreate}
 }
 
 // reduceTag handles the TAG action.
