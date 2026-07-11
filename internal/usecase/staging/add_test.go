@@ -87,6 +87,26 @@ func TestAddUseCase_Execute_RejectsWhenResourceExists(t *testing.T) {
 	assert.ErrorIs(t, err, transition.ErrCannotAddToExisting)
 }
 
+func TestAddUseCase_Execute_RejectsNonUTF8Value(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
+		Key:   staging.EntryKey{Name: "/app/new-param"},
+		Value: "\xff\xfe",
+	})
+	require.ErrorIs(t, err, usecasestaging.ErrValueNotUTF8)
+
+	// Nothing should have been staged
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param", Namespace: ""})
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
 func TestAddUseCase_Execute_MinimalInput(t *testing.T) {
 	t.Parallel()
 
