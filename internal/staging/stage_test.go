@@ -187,6 +187,30 @@ func TestState_Merge(t *testing.T) {
 	})
 }
 
+func TestState_UnmarshalJSON_Version(t *testing.T) {
+	t.Parallel()
+
+	t.Run("older version is dropped as empty", func(t *testing.T) {
+		t.Parallel()
+
+		var state staging.State
+
+		err := json.Unmarshal([]byte(`{"version":2}`), &state)
+		require.NoError(t, err)
+		assert.True(t, state.IsEmpty())
+	})
+
+	t.Run("newer version is an error and is not rewritten", func(t *testing.T) {
+		t.Parallel()
+
+		var state staging.State
+
+		err := json.Unmarshal([]byte(`{"version":4}`), &state)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, staging.ErrStateVersionTooNew)
+	})
+}
+
 func TestState_ExtractService(t *testing.T) {
 	t.Parallel()
 
