@@ -687,6 +687,22 @@ func TestReduceEntry_Delete_NotFound(t *testing.T) {
 	assert.Equal(t, EntryStagedStateNotStaged{}, result.NewState.StagedState)
 }
 
+func TestReduceEntry_Delete_StagedUpdateRemoteVanished(t *testing.T) {
+	t.Parallel()
+
+	// Test case: CurrentValue=nil + Update -> ERROR naming reset as the remedy.
+	// The staged Update can never apply once the remote is gone, so delete must
+	// point at reset instead of the generic not-found (#552).
+	state := EntryState{
+		CurrentValue: nil,
+		StagedState:  EntryStagedStateUpdate{DraftValue: "v2"},
+	}
+	result := ReduceEntry(state, EntryActionDelete{})
+	assert.Equal(t, ErrCannotDeleteStagedUpdateNotFound, result.Error)
+	assert.Contains(t, result.Error.Error(), "reset")
+	assert.Equal(t, EntryStagedStateUpdate{DraftValue: "v2"}, result.NewState.StagedState)
+}
+
 func TestReduceEntry_Delete_InconsistentState(t *testing.T) {
 	t.Parallel()
 
