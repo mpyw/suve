@@ -58,8 +58,30 @@ type Writer interface {
 	WriteState(ctx context.Context, service staging.Service, state *staging.State) error
 }
 
+// Updater performs an atomic read-modify-write of the whole staging state under
+// a single lock hold: it reads the current state fresh, hands it to fn to mutate
+// in place, then writes it back — without releasing the lock in between. This
+// closes the read-then-write race a separate Drain + WriteState leaves open,
+// where a concurrent StageEntry landing between the two is clobbered by the
+// stale snapshot. fn must confine itself to mutating the passed state and must
+// not call back into the store (the lock is not reentrant).
+type Updater interface {
+	Update(ctx context.Context, service staging.Service, fn func(*staging.State) error) error
+}
+
 // FileStore combines drain and write operations for file storage.
 type FileStore interface {
 	Drainer
 	Writer
+}
+
+// WorkingStore is the working-area surface the export and import use cases rely
+// on: a bulk Drain for the export snapshot, per-key writes to clear exactly the
+// exported keys (each re-read under its own lock), and the atomic Update
+// read-modify-write used to reconcile an import without clobbering a concurrent
+// stage.
+type WorkingStore interface {
+	Drainer
+	WriteOperator
+	Updater
 }

@@ -490,6 +490,12 @@ func (s *Store) IsEncrypted() (bool, error) {
 func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*staging.State, error) {
 	defer s.lock()()
 
+	return s.drainLocked(service, keep)
+}
+
+// drainLocked is the lock-free core of Drain. It must be called with the store
+// lock held (see Drain and Update).
+func (s *Store) drainLocked(service staging.Service, keep bool) (*staging.State, error) {
 	if !s.isSplit() {
 		return s.drainSingle(service, keep)
 	}
@@ -559,6 +565,12 @@ func (s *Store) drainServiceFile(service staging.Service, keep bool) (*staging.S
 func (s *Store) WriteState(_ context.Context, service staging.Service, state *staging.State) error {
 	defer s.lock()()
 
+	return s.writeStateLocked(service, state)
+}
+
+// writeStateLocked is the lock-free core of WriteState. It must be called with
+// the store lock held (see WriteState and Update).
+func (s *Store) writeStateLocked(service staging.Service, state *staging.State) error {
 	if !s.isSplit() {
 		if service != "" {
 			state = state.ExtractService(service)
@@ -578,6 +590,37 @@ func (s *Store) WriteState(_ context.Context, service staging.Service, state *st
 	}
 
 	return nil
+}
+
+// updateMidHook, when non-nil, is invoked inside Update while the store lock is
+// held — after the fresh read and before the write-back. Tests use it to prove
+// that no concurrent write can interleave within the atomic cycle. It is nil in
+// production.
+//
+//nolint:gochecknoglobals // test hook for dependency injection
+var updateMidHook func()
+
+// Update performs an atomic read-modify-write of the working state under a
+// single lock hold (see store.Updater). It re-reads the current state inside the
+// lock, so a concurrent StageEntry from another process is serialized either
+// fully before or fully after this cycle — never clobbered by a stale snapshot.
+func (s *Store) Update(_ context.Context, service staging.Service, fn func(*staging.State) error) error {
+	defer s.lock()()
+
+	state, err := s.drainLocked(service, true)
+	if err != nil {
+		return err
+	}
+
+	if updateMidHook != nil {
+		updateMidHook()
+	}
+
+	if err := fn(state); err != nil {
+		return err
+	}
+
+	return s.writeStateLocked(service, state)
 }
 
 // GetEntry retrieves the staged entry identified by key.
@@ -818,4 +861,5 @@ func (s *Store) Delete() error {
 var (
 	_ store.FileStore         = (*Store)(nil)
 	_ store.ReadWriteOperator = (*Store)(nil)
+	_ store.WorkingStore      = (*Store)(nil)
 )

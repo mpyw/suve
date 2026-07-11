@@ -1,11 +1,15 @@
 package file
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,6 +17,126 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
+
+// updateTestEntry builds a minimal staged entry for the Update tests.
+func updateTestEntry(value string) staging.Entry {
+	return staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr(value),
+		StagedAt:  time.Now(),
+	}
+}
+
+func TestStore_Update_ReadModifyWrite(t *testing.T) {
+	t.Parallel()
+
+	s := NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+
+	keyA := staging.EntryKey{Name: "/a"}
+	require.NoError(t, s.StageEntry(t.Context(), staging.ServiceParam, keyA, updateTestEntry("a")))
+
+	keyB := staging.EntryKey{Name: "/b"}
+
+	require.NoError(t, s.Update(t.Context(), "", func(st *staging.State) error {
+		st.Entries[staging.ServiceParam][keyB] = updateTestEntry("b")
+
+		return nil
+	}))
+
+	final, err := s.Drain(t.Context(), "", true)
+	require.NoError(t, err)
+	assert.Contains(t, final.Entries[staging.ServiceParam], keyA)
+	assert.Contains(t, final.Entries[staging.ServiceParam], keyB)
+}
+
+func TestStore_Update_FnErrorLeavesStateUnchanged(t *testing.T) {
+	t.Parallel()
+
+	s := NewStoreWithPath(filepath.Join(t.TempDir(), "stage.json"))
+
+	keyA := staging.EntryKey{Name: "/a"}
+	require.NoError(t, s.StageEntry(t.Context(), staging.ServiceParam, keyA, updateTestEntry("a")))
+
+	sentinel := errors.New("boom")
+	err := s.Update(t.Context(), "", func(st *staging.State) error {
+		st.Entries[staging.ServiceParam][staging.EntryKey{Name: "/b"}] = updateTestEntry("b")
+
+		return sentinel
+	})
+	require.ErrorIs(t, err, sentinel)
+
+	// The failed mutation must not have been persisted.
+	final, err := s.Drain(t.Context(), "", true)
+	require.NoError(t, err)
+	assert.Len(t, final.Entries[staging.ServiceParam], 1)
+	assert.Contains(t, final.Entries[staging.ServiceParam], keyA)
+}
+
+// TestStore_Update_AtomicAgainstConcurrentStage proves the read-modify-write
+// cycle is atomic: a StageEntry from a second store handle (standing in for
+// another process) that fires while Update holds the lock cannot interleave, so
+// neither the Update's change nor the concurrent stage is lost. Under the old
+// Drain + WriteState(stale snapshot) pattern the concurrent entry was silently
+// clobbered.
+//
+//nolint:paralleltest // mutates the package-level updateMidHook; must run serially
+func TestStore_Update_AtomicAgainstConcurrentStage(t *testing.T) {
+	// Not parallel: it sets the package-level updateMidHook.
+	dir := t.TempDir()
+	path := filepath.Join(dir, "stage.json")
+
+	writer := NewStoreWithPath(path) // the Update caller (import path)
+	stager := NewStoreWithPath(path) // a second handle standing in for another process
+
+	keyA := staging.EntryKey{Name: "/a"}
+	keyB := staging.EntryKey{Name: "/b"}
+	keyC := staging.EntryKey{Name: "/c"}
+
+	require.NoError(t, writer.StageEntry(t.Context(), staging.ServiceParam, keyA, updateTestEntry("a")))
+
+	stageStarted := make(chan struct{})
+	stageDone := make(chan struct{})
+
+	var stageErr error
+
+	updateMidHook = func() {
+		go func() {
+			close(stageStarted)
+			// Blocks on the store lock (held by Update) until the cycle completes.
+			stageErr = stager.StageEntry(context.Background(), staging.ServiceParam, keyC, updateTestEntry("c"))
+
+			close(stageDone)
+		}()
+
+		<-stageStarted
+
+		// The concurrent stage must NOT complete while Update holds the lock.
+		select {
+		case <-stageDone:
+			t.Error("concurrent StageEntry completed while Update held the store lock")
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+
+	t.Cleanup(func() { updateMidHook = nil })
+
+	require.NoError(t, writer.Update(t.Context(), "", func(st *staging.State) error {
+		st.Entries[staging.ServiceParam][keyB] = updateTestEntry("b")
+
+		return nil
+	}))
+
+	<-stageDone
+	require.NoError(t, stageErr)
+
+	final, err := writer.Drain(t.Context(), "", true)
+	require.NoError(t, err)
+
+	// Nothing lost: pre-existing A, the Update's B, and the concurrent C all survive.
+	assert.Contains(t, final.Entries[staging.ServiceParam], keyA)
+	assert.Contains(t, final.Entries[staging.ServiceParam], keyB)
+	assert.Contains(t, final.Entries[staging.ServiceParam], keyC)
+}
 
 func TestInitializeStateMaps(t *testing.T) {
 	t.Parallel()

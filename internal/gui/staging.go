@@ -840,20 +840,22 @@ type EnvelopeInfoResult struct {
 // =============================================================================
 
 // errStoreNotFileStore is returned when the resolved staging store cannot serve
-// bulk drain/write operations (should never happen for the file/mock stores).
+// the working-area drain/unstage/update operations (should never happen for the
+// file/mock stores).
 var errStoreNotFileStore = stringError("staging store does not support import/export")
 
-// getWorkingFileStore resolves the per-service working store as a FileStore
-// (bulk Drain/WriteState). It goes through getStagingStore so the test seam and
-// the per-service scope resolution (the #445 fix: param → App Configuration
-// bucket, secret → Key Vault bucket) are shared with every other staging op.
-func (a *App) getWorkingFileStore(kind provider.Kind) (store.FileStore, error) {
+// getWorkingFileStore resolves the per-service working store as a WorkingStore
+// (bulk Drain plus the per-key unstage and atomic Update the export/import use
+// cases need). It goes through getStagingStore so the test seam and the
+// per-service scope resolution (the #445 fix: param → App Configuration bucket,
+// secret → Key Vault bucket) are shared with every other staging op.
+func (a *App) getWorkingFileStore(kind provider.Kind) (store.WorkingStore, error) {
 	s, err := a.getStagingStore(kind)
 	if err != nil {
 		return nil, err
 	}
 
-	fs, ok := s.(store.FileStore)
+	fs, ok := s.(store.WorkingStore)
 	if !ok {
 		return nil, errStoreNotFileStore
 	}
