@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -184,6 +185,68 @@ func TestState_Merge(t *testing.T) {
 
 		assert.NotNil(t, state1.Entries[staging.ServiceParam])
 		assert.Len(t, state1.Entries[staging.ServiceParam], 1)
+	})
+
+	t.Run("merge unions tag deltas for the same key", func(t *testing.T) {
+		t.Parallel()
+
+		key := staging.EntryKey{Name: "/app/config"}
+
+		working := staging.NewEmptyState()
+		working.Tags[staging.ServiceParam][key] = staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			Remove:   maputil.NewSet("old"),
+			StagedAt: time.Now(),
+		}
+
+		envelope := staging.NewEmptyState()
+		envelope.Tags[staging.ServiceParam][key] = staging.TagEntry{
+			Add:      map[string]string{"team": "foo"},
+			StagedAt: time.Now(),
+		}
+
+		working.Merge(envelope)
+
+		merged := working.Tags[staging.ServiceParam][key]
+		assert.Equal(t, "prod", merged.Add["env"])
+		assert.Equal(t, "foo", merged.Add["team"])
+		assert.True(t, merged.Remove.Contains("old"))
+	})
+
+	t.Run("merge lets envelope win per tag-key and on add-vs-remove clash", func(t *testing.T) {
+		t.Parallel()
+
+		key := staging.EntryKey{Name: "/app/config"}
+
+		working := staging.NewEmptyState()
+		working.Tags[staging.ServiceParam][key] = staging.TagEntry{
+			// env:    same tag-key Add in both -> envelope value wins.
+			// keep:   working Add, envelope silent -> preserved.
+			// revive: working Remove, envelope Add -> envelope Add wins.
+			// gone:   working Remove, envelope silent -> preserved.
+			// drop:   working Add, envelope Remove -> envelope Remove wins.
+			Add:      map[string]string{"env": "stage", "keep": "yes", "drop": "no"},
+			Remove:   maputil.NewSet("gone", "revive"),
+			StagedAt: time.Now(),
+		}
+
+		envelope := staging.NewEmptyState()
+		envelope.Tags[staging.ServiceParam][key] = staging.TagEntry{
+			Add:      map[string]string{"env": "prod", "revive": "back"},
+			Remove:   maputil.NewSet("drop"),
+			StagedAt: time.Now(),
+		}
+
+		working.Merge(envelope)
+
+		merged := working.Tags[staging.ServiceParam][key]
+		assert.Equal(t, "prod", merged.Add["env"])     // envelope wins same tag-key
+		assert.Equal(t, "yes", merged.Add["keep"])     // working-only preserved
+		assert.Equal(t, "back", merged.Add["revive"])  // envelope Add beats working Remove
+		assert.True(t, merged.Remove.Contains("gone")) // working-only remove preserved
+		assert.True(t, merged.Remove.Contains("drop")) // envelope Remove beats working Add
+		assert.NotContains(t, merged.Add, "drop")
+		assert.NotContains(t, merged.Remove, "revive")
 	})
 }
 

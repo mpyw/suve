@@ -335,8 +335,80 @@ func (s *State) Merge(other *State) {
 			s.Tags[svc] = make(map[EntryKey]TagEntry)
 		}
 
-		maps.Copy(s.Tags[svc], tags)
+		for key, incoming := range tags {
+			if existing, ok := s.Tags[svc][key]; ok {
+				s.Tags[svc][key] = mergeTagEntry(existing, incoming)
+			} else {
+				s.Tags[svc][key] = incoming
+			}
+		}
 	}
+}
+
+// mergeTagEntry field-unions two staged tag deltas for the same key instead of
+// replacing base wholesale. Value entries are complete snapshots and stay
+// wholesale-replaced, but tag deltas are partial edits, so replacing base
+// wholesale silently drops the base side's pending Add/Remove. The incoming
+// (envelope) side wins per tag-key: its Add value overrides, and an
+// Add-vs-Remove clash on the same tag-key resolves to whichever side incoming
+// chose. Tag-keys only present in base are preserved (union). Non-tag fields
+// (StagedAt, BaseModifiedAt) follow the winning envelope.
+func mergeTagEntry(base, incoming TagEntry) TagEntry {
+	tagKeys := maputil.NewSet[string]()
+	for k := range base.Add {
+		tagKeys.Add(k)
+	}
+
+	for k := range incoming.Add {
+		tagKeys.Add(k)
+	}
+
+	for k := range base.Remove {
+		tagKeys.Add(k)
+	}
+
+	for k := range incoming.Remove {
+		tagKeys.Add(k)
+	}
+
+	add := make(map[string]string)
+	remove := make(maputil.Set[string])
+
+	for k := range tagKeys {
+		switch {
+		case hasKey(incoming.Add, k):
+			add[k] = incoming.Add[k]
+		case incoming.Remove.Contains(k):
+			remove.Add(k)
+		case hasKey(base.Add, k):
+			add[k] = base.Add[k]
+		case base.Remove.Contains(k):
+			remove.Add(k)
+		}
+	}
+
+	merged := incoming
+
+	if len(add) == 0 {
+		add = nil
+	}
+
+	if len(remove) == 0 {
+		remove = nil
+	}
+
+	merged.Add = add
+	merged.Remove = remove
+
+	return merged
+}
+
+// hasKey reports whether m contains key, distinguishing an explicit empty-string
+// tag value from an absent tag-key.
+func hasKey(m map[string]string, key string) bool {
+	_, ok := m[key]
+
+	return ok
 }
 
 // NewEmptyState creates a new empty state with initialized maps.
