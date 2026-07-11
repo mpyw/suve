@@ -6,13 +6,18 @@
   interface Props {
     title: string;
     show?: boolean;
+    // busy suppresses every dismissal path (Escape, backdrop, close button) while
+    // an operation is in flight, so a mid-flight dismiss cannot unmount the modal
+    // and silently discard its pending result/error.
+    busy?: boolean;
     onclose?: () => void;
     children?: Snippet;
   }
 
-  let { title, show = false, onclose, children }: Props = $props();
+  let { title, show = false, busy = false, onclose, children }: Props = $props();
 
   function handleClose() {
+    if (busy) return;
     onclose?.();
   }
 
@@ -29,11 +34,11 @@
 
 {#if show}
   <div class="modal-backdrop">
-    <button type="button" class="modal-backdrop-dismiss" aria-label="Dismiss" onclick={handleClose}></button>
+    <button type="button" class="modal-backdrop-dismiss" aria-label="Dismiss" disabled={busy} onclick={handleClose}></button>
     <div class="modal">
       <div class="modal-header">
         <h3 class="modal-title">{title}</h3>
-        <button class="btn-close" onclick={handleClose}>
+        <button class="btn-close" disabled={busy} onclick={handleClose}>
           <CloseIcon />
         </button>
       </div>
