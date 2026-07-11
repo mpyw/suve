@@ -10,6 +10,10 @@ export function DetectProviders() {
   return window['go']['gui']['App']['DetectProviders']();
 }
 
+export function EnvScope(arg1) {
+  return window['go']['gui']['App']['EnvScope'](arg1);
+}
+
 export function GetAWSIdentity() {
   return window['go']['gui']['App']['GetAWSIdentity']();
 }
