@@ -33,9 +33,23 @@ func TestScope_Key(t *testing.T) {
 			want:  "azure/keyvault/vault1",
 		},
 		{
+			// Vault names are case-insensitive DNS labels, so mixed-case spellings
+			// of the same vault must fold to one stable key.
+			name:  "azure keyvault mixed case folds to lower",
+			scope: provider.AzureKeyVaultScope("MyVault"),
+			want:  "azure/keyvault/myvault",
+		},
+		{
 			name:  "azure appconfig",
 			scope: provider.AzureAppConfigScope("store1"),
 			want:  "azure/appconfig/store1",
+		},
+		{
+			// Store names are case-insensitive DNS labels, so mixed-case spellings
+			// of the same store must fold to one stable key.
+			name:  "azure appconfig mixed case folds to lower",
+			scope: provider.AzureAppConfigScope("MyStore"),
+			want:  "azure/appconfig/mystore",
 		},
 		{
 			// Staging is per-STORE, not per-namespace: the namespace is NOT in the

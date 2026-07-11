@@ -1,6 +1,9 @@
 package provider
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Scope identifies a provider-specific namespace for staging state. The set of
 // meaningful fields depends on Provider:
@@ -47,16 +50,18 @@ func (s Scope) Key() string {
 	case ProviderAzure:
 		// Key Vault and App Configuration names are globally unique DNS labels
 		// (*.vault.azure.net / *.azconfig.io), so the name alone identifies the
-		// resource — no subscription/resource-group needed.
+		// resource — no subscription/resource-group needed. DNS labels are
+		// case-insensitive, so fold to lower case to keep the key stable across
+		// mixed-case spellings of the same resource.
 		if s.VaultName != "" {
-			return fmt.Sprintf("azure/keyvault/%s", s.VaultName)
+			return fmt.Sprintf("azure/keyvault/%s", strings.ToLower(s.VaultName))
 		}
 
 		// App Configuration staging is per-STORE, not per-namespace: all of a
 		// store's staged settings share one param.json, and each entry carries
 		// its own namespace as part of its identity (see staging.CompositeEntryKey).
 		// The namespace is deliberately NOT in the key.
-		return fmt.Sprintf("azure/appconfig/%s", s.StoreName)
+		return fmt.Sprintf("azure/appconfig/%s", strings.ToLower(s.StoreName))
 	default:
 		return ""
 	}
