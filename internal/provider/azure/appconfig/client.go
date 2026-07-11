@@ -41,14 +41,16 @@ func (a *apiClient) GetSetting(ctx context.Context, key, label string) (azappcon
 	return a.c.GetSetting(ctx, key, opts)
 }
 
-// SetSetting upserts key=value under label, carrying the given tags and (when
-// etag is non-nil) an OnlyIfUnchanged precondition. App Configuration's PUT
-// replaces the whole key-value, so tags must always be re-sent to be preserved;
-// a nil etag makes the write unconditional.
+// SetSetting upserts key=value under label, carrying the given tags, the given
+// content-type, and (when etag is non-nil) an OnlyIfUnchanged precondition. App
+// Configuration's PUT replaces the whole key-value, so both tags and
+// content-type must always be re-sent to be preserved (a nil content-type
+// leaves it unset); a nil etag makes the write unconditional.
 func (a *apiClient) SetSetting(
-	ctx context.Context, key, value, label string, tags map[string]*string, etag *azcore.ETag,
+	ctx context.Context, key, value, label string, tags map[string]*string, contentType *string, etag *azcore.ETag,
 ) (azappconfig.SetSettingResponse, error) {
 	opts := &azappconfig.SetSettingOptions{
+		ContentType:     contentType,
 		Tags:            tags,
 		OnlyIfUnchanged: etag,
 	}
