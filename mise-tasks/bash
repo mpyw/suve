@@ -89,6 +89,18 @@ if $want_keyvault; then
   )
 fi
 
+# Staging (every provider) persists to a keychain-encrypted working store. Pin a
+# deterministic data key — base64 of 32 zero bytes — so that (a) the shell never
+# blocks on an OS keychain prompt, and (b) staged changes written by
+# `mise run seed*` are read back with the SAME key, staying visible here. Without
+# this, seeding writes under the fixed key while this shell would read under the
+# keychain/plaintext key and see NO staged changes (or a decryption error).
+# Respected as an override if already exported. Only set it when a cloud is
+# active, keeping the flagless plain shell truly env-free.
+if [ "${#clouds[@]}" -gt 0 ]; then
+  env_kv+=("SUVE_STAGING_KEY=${SUVE_STAGING_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}")
+fi
+
 if [ "${#services[@]}" -gt 0 ]; then
   profile_args=()
   for p in "${profiles[@]}"; do profile_args+=(--profile "$p"); done
