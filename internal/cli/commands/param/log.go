@@ -24,10 +24,11 @@ import (
 
 // logJSONItem represents a single version entry in JSON output.
 type logJSONItem struct {
-	Version  int64  `json:"version"`
-	Type     string `json:"type"`
-	Modified string `json:"modified,omitempty"`
-	Value    string `json:"value"`
+	Version  int64   `json:"version"`
+	Type     string  `json:"type,omitempty"`
+	Modified string  `json:"modified,omitempty"`
+	Value    *string `json:"value,omitempty"` // nil when error, pointer to distinguish from empty string
+	Error    string  `json:"error,omitempty"`
 }
 
 // logPresenter renders SSM Parameter Store log output byte-for-byte as before.
@@ -69,11 +70,16 @@ func (p *logPresenter) RenderJSON(stdout io.Writer) error {
 	for i, entry := range entries {
 		items[i] = logJSONItem{
 			Version: entry.Version,
-			Type:    paramtype.Display(entry.Type),
-			Value:   entry.Value,
 		}
 		if entry.LastModified != nil {
 			items[i].Modified = timeutil.FormatRFC3339(*entry.LastModified)
+		}
+
+		if entry.Error != nil {
+			items[i].Error = entry.Error.Error()
+		} else {
+			items[i].Type = paramtype.Display(entry.Type)
+			items[i].Value = &entry.Value
 		}
 	}
 
@@ -90,6 +96,9 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, maxValueLength int) {
 	}
 
 	value := entry.Value
+	if entry.Error != nil {
+		value = fmt.Sprintf("<error: %v>", entry.Error)
+	}
 	// Determine max length for oneline mode
 	maxLen := maxValueLength
 	if maxLen == 0 {
@@ -139,6 +148,12 @@ func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 func (p *logPresenter) RenderValue(stdout io.Writer, i, maxValueLength int) {
 	entry := p.result.Entries[i]
 
+	if entry.Error != nil {
+		output.Printf(stdout, "<error: %v>\n", entry.Error)
+
+		return
+	}
+
 	// Show value preview (unlimited unless --max-value-length specified).
 	// Truncate by runes so multi-byte content is never cut mid-rune (#340).
 	// Newlines are preserved here: normal mode intentionally shows the full
@@ -153,6 +168,11 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 	parentIdx, oldest := genericlog.PatchParent(i, len(entries), reverse)
 
 	newEntry := entries[i]
+	// A version whose value failed to fetch has no content to diff against.
+	if newEntry.Error != nil {
+		return
+	}
+
 	newValue := newEntry.Value
 
 	var oldValue, oldName string
@@ -173,6 +193,11 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 		}
 	} else {
 		oldEntry := entries[parentIdx]
+		// Skip the diff when the parent's value could not be fetched.
+		if oldEntry.Error != nil {
+			return
+		}
+
 		oldValue = oldEntry.Value
 		oldName = fmt.Sprintf("%s#%d", p.result.Name, oldEntry.Version)
 

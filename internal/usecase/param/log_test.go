@@ -24,6 +24,7 @@ type logVer struct {
 	value    string
 	typ      domain.ValueType
 	modified *time.Time
+	getErr   error // when set, Get fails for this version
 }
 
 // newLogStore builds a provider mock whose History returns the given versions
@@ -49,6 +50,10 @@ func newLogStore(oldestFirst []logVer) *providermock.Store {
 		},
 		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
 			v := byID[ref.ID()]
+
+			if v.getErr != nil {
+				return nil, v.getErr
+			}
 
 			return &domain.Entry{
 				Name:     name,
@@ -115,6 +120,33 @@ func TestLogUseCase_Execute_Error(t *testing.T) {
 
 	_, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config"})
 	require.Error(t, err)
+}
+
+// TestLogUseCase_Execute_PartialFetchError records a per-version fetch failure
+// on the entry rather than aborting the whole listing.
+func TestLogUseCase_Execute_PartialFetchError(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	store := newLogStore([]logVer{
+		{ver: 1, value: "v1", getErr: errAccessDenied, modified: lo.ToPtr(now.Add(-1 * time.Hour))},
+		{ver: 2, value: "v2", modified: lo.ToPtr(now)},
+	})
+
+	uc := &param.LogUseCase{Reader: store}
+
+	output, err := uc.Execute(t.Context(), param.LogInput{Name: "/app/config"})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 2)
+
+	// Newest first: v2 succeeds, v1 records its fetch error.
+	require.NoError(t, output.Entries[0].Error)
+	assert.Equal(t, "v2", output.Entries[0].Value)
+	require.Error(t, output.Entries[1].Error)
+	assert.Empty(t, output.Entries[1].Value)
+	// IsCurrent stays correct even for a failed entry (derived from version number).
+	assert.True(t, output.Entries[0].IsCurrent)
+	assert.False(t, output.Entries[1].IsCurrent)
 }
 
 func TestLogUseCase_Execute_Reverse(t *testing.T) {
