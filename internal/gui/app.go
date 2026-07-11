@@ -422,16 +422,10 @@ func (a *App) paramStoreForNamespaceScoped(sc provider.Scope, ns string) (provid
 	return registry.Store(a.ctx, a.effectiveParamScopeScoped(sc, ns), provider.KindParam)
 }
 
-// appConfigParamStrategyForNamespace builds the App Configuration staging
+// appConfigParamStrategyForNamespaceScoped builds the App Configuration staging
 // strategy over a provider store scoped to ns, so a staged entry's create/diff/
 // apply runs against its own namespace (the per-namespace resolver #431 threads
-// into the apply/diff use cases).
-func (a *App) appConfigParamStrategyForNamespace(ns string) (staging.FullStrategy, error) {
-	return a.appConfigParamStrategyForNamespaceScoped(a.currentScope(), ns)
-}
-
-// appConfigParamStrategyForNamespaceScoped is appConfigParamStrategyForNamespace
-// resolved from an already-snapshotted scope (#560).
+// into the apply/diff use cases). Resolved from an already-snapshotted scope (#560).
 func (a *App) appConfigParamStrategyForNamespaceScoped(sc provider.Scope, ns string) (staging.FullStrategy, error) {
 	s, err := a.paramStoreForNamespaceScoped(sc, ns)
 	if err != nil {
@@ -439,12 +433,6 @@ func (a *App) appConfigParamStrategyForNamespaceScoped(sc provider.Scope, ns str
 	}
 
 	return staging.NewAzureAppConfigParamStrategy(s), nil
-}
-
-// isAppConfigParam reports whether the active param scope is Azure App
-// Configuration (the only param service with a namespace axis).
-func (a *App) isAppConfigParam() bool {
-	return isAppConfigParamScope(a.currentScope())
 }
 
 // isAppConfigParamScope reports whether an already-snapshotted scope is Azure App
@@ -550,19 +538,13 @@ func (a *App) getParserScoped(sc provider.Scope, service string) (staging.Parser
 	}
 }
 
-// serviceStrategy builds the staging strategy for a service, wrapping a
-// provider.Store resolved through the registry for the ACTIVE provider. The
-// concrete strategy is provider-specific (AWS SSM/Secrets Manager, Google Cloud
-// Secret Manager, Azure Key Vault / App Configuration) and satisfies every
-// staging strategy interface, so the typed getters below narrow it as needed.
-// It shares the active scope with getStagingStore (see stagingScope), so a
-// staged entry can only ever apply to the provider it was staged against.
-func (a *App) serviceStrategy(service string) (staging.FullStrategy, error) {
-	return a.serviceStrategyScoped(a.currentScope(), service)
-}
-
-// serviceStrategyScoped is serviceStrategy resolved from an already-snapshotted
-// scope, so a binding pairs its strategy and store against the SAME scope (#560).
+// serviceStrategyScoped builds the staging strategy for a service, wrapping a
+// provider.Store resolved through the registry for the given (already-snapshotted)
+// scope. The concrete strategy is provider-specific (AWS SSM/Secrets Manager,
+// Google Cloud Secret Manager, Azure Key Vault / App Configuration) and satisfies
+// every staging strategy interface, so the typed getters below narrow it as
+// needed. It shares the scope with the binding's store, so a staged entry can only
+// ever apply to the provider it was staged against (#560).
 func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.FullStrategy, error) {
 	switch service {
 	case string(staging.ServiceParam):
@@ -595,17 +577,13 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 	}
 }
 
-// strategyAs resolves the service strategy and narrows it to the requested
-// staging strategy interface T. The concrete *ParamStrategy / *SecretStrategy
-// satisfy every staging strategy interface, so this succeeds for the Edit,
-// Apply and Diff interfaces (which FullStrategy embeds) as well as for
-// DeleteStrategy (which it does not embed but the concrete types implement).
-// It is a free function because Go methods cannot declare type parameters.
-func strategyAs[T any](a *App, service string) (T, error) {
-	return strategyAsScoped[T](a, a.currentScope(), service)
-}
-
-// strategyAsScoped is strategyAs resolved from an already-snapshotted scope (#560).
+// strategyAsScoped resolves the service strategy for an already-snapshotted scope
+// and narrows it to the requested staging strategy interface T. The concrete
+// *ParamStrategy / *SecretStrategy satisfy every staging strategy interface, so
+// this succeeds for the Edit, Apply and Diff interfaces (which FullStrategy
+// embeds) as well as for DeleteStrategy (which it does not embed but the concrete
+// types implement). It is a free function because Go methods cannot declare type
+// parameters (#560).
 func strategyAsScoped[T any](a *App, sc provider.Scope, service string) (T, error) {
 	var zero T
 
