@@ -14,13 +14,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cmdparam "github.com/mpyw/suve/internal/cli/commands/param"
-	paramcreate "github.com/mpyw/suve/internal/cli/commands/param/create"
-	paramdelete "github.com/mpyw/suve/internal/cli/commands/param/delete"
-	paramupdate "github.com/mpyw/suve/internal/cli/commands/param/update"
-	globaldiff "github.com/mpyw/suve/internal/cli/commands/stage/diff"
-	paramstage "github.com/mpyw/suve/internal/cli/commands/stage/param"
-	globalstatus "github.com/mpyw/suve/internal/cli/commands/stage/status"
+	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
+	paramcreate "github.com/mpyw/suve/internal/cli/commands/aws/param/create"
+	paramdelete "github.com/mpyw/suve/internal/cli/commands/aws/param/delete"
+	paramupdate "github.com/mpyw/suve/internal/cli/commands/aws/param/update"
+	globaldiff "github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
+	paramstage "github.com/mpyw/suve/internal/cli/commands/aws/stage/param"
+	globalstatus "github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
 	"github.com/mpyw/suve/internal/staging"
 )
 
