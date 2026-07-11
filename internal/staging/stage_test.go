@@ -253,13 +253,14 @@ func TestState_Merge(t *testing.T) {
 func TestState_UnmarshalJSON_Version(t *testing.T) {
 	t.Parallel()
 
-	t.Run("older version is dropped as empty", func(t *testing.T) {
+	t.Run("older version is dropped as empty with a distinct diagnostic", func(t *testing.T) {
 		t.Parallel()
 
 		var state staging.State
 
 		err := json.Unmarshal([]byte(`{"version":2}`), &state)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, staging.ErrStateVersionTooOld)
+		require.NotErrorIs(t, err, staging.ErrStateVersionTooNew)
 		assert.True(t, state.IsEmpty())
 	})
 
@@ -271,6 +272,52 @@ func TestState_UnmarshalJSON_Version(t *testing.T) {
 		err := json.Unmarshal([]byte(`{"version":4}`), &state)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, staging.ErrStateVersionTooNew)
+	})
+}
+
+func TestState_UnmarshalJSON_Duplicate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("duplicate entry records are rejected", func(t *testing.T) {
+		t.Parallel()
+
+		data := `{"version":3,"entries":{"param":[` +
+			`{"name":"/app/x","operation":"update","staged_at":"2024-01-01T00:00:00Z"},` +
+			`{"name":"/app/x","operation":"delete","staged_at":"2024-01-02T00:00:00Z"}]}}`
+
+		var state staging.State
+
+		err := json.Unmarshal([]byte(data), &state)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, staging.ErrDuplicateRecord)
+	})
+
+	t.Run("duplicate tag records are rejected", func(t *testing.T) {
+		t.Parallel()
+
+		data := `{"version":3,"tags":{"param":[` +
+			`{"name":"/app/x","staged_at":"2024-01-01T00:00:00Z"},` +
+			`{"name":"/app/x","staged_at":"2024-01-02T00:00:00Z"}]}}`
+
+		var state staging.State
+
+		err := json.Unmarshal([]byte(data), &state)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, staging.ErrDuplicateRecord)
+	})
+
+	t.Run("same name under distinct namespaces is not a duplicate", func(t *testing.T) {
+		t.Parallel()
+
+		data := `{"version":3,"entries":{"param":[` +
+			`{"name":"x","namespace":"a","operation":"update","staged_at":"2024-01-01T00:00:00Z"},` +
+			`{"name":"x","namespace":"b","operation":"update","staged_at":"2024-01-02T00:00:00Z"}]}}`
+
+		var state staging.State
+
+		err := json.Unmarshal([]byte(data), &state)
+		require.NoError(t, err)
+		assert.Equal(t, 2, state.EntryCount())
 	})
 }
 

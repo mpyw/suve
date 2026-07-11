@@ -210,11 +210,19 @@ func (s *State) UnmarshalJSON(data []byte) error {
 
 	if head.Version < stateVersion {
 		// Pre-v3 state used a different on-disk layout (NUL-composite string map
-		// keys) that is intentionally not migrated. Treat it as empty so a format
-		// bump never crashes commands; stale local working state is dropped.
+		// keys) that is intentionally not migrated. Decode it as empty so a format
+		// bump never crashes commands, but report the drop with a distinct error so
+		// a reader that is NOT a stale-working-state migration (e.g. an envelope
+		// import) can surface "records dropped due to unsupported version" instead
+		// of a silent "nothing imported". The working store treats this sentinel as
+		// a benign reset (see file.Store.readFile).
 		*s = *NewEmptyState()
 
-		return nil
+		return fmt.Errorf(
+			"%w: on-disk state is version %d but this build only supports version %d; "+
+				"records dropped due to unsupported version",
+			ErrStateVersionTooOld, head.Version, stateVersion,
+		)
 	}
 
 	if head.Version > stateVersion {
@@ -240,7 +248,13 @@ func (s *State) UnmarshalJSON(data []byte) error {
 	for svc, recs := range in.Entries {
 		m := make(map[EntryKey]Entry, len(recs))
 		for _, rec := range recs {
-			m[EntryKey{Name: rec.Name, Namespace: rec.Namespace}] = rec.Entry
+			key := EntryKey{Name: rec.Name, Namespace: rec.Namespace}
+			if _, dup := m[key]; dup {
+				return fmt.Errorf(
+					"%w: entry %s appears more than once in service %q", ErrDuplicateRecord, key.Label(), svc)
+			}
+
+			m[key] = rec.Entry
 		}
 
 		s.Entries[svc] = m
@@ -249,7 +263,13 @@ func (s *State) UnmarshalJSON(data []byte) error {
 	for svc, recs := range in.Tags {
 		m := make(map[EntryKey]TagEntry, len(recs))
 		for _, rec := range recs {
-			m[EntryKey{Name: rec.Name, Namespace: rec.Namespace}] = rec.TagEntry
+			key := EntryKey{Name: rec.Name, Namespace: rec.Namespace}
+			if _, dup := m[key]; dup {
+				return fmt.Errorf(
+					"%w: tag change for %s appears more than once in service %q", ErrDuplicateRecord, key.Label(), svc)
+			}
+
+			m[key] = rec.TagEntry
 		}
 
 		s.Tags[svc] = m
@@ -508,4 +528,14 @@ var (
 	// upgrade suve; the state is left untouched rather than rewritten as an older
 	// version.
 	ErrStateVersionTooNew = errors.New("staging state was written by a newer suve; upgrade suve")
+	// ErrStateVersionTooOld is returned by UnmarshalJSON when the state was
+	// written by an older suve whose on-disk layout this build does not migrate.
+	// The state decodes as empty (its records are dropped), but the error makes
+	// that drop explicit so an importer can report it instead of silently
+	// importing nothing. The working store treats it as a benign reset.
+	ErrStateVersionTooOld = errors.New("staging state was written by an older suve and cannot be read; its records were dropped")
+	// ErrDuplicateRecord is returned by UnmarshalJSON when a payload carries two
+	// records for the same (name, namespace). Silently keeping the last one would
+	// hide the ambiguity, so the state is rejected instead.
+	ErrDuplicateRecord = errors.New("duplicate staged record")
 )

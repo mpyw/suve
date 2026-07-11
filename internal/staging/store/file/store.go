@@ -327,6 +327,13 @@ func (s *Store) readFile(path string) (*staging.State, error) {
 
 	var state staging.State
 	if err := json.Unmarshal(data, &state); err != nil {
+		// A too-old on-disk layout is intentionally not migrated: it decodes as an
+		// empty state and the stale working area is silently reset (the diagnostic
+		// only matters to an importer, not to this migration path).
+		if errors.Is(err, staging.ErrStateVersionTooOld) {
+			return staging.NewEmptyState(), nil
+		}
+
 		return nil, fmt.Errorf("failed to parse state file: %w", err)
 	}
 
