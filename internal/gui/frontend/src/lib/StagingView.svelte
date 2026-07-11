@@ -418,7 +418,11 @@
 
   function proceedImportAfterWarn() {
     showImportWarnModal = false;
-    if (serviceHasChanges(importService)) {
+    // Prompt for merge/overwrite only when the working area already holds
+    // changes for this service. The signal comes from the import metadata
+    // (InspectImportFile) rather than the loaded view state, which may be stale
+    // or not yet loaded — matching the CLI, which prompts from the working area.
+    if (importInfo?.workingHasChanges) {
       importMode = 'merge';
       showImportModeModal = true;
       return;

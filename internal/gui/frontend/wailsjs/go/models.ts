@@ -44,11 +44,12 @@ export namespace gui {
 	    scope: string;
 	    service: string;
 	    scopeMatches: boolean;
-	
+	    workingHasChanges: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new EnvelopeInfoResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.encrypted = source["encrypted"];
@@ -56,6 +57,7 @@ export namespace gui {
 	        this.scope = source["scope"];
 	        this.service = source["service"];
 	        this.scopeMatches = source["scopeMatches"];
+	        this.workingHasChanges = source["workingHasChanges"];
 	    }
 	}
 	export class ParamDeleteResult {

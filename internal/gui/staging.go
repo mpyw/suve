@@ -863,6 +863,13 @@ type EnvelopeInfoResult struct {
 	// ScopeMatches reports whether the envelope's scope matches the scope the
 	// selected service resolves to under the active provider.
 	ScopeMatches bool `json:"scopeMatches"`
+	// WorkingHasChanges reports whether the working staging area for the
+	// envelope's declared service already holds staged entries or tag changes.
+	// The frontend prompts for merge/overwrite only when it is true, deciding
+	// from the import metadata instead of the (possibly stale/unloaded) view
+	// state — matching the CLI, which prompts only when the working area is
+	// non-empty.
+	WorkingHasChanges bool `json:"workingHasChanges"`
 }
 
 // =============================================================================
@@ -1028,13 +1035,56 @@ func (a *App) InspectImportFile(path string) (*EnvelopeInfoResult, error) {
 		return nil, err
 	}
 
+	workingHasChanges, err := a.workingHasChangesForService(env.Service)
+	if err != nil {
+		return nil, err
+	}
+
 	return &EnvelopeInfoResult{
-		Encrypted:    encrypted,
-		Provider:     env.Provider,
-		Scope:        env.Scope,
-		Service:      env.Service,
-		ScopeMatches: env.Scope == scope.Key(),
+		Encrypted:         encrypted,
+		Provider:          env.Provider,
+		Scope:             env.Scope,
+		Service:           env.Service,
+		ScopeMatches:      env.Scope == scope.Key(),
+		WorkingHasChanges: workingHasChanges,
 	}, nil
+}
+
+// workingHasChangesForService reports whether the per-service working staging
+// area holds any staged entries or tag changes for the given service. The GUI
+// uses it (via InspectImportFile) to prompt for merge/overwrite only when the
+// working area is non-empty, mirroring the CLI's import behavior. The working
+// store is file-based, so this makes no network calls. An unrecognized service
+// (a malformed envelope) reports no changes rather than erroring.
+func (a *App) workingHasChangesForService(service string) (bool, error) {
+	// A malformed envelope may name an unknown service; treat that as no working
+	// changes rather than resolving a store for it.
+	if service != string(staging.ServiceParam) && service != string(staging.ServiceSecret) {
+		return false, nil
+	}
+
+	svc := staging.Service(service)
+
+	store, err := a.getStagingStore(kindForService(service))
+	if err != nil {
+		return false, err
+	}
+
+	entries, err := store.ListEntries(a.ctx, svc)
+	if err != nil {
+		return false, err
+	}
+
+	if len(entries[svc]) > 0 {
+		return true, nil
+	}
+
+	tags, err := store.ListTags(a.ctx, svc)
+	if err != nil {
+		return false, err
+	}
+
+	return len(tags[svc]) > 0, nil
 }
 
 // StagingImport reads a per-service envelope file into the working staging area
