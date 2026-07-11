@@ -60,6 +60,14 @@
   let error = $state('');
   let nextToken = $state('');
 
+  // Monotonic request id. Filter/prefix input is debounced, but debounce only
+  // delays dispatch — it does not serialize in-flight requests. A slow broader
+  // query resolving after a fast narrower one would otherwise overwrite the list
+  // with stale rows. Each loadParams bumps the id and only the latest run may
+  // assign entries/nextToken; loadMore captures the current id and appends only
+  // while it is still current (#539).
+  let loadSeq = 0;
+
   let entries: gui.ParamListEntry[] = $state([]);
   let selectedParam: string | null = $state(null);
   let paramDetail: gui.ParamShowResult | null = $state(null);
@@ -189,30 +197,38 @@
   }
 
   async function loadParams(opts: LoadParamsOptions) {
+    const seq = ++loadSeq;
     loading = true;
     error = '';
     nextToken = '';
     try {
       const result = await ParamList(opts.prefix, opts.recursive, opts.withValue, opts.filter, PAGE_SIZE, '');
+      if (seq !== loadSeq) return; // superseded by a newer query
       entries = result?.entries || [];
       nextToken = result?.nextToken || '';
     } catch (e) {
+      if (seq !== loadSeq) return; // superseded by a newer query
       error = parseError(e);
       entries = [];
     } finally {
-      loading = false;
+      if (seq === loadSeq) loading = false;
     }
   }
 
   async function loadMore(opts: LoadParamsOptions) {
     if (!nextToken || loadingMore || loading) return;
 
+    // Continuation of the current query: capture the id without bumping so a
+    // loadParams starting mid-flight supersedes this append.
+    const seq = loadSeq;
     loadingMore = true;
     try {
       const result = await ParamList(opts.prefix, opts.recursive, opts.withValue, opts.filter, PAGE_SIZE, nextToken);
+      if (seq !== loadSeq) return; // superseded by a newer query
       entries = [...entries, ...(result?.entries || [])];
       nextToken = result?.nextToken || '';
     } catch (e) {
+      if (seq !== loadSeq) return; // superseded by a newer query
       error = parseError(e);
     } finally {
       loadingMore = false;
