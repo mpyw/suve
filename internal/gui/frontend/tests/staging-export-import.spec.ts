@@ -100,6 +100,32 @@ test.describe('Export', () => {
     await expect(page.locator('.section').nth(1).locator('.entry-item')).toHaveCount(1);
   });
 
+  test('keeps the working area when the Keep option is checked', async ({ page }) => {
+    await setupWailsMocks(page, createStagedForExportState());
+    await page.goto('/');
+    await navigateTo(page, 'Staging');
+    await page.waitForSelector('.entry-item');
+
+    await openTransferMenu(page);
+    await page.getByTestId('export-param').click();
+
+    await expect(page.locator('.modal-title')).toHaveText(/Export Param/);
+    // Opt in to retaining the working area, then export as plaintext.
+    await page.getByTestId('export-keep').check();
+    await submitPlaintextExport(page);
+
+    await expect(page.locator('.modal-title')).toHaveText(/Export Complete/);
+
+    // The file was still written.
+    const files = await readExportFiles(page);
+    expect(files['/mock/exports/export.json'].service).toBe('param');
+
+    // Working param area was NOT cleared (Keep was checked); secret remains too.
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('.section').nth(0).locator('.entry-item')).toHaveCount(1);
+    await expect(page.locator('.section').nth(1).locator('.entry-item')).toHaveCount(1);
+  });
+
   test('encrypts the export when a passphrase is supplied', async ({ page }) => {
     await setupWailsMocks(page, createStagedForExportState());
     await page.goto('/');

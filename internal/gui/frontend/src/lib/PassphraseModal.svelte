@@ -12,9 +12,23 @@
     oncancel?: () => void;
     loading?: boolean;
     error?: string;
+    // keepOption renders a "keep in the working area" checkbox (export only).
+    keepOption?: boolean;
+    // keep is bound to the checkbox above; the parent reads it after onsubmit.
+    keep?: boolean;
   }
 
-  let { show = false, mode, title, onsubmit, oncancel, loading = false, error = '' }: Props = $props();
+  let {
+    show = false,
+    mode,
+    title,
+    onsubmit,
+    oncancel,
+    loading = false,
+    error = '',
+    keepOption = false,
+    keep = $bindable(false),
+  }: Props = $props();
 
   let passphrase = $state('');
   let confirmPassphrase = $state('');
@@ -150,6 +164,13 @@
         </div>
       {/if}
 
+      {#if keepOption}
+        <label class="keep-option">
+          <input type="checkbox" bind:checked={keep} disabled={loading} data-testid="export-keep" />
+          <span>Keep staged changes in the working area after exporting</span>
+        </label>
+      {/if}
+
       <div class="form-actions">
         <button type="button" class="btn-secondary" onclick={handleClose} disabled={loading}>
           Cancel
@@ -179,6 +200,19 @@
     font-size: 12px;
     color: #888;
     text-transform: uppercase;
+  }
+
+  .keep-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #ccc;
+    cursor: pointer;
+  }
+
+  .keep-option input {
+    cursor: pointer;
   }
 
   .password-input-wrapper {
