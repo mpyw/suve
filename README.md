@@ -33,6 +33,20 @@ A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud S
 - **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`; plaintext fallback with a warning if unavailable). Exported snapshot files carry a separately passphrase-encrypted payload ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode); an empty passphrase writes plaintext).
 - **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
 
+### Metadata terminology
+
+suve uses AWS-friendly terms and maps each backend's native concept onto three axes. Mind two naming traps: Google Cloud "labels" are suve **tags** (key=value metadata), and Azure App Configuration's "label" is suve's **namespace** (an identity axis, `--namespace`/`--ns`) — neither is the other.
+
+| Backend | suve **tag** (`tag`/`untag`) | suve **`:LABEL`** (version selector) | suve **namespace** (`--namespace`) |
+|---|---|---|---|
+| AWS Parameter Store | resource tags | — | — |
+| AWS Secrets Manager | resource tags | version staging labels (`AWSCURRENT` / `AWSPREVIOUS` / custom) | — |
+| Google Cloud Secret Manager | resource **labels** | — | — |
+| Azure Key Vault | tags on a specific version | — | — |
+| Azure App Configuration | tags on a specific version | — | **label** — the `(key, label)` composite address (unset = empty string, or `dev` / `prd` / …) |
+
+All key=value metadata is unified as **tags**; suve adds no per-provider command or flag aliases. For the App Configuration label axis, see [Namespaces](#namespaces).
+
 ## Installation
 
 > [!NOTE]
@@ -65,7 +79,7 @@ suve is available in the [standard aqua registry](https://github.com/aquaproj/aq
 aqua g -i mpyw/suve
 ```
 
-The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI-only static build on Linux (supported from v1.3.0).
+The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI-only static build on Linux (supported from v1.6.1).
 
 ### Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
@@ -594,37 +608,35 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 > [!NOTE]
 > Azure App Configuration is unversioned. `#`, `~`, and `:` are valid key characters — the whole argument is the literal key name, not a version spec — and `log` reports that history is unsupported.
 
-## Providers
+## Command Reference
 
-### Feature support
+### Providers
 
-| Backend | Command | Versioning | Labels / Tags | Staging | GUI | Auth |
-|---------|---------|------------|---------------|---------|------|------|
-| [AWS Parameter Store](docs/aws.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | shared config/env/role |
-| [AWS Secrets Manager](docs/aws.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
-| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | ✅ | ✅ | Application Default Credentials |
-| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | ✅ | ✅ | DefaultAzureCredential |
-| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ✅ tags¹ | ✅² | ✅ | DefaultAzureCredential |
+Each backend lives under a provider **group**; the group names take aliases:
 
-Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is available on AWS Secrets Manager and Azure Key Vault (soft-delete recovery); on Azure App Configuration `log` reports history unsupported and `#`/`~`/`:` are treated as literal key characters (not version specifiers). Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
+| Group | Aliases |
+|-------|---------|
+| `aws` | — |
+| `gcloud` | `gcp`, `google` <!-- naming-allow-gcp --> |
+| `azure` | `az` |
 
-¹ App Configuration's PUT replaces the whole key-value, so tag writes are a **GET-merge-PUT** with an ETag precondition (`azappconfig/v2`): `tag`/`untag` preserve the value and other tags, and a value write (`update`) preserves existing tags.
+Group aliases are interchangeable with the group name (e.g. `suve az kv show`). Under `azure stage`, the `secret` / `param` subgroups take the same aliases as their read/write forms (`kv` / `keyvault`, `appconfig` / `ac` / `appcfg`).
 
-² App Configuration is unversioned, so staging uses **last-write-wins** (no modified-after conflict check); `tag`/`untag` are available.
+### Services
 
-### Metadata terminology
+Each backend is a service under its provider group, with its own aliases:
 
-suve normalizes every provider's key=value metadata to a single term — **tags** (`suve … tag` / `untag`). Each provider's native word is a documented mapping; suve does **not** add per-provider command or flag aliases.
+| Backend | Command | Aliases |
+|---------|---------|---------|
+| [AWS SSM Parameter Store](docs/aws.md) | `aws param` | `ssm`, `ps` |
+| [AWS Secrets Manager](docs/aws.md) | `aws secret` | `sm`, `secretsmanager` |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | `secrets`, `sm` |
+| [Azure Key Vault](docs/azure.md) | `azure secret` | `kv`, `keyvault` |
+| [Azure App Configuration](docs/azure.md) | `azure param` | `appconfig`, `ac`, `appcfg` |
 
-| Cloud | metadata term (native) | suve term | identity axis (native) |
-|---|---|---|---|
-| AWS SSM / Secrets Manager | tags | **tags** | version |
-| Azure Key Vault | tags | **tags** | version |
-| Azure App Configuration | tags | **tags** | **label** (`(key, label)` — a *separate* concept, surfaced as suve's [namespace](#namespaces)) |
-| Google Cloud Secret Manager | **labels** | **tags** | version |
+**Staging** is the same for every backend — `<group> stage` (alias `stg`), i.e. `aws stage`, `gcloud stage`, `azure stage`.
 
-> [!WARNING]
-> Naming trap: Google Cloud "labels" are key=value **metadata** — suve surfaces them as **tags** (`suve gcloud secret tag …`). Azure App Configuration's "label" is an **identity** dimension (part of a setting's address), which suve exposes as its own **namespace** axis (`--namespace`/`--ns`; see [Namespaces](#namespaces)). These are different concepts that happen to share the vendor word "label".
+**Bare form:** when exactly one backend is active for a service (see [Provider selection](#provider-selection)), drop the group prefix — every alias still works. So `suve param` / `suve ssm`, `suve secret` / `suve kv`, `suve stage` / `suve stg`, … resolve to the uniquely-active backend.
 
 ### Provider selection
 
@@ -669,24 +681,21 @@ Examples (`—` = alias not exposed):
 
 `suve --help` lists which aliases are active in the current environment.
 
-## Command Reference
+### Feature support
 
-### Services
+| Backend | Command | Versioning | Labels / Tags | Staging | GUI | Auth |
+|---------|---------|------------|---------------|---------|------|------|
+| [AWS Parameter Store](docs/aws.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | shared config/env/role |
+| [AWS Secrets Manager](docs/aws.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | ✅ | ✅ | Application Default Credentials |
+| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | ✅ | ✅ | DefaultAzureCredential |
+| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ✅ tags¹ | ✅² | ✅ | DefaultAzureCredential |
 
-Explicit command groups (always available) and their bare aliases (exposed per the [provider selection](#provider-selection) rules above):
+Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is available on AWS Secrets Manager and Azure Key Vault (soft-delete recovery); on Azure App Configuration `log` reports history unsupported and `#`/`~`/`:` are treated as literal key characters (not version specifiers). Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
 
-| Backend | Explicit command | Bare alias (conditional) |
-|---------|------------------|--------------------------|
-| [AWS SSM Parameter Store](docs/aws.md) | `aws param` (`ssm`, `ps`) | `param` |
-| [AWS Secrets Manager](docs/aws.md) | `aws secret` (`sm`, `secretsmanager`) | `secret` |
-| AWS Staging | `aws stage` (`stg`) | `stage` |
-| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` (`secrets`, `sm`) | `secret` |
-| Google Cloud Staging | `gcloud stage` (`stg`) | `stage` |
-| [Azure Key Vault](docs/azure.md) | `azure secret` (`kv`, `keyvault`) | `secret` |
-| [Azure App Configuration](docs/azure.md) | `azure param` (`appconfig`, `ac`, `appcfg`) | `param` |
-| Azure Staging | `azure stage` (`stg`) | `stage` |
+¹ App Configuration's PUT replaces the whole key-value, so tag writes are a **GET-merge-PUT** with an ETag precondition (`azappconfig/v2`): `tag`/`untag` preserve the value and other tags, and a value write (`update`) preserves existing tags.
 
-The command **groups** themselves also take aliases: `gcloud` → `gcp` / `google`, and `azure` → `az` (e.g. `suve gcp secrets show`, `suve az kv show`). <!-- naming-allow-gcp --> Under `azure stage`, the `secret` / `param` subgroups accept the same aliases as their read/write counterparts (`kv` / `keyvault`, `appconfig` / `ac` / `appcfg`).
+² App Configuration is unversioned, so staging uses **last-write-wins** (no modified-after conflict check); `tag`/`untag` are available.
 
 ### AWS SSM Parameter Store
 
@@ -862,15 +871,14 @@ The value is interpreted by context:
 | `suve azure stage param export` | `<file>` | Export staged changes to a snapshot file |
 | `suve azure stage param import` | `<file>` | Import staged changes from a snapshot file |
 
-> [!NOTE]
-> Azure staging is **per-service** under the hood: `suve azure stage secret` (Key Vault) and `suve azure stage param` (App Configuration) keep separate staging state. Provider-wide `azure stage status`/`diff`/`apply`/`reset` span both services, skipping whichever one is not configured.
+### Aggregate stage commands
 
-### Global Stage Commands (AWS)
+`suve stage <command>` (and `suve <backend> stage <command>`) operate across every service of the active backend — AWS Parameter Store + Secrets Manager, or Azure Key Vault + App Configuration (Google Cloud is secret-only). The backend is resolved by the same [provider selection](#provider-selection) rules, and a backend that is not configured is skipped.
 
 | Command | Options | Description |
 |---------|---------|-------------|
 | `suve stage status` | `--verbose` (`-v`) | Show all staged changes |
-| `suve stage diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare all staged vs AWS |
+| `suve stage diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare all staged vs the live backend |
 | `suve stage apply` | `--yes`<br>`--ignore-conflicts` | Apply all staged changes |
 | `suve stage reset` | `--all` | Unstage all changes |
 
@@ -890,6 +898,34 @@ Export writes the working staging area out to portable snapshot files (one per s
 - **`import`** has no `--keep` (it is read-only on the file). `--merge` / `--overwrite` are mutually exclusive and only matter when the working area already holds changes; otherwise the file is applied directly. `--allow-scope-mismatch` imports even when the file's embedded scope differs from the current scope.
 
 ## Environment Variables
+
+### Providers
+
+Each backend is selected and authenticated from its own environment variables (all also settable via flags; see [Provider selection](#provider-selection)).
+
+#### AWS
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | Static credentials |
+| `AWS_PROFILE` | Shared-config profile to load |
+| `AWS_REGION` / `AWS_DEFAULT_REGION` | Region |
+
+#### Google Cloud
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` | Project for Secret Manager (or use `--project`) |
+
+#### Azure
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_KEYVAULT_NAME` | Key Vault name for `azure secret` (or use `--vault-name`) |
+| `AZURE_APPCONFIG_NAME` | App Configuration store for `azure param` (or use `--store-name`) |
+| `AZURE_APPCONFIG_NAMESPACE` | Default [namespace](#namespaces) for `azure param` — Azure calls this axis a "label" (or use `--namespace`/`--ns`) |
+
+Authentication uses the DefaultAzureCredential chain (`az login`, environment, managed identity, ...). The Key Vault / App Configuration name is a globally-unique endpoint, so no subscription or resource group is needed.
 
 ### Timezone
 
@@ -978,30 +1014,6 @@ message bodies at all.
 | Variable | Description |
 |----------|-------------|
 | `SUVE_STAGING_KEY` | Base64-encoded 32-byte key that overrides the OS keychain for encrypting the working staging state |
-
-### AWS
-
-| Variable | Description |
-|----------|-------------|
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | Static credentials |
-| `AWS_PROFILE` | Shared-config profile to load |
-| `AWS_REGION` / `AWS_DEFAULT_REGION` | Region |
-
-### Google Cloud
-
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_CLOUD_PROJECT` | Project for Secret Manager (or use `--project`) |
-
-### Azure
-
-| Variable | Description |
-|----------|-------------|
-| `AZURE_KEYVAULT_NAME` | Key Vault name for `azure secret` (or use `--vault-name`) |
-| `AZURE_APPCONFIG_NAME` | App Configuration store for `azure param` (or use `--store-name`) |
-| `AZURE_APPCONFIG_NAMESPACE` | Default [namespace](#namespaces) for `azure param` — Azure calls this axis a "label" (or use `--namespace`/`--ns`) |
-
-Authentication uses the DefaultAzureCredential chain (`az login`, environment, managed identity, ...). The Key Vault / App Configuration name is a globally-unique endpoint, so no subscription or resource group is needed.
 
 ## AWS Configuration
 
