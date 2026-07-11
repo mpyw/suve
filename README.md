@@ -610,22 +610,34 @@ where ~SHIFT = ~ | ~N  (repeatable, cumulative)
 
 ## Command Reference
 
+### Providers
+
+Each backend lives under a provider **group**; the group names take aliases:
+
+| Group | Aliases |
+|-------|---------|
+| `aws` | — |
+| `gcloud` | `gcp`, `google` <!-- naming-allow-gcp --> |
+| `azure` | `az` |
+
+Group aliases are interchangeable with the group name (e.g. `suve az kv show`). Under `azure stage`, the `secret` / `param` subgroups take the same aliases as their read/write forms (`kv` / `keyvault`, `appconfig` / `ac` / `appcfg`).
+
 ### Services
 
-Explicit command groups (always available) and their bare aliases (exposed per the [provider selection](#provider-selection) rules above):
+Each service runs under its group (`aws param`, `azure secret`, …) and carries its own aliases:
 
-| Backend | Explicit command | Bare alias (conditional) |
-|---------|------------------|--------------------------|
-| [AWS SSM Parameter Store](docs/aws.md) | `aws param` (`ssm`, `ps`) | `param` |
-| [AWS Secrets Manager](docs/aws.md) | `aws secret` (`sm`, `secretsmanager`) | `secret` |
-| AWS Staging | `aws stage` (`stg`) | `stage` |
-| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` (`secrets`, `sm`) | `secret` |
-| Google Cloud Staging | `gcloud stage` (`stg`) | `stage` |
-| [Azure Key Vault](docs/azure.md) | `azure secret` (`kv`, `keyvault`) | `secret` |
-| [Azure App Configuration](docs/azure.md) | `azure param` (`appconfig`, `ac`, `appcfg`) | `param` |
-| Azure Staging | `azure stage` (`stg`) | `stage` |
+| Backend | Command | Aliases |
+|---------|---------|---------|
+| [AWS SSM Parameter Store](docs/aws.md) | `aws param` | `ssm`, `ps` |
+| [AWS Secrets Manager](docs/aws.md) | `aws secret` | `sm`, `secretsmanager` |
+| AWS Staging | `aws stage` | `stg` |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | `secrets`, `sm` |
+| Google Cloud Staging | `gcloud stage` | `stg` |
+| [Azure Key Vault](docs/azure.md) | `azure secret` | `kv`, `keyvault` |
+| [Azure App Configuration](docs/azure.md) | `azure param` | `appconfig`, `ac`, `appcfg` |
+| Azure Staging | `azure stage` | `stg` |
 
-The command **groups** themselves also take aliases: `gcloud` → `gcp` / `google`, and `azure` → `az` (e.g. `suve gcp secrets show`, `suve az kv show`). <!-- naming-allow-gcp --> Under `azure stage`, the `secret` / `param` subgroups accept the same aliases as their read/write counterparts (`kv` / `keyvault`, `appconfig` / `ac` / `appcfg`).
+When exactly one backend is active for a service (see [Provider selection](#provider-selection)), that service command is also available **bare**, without the group prefix — and every alias works bare too. So `suve param` / `suve ssm` / `suve ps`, `suve secret` / `suve sm` / `suve kv`, `suve stage` / `suve stg`, etc. all resolve to the uniquely-active backend.
 
 ### Provider selection
 
@@ -888,6 +900,34 @@ Export writes the working staging area out to portable snapshot files (one per s
 
 ## Environment Variables
 
+### Providers
+
+Each backend is selected and authenticated from its own environment variables (all also settable via flags; see [Provider selection](#provider-selection)).
+
+#### AWS
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | Static credentials |
+| `AWS_PROFILE` | Shared-config profile to load |
+| `AWS_REGION` / `AWS_DEFAULT_REGION` | Region |
+
+#### Google Cloud
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` | Project for Secret Manager (or use `--project`) |
+
+#### Azure
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_KEYVAULT_NAME` | Key Vault name for `azure secret` (or use `--vault-name`) |
+| `AZURE_APPCONFIG_NAME` | App Configuration store for `azure param` (or use `--store-name`) |
+| `AZURE_APPCONFIG_NAMESPACE` | Default [namespace](#namespaces) for `azure param` — Azure calls this axis a "label" (or use `--namespace`/`--ns`) |
+
+Authentication uses the DefaultAzureCredential chain (`az login`, environment, managed identity, ...). The Key Vault / App Configuration name is a globally-unique endpoint, so no subscription or resource group is needed.
+
 ### Timezone
 
 suve respects the `TZ` environment variable for date/time formatting:
@@ -975,30 +1015,6 @@ message bodies at all.
 | Variable | Description |
 |----------|-------------|
 | `SUVE_STAGING_KEY` | Base64-encoded 32-byte key that overrides the OS keychain for encrypting the working staging state |
-
-### AWS
-
-| Variable | Description |
-|----------|-------------|
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | Static credentials |
-| `AWS_PROFILE` | Shared-config profile to load |
-| `AWS_REGION` / `AWS_DEFAULT_REGION` | Region |
-
-### Google Cloud
-
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_CLOUD_PROJECT` | Project for Secret Manager (or use `--project`) |
-
-### Azure
-
-| Variable | Description |
-|----------|-------------|
-| `AZURE_KEYVAULT_NAME` | Key Vault name for `azure secret` (or use `--vault-name`) |
-| `AZURE_APPCONFIG_NAME` | App Configuration store for `azure param` (or use `--store-name`) |
-| `AZURE_APPCONFIG_NAMESPACE` | Default [namespace](#namespaces) for `azure param` — Azure calls this axis a "label" (or use `--namespace`/`--ns`) |
-
-Authentication uses the DefaultAzureCredential chain (`az login`, environment, managed identity, ...). The Key Vault / App Configuration name is a globally-unique endpoint, so no subscription or resource group is needed.
 
 ## AWS Configuration
 
