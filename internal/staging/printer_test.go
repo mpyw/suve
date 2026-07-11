@@ -10,12 +10,16 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/timeutil"
 )
 
 func TestEntryPrinter_PrintEntry(t *testing.T) {
 	t.Parallel()
 
 	fixedTime := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
+	// The Staged timestamp is rendered through timeutil so it honors $TZ; assert
+	// against the same TZ-aware representation rather than a hard-coded UTC one.
+	stagedAt := timeutil.FormatDateTime(fixedTime)
 
 	tests := []struct {
 		name              string
@@ -56,7 +60,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 				StagedAt:  fixedTime,
 			},
 			verbose:      true,
-			wantContains: []string{"M", "/app/config", "Staged:", "2024-01-15 10:30:00", "Value: test-value"},
+			wantContains: []string{"M", "/app/config", "Staged:", stagedAt, "Value: test-value"},
 		},
 		{
 			name:      "update operation verbose with long value",

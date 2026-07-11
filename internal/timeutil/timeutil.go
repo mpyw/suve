@@ -55,6 +55,12 @@ func FormatDate(t time.Time) string {
 	return t.In(GetLocation()).Format("2006-01-02")
 }
 
+// FormatDateTime formats the given time as a YYYY-MM-DD HH:MM:SS datetime using
+// the timezone from TZ environment variable.
+func FormatDateTime(t time.Time) string {
+	return t.In(GetLocation()).Format("2006-01-02 15:04:05")
+}
+
 // ResetLocationCache resets the cached location.
 // This is intended for testing purposes only.
 func ResetLocationCache() {
