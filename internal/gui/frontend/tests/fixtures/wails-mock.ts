@@ -1410,12 +1410,19 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         if (!file) {
           throw new Error('failed to read export file');
         }
+        // Whether the working area for the file's service already holds staged
+        // changes; the frontend prompts for merge/overwrite only when true.
+        const b = currentBucket();
+        const workingHasChanges = file.service === 'param'
+          ? (b.param.length > 0 || b.paramTags.length > 0)
+          : (b.secret.length > 0 || b.secretTags.length > 0);
         return {
           encrypted: file.encrypted,
           provider: file.provider,
           scope: file.scope,
           service: file.service,
           scopeMatches: file.scope === expectedScopeKey(file.service),
+          workingHasChanges,
         };
       },
       // Import ONE concrete service from a per-service envelope into the working
