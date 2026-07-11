@@ -154,8 +154,6 @@ func (m *MockStore) servicesFor(service staging.Service) []staging.Service {
 }
 
 // ListEntries returns all staged entries for a service.
-//
-//nolint:dupl // similar structure to ListTags but different types
 func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.Entry, error) {
 	if m.ListEntriesErr != nil {
 		return nil, m.ListEntriesErr
@@ -173,8 +171,6 @@ func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map
 }
 
 // ListTags returns all staged tag changes for a service.
-//
-//nolint:dupl // similar structure to ListEntries but different types
 func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.TagEntry, error) {
 	if m.ListTagsErr != nil {
 		return nil, m.ListTagsErr
