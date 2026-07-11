@@ -1056,7 +1056,7 @@ mise build-cli
 mise build-gui
 
 # Run E2E tests (requires Docker)
-mise e2e
+mise e2e-aws
 
 # Coverage (unit + E2E combined)
 mise coverage-all

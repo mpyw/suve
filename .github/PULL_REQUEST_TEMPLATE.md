@@ -16,7 +16,7 @@
 
 - [ ] Tests pass (`mise test`)
 - [ ] Linter passes (`mise lint`)
-- [ ] E2E tests pass if applicable (`mise e2e`)
+- [ ] E2E tests pass if applicable (`mise e2e-aws`)
 - [ ] Documentation updated if needed
 - [ ] Breaking changes are documented
 

@@ -90,8 +90,9 @@ run = "GOOS=$(go env GOHOSTOS) golangci-lint run --build-tags=e2e,production ./.
 # the runner service in compose.test.yaml.
 # -----------------------------------------------------------------------------
 
-[tasks.e2e]
-description = "Run E2E tests against localstack, fully inside Docker (no host ports)"
+[tasks.e2e-aws]
+alias = "e2e"
+description = "Run AWS E2E tests against localstack, fully inside Docker (no host ports)"
 shell = "bash -c"
 run = '''
 set -euo pipefail
@@ -251,13 +252,14 @@ go test -coverprofile=coverage.out -coverpkg="$coverpkg" $(go list ./... | grep 
 go tool cover -func=coverage.out | grep total
 '''
 
-# coverage-e2e / coverage-all use the AWS emulator, so they run in the same
+# coverage-e2e-aws / coverage-all use the AWS emulator, so they run in the same
 # closed Docker model as the e2e tasks (unique per-run project, guaranteed
 # teardown, no host ports, keychain bypass via the runner). The runner's /app
 # source mount is read-only, so coverage profiles are written to a dedicated
 # writable bind mount (host ./coverage -> container /out).
-[tasks.coverage-e2e]
-description = "Run E2E tests with coverage, fully inside Docker (no host ports)"
+[tasks.coverage-e2e-aws]
+alias = "coverage-e2e"
+description = "Run AWS E2E tests with coverage, fully inside Docker (no host ports)"
 shell = "bash -c"
 run = '''
 set -euo pipefail
