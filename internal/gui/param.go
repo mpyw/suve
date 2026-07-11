@@ -144,8 +144,10 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 	entries := make([]ParamListEntry, len(result.Entries))
 	for i, e := range result.Entries {
 		entries[i] = ParamListEntry{
-			Name:  e.Name,
-			Value: e.Value,
+			Name:   e.Name,
+			Type:   paramtype.Display(e.Type),
+			Secret: e.Type == domain.ValueTypeSecret,
+			Value:  e.Value,
 		}
 	}
 
@@ -186,7 +188,14 @@ func (a *App) paramListWithNamespaces(
 			continue
 		}
 
-		entry := ParamListEntry{Name: item.Key, Namespace: item.Namespace}
+		// App Configuration values are always plaintext (never a secret), so the
+		// domain value type is fixed; mirror it into Type/Secret like the SSM path.
+		entry := ParamListEntry{
+			Name:      item.Key,
+			Type:      paramtype.Display(domain.ValueTypePlaintext),
+			Secret:    false,
+			Namespace: item.Namespace,
+		}
 		if withValue {
 			entry.Value = lo.ToPtr(item.Value)
 		}
