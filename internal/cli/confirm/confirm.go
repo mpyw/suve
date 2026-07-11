@@ -17,6 +17,13 @@ type Prompter struct {
 	Stdout io.Writer
 	Stderr io.Writer
 
+	// BufReader, when set, is a shared buffered stdin reader used instead of
+	// allocating a per-call one. Sharing one reader across prompters (e.g. a
+	// passphrase prompt then a confirm prompt) prevents double-buffering: a
+	// fresh bufio.Reader over piped stdin would find the bytes already
+	// read-ahead into the first reader's buffer and hit EOF.
+	BufReader *bufio.Reader
+
 	// Target is a provider-neutral, human-readable description of where the
 	// operation applies (e.g. "my-profile (123456789012 / us-east-1)" for AWS or
 	// "project my-gcloud-project" for Google Cloud). When set, it is shown before
@@ -49,11 +56,19 @@ func (p *Prompter) printTargetInfo() {
 	}
 }
 
+// reader returns the shared buffered reader when one was injected, otherwise a
+// per-call reader over Stdin.
+func (p *Prompter) reader() *bufio.Reader {
+	if p.BufReader != nil {
+		return p.BufReader
+	}
+
+	return bufio.NewReader(p.Stdin)
+}
+
 // readYesNo reads a yes/no response from stdin.
 func (p *Prompter) readYesNo() (bool, error) {
-	reader := bufio.NewReader(p.Stdin)
-
-	response, err := reader.ReadString('\n')
+	response, err := p.reader().ReadString('\n')
 	if err != nil {
 		return false, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -127,9 +142,7 @@ func (p *Prompter) ConfirmChoice(message string, choices []Choice) (ChoiceResult
 
 	output.Printf(p.Stderr, "Enter choice [1]: ")
 
-	reader := bufio.NewReader(p.Stdin)
-
-	response, err := reader.ReadString('\n')
+	response, err := p.reader().ReadString('\n')
 	if err != nil {
 		return ChoiceCancelled, fmt.Errorf("failed to read response: %w", err)
 	}

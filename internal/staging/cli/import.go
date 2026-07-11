@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -90,9 +91,14 @@ type ImportModeInput struct {
 	// SkipPrompt (--yes) accepts the default (Merge) without the interactive
 	// Merge/Overwrite/Cancel prompt, for scripts/automation.
 	SkipPrompt bool
-	HasChanges bool
-	ItemCount  int
-	IsTTY      bool
+	// PassphraseStdin (--passphrase-stdin) means stdin carries the passphrase, not
+	// an interactive answer. Prompting would double-buffer/EOF against the
+	// passphrase read (#472), so the mode is resolved from flags only (default
+	// Merge) without prompting.
+	PassphraseStdin bool
+	HasChanges      bool
+	ItemCount       int
+	IsTTY           bool
 }
 
 // ImportModeResult holds the outcome of import-mode selection.
@@ -121,7 +127,7 @@ func (c *ImportModeChooser) ChooseMode(input ImportModeInput) (ImportModeResult,
 		return ImportModeResult{Mode: usestaging.ImportModeMerge}, nil
 	}
 
-	if input.HasChanges && input.IsTTY && !input.SkipPrompt {
+	if input.HasChanges && input.IsTTY && !input.SkipPrompt && !input.PassphraseStdin {
 		output.Warning(c.Stderr, "Working staging area already has %d staged change(s).", input.ItemCount)
 
 		choice, err := c.Prompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
@@ -233,12 +239,13 @@ func anyEncrypted(present []presentEnvelope) (bool, error) {
 
 // importPassphrase prompts for the decryption passphrase once. It is only called
 // when at least one present envelope is encrypted.
-func importPassphrase(cmd *cli.Command) (string, error) {
+func importPassphrase(cmd *cli.Command, stdin *bufio.Reader) (string, error) {
 	prompter := &passphrase.Prompter{
 		Stdin:  cmd.Root().Reader,
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
 	}
+	prompter.UseBufReader(stdin)
 
 	switch {
 	case cmd.Bool(flagPassphraseStdin):
@@ -308,10 +315,15 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 			return err
 		}
 
+		// Share one buffered stdin reader across the passphrase prompt and the
+		// merge/overwrite confirmation so consecutive reads over piped stdin don't
+		// double-buffer and drop bytes (#472).
+		stdin := bufio.NewReader(cmd.Root().Reader)
+
 		var pass string
 
 		if encrypted {
-			pass, err = importPassphrase(cmd)
+			pass, err = importPassphrase(cmd, stdin)
 			if err != nil {
 				return err
 			}
@@ -330,22 +342,24 @@ func importAction(service staging.Service, resolver staging.ScopeResolver) func(
 
 		chooser := &ImportModeChooser{
 			Prompter: &confirm.Prompter{
-				Stdin:  cmd.Root().Reader,
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
-				Target: resolved.Target,
+				Stdin:     cmd.Root().Reader,
+				Stdout:    cmd.Root().Writer,
+				Stderr:    cmd.Root().ErrWriter,
+				Target:    resolved.Target,
+				BufReader: stdin,
 			},
 			Stderr: cmd.Root().ErrWriter,
 			Stdout: cmd.Root().Writer,
 		}
 
 		mode, err := chooser.ChooseMode(ImportModeInput{
-			MergeFlag:     cmd.Bool(flagMerge),
-			OverwriteFlag: cmd.Bool(flagOverwrite),
-			SkipPrompt:    cmd.Bool(flagYes),
-			HasChanges:    !existing.IsEmpty(),
-			ItemCount:     existing.TotalCount(),
-			IsTTY:         terminal.IsTerminalWriter(cmd.Root().ErrWriter),
+			MergeFlag:       cmd.Bool(flagMerge),
+			OverwriteFlag:   cmd.Bool(flagOverwrite),
+			SkipPrompt:      cmd.Bool(flagYes),
+			PassphraseStdin: cmd.Bool(flagPassphraseStdin),
+			HasChanges:      !existing.IsEmpty(),
+			ItemCount:       existing.TotalCount(),
+			IsTTY:           terminal.IsTerminalWriter(cmd.Root().ErrWriter),
 		})
 		if err != nil {
 			return err

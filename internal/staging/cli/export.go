@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -62,12 +63,13 @@ func exportFlags() []cli.Flag {
 // It returns the passphrase (empty means plaintext), whether the user cancelled,
 // and any error. --passphrase-stdin reads from stdin; otherwise a TTY is prompted
 // interactively and a non-TTY falls back to plaintext with a warning.
-func exportPassphrase(cmd *cli.Command) (pass string, cancelled bool, err error) {
+func exportPassphrase(cmd *cli.Command, stdin *bufio.Reader) (pass string, cancelled bool, err error) {
 	prompter := &passphrase.Prompter{
 		Stdin:  cmd.Root().Reader,
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
 	}
+	prompter.UseBufReader(stdin)
 
 	switch {
 	case cmd.Bool(flagPassphraseStdin):
@@ -118,7 +120,7 @@ func exportServices(service staging.Service, state *staging.State) []staging.Ser
 // confirmExportOverwrite prompts (or refuses) before overwriting existing export
 // files. It is a plain overwrite confirmation, NOT a merge: export always writes
 // wholesale. --yes / --force skip it; a non-TTY without --yes is refused.
-func confirmExportOverwrite(cmd *cli.Command, paths []string) (proceed bool, err error) {
+func confirmExportOverwrite(cmd *cli.Command, paths []string, stdin *bufio.Reader) (proceed bool, err error) {
 	if cmd.Bool(flagYes) {
 		return true, nil
 	}
@@ -135,7 +137,11 @@ func confirmExportOverwrite(cmd *cli.Command, paths []string) (proceed bool, err
 		return true, nil
 	}
 
-	if !terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
+	// With --passphrase-stdin, stdin carries the passphrase, not an interactive
+	// answer: prompting here would consume the passphrase line as the y/N reply
+	// and silently cancel (#471). Require --yes explicitly, mirroring the non-TTY
+	// branch, so a scripted overwrite fails loudly instead of no-op'ing at exit 0.
+	if cmd.Bool(flagPassphraseStdin) || !terminal.IsTerminalWriter(cmd.Root().ErrWriter) {
 		return false, fmt.Errorf(
 			"export file(s) already exist: %v; re-run with --yes to overwrite",
 			existing,
@@ -143,9 +149,10 @@ func confirmExportOverwrite(cmd *cli.Command, paths []string) (proceed bool, err
 	}
 
 	prompter := &confirm.Prompter{
-		Stdin:  cmd.Root().Reader,
-		Stdout: cmd.Root().Writer,
-		Stderr: cmd.Root().ErrWriter,
+		Stdin:     cmd.Root().Reader,
+		Stdout:    cmd.Root().Writer,
+		Stderr:    cmd.Root().ErrWriter,
+		BufReader: stdin,
 	}
 
 	output.Warning(cmd.Root().ErrWriter, "Export file(s) already exist and will be overwritten: %v", existing)
@@ -208,7 +215,12 @@ func exportAction(service staging.Service, resolver staging.ScopeResolver) func(
 			targetPaths = append(targetPaths, pathFor(svc))
 		}
 
-		proceed, err := confirmExportOverwrite(cmd, targetPaths)
+		// Share one buffered stdin reader across the overwrite confirmation and the
+		// passphrase prompt so consecutive reads over piped stdin don't
+		// double-buffer and drop bytes.
+		stdin := bufio.NewReader(cmd.Root().Reader)
+
+		proceed, err := confirmExportOverwrite(cmd, targetPaths, stdin)
 		if err != nil {
 			return err
 		}
@@ -219,7 +231,7 @@ func exportAction(service staging.Service, resolver staging.ScopeResolver) func(
 			return nil
 		}
 
-		pass, cancelled, err := exportPassphrase(cmd)
+		pass, cancelled, err := exportPassphrase(cmd, stdin)
 		if err != nil {
 			return err
 		}

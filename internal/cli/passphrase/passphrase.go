@@ -31,6 +31,15 @@ type Prompter struct {
 	bufReader *bufio.Reader
 }
 
+// UseBufReader shares an externally-owned buffered stdin reader with this
+// Prompter. Reading a single piped stdin across more than one Prompter (e.g. a
+// passphrase prompt followed by a confirmation prompt) requires them to share
+// one buffered reader; otherwise a second bufio.Reader over the same fd finds
+// the bytes already read-ahead into the first buffer and hits EOF.
+func (p *Prompter) UseBufReader(r *bufio.Reader) {
+	p.bufReader = r
+}
+
 // PromptForEncrypt prompts for passphrase with confirmation for encryption.
 // Returns empty string if user chooses to continue without encryption after warning.
 // Returns ErrCancelled if user declines to continue without encryption.

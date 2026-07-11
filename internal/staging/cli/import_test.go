@@ -188,6 +188,31 @@ func TestGlobalImport(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	// Regression for #472: an encrypted import via --passphrase-stdin with a dirty
+	// working area must merge (the default) without an EOF failure. The passphrase
+	// read and the mode resolution must not double-buffer the single stdin stream.
+	t.Run("encrypted --passphrase-stdin with dirty working area merges without EOF", func(t *testing.T) {
+		scope := setupExportImportEnv(t)
+		stageEntry(t, scope, staging.ServiceParam, "/app/param1", "v1")
+
+		dir := filepath.Join(t.TempDir(), "backup")
+		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
+		require.NoError(t, err)
+		require.True(t, workingState(t, scope).IsEmpty())
+
+		// Dirty the working area so the reconcile path is exercised.
+		stageEntry(t, scope, staging.ServiceParam, "/app/param2", "v2")
+
+		// Only the passphrase is on stdin (no merge/overwrite answer line).
+		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "merged")
+
+		entries := workingState(t, scope).Entries[staging.ServiceParam]
+		assert.Contains(t, entries, staging.EntryKey{Name: "/app/param1"})
+		assert.Contains(t, entries, staging.EntryKey{Name: "/app/param2"})
+	})
+
 	t.Run("encrypted round-trip via --passphrase-stdin", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
 		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
@@ -298,6 +323,27 @@ func TestImportModeChooser_ChooseMode(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, result.Cancelled)
 		assert.Equal(t, usestaging.ImportModeMerge, result.Mode)
+	})
+
+	// Regression for #472: with --passphrase-stdin, stdin carries the passphrase,
+	// not an interactive answer. The mode must resolve to the default (Merge)
+	// without prompting, so the passphrase read and a would-be confirmation prompt
+	// never contend over the same stdin.
+	t.Run("--passphrase-stdin skips the prompt and defaults to merge", func(t *testing.T) {
+		t.Parallel()
+
+		stderr := &bytes.Buffer{}
+		// A Prompter whose stdin would error if read, proving no prompt occurs.
+		chooser := &stgcli.ImportModeChooser{
+			Prompter: &confirm.Prompter{Stdin: bytes.NewBufferString(""), Stdout: &bytes.Buffer{}, Stderr: stderr},
+			Stderr:   stderr,
+			Stdout:   &bytes.Buffer{},
+		}
+		result, err := chooser.ChooseMode(stgcli.ImportModeInput{PassphraseStdin: true, HasChanges: true, ItemCount: 2, IsTTY: true})
+		require.NoError(t, err)
+		assert.False(t, result.Cancelled)
+		assert.Equal(t, usestaging.ImportModeMerge, result.Mode)
+		assert.NotContains(t, stderr.String(), "How do you want to proceed?")
 	})
 
 	t.Run("prompt selects merge", func(t *testing.T) {
