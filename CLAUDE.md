@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for multi-cloud secret and parameter management, covering AWS (Parameter Store + Secrets Manager), Google Cloud (Secret Manager), and Azure (Key Vault + App Configuration). It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `tag`, `stash`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
+**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for multi-cloud secret and parameter management, covering AWS (Parameter Store + Secrets Manager), Google Cloud (Secret Manager), and Azure (Key Vault + App Configuration). It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `tag`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
 
 ### Core Concepts
 
@@ -25,16 +25,14 @@ This file provides guidance to Claude Code when working with code in this reposi
    - `stage apply` - Apply all staged changes to AWS
    - `stage reset` - Unstage changes
 
-3. **Stash Commands**: Save/restore staging state to file
-   - `stage stash push` - Save staged changes to encrypted file
-   - `stage stash pop` - Restore staged changes from file (deletes file)
-   - `stage stash pop --keep` - Restore staged changes (keeps file)
-   - `stage stash show` - Preview stashed changes
-   - `stage stash drop` - Delete stash file
-   - Mode flags (mutually exclusive):
-     - `--merge` - Combine with existing data (default)
-     - `--overwrite` - Replace existing data
-   - `--yes` - Confirm without prompt
+3. **Export / Import Commands**: Save/restore staging state to portable snapshot files
+   - `stage export <dir>` - Write every service with staged changes to `<dir>/param.json` + `<dir>/secret.json` (wholesale, never merges)
+   - `stage {param,secret} export <file>` - Write a single service to `<file>`
+   - `stage import <dir>` - Read `param.json` / `secret.json` from `<dir>` (missing skipped; nothing imported if both absent)
+   - `stage {param,secret} import <file>` - Read a single service from `<file>` (missing file or `service` mismatch = hard error)
+   - Each file is a plaintext JSON envelope `{version, provider, scope, service, payload}` whose `payload` is passphrase-encrypted (Argon2id) or plaintext when the passphrase is empty; the full scope is embedded and validated on import
+   - `export` flags: `--keep` (retain the working area; default clears it), `--yes`/`--force` (skip overwrite confirmation), `--passphrase-stdin`. NO `--merge`/`--overwrite`
+   - `import` flags: `--merge`/`--overwrite` (mutually exclusive; only used when the working area already has changes), `--yes`, `--passphrase-stdin`, `--force` (override scope mismatch). NO `--keep`
 
 4. **Version Specification**: Git-like revision syntax
    ```
@@ -80,7 +78,7 @@ suve/
 │   │   ├── editor/               # External editor integration ($EDITOR)
 │   │   ├── output/               # Output formatting (diff, colors)
 │   │   ├── pager/                # Pager integration ($PAGER)
-│   │   ├── passphrase/           # Passphrase input (for stash encryption)
+│   │   ├── passphrase/           # Passphrase input (for export/import encryption)
 │   │   ├── terminal/             # Terminal utilities (TTY detection)
 │   │   └── commands/
 │   │       ├── app.go            # urfave/cli v3 app definition
@@ -133,9 +131,9 @@ suve/
 │   │   ├── transition/           # Reducer-based state machine (state/action/reducer/executor)
 │   │   └── store/                # Storage backend
 │   │       ├── store.go          # Storage interfaces
-│   │       ├── file/             # File-based storage (ONLY backend); scope-keyed split param.json/secret.json + stash.json
+│   │       ├── file/             # File-based storage (ONLY backend); scope-keyed split param.json/secret.json (working area) + per-service export envelopes
 │   │       │   └── internal/
-│   │       │       ├── crypt/        # Argon2 + AES-GCM (stash, passphrase) and raw-key (working) encryption
+│   │       │       ├── crypt/        # Argon2 + AES-GCM (export/import passphrase payload) and raw-key (working) encryption
 │   │       │       └── keyprovider/  # OS-keychain data-key provider (zalando/go-keyring); SUVE_STAGING_KEY override
 │   │       └── testutil/         # Mock store for testing
 │   │

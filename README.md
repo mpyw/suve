@@ -25,12 +25,12 @@ A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud S
 
 ## Features
 
-- **Git-like commands**: `show`, `log`, `diff`, `ls`, `tag`, `stash`
-- **Staging workflow**: `edit` → `status` → `diff` → `apply` (review changes before applying)
+- **Git-like commands**: `show`, `log`, `diff`, `ls`, `tag`
+- **Staging workflow**: `edit` → `status` → `diff` → `apply` (review changes before applying), plus `export` / `import` for portable, per-service snapshots
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
 - **Multi-cloud**: [AWS SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) / [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html), [Google Cloud Secret Manager](https://cloud.google.com/secret-manager/docs), and [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/) / [App Configuration](https://learn.microsoft.com/en-us/azure/azure-app-configuration/)
-- **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`; plaintext fallback with a warning if unavailable). The stash is separately encrypted ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode), passphrase-based).
+- **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`; plaintext fallback with a warning if unavailable). Exported snapshot files carry a separately passphrase-encrypted payload ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode); an empty passphrase writes plaintext).
 - **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
 
 ## Installation
@@ -424,7 +424,7 @@ Output will look like:
 > For detailed documentation, see [Staging State Transitions](docs/staging-state-transitions.md).
 
 > [!TIP]
-> Staged values live in encrypted files under `~/.suve/staging/`. Use `suve stage stash` to save changes to a separately encrypted file for later restoration.
+> Staged values live in encrypted files under `~/.suve/staging/`. Use `suve stage export <dir>` to write them to portable snapshot files and `suve stage import <dir>` to restore them later.
 
 **1. Stage changes** (opens editor or accepts value directly):
 
@@ -497,21 +497,26 @@ suve stage reset --all
 > [!TIP]
 > `suve stage apply` prompts for confirmation before applying. Use `--yes` to skip the prompt.
 
-**Save changes for later** (stash):
+**Save changes for later** (export / import):
 
 ```bash
-# Save staged changes to file (prompts for passphrase)
-suve stage stash
+# Export staged changes to a directory as one file per service
+# (param.json / secret.json); prompts for a passphrase.
+# By default the working staging area is cleared; use --keep to retain it.
+suve stage export ./backup
 
-# Restore from file
-suve stage stash pop
+# Restore them into the working staging area later
+suve stage import ./backup
 
-# Preview stashed changes
-suve stage stash show
+# Export a single service to a specific file
+suve stage param export ./param-backup.json
 
-# Delete stash without restoring
-suve stage stash drop
+# Import a single service from a specific file
+suve stage param import ./param-backup.json
 ```
+
+> [!NOTE]
+> `export` writes the working area out wholesale (no merge). `import` prompts to Merge or Overwrite only when the working area already holds changes; pass `--merge` / `--overwrite` to choose non-interactively.
 
 > [!NOTE]
 > See [Staging State Transitions](docs/staging-state-transitions.md) for detailed staging documentation.
@@ -772,7 +777,8 @@ Uses integer version numbers (with the `latest` alias) and has no staging labels
 | `suve gcloud stage reset` | `--all` | Unstage changes |
 | `suve gcloud stage tag` | `<KEY>=<VALUE>...` | Stage tag additions (Google Cloud "labels") |
 | `suve gcloud stage untag` | `<KEY>...` | Stage tag removals (Google Cloud "labels") |
-| `suve gcloud stage stash` | `push`/`pop`/`show`/`drop` | Save/restore staged changes |
+| `suve gcloud stage export` | `<file>` | Export staged changes to a snapshot file |
+| `suve gcloud stage import` | `<file>` | Import staged changes from a snapshot file |
 
 ### Azure Key Vault
 
@@ -804,7 +810,8 @@ Secrets are versioned by opaque IDs and have no staging labels. Select the vault
 | `suve azure stage secret reset` | `--all` | Unstage changes |
 | `suve azure stage secret tag` | `<KEY>=<VALUE>...` | Stage tag additions |
 | `suve azure stage secret untag` | `<KEY>...` | Stage tag removals |
-| `suve azure stage secret stash` | `push`/`pop`/`show`/`drop` | Save/restore staged changes |
+| `suve azure stage secret export` | `<file>` | Export staged changes to a snapshot file |
+| `suve azure stage secret import` | `<file>` | Import staged changes from a snapshot file |
 
 ### Azure App Configuration
 
@@ -852,7 +859,8 @@ The value is interpreted by context:
 | `suve azure stage param diff` | `--parse-json` (`-j`)<br>`--no-pager` | Show staged vs App Configuration |
 | `suve azure stage param apply` | `--yes` | Apply staged changes |
 | `suve azure stage param reset` | `--all` | Unstage changes |
-| `suve azure stage param stash` | `push`/`pop`/`show`/`drop` | Save/restore staged changes |
+| `suve azure stage param export` | `<file>` | Export staged changes to a snapshot file |
+| `suve azure stage param import` | `<file>` | Import staged changes from a snapshot file |
 
 > [!NOTE]
 > Azure staging is **per-service** under the hood: `suve azure stage secret` (Key Vault) and `suve azure stage param` (App Configuration) keep separate staging state. Provider-wide `azure stage status`/`diff`/`apply`/`reset` span both services, skipping whichever one is not configured.
@@ -866,15 +874,19 @@ The value is interpreted by context:
 | `suve stage apply` | `--yes`<br>`--ignore-conflicts` | Apply all staged changes |
 | `suve stage reset` | `--all` | Unstage all changes |
 
-### Stash Commands
+### Export / Import Commands
 
-| Command | Options | Description |
-|---------|---------|-------------|
-| `suve stage stash` | | Save staged changes to file (alias for `push`) |
-| `suve stage stash push` | `--keep`<br>`--yes`<br>`--merge`<br>`--overwrite`<br>`--passphrase-stdin` | Save staged changes from the working staging area to the stash file |
-| `suve stage stash pop` | `--keep`<br>`--yes`<br>`--merge`<br>`--overwrite`<br>`--passphrase-stdin` | Restore staged changes from file |
-| `suve stage stash show` | `--verbose` (`-v`)<br>`--passphrase-stdin` | Preview stashed changes |
-| `suve stage stash drop` | `--yes`<br>`--passphrase-stdin` | Delete stash file |
+Export writes the working staging area out to portable snapshot files (one per service) and import reads them back. Each file is a plaintext JSON envelope (`{version, provider, scope, service, payload}`) whose `payload` is passphrase-encrypted (Argon2id) or plaintext when the passphrase is empty. The full scope is embedded and validated on import.
+
+| Command | Argument | Options | Description |
+|---------|----------|---------|-------------|
+| `suve stage export` | `<dir>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export every service with staged changes to `<dir>/param.json` + `<dir>/secret.json` |
+| `suve stage {param,secret} export` | `<file>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export a single service to `<file>` |
+| `suve stage import` | `<dir>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--force` | Import `param.json` / `secret.json` from `<dir>` (missing files skipped; nothing imported if both absent) |
+| `suve stage {param,secret} import` | `<file>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--force` | Import a single service from `<file>` (missing file or service mismatch is a hard error) |
+
+- **`export`** writes the working area out wholesale; there is no `--merge` / `--overwrite`. By default it clears the working staging area; `--keep` retains it. `--yes` / `--force` skip the overwrite confirmation.
+- **`import`** has no `--keep` (it is read-only on the file). `--merge` / `--overwrite` are mutually exclusive and only matter when the working area already holds changes; otherwise the file is applied directly. `--force` imports even when the file's embedded scope differs from the current scope.
 
 ## Environment Variables
 

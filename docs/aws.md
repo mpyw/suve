@@ -633,7 +633,7 @@ The staging workflow allows you to prepare changes locally before applying them 
 > [!IMPORTANT]
 > The staging workflow lets you prepare changes locally, review them, and apply when ready--just like `git add` -> `git diff --staged` -> `git commit`.
 
-Working state is split per service and namespaced by provider scope: `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/param.json` and `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/secret.json`. The stash is stored alongside them at `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/stash.json`. There is no longer any single `stage.json`.
+Working state is split per service and namespaced by provider scope: `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/param.json` and `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/secret.json` — there is no single combined state file. To save or move this state, `stage export <dir>` / `stage import <dir>` write and read portable per-service snapshot files (`param.json` / `secret.json`) at a path you choose; these snapshots are not kept under `~/.suve/staging/`.
 
 > [!NOTE]
 > The working-state files are encrypted at rest. The encryption key is resolved from the `SUVE_STAGING_KEY` environment variable (base64-encoded 32 bytes) if set, otherwise from an OS keychain (created on first use), otherwise the state is stored as plaintext with a warning.
@@ -1690,7 +1690,7 @@ The staging workflow allows you to prepare changes locally before applying them 
 > [!IMPORTANT]
 > The staging workflow lets you prepare changes locally, review them, and apply when ready--just like `git add` -> `git diff --staged` -> `git commit`.
 
-Working state is split per service and namespaced by provider scope: `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/param.json` and `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/secret.json`. The stash is stored alongside them at `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/stash.json`. There is no longer any single `stage.json`.
+Working state is split per service and namespaced by provider scope: `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/param.json` and `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/secret.json` — there is no single combined state file. To save or move this state, `stage export <dir>` / `stage import <dir>` write and read portable per-service snapshot files (`param.json` / `secret.json`) at a path you choose; these snapshots are not kept under `~/.suve/staging/`.
 
 > [!NOTE]
 > The working-state files are encrypted at rest. The encryption key is resolved from the `SUVE_STAGING_KEY` environment variable (base64-encoded 32 bytes) if set, otherwise from an OS keychain (created on first use), otherwise the state is stored as plaintext with a warning.
@@ -2128,4 +2128,4 @@ suve aws stage secret untag my-secret deprecated old-tag
 
 ## Staging (`suve aws stage`)
 
-Staging (`stage add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`stash`) is available on AWS, Google Cloud, and Azure — each provider keys its on-disk staging state by its own scope. See [Staging State Transitions](staging-state-transitions.md) for the underlying state model; the per-command staging docs live in the README staging section.
+Staging (`stage add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`export`/`import`) is available on AWS, Google Cloud, and Azure — each provider keys its on-disk staging state by its own scope. See [Staging State Transitions](staging-state-transitions.md) for the underlying state model; the per-command staging docs live in the README staging section.
