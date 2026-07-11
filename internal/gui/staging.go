@@ -1009,15 +1009,18 @@ func (a *App) InspectImportFile(path string) (*EnvelopeInfoResult, error) {
 
 // StagingImport reads a per-service envelope file into the working staging area
 // for the selected service, mirroring `stage <svc> import`. A service mismatch
-// (the file holds another service's data) is a hard error. Scope validation is
-// surfaced to the frontend via InspectImportFile: the GUI warns and lets the
-// user confirm before calling this (the equivalent of the CLI's --force), so
-// StagingImport does not re-refuse a scope mismatch here.
+// (the file holds another service's data) is a hard error, as is a provider
+// mismatch (never overridable — a provider change is qualitatively different
+// from an account/region/vault change). A scope mismatch is refused unless force
+// is true; the frontend passes force after the user confirms the InspectImportFile
+// scope warning (the equivalent of the CLI's --force). This backend guard restores
+// defense-in-depth parity with the CLI so a frontend regression cannot import
+// cross-scope changes unchecked.
 //
 // mode is "merge" (default) or "overwrite"; it only matters when the working
 // area already holds changes for the service. The working store is resolved per
 // service via stagingScopeForKind (#445).
-func (a *App) StagingImport(path, service, passphrase, mode string) (*StagingImportResult, error) {
+func (a *App) StagingImport(path, service, passphrase, mode string, force bool) (*StagingImportResult, error) {
 	svc, err := a.getService(service)
 	if err != nil {
 		return nil, err
@@ -1031,6 +1034,23 @@ func (a *App) StagingImport(path, service, passphrase, mode string) (*StagingImp
 	if env.Service != service {
 		return nil, fmt.Errorf(
 			"import file holds %q data but %q was selected; choose the matching service", env.Service, service)
+	}
+
+	scope, err := a.stagingScopeForKind(kindForService(service))
+	if err != nil {
+		return nil, err
+	}
+
+	if env.Provider != string(scope.Provider) {
+		return nil, fmt.Errorf(
+			"import file provider %q does not match the current provider %q; a provider change cannot be imported",
+			env.Provider, scope.Provider)
+	}
+
+	if env.Scope != scope.Key() && !force {
+		return nil, fmt.Errorf(
+			"import file scope %q does not match the current scope %q; confirm the scope mismatch to import anyway",
+			env.Scope, scope.Key())
 	}
 
 	working, err := a.getWorkingFileStore(kindForService(service))

@@ -444,7 +444,11 @@
     importLoading = true;
     importError = '';
     try {
-      const result = await StagingImport(importPath, importService, passphrase, importMode);
+      // Pass force=true only for a confirmed scope mismatch: reaching runImport
+      // with importInfo.scopeMatches === false means the user clicked through the
+      // Scope Mismatch modal, so the backend scope guard should be overridden.
+      const force = importInfo ? !importInfo.scopeMatches : false;
+      const result = await StagingImport(importPath, importService, passphrase, importMode, force);
       importResult = result;
       showImportModeModal = false;
       showImportPassphrase = false;
