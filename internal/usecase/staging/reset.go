@@ -157,8 +157,9 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name, namespace string
 	// Always use the value pointer - empty string is a valid AWS value
 	currentValue := &fetchResult.Value
 
-	// Load current state with AWS value for auto-skip
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
+	// Load current state with AWS value for auto-skip, keeping any existing
+	// staged base so conflict detection is preserved across the restore.
+	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(ctx, u.Store, service, key, currentValue)
 	if err != nil {
 		return nil, err
 	}
@@ -166,10 +167,23 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name, namespace string
 	// Check if value matches current AWS (would be auto-skipped)
 	_, wasNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged)
 
+	// Anchor the conflict base: reuse an existing staged base when present,
+	// otherwise fall back to the current AWS LastModified (zero-time → nil),
+	// mirroring the edit use case.
+	baseModifiedAt := existingBaseModifiedAt
+	if baseModifiedAt == nil && !fetchResult.LastModified.IsZero() {
+		lastModified := fetchResult.LastModified
+		baseModifiedAt = &lastModified
+	}
+
+	opts := &transition.EntryExecuteOptions{
+		BaseModifiedAt: baseModifiedAt,
+	}
+
 	// Execute the edit transition with the restored value
 	executor := transition.NewExecutor(u.Store)
 
-	result, err := executor.ExecuteEntry(ctx, service, key, entryState, transition.EntryActionEdit{Value: value}, nil)
+	result, err := executor.ExecuteEntry(ctx, service, key, entryState, transition.EntryActionEdit{Value: value}, opts)
 	if err != nil {
 		return nil, err
 	}
