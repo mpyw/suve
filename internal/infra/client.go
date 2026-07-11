@@ -11,8 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go/logging"
 	"github.com/samber/lo"
@@ -153,26 +151,6 @@ func logEffectiveConfig(ctx context.Context, d debug.Config, cfg aws.Config) {
 	}
 
 	d.Logf("aws: region=%q profile=%q credentials-source=%s\n", cfg.Region, profile, creds.Source)
-}
-
-// NewParamClient creates a new SSM Parameter Store client using the default configuration.
-func NewParamClient(ctx context.Context) (*ssm.Client, error) {
-	cfg, err := LoadConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return ssm.NewFromConfig(cfg), nil
-}
-
-// NewSecretClient creates a new Secrets Manager client using the default configuration.
-func NewSecretClient(ctx context.Context) (*secretsmanager.Client, error) {
-	cfg, err := LoadConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return secretsmanager.NewFromConfig(cfg), nil
 }
 
 // AWSIdentity contains AWS account ID, region, and profile name.
