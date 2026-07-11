@@ -12,6 +12,7 @@
 
 # Output of the go coverage tool
 *.out
+coverage.html
 # Writable coverage output mount for the Dockerized coverage-e2e/coverage-all tasks
 /coverage/
 
@@ -30,11 +31,6 @@ go.work
 # OS
 .DS_Store
 Thumbs.db
-
-# MCP
-.mcp.json
-.kiri/
-coverage.html
 
 # Playwright
 /gui/frontend/test-results/
