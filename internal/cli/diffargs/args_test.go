@@ -216,6 +216,68 @@ func TestParseArgs_Param(t *testing.T) {
 	}
 }
 
+// TestParseArgs_ThreeArgRequiresSpecifier covers the fix for #482: in the 3-arg
+// form each version argument must start with a specifier prefix so that a bare
+// token (e.g. "3") is rejected instead of being concatenated onto the name.
+func TestParseArgs_ThreeArgRequiresSpecifier(t *testing.T) {
+	t.Parallel()
+
+	parse := paramversion.Parse
+	hasAbsolute := func(abs paramversion.AbsoluteSpec) bool { return abs.Version != nil }
+	prefixes := "#~"
+	usage := "usage: suve param diff"
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantSpec1  *paramversion.Spec
+		wantSpec2  *paramversion.Spec
+		wantErrMsg string
+	}{
+		{
+			name:       "bare version1 rejected",
+			args:       []string{"/p", "3", "1"},
+			wantErrMsg: "must start with a version specifier",
+		},
+		{
+			name:       "bare version2 rejected",
+			args:       []string{"/p", "#3", "1"},
+			wantErrMsg: "must start with a version specifier",
+		},
+		{
+			name: "hash specifiers keep name",
+			args: []string{"/p", "#3", "#1"},
+			wantSpec1: &paramversion.Spec{
+				Name:     "/p",
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
+			},
+			wantSpec2: &paramversion.Spec{
+				Name:     "/p",
+				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec1, spec2, err := diffargs.ParseArgs(tt.args, parse, hasAbsolute, prefixes, usage)
+
+			if tt.wantErrMsg != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSpec1, spec1)
+			assert.Equal(t, tt.wantSpec2, spec2)
+		})
+	}
+}
+
 func TestParseArgs_Secret(t *testing.T) {
 	t.Parallel()
 

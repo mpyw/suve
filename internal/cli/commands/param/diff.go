@@ -83,7 +83,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 func DiffCommand() *cli.Command {
 	return genericdiff.Command(genericdiff.Config[*paramversion.Spec]{
 		Usage:     "Show diff between two versions",
-		ArgsUsage: "<spec1> [spec2] | <name> <version1> [version2]",
+		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
 		Description: `Compare two versions of a parameter in unified diff format.
 If only one version/spec is specified, compares against latest.
 

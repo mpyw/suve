@@ -80,6 +80,6 @@ func ParseDiffArgs(args []string) (*Spec, *Spec, error) {
 		Parse,
 		func(abs AbsoluteSpec) bool { return abs.Version != nil },
 		"#~",
-		"usage: suve param diff <spec1> [spec2] | <name> <version1> [version2]",
+		"usage: suve param diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 	)
 }
