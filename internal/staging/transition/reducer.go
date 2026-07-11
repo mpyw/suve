@@ -9,10 +9,15 @@ var (
 	ErrCannotAddToExisting  = errors.New("cannot add: resource already exists, use edit instead")
 	ErrCannotEditDelete     = errors.New("cannot edit: staged for deletion, reset first")
 	ErrCannotDeleteNotFound = errors.New("cannot delete: resource not found")
-	ErrCannotTagNotFound    = errors.New("cannot tag: resource not found")
-	ErrCannotTagDelete      = errors.New("cannot tag: resource staged for deletion")
-	ErrCannotUntagNotFound  = errors.New("cannot untag: resource not found")
-	ErrCannotUntagDelete    = errors.New("cannot untag: resource staged for deletion")
+	// ErrCannotDeleteStagedUpdateNotFound is returned when a staged Update points
+	// at a remote that was deleted out-of-band. The Update can never apply and
+	// delete cannot help, so the message names reset as the way out instead of a
+	// generic not-found that dead-ends the user.
+	ErrCannotDeleteStagedUpdateNotFound = errors.New("cannot delete: staged update targets a resource that no longer exists; use reset to discard it")
+	ErrCannotTagNotFound                = errors.New("cannot tag: resource not found")
+	ErrCannotTagDelete                  = errors.New("cannot tag: resource staged for deletion")
+	ErrCannotUntagNotFound              = errors.New("cannot untag: resource not found")
+	ErrCannotUntagDelete                = errors.New("cannot untag: resource staged for deletion")
 )
 
 // EntryTransitionResult holds the result of an entry state transition.
@@ -127,7 +132,7 @@ func reduceEdit(state EntryState, action EntryActionEdit) EntryTransitionResult 
 // Transition rules:
 //   - CurrentValue=nil + NotStaged → ERROR      (resource not found)
 //   - CurrentValue=nil + Create    → NotStaged  (unstage, also unstage tags)
-//   - CurrentValue=nil + Update    → ERROR      (should not happen)
+//   - CurrentValue=nil + Update    → ERROR      (remote vanished out-of-band; names reset)
 //   - CurrentValue=nil + Delete    → ERROR      (should not happen)
 //   - CurrentValue!=nil + NotStaged → Delete    (stage for deletion, also unstage tags)
 //   - CurrentValue!=nil + Create    → NotStaged (unstage, also unstage tags) - should not happen
@@ -143,6 +148,13 @@ func reduceDelete(state EntryState) EntryTransitionResult {
 	// Check if resource exists on AWS or is staged for CREATE
 	_, isCreate := state.StagedState.(EntryStagedStateCreate)
 	if state.CurrentValue == nil && !isCreate {
+		// A staged Update whose remote was deleted out-of-band can never apply;
+		// point the user at reset rather than a generic not-found so they aren't
+		// dead-ended (delete refuses, apply keeps failing).
+		if _, isUpdate := state.StagedState.(EntryStagedStateUpdate); isUpdate {
+			return EntryTransitionResult{NewState: state, Error: ErrCannotDeleteStagedUpdateNotFound}
+		}
+
 		return EntryTransitionResult{NewState: state, Error: ErrCannotDeleteNotFound}
 	}
 
