@@ -258,7 +258,10 @@ func TestList(t *testing.T) {
 
 	names, err := store.List(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, []string{"alpha", "beta"}, names)
+	// List dedups but no longer sorts: ordering is owned by the list use case,
+	// which sorts every provider's names uniformly (#480). Distinct keys are
+	// returned in first-seen order.
+	assert.Equal(t, []string{"beta", "alpha"}, names)
 }
 
 func TestList_ForwardsFilter(t *testing.T) {

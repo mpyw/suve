@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/samber/lo"
@@ -74,6 +75,10 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 	// dropped everything" — the two look identical in the final output.
 	debug.From(ctx).Logf("aws ssm list: provider returned %d names, %d after filters (prefix=%q, recursive=%v, filter=%q)\n",
 		len(names), len(filtered), input.Prefix, input.Recursive, input.Filter)
+
+	// Sort names alphabetically so the listing has a stable, deterministic order
+	// regardless of the provider API's native ordering (#480).
+	slices.Sort(filtered)
 
 	return u.buildOutput(ctx, input.WithValue, filtered), nil
 }

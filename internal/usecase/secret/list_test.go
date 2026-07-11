@@ -161,3 +161,21 @@ func TestListUseCase_Execute_WithValue_PartialError(t *testing.T) {
 	assert.True(t, hasValue)
 	assert.True(t, hasError)
 }
+
+// TestListUseCase_Execute_SortsNames verifies the list use case emits names in a
+// stable alphabetical order regardless of the provider's native ordering (#480).
+func TestListUseCase_Execute_SortsNames(t *testing.T) {
+	t.Parallel()
+
+	uc := &secret.ListUseCase{Reader: listStore([]string{"charlie", "alpha", "bravo"}, nil, nil)}
+
+	output, err := uc.Execute(t.Context(), secret.ListInput{})
+	require.NoError(t, err)
+
+	names := make([]string, len(output.Entries))
+	for i, e := range output.Entries {
+		names[i] = e.Name
+	}
+
+	assert.Equal(t, []string{"alpha", "bravo", "charlie"}, names)
+}

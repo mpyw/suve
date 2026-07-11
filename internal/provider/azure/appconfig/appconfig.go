@@ -139,9 +139,10 @@ func (s *Store) History(_ context.Context, _ string) ([]domain.Version, error) {
 }
 
 // List returns the distinct key names visible under the selected namespace
-// filter, sorted. The raw --namespace value is forwarded as an App
-// Configuration LabelFilter (empty -> the null-label filter); its `*`/`,`/`\`
-// grammar is honored natively by the service.
+// filter. The raw --namespace value is forwarded as an App Configuration
+// LabelFilter (empty -> the null-label filter); its `*`/`,`/`\` grammar is
+// honored natively by the service. Ordering is left to the caller: the list
+// use case sorts every provider's names uniformly (#480).
 func (s *Store) List(ctx context.Context) ([]string, error) {
 	settings, err := s.client.ListSettings(ctx, aznamespace.Filter(s.namespace))
 	if err != nil {
@@ -162,8 +163,6 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 
 		names = append(names, name)
 	}
-
-	sort.Strings(names)
 
 	// The totals make a successful-but-empty result (wrong store) visible at a
 	// glance, which a bodyless HTTP log cannot.
