@@ -49,7 +49,7 @@ type ExportOutput struct {
 // area, not a reconciliation with whatever a file previously held.
 type ExportUseCase struct {
 	// Working is the working staging area (param.json/secret.json).
-	Working store.FileStore
+	Working store.WorkingStore
 	// Target receives the exported per-service state.
 	Target EnvelopeWriter
 }
@@ -82,17 +82,27 @@ func (u *ExportUseCase) Execute(ctx context.Context, input ExportInput) (*Export
 		output.TagCount += t.state.TagCount()
 	}
 
-	// Clear the exported working area unless --keep is specified. The export has
-	// already succeeded, so a failure here is non-fatal.
+	// Clear the exported working area unless --keep is specified. Each exported
+	// key is unstaged individually rather than rewriting the whole state from the
+	// stale snapshot: UnstageEntry/UnstageTag re-read the working state fresh
+	// under their own lock, so a concurrent stage of a *different* (unexported)
+	// key landing during the slow envelope write survives instead of being
+	// silently clobbered. The export has already succeeded, so a failure here is
+	// non-fatal; ErrNotStaged is ignored because the key we meant to clear is
+	// already gone.
 	if !input.Keep {
-		if input.Service != "" {
-			workingState.RemoveService(input.Service)
-		} else {
-			workingState = staging.NewEmptyState()
-		}
+		for _, t := range targets {
+			for key := range t.state.Entries[t.service] {
+				if err := u.Working.UnstageEntry(ctx, t.service, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+					return output, &ExportError{Op: ExportOpClear, Err: err, NonFatal: true}
+				}
+			}
 
-		if err := u.Working.WriteState(ctx, "", workingState); err != nil {
-			return output, &ExportError{Op: ExportOpClear, Err: err, NonFatal: true}
+			for key := range t.state.Tags[t.service] {
+				if err := u.Working.UnstageTag(ctx, t.service, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
+					return output, &ExportError{Op: ExportOpClear, Err: err, NonFatal: true}
+				}
+			}
 		}
 	}
 

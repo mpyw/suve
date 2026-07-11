@@ -303,8 +303,27 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 	return nil
 }
 
+// Update performs an atomic read-modify-write, mirroring the file store's
+// Updater: it reads the current state (honoring DrainErr), hands it to fn to
+// mutate in place, then writes it back (honoring WriteStateErr). fn runs only
+// after a successful read, so callers can distinguish a read failure (fn never
+// ran) from a write failure.
+func (m *MockStore) Update(ctx context.Context, service staging.Service, fn func(*staging.State) error) error {
+	state, err := m.Drain(ctx, service, true)
+	if err != nil {
+		return err
+	}
+
+	if err := fn(state); err != nil {
+		return err
+	}
+
+	return m.WriteState(ctx, service, state)
+}
+
 // Compile-time checks that MockStore implements interfaces.
 var (
 	_ store.ReadWriteOperator = (*MockStore)(nil)
 	_ store.FileStore         = (*MockStore)(nil)
+	_ store.WorkingStore      = (*MockStore)(nil)
 )

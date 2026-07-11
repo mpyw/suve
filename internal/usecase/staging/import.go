@@ -57,7 +57,7 @@ type ImportUseCase struct {
 	// Source provides the imported per-service state.
 	Source EnvelopeReader
 	// Working is the working staging area (param.json/secret.json).
-	Working store.FileStore
+	Working store.WorkingStore
 }
 
 // Execute runs the import use case.
@@ -72,40 +72,60 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 		return nil, ErrNothingToImport
 	}
 
-	// Read the working staging area (keep=true; we never clear the source). A
-	// missing file yields an empty state with a nil error, so any error here is a
-	// real failure (wrong key, corrupt/unreadable file): propagate it before the
-	// WriteState below would replace the working files with a partial view.
-	workingState, err := u.Working.Drain(ctx, "", true)
+	output := &ImportOutput{}
+
+	// Reconcile the source into the working area as a single atomic
+	// read-modify-write. Update re-reads the working state fresh under the store
+	// lock and writes it back without releasing the lock, so a concurrent
+	// StageEntry can no longer land between a stale snapshot and the write-back
+	// and be silently clobbered. A missing working file yields an empty state
+	// with a nil error, so any error is a real failure (wrong key, corrupt file).
+	reconciled := false
+
+	err = u.Working.Update(ctx, "", func(workingState *staging.State) error {
+		reconcileImport(workingState, sourceState, input, output)
+		reconciled = true
+
+		return nil
+	})
 	if err != nil {
-		return nil, &ImportError{Op: ImportOpReadWorking, Err: err}
+		// fn (reconcileImport) runs only after a successful read, so if it never
+		// ran the read failed; otherwise the write-back did.
+		if !reconciled {
+			return nil, &ImportError{Op: ImportOpReadWorking, Err: err}
+		}
+
+		return nil, &ImportError{Op: ImportOpWrite, Err: err}
 	}
 
+	return output, nil
+}
+
+// reconcileImport merges sourceState into workingState in place per the import
+// mode, then records the resulting counts and merge flag in output. It is pure
+// (in-memory) so it can run inside the store's atomic Update callback.
+func reconcileImport(workingState, sourceState *staging.State, input ImportInput, output *ImportOutput) {
 	// Capture whether the working area already held data BEFORE any mutation, for
 	// the Merged output flag.
 	hasExistingData := !workingState.ExtractService(input.Service).IsEmpty()
 	workingWasEmpty := workingState.IsEmpty()
-
-	var finalState *staging.State
 
 	merged := false
 
 	switch {
 	case input.Service != "":
 		// Service-specific: always preserve other services from the working area.
-		finalState = workingState
 		if input.Mode == ImportModeOverwrite {
-			finalState.RemoveService(input.Service)
-			finalState.Merge(sourceState)
+			workingState.RemoveService(input.Service)
+			workingState.Merge(sourceState)
 		} else {
-			finalState.Merge(sourceState)
+			workingState.Merge(sourceState)
 
 			merged = hasExistingData
 		}
 	case input.Mode == ImportModeMerge:
 		// Global merge: combine working state with imported state.
-		finalState = workingState
-		finalState.Merge(sourceState)
+		workingState.Merge(sourceState)
 
 		merged = !workingWasEmpty
 	default:
@@ -113,26 +133,18 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 		// source. A partial import (e.g. a directory holding only param.json,
 		// with secret.json skipped) must not wipe an untouched working service,
 		// so services absent from the source are left intact.
-		finalState = workingState
-
 		for _, svc := range []staging.Service{staging.ServiceParam, staging.ServiceSecret} {
 			if !sourceState.ExtractService(svc).IsEmpty() {
-				finalState.RemoveService(svc)
+				workingState.RemoveService(svc)
 			}
 		}
 
-		finalState.Merge(sourceState)
+		workingState.Merge(sourceState)
 	}
 
-	if err := u.Working.WriteState(ctx, "", finalState); err != nil {
-		return nil, &ImportError{Op: ImportOpWrite, Err: err}
-	}
-
-	return &ImportOutput{
-		Merged:     merged,
-		EntryCount: finalState.EntryCount(),
-		TagCount:   finalState.TagCount(),
-	}, nil
+	output.Merged = merged
+	output.EntryCount = workingState.EntryCount()
+	output.TagCount = workingState.TagCount()
 }
 
 // readSource reads the imported state. With a service filter it reads that one

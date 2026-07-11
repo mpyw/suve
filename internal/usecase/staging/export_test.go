@@ -46,8 +46,59 @@ func stageEntry(t *testing.T, s *testutil.MockStore, svc staging.Service, name, 
 	}))
 }
 
+// concurrentStager is an EnvelopeWriter that, on its first write, stages an
+// extra entry into the working store — standing in for another process staging
+// during the slow envelope encryption/write window (the export TOCTOU).
+type concurrentStager struct {
+	working *testutil.MockStore
+	svc     staging.Service
+	key     staging.EntryKey
+	staged  bool
+}
+
+func (w *concurrentStager) WriteEnvelope(ctx context.Context, _ staging.Service, _ *staging.State) error {
+	if w.staged {
+		return nil
+	}
+
+	w.staged = true
+
+	return w.working.StageEntry(ctx, w.svc, w.key, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("concurrent"),
+		StagedAt:  time.Now(),
+	})
+}
+
 func TestExportUseCase_Execute(t *testing.T) {
 	t.Parallel()
+
+	t.Run("concurrent stage during envelope write survives the clear", func(t *testing.T) {
+		t.Parallel()
+
+		working := testutil.NewMockStore()
+		stageEntry(t, working, staging.ServiceParam, "/exported", "v")
+
+		// The concurrent entry is staged mid-export, inside WriteEnvelope.
+		writer := &concurrentStager{
+			working: working,
+			svc:     staging.ServiceParam,
+			key:     staging.EntryKey{Name: "/late"},
+		}
+		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+
+		_, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{Service: staging.ServiceParam})
+		require.NoError(t, err)
+
+		// The exported key is cleared (per-key unstage)...
+		_, err = working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/exported"})
+		require.ErrorIs(t, err, staging.ErrNotStaged)
+
+		// ...but the entry staged concurrently during the envelope write survives.
+		// The former whole-state clear would have wiped it.
+		_, err = working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/late"})
+		require.NoError(t, err)
+	})
 
 	t.Run("nothing to export when working is empty", func(t *testing.T) {
 		t.Parallel()
@@ -234,8 +285,9 @@ func TestExportUseCase_Execute_Errors(t *testing.T) {
 		writer := &recordingWriter{}
 		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
 
-		// The export write succeeds; only the working-area clear fails.
-		working.WriteStateErr = errors.New("clear error")
+		// The export write succeeds; only the working-area clear fails. Clearing
+		// now unstages each exported key individually, so inject the failure there.
+		working.UnstageEntryErr = errors.New("clear error")
 
 		output, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{})
 		require.NotNil(t, output)
