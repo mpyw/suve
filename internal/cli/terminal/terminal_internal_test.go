@@ -119,3 +119,41 @@ func TestIsTerminalWriter_NonTTY(t *testing.T) {
 	result := IsTerminalWriter(w)
 	assert.False(t, result)
 }
+
+// mockFdReader implements Fder for reader tests.
+type mockFdReader struct {
+	buf bytes.Buffer
+	fd  uintptr
+}
+
+func (m *mockFdReader) Read(p []byte) (n int, err error) {
+	return m.buf.Read(p)
+}
+
+func (m *mockFdReader) Fd() uintptr {
+	return m.fd
+}
+
+//nolint:paralleltest // Test modifies package globals (IsTTY)
+func TestIsTerminalReader_TTY(t *testing.T) {
+	origIsTTY := IsTTY
+
+	defer func() { IsTTY = origIsTTY }()
+
+	IsTTY = func(_ uintptr) bool { return true }
+
+	r := &mockFdReader{fd: 0}
+	assert.True(t, IsTerminalReader(r))
+}
+
+//nolint:paralleltest // Test modifies package globals (IsTTY)
+func TestIsTerminalReader_NonTTY(t *testing.T) {
+	origIsTTY := IsTTY
+
+	defer func() { IsTTY = origIsTTY }()
+
+	IsTTY = func(_ uintptr) bool { return false }
+
+	r := &mockFdReader{fd: 0}
+	assert.False(t, IsTerminalReader(r))
+}

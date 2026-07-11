@@ -271,7 +271,7 @@ func importPassphrase(cmd *cli.Command, stdin *bufio.Reader) (string, error) {
 		}
 
 		return pass, nil
-	case terminal.IsTerminalWriter(cmd.Root().ErrWriter):
+	case terminal.IsTerminalWriter(cmd.Root().ErrWriter) && terminal.IsTerminalReader(cmd.Root().Reader):
 		pass, err := prompter.PromptForDecrypt()
 		if err != nil {
 			return "", fmt.Errorf("failed to get passphrase: %w", err)
@@ -279,6 +279,9 @@ func importPassphrase(cmd *cli.Command, stdin *bufio.Reader) (string, error) {
 
 		return pass, nil
 	default:
+		// Prompting needs both a terminal to draw on and a terminal to read from:
+		// a piped stdin would be consumed as the passphrase instead of the data it
+		// carries. Refuse and point at the non-interactive flag.
 		return "", errors.New("encrypted file cannot be decrypted in non-TTY environment; use --passphrase-stdin")
 	}
 }
@@ -432,7 +435,10 @@ func importAction(
 			PassphraseStdin: cmd.Bool(flagPassphraseStdin),
 			HasChanges:      !existing.IsEmpty(),
 			ItemCount:       existing.TotalCount(),
-			IsTTY:           terminal.IsTerminalWriter(cmd.Root().ErrWriter),
+			// Interactive only when there is both a terminal to draw the prompt on
+			// and a terminal to read the answer from; a piped stdin must not be
+			// consumed as the Merge/Overwrite reply.
+			IsTTY: terminal.IsTerminalWriter(cmd.Root().ErrWriter) && terminal.IsTerminalReader(cmd.Root().Reader),
 		})
 		if err != nil {
 			return err
