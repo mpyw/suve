@@ -3,6 +3,7 @@ package internal_test
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -62,6 +63,37 @@ func TestResolveValue_FromStdin(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot combine a positional value with --value-stdin")
+	})
+
+	t.Run("errors before reading stdin when a confirmation prompt is required", func(t *testing.T) {
+		t.Parallel()
+
+		reader := strings.NewReader("sk-12345\n")
+
+		_, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+			FromStdin:       true,
+			ConfirmRequired: true,
+			Stdin:           reader,
+		})
+		require.ErrorIs(t, err, cliinternal.ErrValueStdinNeedsYes)
+		assert.False(t, proceed)
+		// Stdin must be left untouched so the value is never silently consumed.
+		rest, rerr := io.ReadAll(reader)
+		require.NoError(t, rerr)
+		assert.Equal(t, "sk-12345\n", string(rest))
+	})
+
+	t.Run("reads stdin when confirmation is skipped via --yes", func(t *testing.T) {
+		t.Parallel()
+
+		value, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+			FromStdin:       true,
+			ConfirmRequired: false,
+			Stdin:           strings.NewReader("sk-12345\n"),
+		})
+		require.NoError(t, err)
+		assert.True(t, proceed)
+		assert.Equal(t, "sk-12345", value)
 	})
 }
 
