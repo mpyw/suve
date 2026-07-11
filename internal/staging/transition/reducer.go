@@ -5,7 +5,7 @@ import "errors"
 // Error definitions for transition failures.
 var (
 	ErrCannotAddToUpdate    = errors.New("cannot add: already staged for update")
-	ErrCannotAddToDelete    = errors.New("cannot add: already staged for deletion")
+	ErrCannotAddToDelete    = errors.New("cannot add: already staged for deletion, reset first")
 	ErrCannotAddToExisting  = errors.New("cannot add: resource already exists, use edit instead")
 	ErrCannotEditDelete     = errors.New("cannot edit: staged for deletion, reset first")
 	ErrCannotDeleteNotFound = errors.New("cannot delete: resource not found")
@@ -63,13 +63,21 @@ func ReduceTag(entryState EntryState, stagedTags StagedTags, action TagAction) T
 // reduceAdd handles the ADD action.
 //
 // Transition rules:
+//   - Delete (any CurrentValue)    → ERROR      (staged for deletion; reset first)
 //   - CurrentValue!=nil            → ERROR      (resource already exists)
 //   - CurrentValue=nil + NotStaged → Create     (stage as create)
 //   - CurrentValue=nil + Create    → Create     (update draft value)
 //   - CurrentValue=nil + Update    → ERROR      (cannot add to update)
-//   - CurrentValue=nil + Delete    → ERROR      (cannot add to delete)
 func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 	var err error
+
+	// A staged Delete is checked before the CurrentValue guard: an existing
+	// remote would otherwise make add report "already exists, use edit instead",
+	// but editing a staged delete is refused too. Surface the accurate remedy
+	// (reset first) regardless of whether the remote still exists.
+	if _, isDelete := state.StagedState.(EntryStagedStateDelete); isDelete {
+		return EntryTransitionResult{NewState: state, Error: ErrCannotAddToDelete}
+	}
 
 	// Check if resource already exists on AWS
 	if state.CurrentValue != nil {

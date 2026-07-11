@@ -70,6 +70,18 @@ func TestReduceEntry_Add(t *testing.T) {
 			wantState: EntryStagedStateNotStaged{},
 			wantError: ErrCannotAddToExisting,
 		},
+		{
+			// #553: staged Delete with the remote still present must report the
+			// delete-specific remedy (reset first), not "already exists, use edit".
+			name: "Delete with remote present -> ERROR (reset first, not use edit)",
+			state: EntryState{
+				CurrentValue: lo.ToPtr("current"),
+				StagedState:  EntryStagedStateDelete{},
+			},
+			action:    EntryActionAdd{Value: "new-value"},
+			wantState: EntryStagedStateDelete{},
+			wantError: ErrCannotAddToDelete,
+		},
 	}
 
 	for _, tt := range tests {
