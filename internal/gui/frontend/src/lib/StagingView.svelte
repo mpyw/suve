@@ -29,6 +29,11 @@
   let secretEntries: gui.StagingDiffEntry[] = $state([]);
   let paramTagEntries: gui.StagingDiffTagEntry[] = $state([]);
   let secretTagEntries: gui.StagingDiffTagEntry[] = $state([]);
+  // Entries StagingDiff auto-unstaged because their staged value already equals
+  // the remote current value. They are removed from the staged list/count, but
+  // surfaced as a dismissible info notice (carrying entry.warning) so the change
+  // does not silently vanish and the badge drop is explained — CLI parity (#567).
+  let autoUnstaged: gui.StagingDiffEntry[] = $state([]);
 
   // View mode: 'diff' (default) or 'value'
   let viewMode: 'diff' | 'value' = $state('diff');
@@ -89,7 +94,14 @@
   let importError = $state('');
   let importResult: gui.StagingImportResult | null = $state(null);
 
+  // Monotonic request id: loadStatus is fired from onMount, Refresh, and every
+  // action handler's finally block, so two runs can overlap. Only the latest run
+  // may assign state / fire oncountchange, otherwise a slow earlier snapshot
+  // resolving last could resurrect a just-unstaged entry and stale the badge (#566).
+  let loadSeq = 0;
+
   async function loadStatus() {
+    const seq = ++loadSeq;
     loading = true;
     error = '';
     try {
@@ -97,22 +109,28 @@
         paramSvc ? withRetry(() => StagingDiff('param', '')) : Promise.resolve(null),
         secretSvc ? withRetry(() => StagingDiff('secret', '')) : Promise.resolve(null),
       ]);
-      paramEntries = paramResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
-      secretEntries = secretResult?.entries?.filter(e => e.type !== 'autoUnstaged') || [];
+      if (seq !== loadSeq) return; // superseded by a newer reload
+      const paramAll = paramResult?.entries || [];
+      const secretAll = secretResult?.entries || [];
+      paramEntries = paramAll.filter(e => e.type !== 'autoUnstaged');
+      secretEntries = secretAll.filter(e => e.type !== 'autoUnstaged');
+      autoUnstaged = [...paramAll, ...secretAll].filter(e => e.type === 'autoUnstaged');
       paramTagEntries = paramResult?.tagEntries || [];
       secretTagEntries = secretResult?.tagEntries || [];
       // Emit count change for sidebar badge
       const totalCount = paramEntries.length + secretEntries.length + paramTagEntries.length + secretTagEntries.length;
       oncountchange?.(totalCount);
     } catch (e) {
+      if (seq !== loadSeq) return; // superseded by a newer reload
       error = parseError(e);
       paramEntries = [];
       secretEntries = [];
+      autoUnstaged = [];
       paramTagEntries = [];
       secretTagEntries = [];
       oncountchange?.(0);
     } finally {
-      loading = false;
+      if (seq === loadSeq) loading = false;
     }
   }
 
@@ -514,6 +532,26 @@
 
   {#if error}
     <div class="error-banner">{error}</div>
+  {/if}
+
+  {#if autoUnstaged.length > 0}
+    <div class="auto-unstaged-notice" data-testid="auto-unstaged-notice">
+      <div class="notice-body">
+        <span class="notice-title">
+          {autoUnstaged.length} staged {autoUnstaged.length === 1 ? 'change was' : 'changes were'} auto-unstaged (already identical to the remote):
+        </span>
+        <ul class="notice-list">
+          {#each autoUnstaged as entry}
+            <li>
+              {#if entry.namespace}<span class="notice-namespace">{entry.namespace}</span>{/if}
+              <span class="notice-name">{entry.name}</span>
+              {#if entry.warning}<span class="notice-warning">{entry.warning}</span>{/if}
+            </li>
+          {/each}
+        </ul>
+      </div>
+      <button type="button" class="notice-dismiss" aria-label="Dismiss" onclick={() => autoUnstaged = []}>×</button>
+    </div>
   {/if}
 
   <div class="staging-content">
@@ -960,6 +998,68 @@
 </Modal>
 
 <style>
+  .auto-unstaged-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 12px 16px 0;
+    padding: 12px 14px;
+    background: rgba(255, 152, 0, 0.12);
+    border: 1px solid #ff9800;
+    border-radius: 6px;
+    color: #ffb74d;
+    font-size: 13px;
+  }
+
+  .auto-unstaged-notice .notice-body {
+    flex: 1;
+  }
+
+  .auto-unstaged-notice .notice-title {
+    font-weight: 500;
+  }
+
+  .auto-unstaged-notice .notice-list {
+    margin: 6px 0 0;
+    padding-left: 18px;
+  }
+
+  .auto-unstaged-notice .notice-list li {
+    margin-top: 2px;
+  }
+
+  .auto-unstaged-notice .notice-namespace {
+    padding: 1px 6px;
+    margin-right: 6px;
+    background: rgba(255, 152, 0, 0.2);
+    border-radius: 3px;
+    font-size: 11px;
+  }
+
+  .auto-unstaged-notice .notice-name {
+    color: #fff;
+  }
+
+  .auto-unstaged-notice .notice-warning {
+    margin-left: 8px;
+    color: #ffb74d;
+    opacity: 0.85;
+  }
+
+  .auto-unstaged-notice .notice-dismiss {
+    background: none;
+    border: none;
+    color: #ffb74d;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+
+  .auto-unstaged-notice .notice-dismiss:hover {
+    color: #fff;
+  }
+
   .header {
     display: flex;
     align-items: center;
