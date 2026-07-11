@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/debug"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/provider"
 )
@@ -25,6 +26,9 @@ type ListInput struct {
 type ListEntry struct {
 	Name  string
 	Value *string // nil when error or not requested
+	// Type is the provider-neutral value type. It is only known when values are
+	// fetched (WithValue); for name-only listings it stays the zero value.
+	Type  domain.ValueType
 	Error error
 }
 
@@ -130,15 +134,16 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, names []s
 		return output
 	}
 
-	values, errs := u.fetchValues(ctx, names)
+	entries, errs := u.fetchEntries(ctx, names)
 
 	for _, name := range names {
 		entry := ListEntry{Name: name}
 
 		if err, hasErr := errs[name]; hasErr {
 			entry.Error = err
-		} else if val, hasVal := values[name]; hasVal {
-			entry.Value = lo.ToPtr(val)
+		} else if e, hasEntry := entries[name]; hasEntry {
+			entry.Value = lo.ToPtr(e.Value)
+			entry.Type = e.Type
 		}
 
 		output.Entries = append(output.Entries, entry)
@@ -147,25 +152,25 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, names []s
 	return output
 }
 
-// fetchValues retrieves each parameter's latest value in parallel, returning
-// maps of name->value and name->error.
-func (u *ListUseCase) fetchValues(ctx context.Context, names []string) (map[string]string, map[string]error) {
+// fetchEntries retrieves each parameter's latest entry in parallel, returning
+// maps of name->entry and name->error.
+func (u *ListUseCase) fetchEntries(ctx context.Context, names []string) (map[string]domain.Entry, map[string]error) {
 	if len(names) == 0 {
 		return nil, nil
 	}
 
 	nameMap := lo.SliceToMap(names, func(name string) (string, string) { return name, name })
 
-	results := parallel.ExecuteMap(ctx, nameMap, func(ctx context.Context, _ string, name string) (string, error) {
+	results := parallel.ExecuteMap(ctx, nameMap, func(ctx context.Context, _ string, name string) (domain.Entry, error) {
 		entry, err := u.Reader.Get(ctx, name, provider.VersionRef{})
 		if err != nil {
-			return "", err
+			return domain.Entry{}, err
 		}
 
-		return entry.Value, nil
+		return *entry, nil
 	})
 
-	values := make(map[string]string)
+	entries := make(map[string]domain.Entry)
 	errs := make(map[string]error)
 
 	for name, result := range results {
@@ -175,8 +180,8 @@ func (u *ListUseCase) fetchValues(ctx context.Context, names []string) (map[stri
 			continue
 		}
 
-		values[name] = result.Value
+		entries[name] = result.Value
 	}
 
-	return values, errs
+	return entries, errs
 }

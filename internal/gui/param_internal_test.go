@@ -9,10 +9,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/cli/commands/param/paramtype"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/providermock"
 )
+
+// fakeFactory returns a fixed store for any scope/kind, so a test can inject a
+// providermock into the GUI's package-global registry.
+type fakeFactory struct{ store provider.Store }
+
+func (f fakeFactory) Store(context.Context, provider.Scope, provider.Kind) (provider.Store, error) {
+	return f.store, nil
+}
 
 // fakeNamespaceLister is a minimal appConfigNamespaceLister for testing the
 // Azure App Configuration all-namespaces list path without a real client.
@@ -23,6 +33,68 @@ type fakeNamespaceLister struct {
 
 func (f *fakeNamespaceLister) ListWithNamespaces(_ context.Context) ([]appconfig.KeyNamespace, error) {
 	return f.items, f.err
+}
+
+// TestParamList_PopulatesSecretAndType covers the generic (non-App-Config) list
+// path: Secret/Type must mirror the domain value type of each entry so a future
+// list-mode masking that trusts entry.secret masks SecureString params (#491).
+func TestParamList_PopulatesSecretAndType(t *testing.T) {
+	// Not parallel: overrides the package-global registry.
+	store := &providermock.Store{
+		ListFunc: func(context.Context) ([]string, error) {
+			return []string{"/my/plain", "/my/secure"}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			if name == "/my/secure" {
+				return &domain.Entry{Name: name, Value: "s", Type: domain.ValueTypeSecret}, nil
+			}
+
+			return &domain.Entry{Name: name, Value: "p", Type: domain.ValueTypePlaintext}, nil
+		},
+	}
+
+	orig := registry
+	registry = provider.NewRegistry()
+	registry.Register(provider.ProviderAWS, fakeFactory{store: store})
+
+	t.Cleanup(func() { registry = orig })
+
+	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+	// withValue=true so each entry's value (and thus its type) is fetched.
+	res, err := app.ParamList("", false, true, "", 0, "")
+	require.NoError(t, err)
+	require.Len(t, res.Entries, 2)
+
+	byName := make(map[string]ParamListEntry, len(res.Entries))
+	for _, e := range res.Entries {
+		byName[e.Name] = e
+	}
+
+	assert.False(t, byName["/my/plain"].Secret, "plaintext param must not be a secret")
+	assert.Equal(t, paramtype.String, byName["/my/plain"].Type)
+
+	assert.True(t, byName["/my/secure"].Secret, "SecureString param must be flagged secret")
+	assert.Equal(t, paramtype.SecureString, byName["/my/secure"].Type)
+}
+
+// TestParamListWithNamespaces_PopulatesSecretAndType covers the App
+// Configuration list path: its values are always plaintext, so Secret stays
+// false and Type is the plaintext display, matching the detail path (#491).
+func TestParamListWithNamespaces_PopulatesSecretAndType(t *testing.T) {
+	t.Parallel()
+
+	lister := &fakeNamespaceLister{
+		items: []appconfig.KeyNamespace{{Key: "app/config", Namespace: "dev", Value: "v"}},
+	}
+	app := &App{ctx: t.Context()}
+
+	res, err := app.paramListWithNamespaces(lister, "", true, true, "")
+	require.NoError(t, err)
+	require.Len(t, res.Entries, 1)
+
+	assert.False(t, res.Entries[0].Secret, "App Configuration values are never secrets")
+	assert.Equal(t, paramtype.String, res.Entries[0].Type)
 }
 
 func TestParamListWithNamespaces_PopulatesNamespace(t *testing.T) {
