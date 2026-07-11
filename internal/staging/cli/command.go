@@ -17,15 +17,16 @@ import (
 // Flag names, flag usages, command names, and arg-usage strings shared across
 // sibling stage command builders.
 const (
-	flagYes              = "yes"
-	usageSkipConfirm     = "Skip confirmation prompt"
-	flagPassphraseStdin  = "passphrase-stdin"
-	usagePassphraseStdin = "Read passphrase from stdin (for scripts/automation)"
-	flagMerge            = "merge"
-	flagOverwrite        = "overwrite"
-	flagForce            = "force"
-	cmdNamePush          = "push"
-	argsUsageName        = "[name]"
+	flagYes                = "yes"
+	usageSkipConfirm       = "Skip confirmation prompt"
+	flagPassphraseStdin    = "passphrase-stdin"
+	usagePassphraseStdin   = "Read passphrase from stdin (for scripts/automation)"
+	flagMerge              = "merge"
+	flagOverwrite          = "overwrite"
+	flagForce              = "force"
+	flagAllowScopeMismatch = "allow-scope-mismatch"
+	cmdNamePush            = "push"
+	argsUsageName          = "[name]"
 )
 
 // CommandConfig holds service-specific configuration for building stage commands.

@@ -132,7 +132,7 @@ func TestGlobalImport(t *testing.T) {
 		assert.Contains(t, err.Error(), "usage")
 	})
 
-	t.Run("scope mismatch refused, allowed with --force", func(t *testing.T) {
+	t.Run("scope mismatch refused, allowed with --allow-scope-mismatch", func(t *testing.T) {
 		scopeA := setupExportImportEnv(t)
 		dir := exportDir(t, scopeA, func() {
 			stageEntry(t, scopeA, staging.ServiceParam, "/app/config", "pval")
@@ -145,10 +145,21 @@ func TestGlobalImport(t *testing.T) {
 		assert.Contains(t, err.Error(), scopeA.Key())
 		assert.Contains(t, err.Error(), scopeB.Key())
 
-		// --force overrides.
-		_, _, err = runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scopeB)), nil, dir, "--force")
+		// --allow-scope-mismatch overrides.
+		_, _, err = runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scopeB)), nil, dir, "--allow-scope-mismatch")
 		require.NoError(t, err)
 		assert.False(t, workingState(t, scopeB).ExtractService(staging.ServiceParam).IsEmpty())
+	})
+
+	t.Run("legacy --force is no longer accepted on import", func(t *testing.T) {
+		scope := setupExportImportEnv(t)
+		dir := exportDir(t, scope, func() {
+			stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		})
+
+		_, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir, "--force")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "force")
 	})
 
 	t.Run("encrypted import in non-TTY without --passphrase-stdin is refused", func(t *testing.T) {

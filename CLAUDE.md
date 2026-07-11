@@ -32,7 +32,7 @@ This file provides guidance to Claude Code when working with code in this reposi
    - `stage {param,secret} import <file>` - Read a single service from `<file>` (missing file or `service` mismatch = hard error)
    - Each file is a plaintext JSON envelope `{version, provider, scope, service, payload}` whose `payload` is passphrase-encrypted (Argon2id) or plaintext when the passphrase is empty; the full scope is embedded and validated on import
    - `export` flags: `--keep` (retain the working area; default clears it), `--yes`/`--force` (skip overwrite confirmation), `--passphrase-stdin`. NO `--merge`/`--overwrite`
-   - `import` flags: `--merge`/`--overwrite` (mutually exclusive; only used when the working area already has changes), `--yes`, `--passphrase-stdin`, `--force` (override scope mismatch). NO `--keep`
+   - `import` flags: `--merge`/`--overwrite` (mutually exclusive; only used when the working area already has changes), `--yes`, `--passphrase-stdin`, `--allow-scope-mismatch` (override scope mismatch). NO `--keep`
 
 4. **Version Specification**: Git-like revision syntax
    ```
