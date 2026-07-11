@@ -56,9 +56,14 @@ type StagingTagEntry struct {
 
 // StagingApplyEntryResult represents a single entry apply result.
 type StagingApplyEntryResult struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
+	Name string `json:"name"`
+	// Namespace is the App Configuration namespace the entry was applied under
+	// (empty for the null/default namespace and every other provider). The
+	// frontend shows it as a badge so multi-namespace App Config results are
+	// distinguishable.
+	Namespace string `json:"namespace"`
+	Status    string `json:"status"`
+	Error     string `json:"error,omitempty"`
 	// UnstageError is set when the cloud apply succeeded but clearing the entry
 	// from the staging store afterwards failed. The entry is still staged, so a
 	// later apply would re-run it; the frontend surfaces this as a warning row.
@@ -67,7 +72,10 @@ type StagingApplyEntryResult struct {
 
 // StagingApplyTagResult represents a single tag apply result.
 type StagingApplyTagResult struct {
-	Name       string            `json:"name"`
+	Name string `json:"name"`
+	// Namespace is the App Configuration namespace the tags were applied under
+	// (empty for the null/default namespace and every other provider).
+	Namespace  string            `json:"namespace"`
 	AddTags    map[string]string `json:"addTags,omitempty"`
 	RemoveTags []string          `json:"removeTags,omitempty"`
 	Error      string            `json:"error,omitempty"`
@@ -365,8 +373,9 @@ func newStagingApplyResult(result *stagingusecase.ApplyOutput) *StagingApplyResu
 
 	for _, r := range result.EntryResults {
 		entry := StagingApplyEntryResult{
-			Name:   r.Name,
-			Status: applyStatusNames[r.Status],
+			Name:      r.Name,
+			Namespace: r.Namespace,
+			Status:    applyStatusNames[r.Status],
 		}
 		if r.Status == stagingusecase.ApplyResultFailed && r.Error != nil {
 			entry.Error = r.Error.Error()
@@ -382,6 +391,7 @@ func newStagingApplyResult(result *stagingusecase.ApplyOutput) *StagingApplyResu
 	for _, r := range result.TagResults {
 		tagResult := StagingApplyTagResult{
 			Name:       r.Name,
+			Namespace:  r.Namespace,
 			AddTags:    r.AddTags,
 			RemoveTags: r.RemoveTag.Values(),
 		}
