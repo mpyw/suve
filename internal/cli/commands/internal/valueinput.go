@@ -22,6 +22,18 @@ var ErrValueRequired = errors.New(
 		", or run interactively to edit it in $EDITOR",
 )
 
+// ErrValueStdinNeedsYes is returned when the value was read from stdin via
+// --value-stdin but a confirmation prompt would still run afterwards. The
+// prompt reads from the same stdin, which has already been consumed, so it
+// would immediately hit EOF. Rather than fail cryptically, we detect this up
+// front and tell the user to re-run with --yes. We intentionally neither imply
+// --yes nor read the confirmation from /dev/tty, so the acknowledgement stays
+// explicit.
+var ErrValueStdinNeedsYes = errors.New(
+	"--" + FlagValueStdin + " consumes stdin, so the confirmation prompt cannot be read; " +
+		"re-run with --yes to acknowledge the update",
+)
+
 // FlagValueStdin is the name of the flag that reads a create/update value from
 // stdin instead of a positional argument, keeping the secret out of argv (and
 // therefore out of ps/proc/cmdline and shell history).
@@ -70,6 +82,12 @@ type ValueSource struct {
 	Stdin io.Reader
 	// OpenEditor is the editor seam used for the fallback path (nil -> editor.Open).
 	OpenEditor editor.OpenFunc
+	// ConfirmRequired is true when the command would prompt for confirmation on
+	// the same stdin after resolving the value (i.e. an update without --yes).
+	// Combined with FromStdin this is the double-consume case, so ResolveValue
+	// fails with ErrValueStdinNeedsYes instead of letting the later prompt hit
+	// EOF.
+	ConfirmRequired bool
 }
 
 // ResolveValue determines the value for a create/update command. Precedence:
@@ -83,11 +101,19 @@ type ValueSource struct {
 // cancellation (matching the staging add/edit UX). --value-stdin and the
 // positional argument always proceed, even with an empty value, because those
 // are explicit.
+//
+// When ConfirmRequired is set alongside --value-stdin, ResolveValue returns
+// ErrValueStdinNeedsYes instead of reading stdin, because the later
+// confirmation prompt would find stdin already consumed.
 func ResolveValue(ctx context.Context, src ValueSource) (value string, proceed bool, err error) {
 	switch {
 	case src.FromStdin:
 		if src.HasArg {
 			return "", false, errors.New("cannot combine a positional value with --" + FlagValueStdin)
+		}
+
+		if src.ConfirmRequired {
+			return "", false, ErrValueStdinNeedsYes
 		}
 
 		reader := src.Stdin

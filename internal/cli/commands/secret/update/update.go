@@ -82,6 +82,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
 		Arg:       args.Get(1),
 		Stdin:     internal.Stdin(cmd),
+		// Without --yes we prompt for confirmation on the same stdin below;
+		// reading the value from stdin would leave nothing for that prompt.
+		ConfirmRequired: !skipConfirm,
 	})
 	if err != nil {
 		return err
