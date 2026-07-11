@@ -44,10 +44,18 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 		return nil, ErrValueNotUTF8
 	}
 
+	// Parse and validate name up front (like add/tag); rejects version
+	// specifiers so they surface a clear error instead of a misleading
+	// "resource not found".
+	name, err := u.Strategy.ParseName(input.Key.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	// Check staged state first to avoid unnecessary AWS fetch
 	var stagedEntry *staging.Entry
 
-	key := input.Key
+	key := staging.EntryKey{Name: name, Namespace: input.Key.Namespace}
 
 	entry, err := u.Store.GetEntry(ctx, service, key)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
