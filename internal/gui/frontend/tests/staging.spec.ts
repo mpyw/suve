@@ -605,7 +605,7 @@ test.describe('Staging Edge Cases', () => {
 // A staged change with ONLY tag edits (no value change) must be rendered,
 // counted, and actionable in its service section. Before the fix the sidebar
 // badge counted it while the section showed count 0 / "No staged changes" and
-// Apply/Reset/Stash were all disabled.
+// Apply/Reset/Export were all disabled.
 // ============================================================================
 
 test.describe('Tag-Only Staged Changes (#416)', () => {
@@ -664,7 +664,7 @@ test.describe('Tag-Only Staged Changes (#416)', () => {
       await expect(section.locator('.btn-reset-sm')).toBeEnabled();
     });
 
-    test(`${c.service}: Apply All / Reset All / Stash enabled with only a tag-only change`, async ({ page }) => {
+    test(`${c.service}: Apply All / Reset All / Export enabled with only a tag-only change`, async ({ page }) => {
       const state = c.seed([createStagedTags(c.name, { env: 'staging' }, {})]);
       await setupWailsMocks(page, state);
       await page.goto('/');
@@ -674,9 +674,10 @@ test.describe('Tag-Only Staged Changes (#416)', () => {
       await expect(page.getByRole('button', { name: 'Apply All' })).toBeEnabled();
       await expect(page.getByRole('button', { name: 'Reset All' })).toBeEnabled();
 
-      // Open the Stash dropdown and confirm Push (Persist) is enabled.
-      await page.getByRole('button', { name: /Stash/ }).click();
-      await expect(page.getByRole('button', { name: /Push/ })).toBeEnabled();
+      // Open the Export / Import dropdown and confirm Export for this service is
+      // enabled (a tag-only change is still a staged change to export).
+      await page.getByRole('button', { name: /Export \/ Import/ }).click();
+      await expect(page.getByTestId(`export-${c.service}`)).toBeEnabled();
     });
 
     test(`${c.service}: value + tag change on the same name renders a single row`, async ({ page }) => {

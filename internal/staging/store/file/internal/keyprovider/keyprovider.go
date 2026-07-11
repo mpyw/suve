@@ -19,7 +19,7 @@
 //
 // No passphrase prompt is used for the working store: prompting on every
 // staging operation would defeat the purpose of the keychain. This is an
-// intentional omission (the stash flow still uses a passphrase).
+// intentional omission (the export/import flow still uses a passphrase).
 package keyprovider
 
 import (

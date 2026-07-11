@@ -3,11 +3,16 @@
 package gui
 
 import (
+	"context"
 	"errors"
+	"fmt"
+
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/timeutil"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -790,198 +795,263 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 }
 
 // =============================================================================
-// Drain/Persist Types
+// Export / Import Types
 // =============================================================================
 
-// StagingDrainResult represents the result of draining from the stash file to the working staging area.
-type StagingDrainResult struct {
+// StagingExportResult represents the result of exporting the working staging
+// area to a per-service envelope file.
+type StagingExportResult struct {
+	EntryCount int `json:"entryCount"`
+	TagCount   int `json:"tagCount"`
+}
+
+// StagingImportResult represents the result of importing a per-service envelope
+// file into the working staging area.
+type StagingImportResult struct {
 	Merged     bool `json:"merged"`
 	EntryCount int  `json:"entryCount"`
 	TagCount   int  `json:"tagCount"`
 }
 
-// StagingPersistResult represents the result of persisting from the working staging area to the stash file.
-type StagingPersistResult struct {
-	EntryCount int `json:"entryCount"`
-	TagCount   int `json:"tagCount"`
-}
-
-// StagingFileStatusResult represents the status of the staging file.
-type StagingFileStatusResult struct {
-	Exists    bool `json:"exists"`
+// EnvelopeInfoResult describes an export file's plaintext header so the frontend
+// can decide whether to prompt for a passphrase (Encrypted) and warn on a
+// scope/service mismatch (ScopeMatches) BEFORE any passphrase is supplied.
+type EnvelopeInfoResult struct {
+	// Encrypted reports whether the payload is passphrase-encrypted.
 	Encrypted bool `json:"encrypted"`
+	// Provider is the scope provider string embedded in the envelope.
+	Provider string `json:"provider"`
+	// Scope is the scope key (provider.Scope.Key()) embedded in the envelope.
+	Scope string `json:"scope"`
+	// Service is the staging service the payload holds ("param" or "secret").
+	Service string `json:"service"`
+	// ScopeMatches reports whether the envelope's scope matches the scope the
+	// selected service resolves to under the active provider.
+	ScopeMatches bool `json:"scopeMatches"`
 }
 
 // =============================================================================
-// Drain/Persist Methods
+// Export / Import helpers
 // =============================================================================
 
-// StagingFileStatus checks if the staging file exists and whether it's encrypted.
-func (a *App) StagingFileStatus() (*StagingFileStatusResult, error) {
-	scope, err := a.stagingScope()
+// errStoreNotFileStore is returned when the resolved staging store cannot serve
+// bulk drain/write operations (should never happen for the file/mock stores).
+var errStoreNotFileStore = stringError("staging store does not support import/export")
+
+// getWorkingFileStore resolves the per-service working store as a FileStore
+// (bulk Drain/WriteState). It goes through getStagingStore so the test seam and
+// the per-service scope resolution (the #445 fix: param → App Configuration
+// bucket, secret → Key Vault bucket) are shared with every other staging op.
+func (a *App) getWorkingFileStore(kind provider.Kind) (store.FileStore, error) {
+	s, err := a.getStagingStore(kind)
 	if err != nil {
 		return nil, err
 	}
 
-	fileStore, err := file.NewStashStore(scope)
+	fs, ok := s.(store.FileStore)
+	if !ok {
+		return nil, errStoreNotFileStore
+	}
+
+	return fs, nil
+}
+
+// envelopeWriteTarget adapts file.WriteEnvelopeFile to the export use case's
+// EnvelopeWriter port. It binds the destination path (chosen via the native save
+// dialog), the per-service scope (kept in the plaintext header), and the
+// passphrase, so the use case only supplies the service and its state.
+type envelopeWriteTarget struct {
+	path       string
+	scope      provider.Scope
+	passphrase string
+}
+
+// WriteEnvelope writes svc's state to the bound destination path.
+func (t *envelopeWriteTarget) WriteEnvelope(_ context.Context, svc staging.Service, state *staging.State) error {
+	return file.WriteEnvelopeFile(t.path, t.scope, svc, state, t.passphrase)
+}
+
+// envelopeReadSource adapts a validated file.Envelope to the import use case's
+// EnvelopeReader port. Only the service the header declares yields data; any
+// other service is an empty state (skipped).
+type envelopeReadSource struct {
+	env        *file.Envelope
+	passphrase string
+}
+
+// ReadState decodes (and decrypts when encrypted) the envelope for svc.
+func (s *envelopeReadSource) ReadState(_ context.Context, svc staging.Service) (*staging.State, error) {
+	if string(svc) != s.env.Service {
+		return staging.NewEmptyState(), nil
+	}
+
+	return s.env.DecodeState(s.passphrase)
+}
+
+// =============================================================================
+// Export / Import dialogs
+// =============================================================================
+
+// PickExportPath opens the native Save dialog for choosing an export
+// destination file, prefilled with defaultName. It returns an empty path (no
+// error) when the user cancels, which the frontend treats as an aborted flow.
+func (a *App) PickExportPath(defaultName string) (string, error) {
+	return wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
+		Title:           "Export staged changes",
+		DefaultFilename: defaultName,
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON files (*.json)", Pattern: "*.json"},
+		},
+	})
+}
+
+// PickImportPath opens the native Open dialog for choosing an export file to
+// import. It returns an empty path (no error) when the user cancels.
+func (a *App) PickImportPath() (string, error) {
+	return wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Import staged changes",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON files (*.json)", Pattern: "*.json"},
+		},
+	})
+}
+
+// =============================================================================
+// Export / Import methods
+// =============================================================================
+
+// StagingExport writes the working staging area for a single concrete service
+// out to path as a per-service envelope, mirroring `stage <svc> export`. The
+// working area is cleared afterwards unless keep is true. An empty passphrase
+// stores the payload as plaintext (base64 only); the frontend warns first.
+//
+// The scope and working store are resolved PER SERVICE via
+// stagingScopeForKind — never the combined stagingScope — so an Azure App
+// Configuration param exports under the App Configuration bucket and a Key Vault
+// secret under the Key Vault bucket (#445).
+func (a *App) StagingExport(path, service, passphrase string, keep bool) (*StagingExportResult, error) {
+	svc, err := a.getService(service)
 	if err != nil {
 		return nil, err
 	}
 
-	exists, err := fileStore.Exists()
+	scope, err := a.stagingScopeForKind(kindForService(service))
 	if err != nil {
 		return nil, err
 	}
 
-	result := &StagingFileStatusResult{
-		Exists: exists,
+	working, err := a.getWorkingFileStore(kindForService(service))
+	if err != nil {
+		return nil, err
 	}
 
-	if exists {
-		encrypted, err := fileStore.IsEncrypted()
-		if err != nil {
+	uc := &stagingusecase.ExportUseCase{
+		Working: working,
+		Target: &envelopeWriteTarget{
+			path:       path,
+			scope:      scope,
+			passphrase: passphrase,
+		},
+	}
+
+	result, err := uc.Execute(a.ctx, stagingusecase.ExportInput{Service: svc, Keep: keep})
+	if err != nil {
+		// A non-fatal error means the file was written but clearing the working
+		// area failed; the export itself succeeded, so report the counts.
+		var expErr *stagingusecase.ExportError
+		if !errors.As(err, &expErr) || !expErr.NonFatal {
 			return nil, err
 		}
-
-		result.Encrypted = encrypted
 	}
 
-	return result, nil
+	return &StagingExportResult{
+		EntryCount: result.EntryCount,
+		TagCount:   result.TagCount,
+	}, nil
 }
 
-// stashStores builds the stash (stash.json) and working (param.json/secret.json) file
-// stores for the active provider's staging scope and resolves the optional
-// service selector. It is the shared prelude of StagingDrain and StagingPersist.
-// An empty service yields the zero staging.Service (all services).
-func (a *App) stashStores(service, passphrase string) (stash, working *file.Store, svc staging.Service, err error) {
-	scope, err := a.stagingScope()
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	stash, err = file.NewStashStoreWithPassphrase(scope, passphrase)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	working, err = file.NewWorkingStore(scope)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	if service != "" {
-		svc, err = a.getService(service)
-		if err != nil {
-			return nil, nil, "", err
-		}
-	}
-
-	return stash, working, svc, nil
-}
-
-// StagingDrain loads staged changes from the stash file into the working staging area.
-// If the file is encrypted, passphrase must be provided.
-// mode: "overwrite" or "merge" (default)
-func (a *App) StagingDrain(service string, passphrase string, keep bool, mode string) (*StagingDrainResult, error) {
-	stashStore, working, svc, err := a.stashStores(service, passphrase)
+// InspectImportFile reads and validates the plaintext envelope header at path
+// WITHOUT decoding the (possibly encrypted) payload, so the frontend can prompt
+// for a passphrase only when needed and warn on a scope/service mismatch. The
+// envelope's scope is compared against the scope its declared service resolves
+// to under the active provider (the #445 per-service resolution).
+func (a *App) InspectImportFile(path string) (*EnvelopeInfoResult, error) {
+	env, err := file.ReadEnvelopeFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	drainMode := stagingusecase.StashModeMerge
-	if mode == "overwrite" {
-		drainMode = stagingusecase.StashModeOverwrite
+	encrypted, err := env.IsEncryptedPayload()
+	if err != nil {
+		return nil, err
 	}
 
-	uc := &stagingusecase.StashPopUseCase{
-		Stash:   stashStore,
+	scope, err := a.stagingScopeForKind(kindForService(env.Service))
+	if err != nil {
+		return nil, err
+	}
+
+	return &EnvelopeInfoResult{
+		Encrypted:    encrypted,
+		Provider:     env.Provider,
+		Scope:        env.Scope,
+		Service:      env.Service,
+		ScopeMatches: env.Scope == scope.Key(),
+	}, nil
+}
+
+// StagingImport reads a per-service envelope file into the working staging area
+// for the selected service, mirroring `stage <svc> import`. A service mismatch
+// (the file holds another service's data) is a hard error. Scope validation is
+// surfaced to the frontend via InspectImportFile: the GUI warns and lets the
+// user confirm before calling this (the equivalent of the CLI's --force), so
+// StagingImport does not re-refuse a scope mismatch here.
+//
+// mode is "merge" (default) or "overwrite"; it only matters when the working
+// area already holds changes for the service. The working store is resolved per
+// service via stagingScopeForKind (#445).
+func (a *App) StagingImport(path, service, passphrase, mode string) (*StagingImportResult, error) {
+	svc, err := a.getService(service)
+	if err != nil {
+		return nil, err
+	}
+
+	env, err := file.ReadEnvelopeFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if env.Service != service {
+		return nil, fmt.Errorf(
+			"import file holds %q data but %q was selected; choose the matching service", env.Service, service)
+	}
+
+	working, err := a.getWorkingFileStore(kindForService(service))
+	if err != nil {
+		return nil, err
+	}
+
+	importMode := stagingusecase.ImportModeMerge
+	if mode == "overwrite" {
+		importMode = stagingusecase.ImportModeOverwrite
+	}
+
+	uc := &stagingusecase.ImportUseCase{
+		Source: &envelopeReadSource{
+			env:        env,
+			passphrase: passphrase,
+		},
 		Working: working,
 	}
 
-	result, err := uc.Execute(a.ctx, stagingusecase.StashPopInput{
-		Service: svc,
-		Keep:    keep,
-		Mode:    drainMode,
-	})
+	result, err := uc.Execute(a.ctx, stagingusecase.ImportInput{Service: svc, Mode: importMode})
 	if err != nil {
 		return nil, err
 	}
 
-	return &StagingDrainResult{
+	return &StagingImportResult{
 		Merged:     result.Merged,
 		EntryCount: result.EntryCount,
 		TagCount:   result.TagCount,
-	}, nil
-}
-
-// StagingPersist saves staged changes from the working staging area to the stash file.
-// If passphrase is provided, the file will be encrypted.
-// mode: "overwrite" or "merge"
-func (a *App) StagingPersist(service string, passphrase string, keep bool, mode string) (*StagingPersistResult, error) {
-	stashStore, working, svc, err := a.stashStores(service, passphrase)
-	if err != nil {
-		return nil, err
-	}
-
-	persistMode := stagingusecase.StashModeOverwrite
-	if mode == "merge" {
-		persistMode = stagingusecase.StashModeMerge
-	}
-
-	uc := &stagingusecase.StashPushUseCase{
-		Working: working,
-		Stash:   stashStore,
-	}
-
-	result, err := uc.Execute(a.ctx, stagingusecase.StashPushInput{
-		Service: svc,
-		Keep:    keep,
-		Mode:    persistMode,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &StagingPersistResult{
-		EntryCount: result.EntryCount,
-		TagCount:   result.TagCount,
-	}, nil
-}
-
-// StagingDropResult represents the result of dropping the stash file.
-type StagingDropResult struct {
-	Dropped bool `json:"dropped"`
-}
-
-// StagingDrop deletes the staging file without loading it into memory.
-// This works even for encrypted files since it just deletes the file directly.
-func (a *App) StagingDrop() (*StagingDropResult, error) {
-	scope, err := a.stagingScope()
-	if err != nil {
-		return nil, err
-	}
-
-	fileStore, err := file.NewStashStore(scope)
-	if err != nil {
-		return nil, err
-	}
-
-	exists, err := fileStore.Exists()
-	if err != nil {
-		return nil, err
-	}
-
-	if !exists {
-		return nil, errors.New("no stashed changes to drop")
-	}
-
-	// Delete the file directly without reading its contents
-	// This allows dropping encrypted files without passphrase
-	if err := fileStore.Delete(); err != nil {
-		return nil, err
-	}
-
-	return &StagingDropResult{
-		Dropped: true,
 	}, nil
 }

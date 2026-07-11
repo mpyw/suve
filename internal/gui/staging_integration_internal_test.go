@@ -5,7 +5,6 @@ package gui
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // setupTestApp creates a test App with a memory-based staging store.
@@ -508,29 +508,163 @@ func TestApp_StagingReset(t *testing.T) {
 }
 
 // =============================================================================
-// File-based Integration Tests for Drain/Persist
+// Export / Import GUI method tests
 // =============================================================================
 
-func TestApp_StagingFileStatus(t *testing.T) {
+// newTransferTestApp builds a test App with an in-memory working store and a
+// fully-keyed scope (account+region for AWS, or vault+store for Azure) so the
+// per-service scope resolution runs without an STS round-trip or the keychain.
+//
+// The injected stagingStore short-circuits getStagingStore before scope
+// resolution, so these tests exercise the ENVELOPE scope header (the crux of
+// #445: param → App Configuration, secret → Key Vault) but share one working
+// store across services. The distinct per-service on-disk working stores keyed
+// by scope.Key() are covered end-to-end at the Playwright layer
+// (staging-export-import.spec.ts), which the keychain-gated NewWorkingStore
+// prevents exercising here.
+func newTransferTestApp(t *testing.T, scope provider.Scope) *App {
+	t.Helper()
+
+	app := NewApp(scope, "")
+	app.Startup(t.Context())
+	app.stagingStore = testutil.NewMockStore()
+
+	return app
+}
+
+func TestApp_ExportImport(t *testing.T) {
 	t.Parallel()
 
-	// Skip if AWS credentials are not available
-	if os.Getenv("AWS_ACCESS_KEY_ID") == "" && os.Getenv("AWS_PROFILE") == "" {
-		t.Skip("Skipping test: AWS credentials not configured")
-	}
+	awsScope := provider.AWSScope("123456789012", "ap-northeast-1")
 
-	t.Run("file not exists", func(t *testing.T) {
+	t.Run("export writes an envelope and import round-trips it back", func(t *testing.T) {
 		t.Parallel()
 
-		app := &App{ctx: context.Background()}
+		app := newTransferTestApp(t, awsScope)
+		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceParam,
+			staging.EntryKey{Name: "/app/config"}, staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v")}))
 
-		result, err := app.StagingFileStatus()
-		if err != nil {
-			t.Skipf("Skipping: %v", err)
+		path := filepath.Join(t.TempDir(), "param.json")
+
+		exp, err := app.StagingExport(path, "param", "", false)
+		require.NoError(t, err)
+		assert.Equal(t, 1, exp.EntryCount)
+
+		// The envelope carries the AWS scope key in the clear.
+		env, err := file.ReadEnvelopeFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, awsScope.Key(), env.Scope)
+		assert.Equal(t, "param", env.Service)
+
+		// Export cleared the working area.
+		status, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Empty(t, status.Param)
+
+		// Inspect reports a matching scope and no encryption.
+		info, err := app.InspectImportFile(path)
+		require.NoError(t, err)
+		assert.True(t, info.ScopeMatches)
+		assert.False(t, info.Encrypted)
+		assert.Equal(t, "param", info.Service)
+
+		// Import restores it.
+		imp, err := app.StagingImport(path, "param", "", "merge")
+		require.NoError(t, err)
+		assert.Equal(t, 1, imp.EntryCount)
+
+		status, err = app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, status.Param, 1)
+	})
+
+	t.Run("export --keep retains the working area", func(t *testing.T) {
+		t.Parallel()
+
+		app := newTransferTestApp(t, awsScope)
+		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret,
+			staging.EntryKey{Name: "my-secret"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")}))
+
+		path := filepath.Join(t.TempDir(), "secret.json")
+		_, err := app.StagingExport(path, "secret", "pass", true)
+		require.NoError(t, err)
+
+		env, err := file.ReadEnvelopeFile(path)
+		require.NoError(t, err)
+		enc, err := env.IsEncryptedPayload()
+		require.NoError(t, err)
+		assert.True(t, enc, "a passphrase encrypts the payload")
+
+		status, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, status.Secret, 1, "--keep preserves the working area")
+	})
+
+	t.Run("export of an empty service is an error", func(t *testing.T) {
+		t.Parallel()
+
+		app := newTransferTestApp(t, awsScope)
+		_, err := app.StagingExport(filepath.Join(t.TempDir(), "param.json"), "param", "", false)
+		assert.ErrorIs(t, err, stagingusecase.ErrNothingToExport)
+	})
+
+	t.Run("import refuses a service mismatch", func(t *testing.T) {
+		t.Parallel()
+
+		// Write a secret envelope, then try to import it as a param.
+		app := newTransferTestApp(t, awsScope)
+		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret,
+			staging.EntryKey{Name: "my-secret"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")}))
+
+		path := filepath.Join(t.TempDir(), "secret.json")
+		_, err := app.StagingExport(path, "secret", "", false)
+		require.NoError(t, err)
+
+		_, err = app.StagingImport(path, "param", "", "merge")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "secret")
+		assert.Contains(t, err.Error(), "param")
+	})
+
+	t.Run("invalid service is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		app := newTransferTestApp(t, awsScope)
+		_, err := app.StagingExport(filepath.Join(t.TempDir(), "x.json"), "bogus", "", false)
+		require.ErrorIs(t, err, errInvalidService)
+
+		_, err = app.StagingImport(filepath.Join(t.TempDir(), "x.json"), "bogus", "", "merge")
+		require.ErrorIs(t, err, errInvalidService)
+	})
+
+	// #445: an Azure App Configuration param must export under the App
+	// Configuration bucket, never the Key Vault bucket. The combined Azure scope
+	// keys to Key Vault (VaultName is checked first), so resolving per service is
+	// what keeps the param addressable.
+	t.Run("#445 Azure App Configuration param exports under the App Config scope", func(t *testing.T) {
+		t.Parallel()
+
+		azureScope := provider.Scope{
+			Provider:  provider.ProviderAzure,
+			VaultName: "my-vault",
+			StoreName: "my-store",
 		}
+		app := newTransferTestApp(t, azureScope)
+		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceParam,
+			staging.EntryKey{Name: "app/flag"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("on")}))
 
-		// Result depends on whether file exists in user's environment
-		assert.NotNil(t, result)
+		path := filepath.Join(t.TempDir(), "param.json")
+		_, err := app.StagingExport(path, "param", "", false)
+		require.NoError(t, err)
+
+		env, err := file.ReadEnvelopeFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, "azure/appconfig/my-store", env.Scope)
+		assert.NotContains(t, env.Scope, "keyvault")
+
+		info, err := app.InspectImportFile(path)
+		require.NoError(t, err)
+		assert.True(t, info.ScopeMatches, "the param resolves under the App Configuration scope")
 	})
 }
 

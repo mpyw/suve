@@ -94,30 +94,66 @@ test.describe('wails-mock provider bindings', () => {
     expect(result.storeOnly.vaultName).toBe('');
   });
 
-  test('stash drain routes Google Cloud/Azure names by explicit service, not name shape', async ({ page }) => {
-    // Google Cloud/Azure secret names have no leading '/', so the legacy name-shape
-    // heuristic would misroute them to secrets. With an explicit service field
-    // they route correctly.
+  test('export/import round-trips a single concrete service through the virtual file system', async ({ page }) => {
+    // Export writes a per-service envelope keyed by path; import reads it back
+    // into the same service. Each call carries a concrete service (never the
+    // combined scope), so a secret cannot leak into the param bucket.
     await setupWailsMocks(page, {
-      stashFile: {
-        exists: true,
-        encrypted: false,
-        entries: [
-          { name: 'gcloud-param-like', operation: 'create', value: 'v', service: 'param' },
-          { name: 'gcloud-secret', operation: 'create', value: 'v', service: 'secret' },
-        ],
-        tags: [],
-      },
+      stagedParam: [{ name: '/p1', operation: 'create', value: 'v' }],
+      stagedSecret: [{ name: 's1', operation: 'create', value: 'v' }],
+      savePath: '/mock/secret.json',
     });
     await page.goto('/');
 
     const result = await page.evaluate(async () => {
       const app = (window as any).go.gui.App;
-      await app.StagingDrain('', '', false, 'overwrite');
-      return await app.StagingStatus();
+      // Export only the secret service; the param bucket is untouched.
+      const exp = await app.StagingExport('/mock/secret.json', 'secret', '', false);
+      const info = await app.InspectImportFile('/mock/secret.json');
+      const afterExport = await app.StagingStatus();
+      // Re-import the secret file back into the secret service.
+      const imp = await app.StagingImport('/mock/secret.json', 'secret', '', 'merge');
+      const afterImport = await app.StagingStatus();
+      return { exp, info, afterExport, imp, afterImport };
     });
 
-    expect(result.param.map((e: any) => e.name)).toEqual(['gcloud-param-like']);
-    expect(result.secret.map((e: any) => e.name)).toEqual(['gcloud-secret']);
+    expect(result.exp.entryCount).toBe(1);
+    expect(result.info.service).toBe('secret');
+    expect(result.info.scopeMatches).toBe(true);
+    // Export cleared the secret bucket but left param staged.
+    expect(result.afterExport.secret.map((e: any) => e.name)).toEqual([]);
+    expect(result.afterExport.param.map((e: any) => e.name)).toEqual(['/p1']);
+    // Import restored the secret; it stayed a secret (never routed to param).
+    expect(result.afterImport.secret.map((e: any) => e.name)).toEqual(['s1']);
+    expect(result.afterImport.param.map((e: any) => e.name)).toEqual(['/p1']);
+  });
+
+  test('service mismatch on import is a hard error', async ({ page }) => {
+    await setupWailsMocks(page, {
+      files: {
+        '/mock/secret.json': {
+          provider: 'aws',
+          scope: 'aws/123456789012/ap-northeast-1',
+          service: 'secret',
+          encrypted: false,
+          entries: [{ name: 's1', operation: 'create', value: 'v' }],
+          tags: [],
+        },
+      },
+    });
+    await page.goto('/');
+
+    const err = await page.evaluate(async () => {
+      const app = (window as any).go.gui.App;
+      try {
+        await app.StagingImport('/mock/secret.json', 'param', '', 'merge');
+        return null;
+      } catch (e: any) {
+        return e.message as string;
+      }
+    });
+
+    expect(err).toContain('secret');
+    expect(err).toContain('param');
   });
 });
