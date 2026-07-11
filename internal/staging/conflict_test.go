@@ -384,6 +384,51 @@ func TestCheckTagConflicts(t *testing.T) {
 	})
 }
 
+// TestCheckEntryAndTagConflicts_SingleFetch is a regression for #555: when a key
+// carries both a staged value change and a staged tag change, the remote's
+// last-modified time must be fetched only once and shared between the two
+// comparisons, not fetched separately for each.
+func TestCheckEntryAndTagConflicts_SingleFetch(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	laterTime := time.Date(2024, 1, 1, 13, 0, 0, 0, time.UTC)
+
+	var (
+		mu     sync.Mutex
+		counts = map[string]int{}
+	)
+
+	strategy := &mockApplyStrategy{
+		fetchLastModifiedFunc: func(_ context.Context, name string) (time.Time, error) {
+			mu.Lock()
+			counts[name]++
+			mu.Unlock()
+
+			return laterTime, nil // modified after base -> conflict
+		},
+	}
+
+	entries := map[staging.EntryKey]staging.Entry{
+		{Name: "item"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
+	}
+	tags := map[staging.EntryKey]staging.TagEntry{
+		{Name: "item"}: {Add: map[string]string{"env": "prod"}, BaseModifiedAt: &baseTime},
+	}
+
+	conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, tags)
+
+	// The key is reported once despite conflicting on both its value and its tags.
+	assert.Len(t, conflicts, 1)
+	assert.Contains(t, conflicts, staging.EntryKey{Name: "item"})
+
+	// The shared remote was fetched exactly once, not once per check.
+	mu.Lock()
+	defer mu.Unlock()
+
+	assert.Equal(t, 1, counts["item"])
+}
+
 // TestCheckConflicts_ResolverError verifies that a per-namespace resolver which
 // fails to resolve a strategy is treated like a fetch error: the entry is
 // skipped (no conflict) and the failure surfaces later on the apply attempt.

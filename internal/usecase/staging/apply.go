@@ -155,13 +155,10 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 
 	// Check for conflicts. Both value entries and tag changes carry a
 	// BaseModifiedAt; a remote modified after that base time is a conflict for
-	// either kind. Merge both sets so a resource staged with both a value change
-	// and a tag change is reported once.
+	// either kind. The merged check fetches each remote once — even when a key
+	// has both a value and a tag change — and reports that key once.
 	if !input.IgnoreConflicts {
-		conflicts := staging.CheckConflicts(ctx, u.strategyForNamespace, entries)
-		for key := range staging.CheckTagConflicts(ctx, u.strategyForNamespace, tags) {
-			conflicts[key] = struct{}{}
-		}
+		conflicts := staging.CheckEntryAndTagConflicts(ctx, u.strategyForNamespace, entries, tags)
 
 		if len(conflicts) > 0 {
 			// Report the full EntryKey (sorted for determinism) so callers can
