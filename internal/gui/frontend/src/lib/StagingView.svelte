@@ -918,6 +918,17 @@
   error={importError}
 />
 
+<!-- Import Busy Modal: progress feedback + input blocking for the import paths
+     that show no passphrase modal (plaintext, and plaintext into a service with
+     no existing changes). The encrypted path already surfaces progress via the
+     passphrase modal's loading state, so this is suppressed while that is open.
+     It has no onclose, so its backdrop/Escape/× cannot dismiss it mid-flight. -->
+<Modal title="Importing {serviceLabel(importService)}" show={importLoading && !showImportPassphrase}>
+  <div class="modal-confirm">
+    <p>Importing staged changes…</p>
+  </div>
+</Modal>
+
 <!-- Import Result Modal -->
 {#if importResult}
 <Modal title="Import Complete" show={true} onclose={() => importResult = null}>
