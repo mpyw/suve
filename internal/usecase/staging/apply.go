@@ -3,6 +3,8 @@ package staging
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
@@ -236,6 +238,17 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 
 		output.EntryResults = append(output.EntryResults, resultEntry)
 	}
+
+	// Results are collected in map iteration order, which is nondeterministic;
+	// sort by (Namespace, Name) so every consumer (including the GUI) renders a
+	// stable order that matches the CLI presenters.
+	slices.SortFunc(output.EntryResults, func(a, b ApplyEntryResult) int {
+		if c := strings.Compare(a.Namespace, b.Namespace); c != 0 {
+			return c
+		}
+
+		return strings.Compare(a.Name, b.Name)
+	})
 }
 
 func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, tags map[staging.EntryKey]staging.TagEntry, output *ApplyOutput) {
@@ -275,4 +288,14 @@ func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, t
 
 		output.TagResults = append(output.TagResults, resultTag)
 	}
+
+	// Sort by (Namespace, Name) for a stable order across consumers (see
+	// applyEntries).
+	slices.SortFunc(output.TagResults, func(a, b ApplyTagResult) int {
+		if c := strings.Compare(a.Namespace, b.Namespace); c != 0 {
+			return c
+		}
+
+		return strings.Compare(a.Name, b.Name)
+	})
 }
