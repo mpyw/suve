@@ -173,6 +173,19 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 	}
 
 	if plaintext {
+		// No key is available on this platform. Falling back to plaintext is only
+		// safe when no encrypted state exists yet; otherwise reading that state
+		// needs a key, so hard-fail with the real cause instead of silently
+		// degrading (mirrors the keychain-unavailable and lost-key branches above).
+		guardErr, checkErr := s.guardKeyLossWithEncryptedState(keyprovider.ErrNoKeyAvailable)
+		if checkErr != nil {
+			return nil, checkErr
+		}
+
+		if guardErr != nil {
+			return nil, guardErr
+		}
+
 		warnPlaintextOnce(nil)
 
 		return s, nil
