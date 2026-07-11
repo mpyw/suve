@@ -467,6 +467,24 @@ func TestGet_VersionNotFoundMapsSentinel(t *testing.T) {
 	assert.ErrorIs(t, err, provider.ErrNotFound)
 }
 
+// TestResolve_ShiftNotFoundMapsSentinel guards #481: a ~shift spec drives
+// resolution through GetParameterHistory instead of GetParameter. A missing
+// parameter must still map to provider.ErrNotFound so callers see the same
+// sentinel they get on the no-shift path (Get).
+func TestResolve_ShiftNotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		getHistory: func(*ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
+			return nil, &types.ParameterNotFound{Message: aws.String("nope")}
+		},
+	})
+
+	_, err := store.Resolve(t.Context(), "/missing", "~1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrNotFound)
+}
+
 // paginatedHistoryClient returns history across two pages: page 1 (versions 1,2)
 // with a NextToken, page 2 (version 3) without. Exercises the NextToken loop.
 func paginatedHistoryClient() *mockClient {
