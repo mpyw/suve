@@ -598,10 +598,12 @@ func TestSecret_UpdateMissingArgs(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// Only name, no value
+	// Only name, no value: with a non-interactive stdin the editor fallback must
+	// NOT be launched (it would hang); it must fail fast with an actionable error.
 	t.Run("no-value", func(t *testing.T) {
-		_, _, err := runCommand(t, secretupdate.Command(), "test/secret")
-		assert.Error(t, err)
+		_, _, err := runCommandWithStdin(t, secretupdate.Command(), strings.NewReader(""), "test/secret")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "value is required")
 	})
 }
 
@@ -731,10 +733,12 @@ func TestSecret_CreateMissingArgs(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// Only name, no value
+	// Only name, no value: with a non-interactive stdin the editor fallback must
+	// NOT be launched (it would hang); it must fail fast with an actionable error.
 	t.Run("no-value", func(t *testing.T) {
-		_, _, err := runCommand(t, secretcreate.Command(), "test/secret")
-		assert.Error(t, err)
+		_, _, err := runCommandWithStdin(t, secretcreate.Command(), strings.NewReader(""), "test/secret")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "value is required")
 	})
 }
 

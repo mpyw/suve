@@ -36,9 +36,16 @@ func TestCommandValidation(t *testing.T) {
 			wantErr: "usage:",
 		},
 		{
-			name:    "update missing value",
-			args:    []string{"suve", "azure", "secret", "update", "my-secret"},
+			name:    "update missing name",
+			args:    []string{"suve", "azure", "secret", "update"},
 			wantErr: "usage:",
+		},
+		{
+			// The value is now optional (stdin/editor fallback), but a positional
+			// value cannot be combined with --value-stdin.
+			name:    "create value with --value-stdin conflicts",
+			args:    []string{"suve", "azure", "secret", "create", "my-secret", "value", "--value-stdin"},
+			wantErr: "cannot combine a positional value with --value-stdin",
 		},
 		{
 			name:    "delete missing name",

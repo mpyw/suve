@@ -30,13 +30,15 @@ func TestCommand_Validation(t *testing.T) {
 		assert.Contains(t, err.Error(), "usage:")
 	})
 
-	t.Run("missing value argument", func(t *testing.T) {
+	// The value is now optional (--value-stdin / editor fallback), but a
+	// positional value cannot be combined with --value-stdin.
+	t.Run("positional value with --value-stdin conflicts", func(t *testing.T) {
 		t.Parallel()
 
 		app := apptest.AWSApp()
-		err := app.Run(t.Context(), []string{"suve", "param", "update", "/app/param"})
+		err := app.Run(t.Context(), []string{"suve", "param", "update", "/app/param", "value", "--value-stdin"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usage:")
+		assert.Contains(t, err.Error(), "cannot combine a positional value with --value-stdin")
 	})
 
 	t.Run("conflicting secure and type flags", func(t *testing.T) {

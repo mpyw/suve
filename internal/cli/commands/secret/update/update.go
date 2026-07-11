@@ -3,9 +3,8 @@ package update
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
-	"os"
 
 	"github.com/urfave/cli/v3"
 
@@ -35,7 +34,7 @@ func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "update",
 		Usage:     "Update a secret value",
-		ArgsUsage: "<name> <value>",
+		ArgsUsage: "<name> [<value>]",
 		Description: `Update the value of an existing secret.
 
 This creates a new version of the secret. The previous version will
@@ -44,10 +43,16 @@ have its AWSCURRENT label moved to AWSPREVIOUS.
 Use 'suve secret create' to create a new secret.
 To manage tags, use 'suve secret tag' and 'suve secret untag' commands.
 
+The value may be given as a positional argument, read from stdin with
+--value-stdin (so it never appears in argv/ps or shell history), or, when
+omitted, typed into $EDITOR.
+
 EXAMPLES:
   suve secret update my-api-key "new-key-value"         Update with new value
   suve secret update my-config '{"host":"new-db.com"}'  Update JSON secret
-  suve secret update --yes my-api-key "new-key-value"   Update without confirmation`,
+  suve secret update --yes my-api-key "new-key-value"   Update without confirmation
+  printf '%s' "$VALUE" | suve secret update --yes my-key --value-stdin  Read value from stdin
+  suve secret update my-key                             Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
@@ -57,18 +62,36 @@ EXAMPLES:
 				Name:  "yes",
 				Usage: "Skip confirmation prompt",
 			},
+			internal.ValueStdinFlag(),
 		},
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and value
-		return fmt.Errorf("usage: suve secret update <name> <value>")
+	args := cmd.Args()
+	if args.Len() < 1 {
+		return errors.New("usage: suve secret update <name> [<value>]")
 	}
 
-	name := cmd.Args().Get(0)
+	name := args.Get(0)
 	skipConfirm := cmd.Bool("yes")
+
+	newValue, proceed, err := internal.ResolveValue(ctx, internal.ValueSource{
+		FromStdin: cmd.Bool(internal.FlagValueStdin),
+		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
+		Arg:       args.Get(1),
+		Stdin:     internal.Stdin(cmd),
+	})
+	if err != nil {
+		return err
+	}
+
+	if !proceed {
+		output.Info(cmd.Root().Writer, "Empty value, nothing to update.")
+
+		return nil
+	}
 
 	store, err := internal.SecretStore(ctx)
 	if err != nil {
@@ -76,7 +99,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	uc := &secret.UpdateUseCase{Store: store}
-	newValue := cmd.Args().Get(1)
 
 	// Fetch current value and show diff before confirming
 	if !skipConfirm {
@@ -90,7 +112,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 		// Confirm operation
 		prompter := &confirm.Prompter{
-			Stdin:  os.Stdin,
+			Stdin:  internal.Stdin(cmd),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}

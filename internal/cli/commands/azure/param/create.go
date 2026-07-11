@@ -2,7 +2,7 @@ package param
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 
 	"github.com/urfave/cli/v3"
@@ -31,34 +31,62 @@ func CreateCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "create",
 		Usage:     "Create a new setting",
-		ArgsUsage: "<key> <value>",
+		ArgsUsage: "<key> [<value>]",
 		Description: `Create a new setting (key-value) in Azure App Configuration.
 
 Use this command for new keys only. To change the value of an existing key, use
 'suve azure param update' instead.
 
+The value may be given as a positional argument, read from stdin with
+--value-stdin (so it never appears in argv/ps or shell history), or, when
+omitted, typed into $EDITOR.
+
 EXAMPLES:
    suve azure param create app/timeout "30"                  Create simple setting
-   suve azure param create app/config '{"host":"db"}'        Create JSON setting`,
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: key and value
-				return fmt.Errorf("usage: suve azure param create <key> <value>")
-			}
-
-			store, err := cliinternal.AzureAppConfigStore(ctx)
-			if err != nil {
-				return err
-			}
-
-			r := &CreateRunner{
-				UseCase: &azure.CreateUseCase{Writer: store},
-				Stdout:  cmd.Root().Writer,
-				Stderr:  cmd.Root().ErrWriter,
-			}
-
-			return r.Run(ctx, CreateOptions{Name: cmd.Args().Get(0), Value: cmd.Args().Get(1)})
+   suve azure param create app/config '{"host":"db"}'        Create JSON setting
+   printf '%s' "$V" | suve azure param create app/key --value-stdin  Read value from stdin
+   suve azure param create app/key                           Type value into $EDITOR`,
+		Flags: []cli.Flag{
+			cliinternal.ValueStdinFlag(),
 		},
+		Action: createAction,
 	}
+}
+
+func createAction(ctx context.Context, cmd *cli.Command) error {
+	args := cmd.Args()
+	if args.Len() < 1 {
+		return errors.New("usage: suve azure param create <key> [<value>]")
+	}
+
+	value, proceed, err := cliinternal.ResolveValue(ctx, cliinternal.ValueSource{
+		FromStdin: cmd.Bool(cliinternal.FlagValueStdin),
+		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the key, arg 1 is the optional value
+		Arg:       args.Get(1),
+		Stdin:     cliinternal.Stdin(cmd),
+	})
+	if err != nil {
+		return err
+	}
+
+	if !proceed {
+		output.Info(cmd.Root().Writer, "Empty value, nothing to create.")
+
+		return nil
+	}
+
+	store, err := cliinternal.AzureAppConfigStore(ctx)
+	if err != nil {
+		return err
+	}
+
+	r := &CreateRunner{
+		UseCase: &azure.CreateUseCase{Writer: store},
+		Stdout:  cmd.Root().Writer,
+		Stderr:  cmd.Root().ErrWriter,
+	}
+
+	return r.Run(ctx, CreateOptions{Name: args.Get(0), Value: value})
 }
 
 // Run executes the create command.

@@ -132,6 +132,29 @@ func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr 
 	return outBuf.String(), errBuf.String(), err
 }
 
+// runCommandWithStdin executes a CLI command with a custom stdin (e.g. for
+// --value-stdin) and returns stdout, stderr, and error.
+func runCommandWithStdin(
+	t *testing.T, cmd *cli.Command, stdin io.Reader, args ...string,
+) (stdout, stderr string, err error) {
+	t.Helper()
+
+	var outBuf, errBuf bytes.Buffer
+
+	app := &cli.Command{
+		Name:      "suve",
+		Reader:    stdin,
+		Writer:    &outBuf,
+		ErrWriter: &errBuf,
+		Commands:  []*cli.Command{cmd},
+	}
+
+	fullArgs := append([]string{"suve", cmd.Name}, args...)
+	err = app.Run(t.Context(), fullArgs)
+
+	return outBuf.String(), errBuf.String(), err
+}
+
 // runSubCommand executes a subcommand (e.g., "param stage status") and returns stdout, stderr, and error.
 func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()

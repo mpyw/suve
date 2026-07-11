@@ -402,7 +402,7 @@ suve aws param list --output=json /app/config/
 Create a new parameter.
 
 ```
-suve aws param create [options] <name> <value>
+suve aws param create [options] <name> [<value>]
 ```
 
 **Arguments:**
@@ -410,7 +410,7 @@ suve aws param create [options] <name> <value>
 | Argument | Description |
 |----------|-------------|
 | `name` | Parameter name |
-| `value` | Parameter value |
+| `value` | Parameter value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
 
 **Options:**
 
@@ -423,6 +423,10 @@ suve aws param create [options] <name> <value>
 | `--data-type` | - | - | Parameter data type (e.g. `text`, `aws:ec2:image`) |
 | `--allowed-pattern` | - | - | Regex the value must match |
 | `--policies` | - | - | Parameter policies as a JSON document |
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 > [!NOTE]
 > `--secure` and `--type` cannot be used together.
@@ -461,7 +465,7 @@ suve aws param create --type StringList /app/config/allowed-hosts "host1,host2,h
 Update an existing parameter's value.
 
 ```
-suve aws param update [options] <name> <value>
+suve aws param update [options] <name> [<value>]
 ```
 
 **Arguments:**
@@ -469,7 +473,7 @@ suve aws param update [options] <name> <value>
 | Argument | Description |
 |----------|-------------|
 | `name` | Parameter name |
-| `value` | New parameter value |
+| `value` | New parameter value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
 
 **Options:**
 
@@ -483,6 +487,10 @@ suve aws param update [options] <name> <value>
 | `--allowed-pattern` | - | - | Regex the value must match |
 | `--policies` | - | - | Parameter policies as a JSON document |
 | `--yes` | - | `false` | Skip confirmation prompt |
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 > [!NOTE]
 > `--secure` and `--type` cannot be used together.
@@ -1435,7 +1443,7 @@ suve aws secret list --output=json production/
 Create a new secret.
 
 ```
-suve aws secret create [options] <name> <value>
+suve aws secret create [options] <name> [<value>]
 ```
 
 **Arguments:**
@@ -1443,13 +1451,17 @@ suve aws secret create [options] <name> <value>
 | Argument | Description |
 |----------|-------------|
 | `name` | Secret name |
-| `value` | Secret value |
+| `value` | Secret value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
 
 **Options:**
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--description` | - | - | Description for the secret |
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 **Examples:**
 
@@ -1475,7 +1487,7 @@ Created secret my-database-credentials (version: def67890-1234-1234-1234-1234567
 Update an existing secret's value.
 
 ```
-suve aws secret update [options] <name> <value>
+suve aws secret update [options] <name> [<value>]
 ```
 
 **Arguments:**
@@ -1483,7 +1495,7 @@ suve aws secret update [options] <name> <value>
 | Argument | Description |
 |----------|-------------|
 | `name` | Secret name |
-| `value` | New secret value |
+| `value` | New secret value (optional; may instead be read from stdin with `--value-stdin`, or typed into `$EDITOR` when omitted) |
 
 **Options:**
 
@@ -1491,6 +1503,10 @@ suve aws secret update [options] <name> <value>
 |--------|-------|---------|-------------|
 | `--description` | - | - | Update secret description |
 | `--yes` | - | `false` | Skip confirmation prompt |
+| `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+
+> [!NOTE]
+> The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
 
 **Examples:**
 
