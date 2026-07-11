@@ -38,6 +38,7 @@ func (f *fakeNamespaceLister) ListWithNamespaces(_ context.Context) ([]appconfig
 // TestParamList_PopulatesSecretAndType covers the generic (non-App-Config) list
 // path: Secret/Type must mirror the domain value type of each entry so a future
 // list-mode masking that trusts entry.secret masks SecureString params (#491).
+//
 //nolint:paralleltest // overrides the package-global registry.
 func TestParamList_PopulatesSecretAndType(t *testing.T) {
 	store := &providermock.Store{
