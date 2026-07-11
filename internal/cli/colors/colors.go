@@ -30,11 +30,6 @@ func For(w io.Writer) Palette {
 	return Palette{enabled: os.Getenv("NO_COLOR") == "" && terminal.IsTerminalWriter(w)}
 }
 
-// Enabled reports whether this palette emits ANSI color.
-func (p Palette) Enabled() bool {
-	return p.enabled
-}
-
 // sprint colorizes the operands with attrs when the palette is enabled, and
 // returns them unformatted otherwise. A fresh color.Color with a forced
 // per-instance setting is used, so palettes for different destinations never

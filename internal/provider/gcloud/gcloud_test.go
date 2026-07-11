@@ -100,26 +100,3 @@ func TestRegister(t *testing.T) {
 	require.ErrorIs(t, err, provider.ErrUnsupportedKind)
 	assert.NotErrorIs(t, err, provider.ErrNoFactory)
 }
-
-// TestNewRegistry verifies NewRegistry returns a registry with only the Google
-// Cloud provider registered.
-func TestNewRegistry(t *testing.T) {
-	t.Parallel()
-
-	reg := gcloud.NewRegistry()
-
-	t.Run("google cloud is registered", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := reg.Store(t.Context(), provider.GoogleCloudScope("my-project"), provider.KindParam)
-		require.ErrorIs(t, err, provider.ErrUnsupportedKind)
-		assert.NotErrorIs(t, err, provider.ErrNoFactory)
-	})
-
-	t.Run("other providers are not registered", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := reg.Store(t.Context(), provider.AWSScope("123456789012", "us-east-1"), provider.KindSecret)
-		require.ErrorIs(t, err, provider.ErrNoFactory)
-	})
-}

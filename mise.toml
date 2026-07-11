@@ -17,6 +17,8 @@ golangci-lint = "2.12.2"
 goreleaser = "2"
 nfpm = "2.41.1"
 "go:github.com/wailsapp/wails/v2/cmd/wails" = "2.13.0"
+# Reports production dead code; run via the `deadcode` task (deadcode lint gate).
+"go:golang.org/x/tools/cmd/deadcode" = "0.48.0"
 
 # =============================================================================
 # Tasks (run with `mise run <task>`, or `mise <task>` — no name collides with a
@@ -30,6 +32,10 @@ nfpm = "2.41.1"
 [tasks.build-cli]
 description = "Build the CLI binary"
 run = "go build -o bin/suve ./cmd/suve"
+
+[tasks.deadcode]
+description = "Report production dead code (x/tools deadcode; test-only helpers waived in .github/deadcode-allow.txt)"
+run = "bash .github/scripts/check-deadcode.sh"
 
 [tasks.build-gui]
 description = "Build the single CLI+GUI binary (bin/suve), embedding a freshly-built frontend"

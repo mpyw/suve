@@ -146,11 +146,3 @@ func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Ki
 func Register(reg *provider.Registry) {
 	reg.Register(provider.ProviderGoogleCloud, Factory{})
 }
-
-// NewRegistry returns a provider.Registry with the Google Cloud provider registered.
-func NewRegistry() *provider.Registry {
-	reg := provider.NewRegistry()
-	Register(reg)
-
-	return reg
-}
