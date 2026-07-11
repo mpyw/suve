@@ -266,6 +266,78 @@ func TestListRunner_HideNamespace(t *testing.T) {
 	assert.Equal(t, "app/a\napp/b\n", buf.String())
 }
 
+// TestListRunner_HideNamespaceShowWildcard asserts --hide-namespace --show under
+// a non-literal namespace (wildcard/OR/prefix) sources values from the
+// namespaced list — which already carries them — instead of per-key Get (which
+// cannot address all/multiple namespaces and would make every row an error).
+// The neutral reader must not be touched at all.
+func TestListRunner_HideNamespaceShowWildcard(t *testing.T) {
+	t.Parallel()
+
+	rows := []appconfig.KeyNamespace{
+		{Key: "a", Namespace: "dev", Value: "1"},
+		{Key: "b", Namespace: "prod", Value: "2"},
+	}
+
+	for _, ns := range []string{"*", "dev,prod", "dev*"} {
+		t.Run(ns, func(t *testing.T) {
+			t.Parallel()
+
+			var buf, errBuf bytes.Buffer
+
+			// An unconfigured neutral reader errors on any call, proving the
+			// diverted path never falls back to it.
+			r := nsListRunner(rows, &providermock.Store{}, &buf, &errBuf)
+			require.NoError(t, r.Run(t.Context(), param.ListOptions{Show: true, HideNS: true, Namespace: ns}))
+			assert.Equal(t, "a\t1\nb\t2\n", buf.String())
+		})
+	}
+}
+
+// TestListRunner_HideNamespaceShowWildcardAmbiguous asserts a key that resolves
+// to different values across the matched namespaces becomes an error row rather
+// than an arbitrary pick, while unambiguous keys still show their value.
+func TestListRunner_HideNamespaceShowWildcardAmbiguous(t *testing.T) {
+	t.Parallel()
+
+	rows := []appconfig.KeyNamespace{
+		{Key: "dup", Namespace: "dev", Value: "1"},
+		{Key: "dup", Namespace: "prod", Value: "2"},
+		{Key: "uniq", Namespace: "dev", Value: "ok"},
+	}
+
+	var buf, errBuf bytes.Buffer
+
+	r := nsListRunner(rows, &providermock.Store{}, &buf, &errBuf)
+	require.NoError(t, r.Run(t.Context(), param.ListOptions{Show: true, HideNS: true, Namespace: "*"}))
+	assert.Equal(t, "dup\t<error: value differs across namespaces; drop --hide-namespace to see each>\nuniq\tok\n", buf.String())
+}
+
+// TestListRunner_HideNamespaceShowLiteral asserts a single literal namespace with
+// --show keeps using the neutral per-key path (Reader.List + Get), unaffected by
+// the wildcard diversion.
+func TestListRunner_HideNamespaceShowLiteral(t *testing.T) {
+	t.Parallel()
+
+	reader := &providermock.Store{
+		ListFunc: func(_ context.Context) ([]string, error) {
+			return []string{"k"}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Value: "v"}, nil
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+
+	// Namespaced rows would resolve to a different value; the literal path must
+	// win, proving it did not divert.
+	rows := []appconfig.KeyNamespace{{Key: "k", Namespace: "dev", Value: "WRONG"}}
+	r := nsListRunner(rows, reader, &buf, &errBuf)
+	require.NoError(t, r.Run(t.Context(), param.ListOptions{Show: true, HideNS: true, Namespace: "dev"}))
+	assert.Equal(t, "k\tv\n", buf.String())
+}
+
 func TestListRunner_NonAppConfigNoColumn(t *testing.T) {
 	t.Parallel()
 
