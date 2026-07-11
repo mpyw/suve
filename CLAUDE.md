@@ -161,7 +161,7 @@ suve/
 ├── .github/workflows/
 │   └── test.yml                  # CI: test + lint on push/PR
 │
-└── mise.toml                     # toolchain + tasks: build-cli/build-gui, test, lint, e2e(+ -gcloud/-azure-appconfig/-azure-keyvault), generate-gui-bindings, coverage/coverage-all, clean, bash (run via `mise <task>` / `mise run <task>`)
+└── mise.toml                     # toolchain + tasks: build-cli/build-gui, test, lint, e2e-aws(+ -gcloud/-azure-appconfig/-azure-keyvault), generate-gui-bindings, coverage/coverage-all, clean, bash (run via `mise <task>` / `mise run <task>`)
 ```
 
 ### Key Design Patterns
@@ -186,7 +186,7 @@ mise lint
 mise build-cli
 
 # E2E tests (each task starts its emulator automatically via docker compose)
-mise e2e                  # AWS (localstack)
+mise e2e-aws              # AWS (localstack)
 mise e2e-gcloud           # Google Cloud
 mise e2e-azure-appconfig  # Azure App Configuration
 mise e2e-azure-keyvault   # Azure Key Vault
@@ -217,7 +217,7 @@ mise generate-gui-bindings # Regenerate the GUI wailsjs bindings
 # Run E2E tests fully inside Docker (starts the AWS emulator, localstack, on a
 # closed compose network with no host ports; the test suite runs in-container
 # and tears everything down on exit)
-mise e2e
+mise e2e-aws
 
 # Sweep any leftover test containers/volumes from a crashed run
 mise run clean
@@ -243,4 +243,4 @@ npm run test:ui     # Run with UI mode
 
 1. **Tests must pass**: Run `mise test` after changes
 2. **Lint must pass**: Run `mise lint` after changes
-3. **E2E tests**: Run `mise e2e` for command behavior changes (optional, requires Docker)
+3. **E2E tests**: Run `mise e2e-aws` for command behavior changes (optional, requires Docker)
