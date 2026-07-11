@@ -90,8 +90,8 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
 
-  e2e:
-    name: E2E Test
+  e2e-aws:
+    name: E2E Test (AWS)
     runs-on: ubuntu-latest
     services:
       localstack:
@@ -123,14 +123,14 @@ jobs:
       - name: Run e2e tests with coverage
         run: |
           COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
-          go test -v -race -tags e2e -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
+          go test -v -race -tags e2e -run '^TestAWS' -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: ./coverage-e2e.txt
           flags: e2e
-          name: codecov-suve-e2e
+          name: codecov-suve-e2e-aws
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
