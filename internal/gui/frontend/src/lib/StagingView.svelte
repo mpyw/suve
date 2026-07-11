@@ -440,7 +440,9 @@
   }
 
   function handleImportPassphrase(passphrase: string) {
-    showImportPassphrase = false;
+    // Keep the passphrase modal open across the attempt so a wrong passphrase can
+    // be re-entered inline (via the modal's error prop); runImport closes it on
+    // success. Mirrors the export flow.
     runImport(passphrase);
   }
 
@@ -459,9 +461,14 @@
       await loadStatus();
     } catch (e) {
       importError = parseError(e);
-      // Surface backend errors (e.g. wrong passphrase, service mismatch) in a
-      // modal since the transient chain modals are now closed.
-      showImportErrorModal = true;
+      // When the passphrase prompt is open (encrypted import), keep it open and
+      // show the error inline via the modal's error prop so a wrong passphrase can
+      // be retried without rebuilding the whole import chain (mirrors export).
+      // Only non-passphrase errors (the prompt is closed) fall back to the
+      // standalone Import Failed modal.
+      if (!showImportPassphrase) {
+        showImportErrorModal = true;
+      }
     } finally {
       importLoading = false;
     }
