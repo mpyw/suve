@@ -196,6 +196,11 @@ func (s *Store) getFullHistory(ctx context.Context, name string) ([]types.Parame
 			NextToken:      token,
 		})
 		if err != nil {
+			var notFound *types.ParameterNotFound
+			if errors.As(err, &notFound) {
+				return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+			}
+
 			return nil, err
 		}
 

@@ -744,6 +744,24 @@ func TestDescribe_NotFoundMapsSentinel(t *testing.T) {
 	assert.ErrorIs(t, err, provider.ErrNotFound)
 }
 
+// TestResolve_ShiftNotFoundMapsSentinel guards #481: a ~shift (or label) spec
+// drives resolution through ListSecretVersionIds instead of GetSecretValue. A
+// missing secret must still map to provider.ErrNotFound so callers see the same
+// sentinel they get on the no-shift path (Get).
+func TestResolve_ShiftNotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := secret.New(&mockClient{
+		listVersion: func(*secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
+		},
+	})
+
+	_, err := store.Resolve(t.Context(), "missing-secret", "~1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrNotFound)
+}
+
 // TestHistory_DeterministicOnEqualTimestamps guards #314: versions with equal
 // CreatedDate must sort deterministically (version-id descending tie-break),
 // independent of the arbitrary API/list order.

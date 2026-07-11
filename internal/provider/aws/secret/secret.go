@@ -148,6 +148,11 @@ func (s *Store) listAllVersions(ctx context.Context, name string) ([]types.Secre
 			NextToken:         token,
 		})
 		if err != nil {
+			var notFound *types.ResourceNotFoundException
+			if errors.As(err, &notFound) {
+				return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+			}
+
 			return nil, err
 		}
 
