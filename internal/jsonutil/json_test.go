@@ -78,6 +78,23 @@ func TestTryFormat(t *testing.T) {
 			wantStr:  "{\"k\":\"\xff\"}",
 			wantBool: false,
 		},
+		{
+			// An escaped lone surrogate is valid UTF-8 as raw bytes but the
+			// decoder coerces it to U+FFFD; formatting must not silently mutate
+			// it (#525).
+			name:     "escaped lone surrogate is rejected to avoid U+FFFD coercion",
+			input:    `{"k":"\ud800"}`,
+			wantStr:  `{"k":"\ud800"}`,
+			wantBool: false,
+		},
+		{
+			// A replacement character genuinely present in the input is not a
+			// coercion, so formatting proceeds (no new U+FFFD is introduced).
+			name:     "pre-existing replacement character is preserved and formatted",
+			input:    "{\"k\":\"�\"}",
+			wantStr:  "{\n  \"k\": \"�\"\n}",
+			wantBool: true,
+		},
 	}
 
 	for _, tt := range tests {

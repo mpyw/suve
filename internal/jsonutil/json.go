@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/mpyw/suve/internal/cli/output"
@@ -63,7 +64,20 @@ func TryFormat(value string) (string, bool) {
 
 	// json.Encoder.Encode appends a trailing newline; strip it to match the
 	// previous json.MarshalIndent behavior.
-	return string(bytes.TrimRight(buf.Bytes(), "\n")), true
+	formatted := string(bytes.TrimRight(buf.Bytes(), "\n"))
+
+	// Reject silent lossy conversions that survive raw-byte UTF-8 validation:
+	// Go's json decoder turns an escaped lone surrogate (e.g. "\ud800") into
+	// U+FFFD, so the input is valid UTF-8 yet its decoded content is mangled.
+	// If formatting introduced a replacement character that the input did not
+	// already contain, fall back to the raw string instead of misrepresenting
+	// the value as a clean round-trip (#525).
+	replacementChar := string(utf8.RuneError)
+	if strings.Count(formatted, replacementChar) > strings.Count(value, replacementChar) {
+		return value, false
+	}
+
+	return formatted, true
 }
 
 // TryFormatOrWarn formats JSON or warns and returns original.
