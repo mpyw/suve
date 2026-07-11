@@ -16,11 +16,10 @@ import (
 )
 
 // TestNoAWSSDKOutsideProviderAWS enforces that only internal/provider (which
-// includes internal/provider/aws, .../gcloud, .../azure) and the allowed
-// low-level package internal/infra may import a cloud SDK. It walks the entire
-// internal/ tree plus cmd/ and fails loudly if any other non-test package
-// reintroduces a direct cloud-SDK dependency, which would break provider
-// pluggability.
+// includes internal/provider/aws, .../gcloud, .../azure) may import a cloud
+// SDK. It walks the entire internal/ tree plus cmd/ and fails loudly if any
+// other non-test package reintroduces a direct cloud-SDK dependency, which
+// would break provider pluggability.
 func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 	t.Parallel()
 
@@ -34,7 +33,6 @@ func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 	// permitted to import a cloud SDK and are therefore skipped during the walk.
 	allowedRoots := map[string]struct{}{
 		"provider": {},
-		"infra":    {},
 	}
 
 	// forbiddenPrefixes are import paths banned in non-test packages under a

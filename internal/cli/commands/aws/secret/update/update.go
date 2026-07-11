@@ -11,7 +11,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/infra"
+	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 

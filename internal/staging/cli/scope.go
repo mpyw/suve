@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
