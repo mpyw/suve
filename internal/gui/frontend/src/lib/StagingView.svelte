@@ -669,6 +669,9 @@
             <ul class="result-list">
               {#each applyResult.entryResults as result}
                 <li class="result-item" class:failed={result.status === 'failed'}>
+                  {#if result.namespace}
+                    <span class="result-namespace">{result.namespace}</span>
+                  {/if}
                   <span class="result-name">{result.name}</span>
                   <span class="result-status" class:status-created={result.status === 'created'} class:status-updated={result.status === 'updated'} class:status-deleted={result.status === 'deleted'} class:status-failed={result.status === 'failed'}>
                     {result.status}
@@ -692,6 +695,9 @@
             <ul class="result-list">
               {#each applyResult.tagResults as result}
                 <li class="result-item" class:failed={!!result.error}>
+                  {#if result.namespace}
+                    <span class="result-namespace">{result.namespace}</span>
+                  {/if}
                   <span class="result-name">{result.name}</span>
                   <span class="result-status status-updated">tags</span>
                   {#if result.error}
@@ -1328,6 +1334,16 @@
     font-family: monospace;
     font-size: 13px;
     color: #fff;
+  }
+
+  /* App Configuration namespace badge on an apply-result row (empty otherwise). */
+  .result-namespace {
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: rgba(120, 120, 120, 0.18);
+    color: #888;
+    white-space: nowrap;
   }
 
   .result-status {

@@ -649,6 +649,7 @@ export namespace gui {
 	}
 	export class StagingApplyEntryResult {
 	    name: string;
+	    namespace: string;
 	    status: string;
 	    error?: string;
 	    unstageError?: string;
@@ -660,6 +661,7 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.namespace = source["namespace"];
 	        this.status = source["status"];
 	        this.error = source["error"];
 	        this.unstageError = source["unstageError"];
@@ -667,6 +669,7 @@ export namespace gui {
 	}
 	export class StagingApplyTagResult {
 	    name: string;
+	    namespace: string;
 	    addTags?: Record<string, string>;
 	    removeTags?: string[];
 	    error?: string;
@@ -679,6 +682,7 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.namespace = source["namespace"];
 	        this.addTags = source["addTags"];
 	        this.removeTags = source["removeTags"];
 	        this.error = source["error"];
