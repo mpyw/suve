@@ -45,9 +45,10 @@ func TestResolve_EnvVar_Valid(t *testing.T) {
 			return "", false
 		}
 
-		key, plaintext, err := Resolve()
+		key, plaintext, needsMint, err := Resolve()
 		require.NoError(t, err)
 		assert.False(t, plaintext)
+		assert.False(t, needsMint)
 		assert.Equal(t, want, key)
 	})
 }
@@ -59,7 +60,7 @@ func TestResolve_EnvVar_InvalidBase64(t *testing.T) {
 			return "not!valid!base64!", true
 		}
 
-		_, _, err := Resolve()
+		_, _, _, err := Resolve()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "base64")
 	})
@@ -73,14 +74,14 @@ func TestResolve_EnvVar_WrongLength(t *testing.T) {
 			return base64.StdEncoding.EncodeToString(make([]byte, 16)), true
 		}
 
-		_, _, err := Resolve()
+		_, _, _, err := Resolve()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "32 bytes")
 	})
 }
 
 //nolint:paralleltest // uses global keyring.MockInit and overrides hook vars.
-func TestResolve_Keychain_GetOrCreate(t *testing.T) {
+func TestResolve_Keychain_MintThenReuse(t *testing.T) {
 	keyring.MockInit()
 
 	withHooks(t, func() {
@@ -88,16 +89,24 @@ func TestResolve_Keychain_GetOrCreate(t *testing.T) {
 		keyringGetFunc = keyring.Get
 		keyringSetFunc = keyring.Set
 
-		// First call: no key stored -> generate and store.
-		key1, plaintext, err := Resolve()
+		// First call: no key stored yet -> caller is told to mint (Resolve does
+		// not mint or store on its own).
+		key0, plaintext, needsMint, err := Resolve()
 		require.NoError(t, err)
 		assert.False(t, plaintext)
+		assert.True(t, needsMint)
+		assert.Nil(t, key0)
+
+		// Mint stores a fresh key.
+		key1, err := Mint()
+		require.NoError(t, err)
 		assert.Len(t, key1, 32)
 
-		// Second call: must return the same stored key.
-		key2, plaintext, err := Resolve()
+		// Second call: must return the same stored key, no longer needing a mint.
+		key2, plaintext, needsMint, err := Resolve()
 		require.NoError(t, err)
 		assert.False(t, plaintext)
+		assert.False(t, needsMint)
 		assert.Equal(t, key1, key2)
 	})
 }
@@ -114,9 +123,10 @@ func TestResolve_UnsupportedPlatform_Plaintext(t *testing.T) {
 			return "", keyring.ErrUnsupportedPlatform
 		}
 
-		key, plaintext, err := Resolve()
+		key, plaintext, needsMint, err := Resolve()
 		require.NoError(t, err)
 		assert.True(t, plaintext)
+		assert.False(t, needsMint)
 		assert.Nil(t, key)
 	})
 }
@@ -133,9 +143,10 @@ func TestResolve_HardKeychainError_Surfaced(t *testing.T) {
 			return "", errors.New("keychain locked")
 		}
 
-		key, plaintext, err := Resolve()
+		key, plaintext, needsMint, err := Resolve()
 		require.Error(t, err)
 		assert.False(t, plaintext)
+		assert.False(t, needsMint)
 		assert.Nil(t, key)
 
 		var kcErr *KeychainUnavailableError
@@ -143,26 +154,46 @@ func TestResolve_HardKeychainError_Surfaced(t *testing.T) {
 	})
 }
 
-// TestResolve_SetError_Surfaced: a failed store (Get says not-found, Set fails)
-// is a hard error, surfaced rather than silently downgraded.
+// TestResolve_KeyNotFound_NeedsMint: a reachable-but-empty keychain reports
+// needsMint (Resolve neither mints nor stores) so the caller can gate minting
+// on the absence of encrypted state.
 //
 //nolint:paralleltest // overrides package-level hook vars.
-func TestResolve_SetError_Surfaced(t *testing.T) {
+func TestResolve_KeyNotFound_NeedsMint(t *testing.T) {
 	withHooks(t, func() {
 		lookupEnvFunc = func(string) (string, bool) { return "", false }
 		keyringGetFunc = func(string, string) (string, error) {
 			return "", keyring.ErrNotFound
 		}
+
+		setCalled := false
+		keyringSetFunc = func(string, string, string) error {
+			setCalled = true
+
+			return nil
+		}
+
+		key, plaintext, needsMint, err := Resolve()
+		require.NoError(t, err)
+		assert.False(t, plaintext)
+		assert.True(t, needsMint)
+		assert.Nil(t, key)
+		assert.False(t, setCalled, "Resolve must not store a key")
+	})
+}
+
+// TestMint_SetError: a failed store surfaces from Mint as an error.
+//
+//nolint:paralleltest // overrides package-level hook vars.
+func TestMint_SetError(t *testing.T) {
+	withHooks(t, func() {
 		keyringSetFunc = func(string, string, string) error {
 			return errors.New("cannot write to keychain")
 		}
 
-		_, plaintext, err := Resolve()
+		_, err := Mint()
 		require.Error(t, err)
-		assert.False(t, plaintext)
-
-		var kcErr *KeychainUnavailableError
-		require.ErrorAs(t, err, &kcErr)
+		assert.Contains(t, err.Error(), "keychain")
 	})
 }
 
@@ -176,7 +207,7 @@ func TestResolve_CorruptStoredKey_Surfaced(t *testing.T) {
 			return "!!not-base64!!", nil
 		}
 
-		_, _, err := Resolve()
+		_, _, _, err := Resolve()
 		require.Error(t, err)
 
 		var kcErr *KeychainUnavailableError

@@ -47,6 +47,12 @@ var userHomeDirFunc = os.UserHomeDir
 //nolint:gochecknoglobals // test hook for dependency injection
 var resolveKeyFunc = keyprovider.Resolve
 
+// mintKeyFunc mints and stores a new working-store data key. Overridable for
+// testing.
+//
+//nolint:gochecknoglobals // test hook for dependency injection
+var mintKeyFunc = keyprovider.Mint
+
 // plaintextWarnOnce ensures the plaintext fallback warning is emitted only once
 // per process.
 //
@@ -117,7 +123,7 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 		return nil, err
 	}
 
-	key, plaintext, err := resolveKeyFunc()
+	key, plaintext, needsMint, err := resolveKeyFunc()
 	if err != nil {
 		// A hard keychain failure (as opposed to a genuinely absent keyring
 		// backend or a bad SUVE_STAGING_KEY) is fatal ONLY when encrypted state
@@ -128,14 +134,13 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 		// headless CI without a keyring), warning the user once.
 		var kcErr *keyprovider.KeychainUnavailableError
 		if errors.As(err, &kcErr) {
-			encrypted, encErr := s.IsEncrypted()
-			if encErr != nil {
-				return nil, fmt.Errorf("failed to check staging state encryption: %w", encErr)
+			guardErr, checkErr := s.guardKeyLossWithEncryptedState(err)
+			if checkErr != nil {
+				return nil, checkErr
 			}
 
-			if encrypted {
-				return nil, fmt.Errorf(
-					"cannot access the staging encryption key while encrypted state exists: %w", err)
+			if guardErr != nil {
+				return nil, guardErr
 			}
 
 			warnPlaintextOnce(err)
@@ -144,6 +149,27 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 		}
 
 		return nil, fmt.Errorf("failed to resolve staging encryption key: %w", err)
+	}
+
+	if needsMint {
+		// The keychain is reachable but empty. Minting a replacement key when
+		// encrypted state already exists would leave that state undecryptable
+		// AND silently overwrite the (lost) key, masking the real cause behind a
+		// later "wrong passphrase or corrupted data" error. Refuse to mint in
+		// that case; otherwise this is a genuine first run.
+		guardErr, checkErr := s.guardKeyLossWithEncryptedState(keyprovider.ErrKeychainKeyNotFound)
+		if checkErr != nil {
+			return nil, checkErr
+		}
+
+		if guardErr != nil {
+			return nil, guardErr
+		}
+
+		key, err = mintKeyFunc()
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve staging encryption key: %w", err)
+		}
 	}
 
 	if plaintext {
@@ -155,6 +181,28 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 	s.key = key
 
 	return s, nil
+}
+
+// guardKeyLossWithEncryptedState reports whether the working store must hard-fail
+// because the encryption key is unavailable (a hard keychain failure or a lost
+// keychain entry, given by cause) while encrypted state already exists on disk.
+// When encrypted state exists it returns the explanatory error to surface (so
+// the real cause reaches the user instead of a later misleading decryption
+// failure); otherwise guardErr is nil and the caller may proceed (plaintext
+// fallback or a first-run mint). checkErr is non-nil only when the encryption
+// probe itself failed.
+func (s *Store) guardKeyLossWithEncryptedState(cause error) (guardErr, checkErr error) {
+	encrypted, err := s.IsEncrypted()
+	if err != nil {
+		return nil, fmt.Errorf("failed to check staging state encryption: %w", err)
+	}
+
+	if encrypted {
+		return fmt.Errorf(
+			"cannot access the staging encryption key while encrypted state exists: %w", cause), nil
+	}
+
+	return nil, nil
 }
 
 // warnPlaintextOnce emits the unencrypted-storage warning once per process. When
