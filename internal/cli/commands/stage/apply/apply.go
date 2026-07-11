@@ -405,7 +405,7 @@ func formatTagApplySummary(tagEntry staging.TagEntry) string {
 // distinct items; within one service a key that conflicts on both its value and
 // its tags is reported once.
 func (r *Runner) checkAllConflicts(ctx context.Context, checks []serviceConflictCheck) []conflictItem {
-	var all []conflictItem
+	all := make([]conflictItem, 0, len(checks))
 
 	for _, check := range checks {
 		merged := make(map[staging.EntryKey]struct{})
