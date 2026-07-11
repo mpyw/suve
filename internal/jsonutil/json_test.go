@@ -72,6 +72,12 @@ func TestTryFormat(t *testing.T) {
 			wantStr:  `{"a":1} garbage`,
 			wantBool: false,
 		},
+		{
+			name:     "invalid UTF-8 is left unformatted to avoid U+FFFD coercion",
+			input:    "{\"k\":\"\xff\"}",
+			wantStr:  "{\"k\":\"\xff\"}",
+			wantBool: false,
+		},
 	}
 
 	for _, tt := range tests {

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"unicode/utf8"
 
 	"github.com/mpyw/suve/internal/cli/output"
 )
@@ -25,7 +26,15 @@ import (
 // decoding into float64 (the default) silently loses integer precision beyond
 // 2^53 and collapses 1.0/1, which would make genuinely different values format
 // identically (and diff as "identical").
+//
+// Values carrying invalid UTF-8 are left unformatted: Go's json encoder coerces
+// invalid bytes to the replacement character (U+FFFD), which would silently
+// mutate the displayed value, so we fall back to the raw string instead.
 func TryFormat(value string) (string, bool) {
+	if !utf8.ValidString(value) {
+		return value, false
+	}
+
 	dec := json.NewDecoder(bytes.NewReader([]byte(value)))
 	dec.UseNumber()
 
