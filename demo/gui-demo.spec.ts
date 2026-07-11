@@ -54,8 +54,8 @@ test.describe('GUI Demo Recording', () => {
     console.log('Step 1: Viewing existing parameters');
     await pause(PAUSE_MEDIUM);
 
-    // Enable "Show Values"
-    await page.locator('input[type="checkbox"]').first().check();
+    // Enable "Show Values" (target by label — the first checkbox is "Recursive")
+    await page.getByRole('checkbox', { name: 'Show Values' }).check();
     await pause(PAUSE_MEDIUM);
 
     // Click on /demo/api/url to show details with tags
@@ -94,7 +94,7 @@ test.describe('GUI Demo Recording', () => {
     // 4. Stage an update to existing parameter (/demo/api/url)
     // =========================================================================
     console.log('Step 4: Staging update to existing parameter');
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Param');
     await waitForItemList(page);
     await pause(PAUSE_MEDIUM); // Wait for view transition to complete
 
@@ -197,7 +197,7 @@ test.describe('GUI Demo Recording', () => {
     // 10. Apply all staged changes
     // =========================================================================
     console.log('Step 10: Applying staged changes');
-    await page.getByRole('button', { name: /Apply/i }).first().click();
+    await page.getByRole('button', { name: 'Apply All' }).click();
 
     await pause(PAUSE_LONG); // Show confirm dialog before closing
     await page.locator('.modal-content').getByRole('button').filter({ hasText: /Apply|Confirm/i }).click();
@@ -212,7 +212,7 @@ test.describe('GUI Demo Recording', () => {
     // 11. Verify changes
     // =========================================================================
     console.log('Step 11: Verifying changes');
-    await navigateTo(page, 'Parameters');
+    await navigateTo(page, 'Param');
     await waitForItemList(page);
     await pause(PAUSE_MEDIUM);
 
@@ -221,7 +221,7 @@ test.describe('GUI Demo Recording', () => {
     await waitForItemList(page);
     await pause(PAUSE_MEDIUM);
 
-    const showValues = page.locator('input[type="checkbox"]').first();
+    const showValues = page.getByRole('checkbox', { name: 'Show Values' });
     if (!(await showValues.isChecked())) {
       await showValues.check();
     }
