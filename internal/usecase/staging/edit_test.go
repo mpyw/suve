@@ -93,6 +93,26 @@ func TestEditUseCase_Execute_RejectsNonUTF8Value(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
+func TestEditUseCase_Execute_ParseError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	strategy := newMockEditStrategy()
+	strategy.parseErr = errors.New("invalid name")
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: strategy,
+		Store:    store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Key:   staging.EntryKey{Name: "/app/config@1"},
+		Value: "value",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid name")
+}
+
 func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	t.Parallel()
 
