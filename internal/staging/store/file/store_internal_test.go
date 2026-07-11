@@ -335,6 +335,50 @@ func TestWriteState_EncryptionError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to encrypt state")
 }
 
+// TestReadFile_EmptyOrWhitespaceTreatedAsEmpty guards #562: a state file that is
+// zero bytes or contains only whitespace (e.g. an external truncation) must be
+// read as an empty state instead of hard-failing every command with a parse
+// error, mirroring how a missing file is handled.
+func TestReadFile_EmptyOrWhitespaceTreatedAsEmpty(t *testing.T) {
+	t.Parallel()
+
+	for name, content := range map[string]string{
+		"zero bytes":       "",
+		"single newline":   "\n",
+		"spaces and tabs":  "  \t  ",
+		"crlf and spaces":  " \r\n\t ",
+		"trailing newline": "\n\n\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.TempDir(), "stage.json")
+			require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+			store := NewStoreWithPath(path)
+
+			state, err := store.Drain(t.Context(), "", true)
+			require.NoError(t, err)
+			assert.True(t, state.IsEmpty(), "trimmed-empty file should read as empty state")
+		})
+	}
+}
+
+// TestReadFile_NonEmptyGarbageStillErrors verifies the empty-file tolerance does
+// not swallow genuinely corrupt (non-empty) content.
+func TestReadFile_NonEmptyGarbageStillErrors(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "stage.json")
+	require.NoError(t, os.WriteFile(path, []byte("not json at all"), 0o600))
+
+	store := NewStoreWithPath(path)
+
+	_, err := store.Drain(t.Context(), "", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse state file")
+}
+
 // errorReader is an io.Reader that returns an error.
 type errorReader struct {
 	err error
