@@ -43,8 +43,8 @@ func awsStageGlobalConfig() stgcli.GlobalConfig {
 // Global Stage Commands Tests
 // =============================================================================
 
-// TestGlobal_StageWorkflow tests the global stage commands that work across services.
-func TestGlobal_StageWorkflow(t *testing.T) {
+// TestAWSGlobal_StageWorkflow tests the global stage commands that work across services.
+func TestAWSGlobal_StageWorkflow(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -128,8 +128,8 @@ func TestGlobal_StageWorkflow(t *testing.T) {
 	})
 }
 
-// TestGlobal_StageResetAll tests global reset --all.
-func TestGlobal_StageResetAll(t *testing.T) {
+// TestAWSGlobal_StageResetAll tests global reset --all.
+func TestAWSGlobal_StageResetAll(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -194,8 +194,8 @@ func TestGlobal_StageResetAll(t *testing.T) {
 	})
 }
 
-// TestGlobal_StageCommand tests the global stage parent command structure.
-func TestGlobal_StageCommand(t *testing.T) {
+// TestAWSGlobal_StageCommand tests the global stage parent command structure.
+func TestAWSGlobal_StageCommand(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -216,8 +216,8 @@ func TestGlobal_StageCommand(t *testing.T) {
 	})
 }
 
-// TestStaging_ErrorCases tests staging error scenarios.
-func TestStaging_ErrorCases(t *testing.T) {
+// TestAWSStaging_ErrorCases tests staging error scenarios.
+func TestAWSStaging_ErrorCases(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -259,8 +259,8 @@ func TestStaging_ErrorCases(t *testing.T) {
 	})
 }
 
-// TestGlobal_StagingWithTags tests the global stage commands (diff, apply, reset) with tag entries.
-func TestGlobal_StagingWithTags(t *testing.T) {
+// TestAWSGlobal_StagingWithTags tests the global stage commands (diff, apply, reset) with tag entries.
+func TestAWSGlobal_StagingWithTags(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -320,13 +320,13 @@ func TestGlobal_StagingWithTags(t *testing.T) {
 	})
 }
 
-// TestGlobal_TagConflictDetection covers #483: a staged tag whose remote was
+// TestAWSGlobal_TagConflictDetection covers #483: a staged tag whose remote was
 // modified after the recorded BaseModifiedAt is rejected as a conflict at apply
 // time, and --ignore-conflicts forces it through. Staging the tag with a
 // BaseModifiedAt in the past simulates the remote being changed out-of-band
 // since the tags were fetched — the real FetchLastModified returns the
 // parameter's actual (newer) modified time.
-func TestGlobal_TagConflictDetection(t *testing.T) {
+func TestAWSGlobal_TagConflictDetection(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -378,8 +378,8 @@ func TestGlobal_TagConflictDetection(t *testing.T) {
 	})
 }
 
-// TestGlobal_ResetWithTags tests the global reset command with tag entries.
-func TestGlobal_ResetWithTags(t *testing.T) {
+// TestAWSGlobal_ResetWithTags tests the global reset command with tag entries.
+func TestAWSGlobal_ResetWithTags(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -431,8 +431,8 @@ func TestGlobal_ResetWithTags(t *testing.T) {
 // Export and Import Tests
 // =============================================================================
 
-// TestGlobal_ExportImport tests the export -> clear -> import round-trip.
-func TestGlobal_ExportImport(t *testing.T) {
+// TestAWSGlobal_ExportImport tests the export -> clear -> import round-trip.
+func TestAWSGlobal_ExportImport(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -480,8 +480,8 @@ func TestGlobal_ExportImport(t *testing.T) {
 	})
 }
 
-// TestGlobal_ExportKeep tests export --keep retains the working area.
-func TestGlobal_ExportKeep(t *testing.T) {
+// TestAWSGlobal_ExportKeep tests export --keep retains the working area.
+func TestAWSGlobal_ExportKeep(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -507,8 +507,8 @@ func TestGlobal_ExportKeep(t *testing.T) {
 	assert.Contains(t, stdout, paramName)
 }
 
-// TestGlobal_ImportMerge tests import --merge combines with the working area.
-func TestGlobal_ImportMerge(t *testing.T) {
+// TestAWSGlobal_ImportMerge tests import --merge combines with the working area.
+func TestAWSGlobal_ImportMerge(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -543,9 +543,9 @@ func TestGlobal_ImportMerge(t *testing.T) {
 	assert.Contains(t, stdout, paramName2)
 }
 
-// TestGlobal_ImportScopeMismatch tests that a scope mismatch is refused unless
+// TestAWSGlobal_ImportScopeMismatch tests that a scope mismatch is refused unless
 // --force is given.
-func TestGlobal_ImportScopeMismatch(t *testing.T) {
+func TestAWSGlobal_ImportScopeMismatch(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -595,8 +595,8 @@ func TestGlobal_ImportScopeMismatch(t *testing.T) {
 	})
 }
 
-// TestGlobal_ExportEmpty tests export when nothing is staged.
-func TestGlobal_ExportEmpty(t *testing.T) {
+// TestAWSGlobal_ExportEmpty tests export when nothing is staged.
+func TestAWSGlobal_ExportEmpty(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -612,9 +612,9 @@ func TestGlobal_ExportEmpty(t *testing.T) {
 	assert.True(t, os.IsNotExist(statErr))
 }
 
-// TestGlobal_ExportImportEncrypted tests an encrypted export/import round-trip
+// TestAWSGlobal_ExportImportEncrypted tests an encrypted export/import round-trip
 // via --passphrase-stdin.
-func TestGlobal_ExportImportEncrypted(t *testing.T) {
+func TestAWSGlobal_ExportImportEncrypted(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -653,8 +653,8 @@ func TestGlobal_ExportImportEncrypted(t *testing.T) {
 // Agent Store Direct Tests (for IPC coverage)
 // =============================================================================
 
-// TestAgentStore_DirectMethods tests agent store methods directly to improve IPC coverage.
-func TestAgentStore_DirectMethods(t *testing.T) {
+// TestAWSAgentStore_DirectMethods tests agent store methods directly to improve IPC coverage.
+func TestAWSAgentStore_DirectMethods(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -706,8 +706,8 @@ func TestAgentStore_DirectMethods(t *testing.T) {
 	})
 }
 
-// TestAgentStore_TagMethods tests tag-related methods on the agent store.
-func TestAgentStore_TagMethods(t *testing.T) {
+// TestAWSAgentStore_TagMethods tests tag-related methods on the agent store.
+func TestAWSAgentStore_TagMethods(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -760,8 +760,8 @@ func TestAgentStore_TagMethods(t *testing.T) {
 	})
 }
 
-// TestAgentStore_LoadAndWriteState tests Load and WriteState methods.
-func TestAgentStore_LoadAndWriteState(t *testing.T) {
+// TestAWSAgentStore_LoadAndWriteState tests Load and WriteState methods.
+func TestAWSAgentStore_LoadAndWriteState(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -813,8 +813,8 @@ func TestAgentStore_LoadAndWriteState(t *testing.T) {
 	})
 }
 
-// TestAgentStore_DrainMethod tests the Drain method.
-func TestAgentStore_DrainMethod(t *testing.T) {
+// TestAWSAgentStore_DrainMethod tests the Drain method.
+func TestAWSAgentStore_DrainMethod(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -867,8 +867,8 @@ func TestAgentStore_DrainMethod(t *testing.T) {
 	})
 }
 
-// TestAgentStore_UnstageAll tests UnstageAll with different service filters.
-func TestAgentStore_UnstageAll(t *testing.T) {
+// TestAWSAgentStore_UnstageAll tests UnstageAll with different service filters.
+func TestAWSAgentStore_UnstageAll(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -929,8 +929,8 @@ func TestAgentStore_UnstageAll(t *testing.T) {
 	})
 }
 
-// TestAgentStore_ListMethods tests ListEntries and ListTags with various states.
-func TestAgentStore_ListMethods(t *testing.T) {
+// TestAWSAgentStore_ListMethods tests ListEntries and ListTags with various states.
+func TestAWSAgentStore_ListMethods(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -1011,8 +1011,8 @@ func TestAgentStore_ListMethods(t *testing.T) {
 // Store Sequential Operation Tests
 // =============================================================================
 
-// TestStore_SequentialOperations exercises the store through repeated operations.
-func TestStore_SequentialOperations(t *testing.T) {
+// TestAWSStore_SequentialOperations exercises the store through repeated operations.
+func TestAWSStore_SequentialOperations(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -1067,8 +1067,8 @@ func TestStore_SequentialOperations(t *testing.T) {
 	})
 }
 
-// TestStore_SeparateAccounts verifies that stores for different accounts are isolated.
-func TestStore_SeparateAccounts(t *testing.T) {
+// TestAWSStore_SeparateAccounts verifies that stores for different accounts are isolated.
+func TestAWSStore_SeparateAccounts(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -1093,9 +1093,9 @@ func TestStore_SeparateAccounts(t *testing.T) {
 // Empty-State Command Tests - Commands report empty state without side effects
 // =============================================================================
 
-// TestAgentLifecycle_StatusDoesNotStartAgent verifies that status command
+// TestAWSAgentLifecycle_StatusDoesNotStartAgent verifies that status command
 // returns "No changes staged" without starting the agent when nothing is staged.
-func TestAgentLifecycle_StatusDoesNotStartAgent(t *testing.T) {
+func TestAWSAgentLifecycle_StatusDoesNotStartAgent(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -1125,9 +1125,9 @@ func TestAgentLifecycle_StatusDoesNotStartAgent(t *testing.T) {
 	})
 }
 
-// TestAgentLifecycle_DiffDoesNotStartAgent verifies that diff command
+// TestAWSAgentLifecycle_DiffDoesNotStartAgent verifies that diff command
 // returns warning without starting the agent when nothing is staged.
-func TestAgentLifecycle_DiffDoesNotStartAgent(t *testing.T) {
+func TestAWSAgentLifecycle_DiffDoesNotStartAgent(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -1153,9 +1153,9 @@ func TestAgentLifecycle_DiffDoesNotStartAgent(t *testing.T) {
 	})
 }
 
-// TestAgentLifecycle_ApplyDoesNotStartAgent verifies that apply command
+// TestAWSAgentLifecycle_ApplyDoesNotStartAgent verifies that apply command
 // returns "No changes staged" without starting the agent when nothing is staged.
-func TestAgentLifecycle_ApplyDoesNotStartAgent(t *testing.T) {
+func TestAWSAgentLifecycle_ApplyDoesNotStartAgent(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -1179,9 +1179,9 @@ func TestAgentLifecycle_ApplyDoesNotStartAgent(t *testing.T) {
 	})
 }
 
-// TestAgentLifecycle_ResetDoesNotStartAgent verifies that reset command
+// TestAWSAgentLifecycle_ResetDoesNotStartAgent verifies that reset command
 // returns "No changes staged" without starting the agent when nothing is staged.
-func TestAgentLifecycle_ResetDoesNotStartAgent(t *testing.T) {
+func TestAWSAgentLifecycle_ResetDoesNotStartAgent(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 

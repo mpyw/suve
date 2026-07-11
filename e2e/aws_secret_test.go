@@ -27,8 +27,8 @@ import (
 // Secrets Manager Basic Commands Tests
 // =============================================================================
 
-// TestSecret_FullWorkflow tests the complete Secrets Manager workflow.
-func TestSecret_FullWorkflow(t *testing.T) {
+// TestAWSSecret_FullWorkflow tests the complete Secrets Manager workflow.
+func TestAWSSecret_FullWorkflow(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-test/basic/secret"
@@ -160,8 +160,8 @@ func TestSecret_FullWorkflow(t *testing.T) {
 	})
 }
 
-// TestSecret_VersionSpecifiers tests Secrets Manager version specifier syntax.
-func TestSecret_VersionSpecifiers(t *testing.T) {
+// TestAWSSecret_VersionSpecifiers tests Secrets Manager version specifier syntax.
+func TestAWSSecret_VersionSpecifiers(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-test/version/secret"
@@ -224,8 +224,8 @@ func TestSecret_VersionSpecifiers(t *testing.T) {
 // Secrets Manager Staging Workflow Tests
 // =============================================================================
 
-// TestSecret_StagingWorkflow tests the complete Secrets Manager staging workflow.
-func TestSecret_StagingWorkflow(t *testing.T) {
+// TestAWSSecret_StagingWorkflow tests the complete Secrets Manager staging workflow.
+func TestAWSSecret_StagingWorkflow(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -312,8 +312,8 @@ func TestSecret_StagingWorkflow(t *testing.T) {
 	})
 }
 
-// TestSecret_StagingDeleteOptions tests Secrets Manager staging with delete options.
-func TestSecret_StagingDeleteOptions(t *testing.T) {
+// TestAWSSecret_StagingDeleteOptions tests Secrets Manager staging with delete options.
+func TestAWSSecret_StagingDeleteOptions(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -343,8 +343,8 @@ func TestSecret_StagingDeleteOptions(t *testing.T) {
 	})
 }
 
-// TestSecret_ErrorCases tests various Secrets Manager error scenarios.
-func TestSecret_ErrorCases(t *testing.T) {
+// TestAWSSecret_ErrorCases tests various Secrets Manager error scenarios.
+func TestAWSSecret_ErrorCases(t *testing.T) {
 	setupEnv(t)
 
 	// Show non-existent secret
@@ -369,8 +369,8 @@ func TestSecret_ErrorCases(t *testing.T) {
 	})
 }
 
-// TestSecret_SpecialCharactersInName tests secret names with special characters.
-func TestSecret_SpecialCharactersInName(t *testing.T) {
+// TestAWSSecret_SpecialCharactersInName tests secret names with special characters.
+func TestAWSSecret_SpecialCharactersInName(t *testing.T) {
 	setupEnv(t)
 
 	testCases := []struct {
@@ -400,8 +400,8 @@ func TestSecret_SpecialCharactersInName(t *testing.T) {
 	}
 }
 
-// TestSecret_StagingAddViaCLI tests the Secrets Manager stage add command via CLI.
-func TestSecret_StagingAddViaCLI(t *testing.T) {
+// TestAWSSecret_StagingAddViaCLI tests the Secrets Manager stage add command via CLI.
+func TestAWSSecret_StagingAddViaCLI(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -443,8 +443,8 @@ func TestSecret_StagingAddViaCLI(t *testing.T) {
 	})
 }
 
-// TestSecret_StagingAddExistingResourceFails tests that adding an existing secret fails.
-func TestSecret_StagingAddExistingResourceFails(t *testing.T) {
+// TestAWSSecret_StagingAddExistingResourceFails tests that adding an existing secret fails.
+func TestAWSSecret_StagingAddExistingResourceFails(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
@@ -469,8 +469,8 @@ func TestSecret_StagingAddExistingResourceFails(t *testing.T) {
 	})
 }
 
-// TestSecret_TagAndUntag tests the secret tag and untag commands.
-func TestSecret_TagAndUntag(t *testing.T) {
+// TestAWSSecret_TagAndUntag tests the secret tag and untag commands.
+func TestAWSSecret_TagAndUntag(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-tag/test-secret"
@@ -520,8 +520,8 @@ func TestSecret_TagAndUntag(t *testing.T) {
 	})
 }
 
-// TestSecret_TagInvalidFormat tests error handling for invalid tag formats.
-func TestSecret_TagInvalidFormat(t *testing.T) {
+// TestAWSSecret_TagInvalidFormat tests error handling for invalid tag formats.
+func TestAWSSecret_TagInvalidFormat(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-tag/invalid-format"
@@ -544,8 +544,8 @@ func TestSecret_TagInvalidFormat(t *testing.T) {
 	})
 }
 
-// TestSecret_TagNonExistent tests tagging a non-existent secret.
-func TestSecret_TagNonExistent(t *testing.T) {
+// TestAWSSecret_TagNonExistent tests tagging a non-existent secret.
+func TestAWSSecret_TagNonExistent(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-tag/non-existent"
@@ -559,8 +559,8 @@ func TestSecret_TagNonExistent(t *testing.T) {
 	t.Logf("expected error: %v", err)
 }
 
-// TestSecret_UntagNonExistent tests untagging a non-existent secret.
-func TestSecret_UntagNonExistent(t *testing.T) {
+// TestAWSSecret_UntagNonExistent tests untagging a non-existent secret.
+func TestAWSSecret_UntagNonExistent(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-untag/non-existent"
@@ -574,8 +574,8 @@ func TestSecret_UntagNonExistent(t *testing.T) {
 	t.Logf("expected error: %v", err)
 }
 
-// TestSecret_UpdateNonExistent tests updating a non-existent secret.
-func TestSecret_UpdateNonExistent(t *testing.T) {
+// TestAWSSecret_UpdateNonExistent tests updating a non-existent secret.
+func TestAWSSecret_UpdateNonExistent(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-update/non-existent"
@@ -588,8 +588,8 @@ func TestSecret_UpdateNonExistent(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestSecret_UpdateMissingArgs tests error handling for missing arguments.
-func TestSecret_UpdateMissingArgs(t *testing.T) {
+// TestAWSSecret_UpdateMissingArgs tests error handling for missing arguments.
+func TestAWSSecret_UpdateMissingArgs(t *testing.T) {
 	setupEnv(t)
 
 	// No arguments at all
@@ -607,8 +607,8 @@ func TestSecret_UpdateMissingArgs(t *testing.T) {
 	})
 }
 
-// TestSecret_LogNonExistent tests log for non-existent secret.
-func TestSecret_LogNonExistent(t *testing.T) {
+// TestAWSSecret_LogNonExistent tests log for non-existent secret.
+func TestAWSSecret_LogNonExistent(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-log/non-existent"
@@ -621,8 +621,8 @@ func TestSecret_LogNonExistent(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestSecret_DiffNonExistent tests diff for non-existent secret.
-func TestSecret_DiffNonExistent(t *testing.T) {
+// TestAWSSecret_DiffNonExistent tests diff for non-existent secret.
+func TestAWSSecret_DiffNonExistent(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-diff/non-existent"
@@ -635,8 +635,8 @@ func TestSecret_DiffNonExistent(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestSecret_ShowRaw tests secret show with --raw flag.
-func TestSecret_ShowRaw(t *testing.T) {
+// TestAWSSecret_ShowRaw tests secret show with --raw flag.
+func TestAWSSecret_ShowRaw(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-show/raw-test"
@@ -660,8 +660,8 @@ func TestSecret_ShowRaw(t *testing.T) {
 	})
 }
 
-// TestSecret_ShowNonExistent tests show for non-existent secret.
-func TestSecret_ShowNonExistent(t *testing.T) {
+// TestAWSSecret_ShowNonExistent tests show for non-existent secret.
+func TestAWSSecret_ShowNonExistent(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-show/non-existent"
@@ -674,8 +674,8 @@ func TestSecret_ShowNonExistent(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestSecret_CreateAndTag tests creating a secret and adding tags after.
-func TestSecret_CreateAndTag(t *testing.T) {
+// TestAWSSecret_CreateAndTag tests creating a secret and adding tags after.
+func TestAWSSecret_CreateAndTag(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-create/and-tag"
@@ -702,8 +702,8 @@ func TestSecret_CreateAndTag(t *testing.T) {
 	assert.Contains(t, stdout, "team: suve")
 }
 
-// TestSecret_CreateDuplicate tests creating a duplicate secret.
-func TestSecret_CreateDuplicate(t *testing.T) {
+// TestAWSSecret_CreateDuplicate tests creating a duplicate secret.
+func TestAWSSecret_CreateDuplicate(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-create/duplicate"
@@ -723,8 +723,8 @@ func TestSecret_CreateDuplicate(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// TestSecret_CreateMissingArgs tests error handling for missing arguments.
-func TestSecret_CreateMissingArgs(t *testing.T) {
+// TestAWSSecret_CreateMissingArgs tests error handling for missing arguments.
+func TestAWSSecret_CreateMissingArgs(t *testing.T) {
 	setupEnv(t)
 
 	// No arguments at all
@@ -742,8 +742,8 @@ func TestSecret_CreateMissingArgs(t *testing.T) {
 	})
 }
 
-// TestSecret_DeleteNonExistent tests deleting a non-existent secret.
-func TestSecret_DeleteNonExistent(t *testing.T) {
+// TestAWSSecret_DeleteNonExistent tests deleting a non-existent secret.
+func TestAWSSecret_DeleteNonExistent(t *testing.T) {
 	setupEnv(t)
 	// Use a unique name that definitely doesn't exist
 	secretName := "suve-e2e-delete/definitely-non-existent-secret-xyz"
@@ -757,8 +757,8 @@ func TestSecret_DeleteNonExistent(t *testing.T) {
 	}
 }
 
-// TestSecret_DeleteWithRecoveryWindow tests secret delete with recovery window.
-func TestSecret_DeleteWithRecoveryWindow(t *testing.T) {
+// TestAWSSecret_DeleteWithRecoveryWindow tests secret delete with recovery window.
+func TestAWSSecret_DeleteWithRecoveryWindow(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-delete/scheduled"
@@ -782,8 +782,8 @@ func TestSecret_DeleteWithRecoveryWindow(t *testing.T) {
 	_, _, _ = runCommand(t, secretrestore.Command(), "--yes", secretName)
 }
 
-// TestSecret_ListJSON tests secret list with JSON output.
-func TestSecret_ListJSON(t *testing.T) {
+// TestAWSSecret_ListJSON tests secret list with JSON output.
+func TestAWSSecret_ListJSON(t *testing.T) {
 	setupEnv(t)
 
 	secretName := "suve-e2e-list/json-test"
@@ -807,11 +807,11 @@ func TestSecret_ListJSON(t *testing.T) {
 // Service-Specific Export / Import Tests
 // =============================================================================
 
-// TestSecret_ExportImport restores the round-trip coverage previously provided
-// by TestSecret_StashPushAndPop, expressed through `stage secret export <file>`
+// TestAWSSecret_ExportImport restores the round-trip coverage previously provided
+// by TestAWSSecret_StashPushAndPop, expressed through `stage secret export <file>`
 // / `import <file>`. It runs against an isolated temp HOME so the working
 // staging area starts empty.
-func TestSecret_ExportImport(t *testing.T) {
+func TestAWSSecret_ExportImport(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
