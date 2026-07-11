@@ -27,6 +27,7 @@ type LogEntry struct {
 	Value        string
 	LastModified *time.Time
 	IsCurrent    bool
+	Error        error // Error from fetching value, if any
 }
 
 // LogOutput holds the result of the log use case.
@@ -49,7 +50,8 @@ type LogUseCase struct {
 // It fetches the version history (newest first) via the provider, applies the
 // date filters, then retrieves each surviving version's value and type. The
 // provider's History exposes only version metadata (id/created), so values are
-// fetched per version via Resolve+Get.
+// fetched per version via Resolve+Get. A per-version fetch failure is recorded
+// on the entry's Error field rather than aborting the whole listing.
 func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, error) {
 	versions, err := u.Reader.History(ctx, input.Name)
 	if err != nil {
@@ -102,18 +104,22 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	entries := make([]LogEntry, 0, len(filtered))
 
 	for _, v := range filtered {
-		entry, err := u.getVersion(ctx, input.Name, v)
-		if err != nil {
-			return nil, err
-		}
+		entry, fetchErr := u.getVersion(ctx, input.Name, v)
 
-		entries = append(entries, LogEntry{
+		logEntry := LogEntry{
 			Version:      parseVersion(v.ID),
-			Type:         entry.Type,
-			Value:        entry.Value,
 			LastModified: v.Created,
 			IsCurrent:    parseVersion(v.ID) == maxVersionNum,
-		})
+			Error:        fetchErr,
+		}
+		// Record a per-version fetch failure on the entry rather than aborting
+		// the whole listing; entry is nil when fetchErr is non-nil.
+		if fetchErr == nil {
+			logEntry.Type = entry.Type
+			logEntry.Value = entry.Value
+		}
+
+		entries = append(entries, logEntry)
 	}
 
 	// History yields newest first (default). Reverse to oldest first on request.
