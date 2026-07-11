@@ -255,6 +255,30 @@ func TestCheckConflicts(t *testing.T) {
 	})
 }
 
+// TestCheckConflicts_ResolverError verifies that a per-namespace resolver which
+// fails to resolve a strategy is treated like a fetch error: the entry is
+// skipped (no conflict) and the failure surfaces later on the apply attempt.
+func TestCheckConflicts_ResolverError(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	resolve := func(string) (staging.ApplyStrategy, error) {
+		return nil, errors.New("cannot resolve strategy")
+	}
+	entries := map[staging.EntryKey]staging.Entry{
+		{Name: "create-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+		{Name: "update-item"}: {
+			Operation:      staging.OperationUpdate,
+			Value:          lo.ToPtr("value"),
+			BaseModifiedAt: &baseTime,
+		},
+	}
+
+	conflicts := staging.CheckConflicts(t.Context(), resolve, entries)
+	assert.Empty(t, conflicts)
+}
+
 // TestCheckConflicts_PerNamespace is a regression for #441: two same-named
 // entries under different namespaces must each be probed against their OWN
 // namespace's remote state, and the reported conflict must carry the namespace.

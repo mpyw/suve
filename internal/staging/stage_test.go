@@ -426,3 +426,21 @@ func TestEntryKey_NamespaceIdentity(t *testing.T) {
 		}, got)
 	})
 }
+
+func TestEntryKey_Label(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty namespace renders the bare name", func(t *testing.T) {
+		t.Parallel()
+
+		key := staging.EntryKey{Name: "/app/config"}
+		assert.Equal(t, "/app/config", key.Label())
+	})
+
+	t.Run("non-empty namespace appends a [namespace] badge", func(t *testing.T) {
+		t.Parallel()
+
+		key := staging.EntryKey{Name: "/app/config", Namespace: "dev"}
+		assert.Equal(t, "/app/config [dev]", key.Label())
+	})
+}
