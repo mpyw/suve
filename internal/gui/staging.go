@@ -198,6 +198,7 @@ var (
 		stagingusecase.ResetResultNotStaged:     "notStaged",
 		stagingusecase.ResetResultNothingStaged: "nothingStaged",
 		stagingusecase.ResetResultSkipped:       "skipped",
+		stagingusecase.ResetResultUnstagedTag:   "unstagedTag",
 	}
 
 	diffEntryTypeNames = map[stagingusecase.DiffEntryType]string{

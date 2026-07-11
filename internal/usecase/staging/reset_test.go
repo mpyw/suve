@@ -95,6 +95,38 @@ func TestResetUseCase_Execute_NotStaged(t *testing.T) {
 	assert.Equal(t, usecasestaging.ResetResultNotStaged, output.Type)
 }
 
+// TestResetUseCase_Execute_UnstageTagOnly guards #522: named reset of an item
+// whose value is not staged but which carries a staged tag-only change must
+// cancel that tag change and report it, not misreport "not staged" while the
+// TagEntry silently survives to apply.
+func TestResetUseCase_Execute_UnstageTagOnly(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	key := staging.EntryKey{Name: "/app/config"}
+	// Only a tag change is staged; the entry value itself stays NotStaged.
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	uc := &usecasestaging.ResetUseCase{
+		Parser: newMockParser(),
+		Store:  store,
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ResetInput{
+		Spec: "/app/config",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, usecasestaging.ResetResultUnstagedTag, output.Type)
+	assert.Equal(t, "/app/config", output.Name)
+
+	// The staged tag change must be gone.
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, key)
+	assert.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
 func TestResetUseCase_Execute_UnstageCreate_DiscardsTags(t *testing.T) {
 	t.Parallel()
 

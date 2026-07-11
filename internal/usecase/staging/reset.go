@@ -29,7 +29,8 @@ const (
 	ResetResultRestored
 	ResetResultNotStaged
 	ResetResultNothingStaged
-	ResetResultSkipped // Restore was skipped because value matches current AWS
+	ResetResultSkipped     // Restore was skipped because value matches current AWS
+	ResetResultUnstagedTag // Only staged tag changes were unstaged (entry itself not staged)
 )
 
 // ResetOutput holds the result of the reset use case.
@@ -118,8 +119,28 @@ func (u *ResetUseCase) unstage(ctx context.Context, name, namespace, _, _ string
 
 	// Check if already not staged
 	if _, isNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged); isNotStaged {
+		// The entry value is not staged, but a tag-only change may still be
+		// staged. Named reset must cancel it too; otherwise the CLI misreports
+		// "not staged" while the TagEntry survives and is applied on the next
+		// apply.
+		tagEntry, err := u.Store.GetTag(ctx, service, key)
+		if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+			return nil, err
+		}
+
+		if tagEntry == nil {
+			return &ResetOutput{
+				Type: ResetResultNotStaged,
+				Name: name,
+			}, nil
+		}
+
+		if err := u.Store.UnstageTag(ctx, service, key); err != nil {
+			return nil, err
+		}
+
 		return &ResetOutput{
-			Type: ResetResultNotStaged,
+			Type: ResetResultUnstagedTag,
 			Name: name,
 		}, nil
 	}
