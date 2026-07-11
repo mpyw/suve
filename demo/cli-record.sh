@@ -18,18 +18,25 @@ export AWS_ENDPOINT_URL="http://localhost:${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}
 export AWS_ACCESS_KEY_ID="test"
 export AWS_SECRET_ACCESS_KEY="test"
 export AWS_DEFAULT_REGION="us-east-1"
+# Pin a deterministic staging data key so the staging steps never block on the
+# macOS keychain (matches `mise test` and scripts/seed.sh).
+export SUVE_STAGING_KEY="${SUVE_STAGING_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
+
+# This demo owns the /demo/* namespace, kept deliberately separate from the
+# `mise run seed-*` fixtures (/suve-demo/*), so recording and manual seeding
+# never clobber each other.
 
 echo "=== Setting up demo environment ==="
 
-# Build suve if needed
-if [[ ! -f bin/suve ]]; then
-    echo "Building suve..."
-    mise build
-fi
+# Always build the full GUI binary (bin/suve) so it matches the current bindings
+# and API arity — a stale or CLI-only binary can drift out of sync.
+echo "Building suve (GUI)..."
+mise build-gui
 
-# Reset LocalStack (clean slate)
+# Reset LocalStack (clean slate). --profile "*" so the profile-gated localstack
+# service is actually torn down (a bare `down` leaves profiled services running).
 echo "Resetting LocalStack..."
-docker compose down -v
+docker compose --profile "*" down -v
 docker compose --profile aws up -d
 echo "Waiting for LocalStack to be ready..."
 sleep 3
