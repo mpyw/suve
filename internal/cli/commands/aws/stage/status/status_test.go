@@ -447,8 +447,8 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 // provider-wide status command.
 func awsServices() []stgcli.GlobalServiceSpec {
 	return []stgcli.GlobalServiceSpec{
-		{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory},
-		{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory},
+		{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory},
+		{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory},
 	}
 }
 
@@ -469,8 +469,8 @@ func TestRun_SkipUnconfiguredService(t *testing.T) {
 
 	r := &status.Runner{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: notConfiguredResolver},
-			{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory, ScopeResolver: notConfiguredResolver},
+			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: notConfiguredResolver},
+			{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: notConfiguredResolver},
 		},
 		Stdout: &buf,
 		Stderr: &bytes.Buffer{},
@@ -492,9 +492,13 @@ func TestRun_ResolverErrorPropagates(t *testing.T) {
 
 	r := &status.Runner{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: func(_ context.Context) (staging.ResolvedScope, error) {
-				return staging.ResolvedScope{}, wantErr
-			}},
+			{
+				Service:       staging.ServiceParam,
+				ParserFactory: staging.AWSParamParserFactory,
+				ScopeResolver: func(_ context.Context) (staging.ResolvedScope, error) {
+					return staging.ResolvedScope{}, wantErr
+				},
+			},
 		},
 		Stdout: &buf,
 		Stderr: &bytes.Buffer{},

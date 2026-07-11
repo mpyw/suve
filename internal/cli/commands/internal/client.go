@@ -181,28 +181,28 @@ func storeForKind(ctx context.Context, kind provider.Kind) (provider.Store, erro
 	return store, nil
 }
 
-// ParamStrategyFactory builds a staging FullStrategy for the parameter service,
+// AWSParamStrategyFactory builds a staging FullStrategy for the parameter service,
 // wrapping a provider.Store resolved through the registry. It satisfies
 // staging.StrategyFactory.
-func ParamStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
+func AWSParamStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
 	store, err := ParamStore(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return staging.NewParamStrategy(store), nil
+	return staging.NewAWSParamStrategy(store), nil
 }
 
-// SecretStrategyFactory builds a staging FullStrategy for the secret service,
+// AWSSecretStrategyFactory builds a staging FullStrategy for the secret service,
 // wrapping a provider.Store resolved through the registry. It satisfies
 // staging.StrategyFactory.
-func SecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
+func AWSSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
 	store, err := SecretStore(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return staging.NewSecretStrategy(store), nil
+	return staging.NewAWSSecretStrategy(store), nil
 }
 
 // GoogleCloudSecretStrategyFactory builds a staging FullStrategy for Google Cloud Secret

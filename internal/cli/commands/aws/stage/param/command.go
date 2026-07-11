@@ -13,8 +13,8 @@ import (
 var config = stgcli.CommandConfig{
 	CommandName:   "param",
 	ItemName:      "parameter",
-	Factory:       cliinternal.ParamStrategyFactory,
-	ParserFactory: staging.ParamParserFactory,
+	Factory:       cliinternal.AWSParamStrategyFactory,
+	ParserFactory: staging.AWSParamParserFactory,
 }
 
 // Config returns the AWS SSM Parameter Store staging command config. It is used

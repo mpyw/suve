@@ -16,41 +16,41 @@ import (
 	"github.com/mpyw/suve/internal/version/secretversion"
 )
 
-// SecretStrategy implements ServiceStrategy for Secrets Manager. It is backed by
+// AWSSecretStrategy implements ServiceStrategy for Secrets Manager. It is backed by
 // a provider.Store rather than an AWS SDK client, so it carries no cloud SDK
 // dependency of its own. A nil store yields a parser-only strategy.
-type SecretStrategy struct {
+type AWSSecretStrategy struct {
 	store provider.Store
 }
 
-// NewSecretStrategy creates a new Secrets Manager strategy over the given
+// NewAWSSecretStrategy creates a new Secrets Manager strategy over the given
 // provider store. A nil store is allowed for parser-only use.
-func NewSecretStrategy(store provider.Store) *SecretStrategy {
-	return &SecretStrategy{store: store}
+func NewAWSSecretStrategy(store provider.Store) *AWSSecretStrategy {
+	return &AWSSecretStrategy{store: store}
 }
 
 // Service returns the service type.
-func (s *SecretStrategy) Service() Service {
+func (s *AWSSecretStrategy) Service() Service {
 	return ServiceSecret
 }
 
 // ServiceName returns the user-friendly service name.
-func (s *SecretStrategy) ServiceName() string {
+func (s *AWSSecretStrategy) ServiceName() string {
 	return "Secrets Manager"
 }
 
 // ItemName returns the item name for messages.
-func (s *SecretStrategy) ItemName() string {
+func (s *AWSSecretStrategy) ItemName() string {
 	return itemNameSecret
 }
 
 // HasDeleteOptions returns true as Secrets Manager has delete options.
-func (s *SecretStrategy) HasDeleteOptions() bool {
+func (s *AWSSecretStrategy) HasDeleteOptions() bool {
 	return true
 }
 
 // Apply applies a staged operation to Secrets Manager.
-func (s *SecretStrategy) Apply(ctx context.Context, name string, entry Entry) error {
+func (s *AWSSecretStrategy) Apply(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
 	case OperationCreate:
 		return s.applyCreate(ctx, name, entry)
@@ -63,7 +63,7 @@ func (s *SecretStrategy) Apply(ctx context.Context, name string, entry Entry) er
 	}
 }
 
-func (s *SecretStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
+func (s *AWSSecretStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
 	if _, err := s.store.Create(ctx, name, lo.FromPtr(entry.Value), domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
 		return fmt.Errorf("failed to create secret: %w", err)
 	}
@@ -71,7 +71,7 @@ func (s *SecretStrategy) applyCreate(ctx context.Context, name string, entry Ent
 	return nil
 }
 
-func (s *SecretStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
+func (s *AWSSecretStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
 	if entry.Value == nil {
 		return nil
 	}
@@ -94,7 +94,7 @@ func (s *SecretStrategy) applyUpdate(ctx context.Context, name string, entry Ent
 	return nil
 }
 
-func (s *SecretStrategy) applyDelete(ctx context.Context, name string, entry Entry) error {
+func (s *AWSSecretStrategy) applyDelete(ctx context.Context, name string, entry Entry) error {
 	opts := deleteOptions(entry.DeleteOptions)
 
 	if err := s.store.Delete(ctx, name, opts...); err != nil {
@@ -126,7 +126,7 @@ func deleteOptions(o *DeleteOptions) []provider.DeleteOption {
 }
 
 // ApplyTags applies staged tag changes to Secrets Manager.
-func (s *SecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
+func (s *AWSSecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
 	if len(tagEntry.Add) > 0 {
 		if err := s.store.Tag(ctx, name, tagEntry.Add); err != nil {
 			return err
@@ -146,7 +146,7 @@ func (s *SecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry Ta
 // *ResourceNotFoundError when the secret does not exist, so callers can tell
 // "missing" apart from "exists but has no modification time" (the latter returns
 // a zero time with a nil error).
-func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
+func (s *AWSSecretStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
@@ -164,7 +164,7 @@ func (s *SecretStrategy) FetchLastModified(ctx context.Context, name string) (ti
 }
 
 // FetchCurrent fetches the current value from Secrets Manager for diffing.
-func (s *SecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
+func (s *AWSSecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (s *SecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchR
 }
 
 // FetchCurrentTags fetches the current tags from Secrets Manager.
-func (s *SecretStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
+func (s *AWSSecretStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		// Secret not found - return nil (no tags available)
@@ -201,7 +201,7 @@ func (s *SecretStrategy) FetchCurrentTags(ctx context.Context, name string) (map
 }
 
 // ParseName parses and validates a name for editing.
-func (s *SecretStrategy) ParseName(input string) (string, error) {
+func (s *AWSSecretStrategy) ParseName(input string) (string, error) {
 	spec, err := secretversion.Parse(input)
 	if err != nil {
 		return "", err
@@ -216,7 +216,7 @@ func (s *SecretStrategy) ParseName(input string) (string, error) {
 
 // FetchCurrentValue fetches the current value from Secrets Manager for editing.
 // Returns *ResourceNotFoundError if the secret doesn't exist.
-func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
+func (s *AWSSecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
@@ -238,7 +238,7 @@ func (s *SecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*E
 }
 
 // ParseSpec parses a version spec string for reset.
-func (s *SecretStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
+func (s *AWSSecretStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
 	spec, err := secretversion.Parse(input)
 	if err != nil {
 		return "", false, err
@@ -250,7 +250,7 @@ func (s *SecretStrategy) ParseSpec(input string) (name string, hasVersion bool, 
 }
 
 // FetchVersion fetches the value for a specific version.
-func (s *SecretStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
+func (s *AWSSecretStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
 	spec, err := secretversion.Parse(input)
 	if err != nil {
 		return "", "", err
@@ -291,8 +291,8 @@ func secretSpecSuffix(spec *secretversion.Spec) string {
 	return b.String()
 }
 
-// SecretParserFactory creates a Parser without provider access.
+// AWSSecretParserFactory creates a Parser without provider access.
 // Use this for operations that don't need AWS access (e.g., status, parsing).
-func SecretParserFactory() Parser {
-	return NewSecretStrategy(nil)
+func AWSSecretParserFactory() Parser {
+	return NewAWSSecretStrategy(nil)
 }

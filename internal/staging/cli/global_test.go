@@ -14,8 +14,8 @@ import (
 func TestAWSGlobalConfig(t *testing.T) {
 	t.Parallel()
 
-	param := stgcli.CommandConfig{Factory: nil, ParserFactory: staging.ParamParserFactory}
-	secret := stgcli.CommandConfig{Factory: nil, ParserFactory: staging.SecretParserFactory}
+	param := stgcli.CommandConfig{Factory: nil, ParserFactory: staging.AWSParamParserFactory}
+	secret := stgcli.CommandConfig{Factory: nil, ParserFactory: staging.AWSSecretParserFactory}
 
 	cfg := stgcli.AWSGlobalConfig(param, secret)
 

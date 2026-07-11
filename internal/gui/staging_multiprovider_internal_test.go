@@ -58,8 +58,8 @@ func TestApp_getParser_PerProvider(t *testing.T) {
 		service  string
 		want     staging.Parser
 	}{
-		{"aws param", provider.ProviderAWS, "param", &staging.ParamStrategy{}},
-		{"aws secret", provider.ProviderAWS, "secret", &staging.SecretStrategy{}},
+		{"aws param", provider.ProviderAWS, "param", &staging.AWSParamStrategy{}},
+		{"aws secret", provider.ProviderAWS, "secret", &staging.AWSSecretStrategy{}},
 		{"google cloud secret", provider.ProviderGoogleCloud, "secret", &staging.GoogleCloudSecretStrategy{}},
 		{"azure param", provider.ProviderAzure, "param", &staging.AzureAppConfigParamStrategy{}},
 		{"azure secret", provider.ProviderAzure, "secret", &staging.AzureKeyVaultSecretStrategy{}},

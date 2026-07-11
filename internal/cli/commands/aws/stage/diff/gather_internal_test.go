@@ -51,8 +51,8 @@ func TestGatherServices_SkipsUnconfigured(t *testing.T) {
 
 	cfg := stgcli.GlobalConfig{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: notConfiguredResolver},
-			{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory, ScopeResolver: notConfiguredResolver},
+			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: notConfiguredResolver},
+			{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: notConfiguredResolver},
 		},
 	}
 
@@ -67,9 +67,13 @@ func TestGatherServices_ResolverErrorPropagates(t *testing.T) {
 	wantErr := errors.New("boom")
 	cfg := stgcli.GlobalConfig{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: func(_ context.Context) (staging.ResolvedScope, error) {
-				return staging.ResolvedScope{}, wantErr
-			}},
+			{
+				Service:       staging.ServiceParam,
+				ParserFactory: staging.AWSParamParserFactory,
+				ScopeResolver: func(_ context.Context) (staging.ResolvedScope, error) {
+					return staging.ResolvedScope{}, wantErr
+				},
+			},
 		},
 	}
 
@@ -86,7 +90,7 @@ func TestGatherServices_ListEntriesErrorPropagates(t *testing.T) {
 
 	cfg := stgcli.GlobalConfig{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: targetResolver("t")},
+			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: targetResolver("t")},
 		},
 	}
 
@@ -103,7 +107,7 @@ func TestGatherServices_ListTagsErrorPropagates(t *testing.T) {
 
 	cfg := stgcli.GlobalConfig{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: targetResolver("t")},
+			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: targetResolver("t")},
 		},
 	}
 
@@ -128,8 +132,8 @@ func TestGatherServices_PerServiceStores(t *testing.T) {
 
 	cfg := stgcli.GlobalConfig{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.ParamParserFactory, ScopeResolver: targetResolver("store"), Factory: nilFactory},
-			{Service: staging.ServiceSecret, ParserFactory: staging.SecretParserFactory, ScopeResolver: targetResolver("vault"), Factory: nilFactory},
+			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: targetResolver("store"), Factory: nilFactory},
+			{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: targetResolver("vault"), Factory: nilFactory},
 		},
 	}
 

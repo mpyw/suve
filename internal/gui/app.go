@@ -523,7 +523,7 @@ func (a *App) getParserScoped(sc provider.Scope, service string) (staging.Parser
 			return &staging.AzureAppConfigParamStrategy{}, nil
 		}
 
-		return &staging.ParamStrategy{}, nil
+		return &staging.AWSParamStrategy{}, nil
 	case string(staging.ServiceSecret):
 		switch sc.Provider {
 		case provider.ProviderGoogleCloud:
@@ -531,7 +531,7 @@ func (a *App) getParserScoped(sc provider.Scope, service string) (staging.Parser
 		case provider.ProviderAzure:
 			return &staging.AzureKeyVaultSecretStrategy{}, nil
 		default:
-			return &staging.SecretStrategy{}, nil
+			return &staging.AWSSecretStrategy{}, nil
 		}
 	default:
 		return nil, errInvalidService
@@ -557,7 +557,7 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 			return staging.NewAzureAppConfigParamStrategy(s), nil
 		}
 
-		return staging.NewParamStrategy(s), nil
+		return staging.NewAWSParamStrategy(s), nil
 	case string(staging.ServiceSecret):
 		s, err := a.secretStoreScoped(sc)
 		if err != nil {
@@ -570,7 +570,7 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 		case provider.ProviderAzure:
 			return staging.NewAzureKeyVaultSecretStrategy(s), nil
 		default:
-			return staging.NewSecretStrategy(s), nil
+			return staging.NewAWSSecretStrategy(s), nil
 		}
 	default:
 		return nil, errInvalidService
@@ -579,7 +579,7 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 
 // strategyAsScoped resolves the service strategy for an already-snapshotted scope
 // and narrows it to the requested staging strategy interface T. The concrete
-// *ParamStrategy / *SecretStrategy satisfy every staging strategy interface, so
+// *AWSParamStrategy / *AWSSecretStrategy satisfy every staging strategy interface, so
 // this succeeds for the Edit, Apply and Diff interfaces (which FullStrategy
 // embeds) as well as for DeleteStrategy (which it does not embed but the concrete
 // types implement). It is a free function because Go methods cannot declare type

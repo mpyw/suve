@@ -15,41 +15,41 @@ import (
 	"github.com/mpyw/suve/internal/version/paramversion"
 )
 
-// ParamStrategy implements ServiceStrategy for SSM Parameter Store. It is backed
+// AWSParamStrategy implements ServiceStrategy for SSM Parameter Store. It is backed
 // by a provider.Store rather than an AWS SDK client, so it carries no cloud SDK
 // dependency. A nil store yields a parser-only strategy (ParseName/ParseSpec).
-type ParamStrategy struct {
+type AWSParamStrategy struct {
 	store provider.Store
 }
 
-// NewParamStrategy creates a new SSM Parameter Store strategy over the given
+// NewAWSParamStrategy creates a new SSM Parameter Store strategy over the given
 // provider store. A nil store is allowed for parser-only use.
-func NewParamStrategy(store provider.Store) *ParamStrategy {
-	return &ParamStrategy{store: store}
+func NewAWSParamStrategy(store provider.Store) *AWSParamStrategy {
+	return &AWSParamStrategy{store: store}
 }
 
 // Service returns the service type.
-func (s *ParamStrategy) Service() Service {
+func (s *AWSParamStrategy) Service() Service {
 	return ServiceParam
 }
 
 // ServiceName returns the user-friendly service name.
-func (s *ParamStrategy) ServiceName() string {
+func (s *AWSParamStrategy) ServiceName() string {
 	return "SSM Parameter Store"
 }
 
 // ItemName returns the item name for messages.
-func (s *ParamStrategy) ItemName() string {
+func (s *AWSParamStrategy) ItemName() string {
 	return "parameter"
 }
 
 // HasDeleteOptions returns false as SSM Parameter Store doesn't have delete options.
-func (s *ParamStrategy) HasDeleteOptions() bool {
+func (s *AWSParamStrategy) HasDeleteOptions() bool {
 	return false
 }
 
 // Apply applies a staged operation to SSM Parameter Store.
-func (s *ParamStrategy) Apply(ctx context.Context, name string, entry Entry) error {
+func (s *AWSParamStrategy) Apply(ctx context.Context, name string, entry Entry) error {
 	switch entry.Operation {
 	case OperationCreate:
 		return s.applyCreate(ctx, name, entry)
@@ -62,7 +62,7 @@ func (s *ParamStrategy) Apply(ctx context.Context, name string, entry Entry) err
 	}
 }
 
-func (s *ParamStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
+func (s *AWSParamStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
 	if entry.Value == nil {
 		return nil
 	}
@@ -76,7 +76,7 @@ func (s *ParamStrategy) applyCreate(ctx context.Context, name string, entry Entr
 	return nil
 }
 
-func (s *ParamStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
+func (s *AWSParamStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
 	if entry.Value == nil {
 		return nil
 	}
@@ -99,7 +99,7 @@ func (s *ParamStrategy) applyUpdate(ctx context.Context, name string, entry Entr
 	return nil
 }
 
-func (s *ParamStrategy) applyDelete(ctx context.Context, name string) error {
+func (s *AWSParamStrategy) applyDelete(ctx context.Context, name string) error {
 	if err := s.store.Delete(ctx, name); err != nil {
 		// Already deleted is considered success.
 		if errors.Is(err, provider.ErrNotFound) {
@@ -113,7 +113,7 @@ func (s *ParamStrategy) applyDelete(ctx context.Context, name string) error {
 }
 
 // ApplyTags applies staged tag changes to SSM Parameter Store.
-func (s *ParamStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
+func (s *AWSParamStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
 	if len(tagEntry.Add) > 0 {
 		if err := s.store.Tag(ctx, name, tagEntry.Add); err != nil {
 			return err
@@ -133,7 +133,7 @@ func (s *ParamStrategy) ApplyTags(ctx context.Context, name string, tagEntry Tag
 // a *ResourceNotFoundError when the parameter does not exist, so callers can
 // tell "missing" apart from "exists but has no modification time" (the latter
 // returns a zero time with a nil error).
-func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
+func (s *AWSParamStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
@@ -151,7 +151,7 @@ func (s *ParamStrategy) FetchLastModified(ctx context.Context, name string) (tim
 }
 
 // FetchCurrent fetches the current value from SSM Parameter Store for diffing.
-func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
+func (s *AWSParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func (s *ParamStrategy) FetchCurrent(ctx context.Context, name string) (*FetchRe
 }
 
 // FetchCurrentTags fetches the current tags from SSM Parameter Store.
-func (s *ParamStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
+func (s *AWSParamStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		// Parameter not found - return nil (no tags available)
@@ -188,7 +188,7 @@ func (s *ParamStrategy) FetchCurrentTags(ctx context.Context, name string) (map[
 }
 
 // ParseName parses and validates a name for editing.
-func (s *ParamStrategy) ParseName(input string) (string, error) {
+func (s *AWSParamStrategy) ParseName(input string) (string, error) {
 	spec, err := paramversion.Parse(input)
 	if err != nil {
 		return "", err
@@ -203,7 +203,7 @@ func (s *ParamStrategy) ParseName(input string) (string, error) {
 
 // FetchCurrentValue fetches the current value from SSM Parameter Store for editing.
 // Returns *ResourceNotFoundError if the parameter doesn't exist.
-func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
+func (s *AWSParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
 	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
@@ -225,7 +225,7 @@ func (s *ParamStrategy) FetchCurrentValue(ctx context.Context, name string) (*Ed
 }
 
 // ParseSpec parses a version spec string for reset.
-func (s *ParamStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
+func (s *AWSParamStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
 	spec, err := paramversion.Parse(input)
 	if err != nil {
 		return "", false, err
@@ -237,7 +237,7 @@ func (s *ParamStrategy) ParseSpec(input string) (name string, hasVersion bool, e
 }
 
 // FetchVersion fetches the value for a specific version.
-func (s *ParamStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
+func (s *AWSParamStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
 	spec, err := paramversion.Parse(input)
 	if err != nil {
 		return "", "", err
@@ -274,8 +274,8 @@ func paramSpecSuffix(spec *paramversion.Spec) string {
 	return b.String()
 }
 
-// ParamParserFactory creates a Parser without provider access.
+// AWSParamParserFactory creates a Parser without provider access.
 // Use this for operations that don't need AWS access (e.g., status, parsing).
-func ParamParserFactory() Parser {
-	return NewParamStrategy(nil)
+func AWSParamParserFactory() Parser {
+	return NewAWSParamStrategy(nil)
 }

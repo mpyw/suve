@@ -17,7 +17,7 @@ import (
 
 // GoogleCloudSecretStrategy implements the staging strategies for Google Cloud Secret
 // Manager. Like the AWS strategies it is backed by a provider.Store and carries
-// no cloud SDK dependency. It differs from the AWS SecretStrategy in three
+// no cloud SDK dependency. It differs from the AWSSecretStrategy in three
 // provider-specific ways:
 //
 //   - Versions are immutable integers, parsed with gcloudversion (#N, ~SHIFT); a
