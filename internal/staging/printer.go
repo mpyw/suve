@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/timeutil"
 )
 
 // maxValueDisplayLength is the maximum length of a value shown in status output.
@@ -49,7 +50,7 @@ func (p *EntryPrinter) PrintEntry(key EntryKey, entry Entry, verbose, showDelete
 	}
 
 	output.Printf(p.Writer, "\n%s %s%s\n", opColor, key.Name, nsSuffix)
-	output.Printf(p.Writer, "  %s %s\n", pal.FieldLabel("Staged:"), entry.StagedAt.Format("2006-01-02 15:04:05"))
+	output.Printf(p.Writer, "  %s %s\n", pal.FieldLabel("Staged:"), timeutil.FormatDateTime(entry.StagedAt))
 
 	switch entry.Operation {
 	case OperationCreate, OperationUpdate:
