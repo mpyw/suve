@@ -38,7 +38,7 @@ func serverError() error {
 type mockClient struct {
 	getFunc func(ctx context.Context, key, label string) (azappconfig.GetSettingResponse, error)
 	setFunc func(
-		ctx context.Context, key, value, label string, tags map[string]*string, etag *azcore.ETag,
+		ctx context.Context, key, value, label string, tags map[string]*string, contentType *string, etag *azcore.ETag,
 	) (azappconfig.SetSettingResponse, error)
 	addFunc    func(ctx context.Context, key, value, label string) (azappconfig.AddSettingResponse, error)
 	deleteFunc func(ctx context.Context, key, label string) (azappconfig.DeleteSettingResponse, error)
@@ -50,9 +50,9 @@ func (m *mockClient) GetSetting(ctx context.Context, key, label string) (azappco
 }
 
 func (m *mockClient) SetSetting(
-	ctx context.Context, key, value, label string, tags map[string]*string, etag *azcore.ETag,
+	ctx context.Context, key, value, label string, tags map[string]*string, contentType *string, etag *azcore.ETag,
 ) (azappconfig.SetSettingResponse, error) {
-	return m.setFunc(ctx, key, value, label, tags, etag)
+	return m.setFunc(ctx, key, value, label, tags, contentType, etag)
 }
 
 func (m *mockClient) AddSetting(
@@ -524,7 +524,7 @@ func TestPut(t *testing.T) {
 			return azappconfig.GetSettingResponse{}, notFound()
 		},
 		setFunc: func(
-			_ context.Context, key, value, label string, _ map[string]*string, _ *azcore.ETag,
+			_ context.Context, key, value, label string, _ map[string]*string, _ *string, _ *azcore.ETag,
 		) (azappconfig.SetSettingResponse, error) {
 			setKey, setVal, setLabel = key, value, label
 
@@ -558,7 +558,7 @@ func TestPut_PreservesExistingTags(t *testing.T) {
 			}}, nil
 		},
 		setFunc: func(
-			_ context.Context, _, value, _ string, tags map[string]*string, _ *azcore.ETag,
+			_ context.Context, _, value, _ string, tags map[string]*string, _ *string, _ *azcore.ETag,
 		) (azappconfig.SetSettingResponse, error) {
 			sentTags = tags
 
@@ -574,6 +574,39 @@ func TestPut_PreservesExistingTags(t *testing.T) {
 	assert.Equal(t, map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("core")}, sentTags)
 }
 
+// TestPut_PreservesContentType asserts a value edit re-sends the setting's
+// current content-type so the PUT (a whole-key-value replace) does not strip it
+// — a Key Vault reference must stay a reference after its value is edited.
+func TestPut_PreservesContentType(t *testing.T) {
+	t.Parallel()
+
+	const kvRef = "application/vnd.microsoft.appconfig.keyvaultref+json"
+
+	var sentContentType *string
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
+				Key:         lo.ToPtr(key),
+				Value:       lo.ToPtr("old"),
+				ContentType: lo.ToPtr(kvRef),
+			}}, nil
+		},
+		setFunc: func(
+			_ context.Context, _, _, _ string, _ map[string]*string, contentType *string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
+			sentContentType = contentType
+
+			return azappconfig.SetSettingResponse{}, nil
+		},
+	}
+	store := appconfig.New(m, "")
+
+	_, err := store.Put(t.Context(), "db-password", "new", domain.ValueTypePlaintext, "")
+	require.NoError(t, err)
+	assert.Equal(t, kvRef, lo.FromPtr(sentContentType))
+}
+
 func TestPut_Error(t *testing.T) {
 	t.Parallel()
 
@@ -582,7 +615,7 @@ func TestPut_Error(t *testing.T) {
 			return azappconfig.GetSettingResponse{}, notFound()
 		},
 		setFunc: func(
-			_ context.Context, _, _, _ string, _ map[string]*string, _ *azcore.ETag,
+			_ context.Context, _, _, _ string, _ map[string]*string, _ *string, _ *azcore.ETag,
 		) (azappconfig.SetSettingResponse, error) {
 			return azappconfig.SetSettingResponse{}, serverError()
 		},
@@ -600,7 +633,7 @@ func TestPut_RejectsFilterNamespace(t *testing.T) {
 	called := false
 	m := &mockClient{
 		setFunc: func(
-			_ context.Context, _, _, _ string, _ map[string]*string, _ *azcore.ETag,
+			_ context.Context, _, _, _ string, _ map[string]*string, _ *string, _ *azcore.ETag,
 		) (azappconfig.SetSettingResponse, error) {
 			called = true
 
@@ -732,7 +765,7 @@ func TestTag_MergesAndPreservesValue(t *testing.T) {
 			}}, nil
 		},
 		setFunc: func(
-			_ context.Context, _, value, label string, tags map[string]*string, e *azcore.ETag,
+			_ context.Context, _, value, label string, tags map[string]*string, _ *string, e *azcore.ETag,
 		) (azappconfig.SetSettingResponse, error) {
 			gotValue, gotLabel, gotTags, gotETag = value, label, tags, e
 
@@ -746,6 +779,39 @@ func TestTag_MergesAndPreservesValue(t *testing.T) {
 	assert.Equal(t, "dev", gotLabel)
 	assert.Equal(t, &etag, gotETag)
 	assert.Equal(t, map[string]string{"env": "prod", "keep": "yes", "team": "core"}, derefTags(gotTags))
+}
+
+// TestTag_PreservesContentType asserts a tag-only edit re-sends the setting's
+// current content-type so the GET-merge-PUT does not strip it — a tag change
+// must never alter the value semantics (e.g. turn a Key Vault reference into a
+// plain literal).
+func TestTag_PreservesContentType(t *testing.T) {
+	t.Parallel()
+
+	const kvRef = "application/vnd.microsoft.appconfig.keyvaultref+json"
+
+	var sentContentType *string
+
+	m := &mockClient{
+		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
+			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
+				Key:         lo.ToPtr(key),
+				Value:       lo.ToPtr("keep-me"),
+				ContentType: lo.ToPtr(kvRef),
+			}}, nil
+		},
+		setFunc: func(
+			_ context.Context, _, _, _ string, _ map[string]*string, contentType *string, _ *azcore.ETag,
+		) (azappconfig.SetSettingResponse, error) {
+			sentContentType = contentType
+
+			return azappconfig.SetSettingResponse{}, nil
+		},
+	}
+	store := appconfig.New(m, "")
+
+	require.NoError(t, store.Tag(t.Context(), "db-password", map[string]string{"team": "payments"}))
+	assert.Equal(t, kvRef, lo.FromPtr(sentContentType))
 }
 
 // TestUntag_RemovesKeys asserts Untag deletes the given keys from the current
@@ -764,7 +830,7 @@ func TestUntag_RemovesKeys(t *testing.T) {
 			}}, nil
 		},
 		setFunc: func(
-			_ context.Context, _, _, _ string, tags map[string]*string, _ *azcore.ETag,
+			_ context.Context, _, _, _ string, tags map[string]*string, _ *string, _ *azcore.ETag,
 		) (azappconfig.SetSettingResponse, error) {
 			gotTags = tags
 
@@ -795,7 +861,7 @@ func TestTag_RetriesOn412ThenSucceeds(t *testing.T) {
 			}}, nil
 		},
 		setFunc: func(
-			_ context.Context, _, _, _ string, _ map[string]*string, _ *azcore.ETag,
+			_ context.Context, _, _, _ string, _ map[string]*string, _ *string, _ *azcore.ETag,
 		) (azappconfig.SetSettingResponse, error) {
 			sets++
 			if sets == 1 {
@@ -827,7 +893,7 @@ func TestTag_SurfacesPersistentConflict(t *testing.T) {
 			}}, nil
 		},
 		setFunc: func(
-			_ context.Context, _, _, _ string, _ map[string]*string, _ *azcore.ETag,
+			_ context.Context, _, _, _ string, _ map[string]*string, _ *string, _ *azcore.ETag,
 		) (azappconfig.SetSettingResponse, error) {
 			sets++
 
