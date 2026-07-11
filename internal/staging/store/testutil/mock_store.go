@@ -4,6 +4,7 @@ package testutil
 import (
 	"context"
 	"maps"
+	"slices"
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -133,26 +134,26 @@ func (m *MockStore) UnstageAll(_ context.Context, service staging.Service) error
 		return m.UnstageAllErr
 	}
 
-	switch service {
-	case staging.ServiceParam:
-		m.entries[staging.ServiceParam] = make(map[staging.EntryKey]staging.Entry)
-		m.tags[staging.ServiceParam] = make(map[staging.EntryKey]staging.TagEntry)
-	case staging.ServiceSecret:
-		m.entries[staging.ServiceSecret] = make(map[staging.EntryKey]staging.Entry)
-		m.tags[staging.ServiceSecret] = make(map[staging.EntryKey]staging.TagEntry)
-	case "":
-		m.entries[staging.ServiceParam] = make(map[staging.EntryKey]staging.Entry)
-		m.entries[staging.ServiceSecret] = make(map[staging.EntryKey]staging.Entry)
-		m.tags[staging.ServiceParam] = make(map[staging.EntryKey]staging.TagEntry)
-		m.tags[staging.ServiceSecret] = make(map[staging.EntryKey]staging.TagEntry)
+	for _, svc := range m.servicesFor(service) {
+		m.entries[svc] = make(map[staging.EntryKey]staging.Entry)
+		m.tags[svc] = make(map[staging.EntryKey]staging.TagEntry)
 	}
 
 	return nil
 }
 
+// servicesFor returns the services to operate on for the given service filter.
+// An empty filter expands to the services the mock tracks, mirroring the real
+// store's scope-driven iteration instead of hardcoding {param, secret}.
+func (m *MockStore) servicesFor(service staging.Service) []staging.Service {
+	if service != "" {
+		return []staging.Service{service}
+	}
+
+	return slices.Sorted(maps.Keys(m.entries))
+}
+
 // ListEntries returns all staged entries for a service.
-//
-//nolint:dupl // similar structure to ListTags but different types
 func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.Entry, error) {
 	if m.ListEntriesErr != nil {
 		return nil, m.ListEntriesErr
@@ -160,22 +161,9 @@ func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map
 
 	result := make(map[staging.Service]map[staging.EntryKey]staging.Entry)
 
-	switch service {
-	case staging.ServiceParam:
-		if len(m.entries[staging.ServiceParam]) > 0 {
-			result[staging.ServiceParam] = m.entries[staging.ServiceParam]
-		}
-	case staging.ServiceSecret:
-		if len(m.entries[staging.ServiceSecret]) > 0 {
-			result[staging.ServiceSecret] = m.entries[staging.ServiceSecret]
-		}
-	case "":
-		if len(m.entries[staging.ServiceParam]) > 0 {
-			result[staging.ServiceParam] = m.entries[staging.ServiceParam]
-		}
-
-		if len(m.entries[staging.ServiceSecret]) > 0 {
-			result[staging.ServiceSecret] = m.entries[staging.ServiceSecret]
+	for _, svc := range m.servicesFor(service) {
+		if len(m.entries[svc]) > 0 {
+			result[svc] = maps.Clone(m.entries[svc])
 		}
 	}
 
@@ -183,8 +171,6 @@ func (m *MockStore) ListEntries(_ context.Context, service staging.Service) (map
 }
 
 // ListTags returns all staged tag changes for a service.
-//
-//nolint:dupl // similar structure to ListEntries but different types
 func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.TagEntry, error) {
 	if m.ListTagsErr != nil {
 		return nil, m.ListTagsErr
@@ -192,22 +178,9 @@ func (m *MockStore) ListTags(_ context.Context, service staging.Service) (map[st
 
 	result := make(map[staging.Service]map[staging.EntryKey]staging.TagEntry)
 
-	switch service {
-	case staging.ServiceParam:
-		if len(m.tags[staging.ServiceParam]) > 0 {
-			result[staging.ServiceParam] = m.tags[staging.ServiceParam]
-		}
-	case staging.ServiceSecret:
-		if len(m.tags[staging.ServiceSecret]) > 0 {
-			result[staging.ServiceSecret] = m.tags[staging.ServiceSecret]
-		}
-	case "":
-		if len(m.tags[staging.ServiceParam]) > 0 {
-			result[staging.ServiceParam] = m.tags[staging.ServiceParam]
-		}
-
-		if len(m.tags[staging.ServiceSecret]) > 0 {
-			result[staging.ServiceSecret] = m.tags[staging.ServiceSecret]
+	for _, svc := range m.servicesFor(service) {
+		if len(m.tags[svc]) > 0 {
+			result[svc] = maps.Clone(m.tags[svc])
 		}
 	}
 
@@ -248,13 +221,9 @@ func (m *MockStore) Drain(_ context.Context, service staging.Service, keep bool)
 
 	// Clear storage if not keeping
 	if !keep {
-		m.entries = map[staging.Service]map[staging.EntryKey]staging.Entry{
-			staging.ServiceParam:  make(map[staging.EntryKey]staging.Entry),
-			staging.ServiceSecret: make(map[staging.EntryKey]staging.Entry),
-		}
-		m.tags = map[staging.Service]map[staging.EntryKey]staging.TagEntry{
-			staging.ServiceParam:  make(map[staging.EntryKey]staging.TagEntry),
-			staging.ServiceSecret: make(map[staging.EntryKey]staging.TagEntry),
+		for _, svc := range m.servicesFor("") {
+			m.entries[svc] = make(map[staging.EntryKey]staging.Entry)
+			m.tags[svc] = make(map[staging.EntryKey]staging.TagEntry)
 		}
 	}
 
@@ -279,13 +248,9 @@ func (m *MockStore) WriteState(_ context.Context, service staging.Service, state
 	}
 
 	// Replace all entries and tags
-	m.entries = map[staging.Service]map[staging.EntryKey]staging.Entry{
-		staging.ServiceParam:  make(map[staging.EntryKey]staging.Entry),
-		staging.ServiceSecret: make(map[staging.EntryKey]staging.Entry),
-	}
-	m.tags = map[staging.Service]map[staging.EntryKey]staging.TagEntry{
-		staging.ServiceParam:  make(map[staging.EntryKey]staging.TagEntry),
-		staging.ServiceSecret: make(map[staging.EntryKey]staging.TagEntry),
+	for _, svc := range m.servicesFor("") {
+		m.entries[svc] = make(map[staging.EntryKey]staging.Entry)
+		m.tags[svc] = make(map[staging.EntryKey]staging.TagEntry)
 	}
 
 	if state == nil {
