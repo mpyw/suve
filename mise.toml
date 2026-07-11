@@ -163,11 +163,16 @@ $compose run --rm --no-deps -e SUVE_AZURE_KEYVAULT_ENDPOINT=https://azure-keyvau
 '''
 
 [tasks.clean]
-description = "Remove build artifacts and stop containers (incl. volumes)"
+description = "Remove build artifacts and stop containers (incl. local-verification + test volumes)"
 shell = "bash -c"
 run = '''
 rm -rf bin/ *.out coverage/
-docker compose down -v 2>/dev/null || true
+# Default compose project: the local dev-verification emulators (started by
+# `mise run bash --aws/--gcloud/--azure`) and the ubuntu-* GUI desktops all sit
+# behind profiles, so --profile "*" is required to actually stop them and drop
+# their named volumes (go-cache / go-build-cache) — a bare `down -v` would leave
+# the profiled emulator containers and their volumes orphaned.
+docker compose --profile "*" down -v 2>/dev/null || true
 # Sweep any leftover closed-test projects (suve-test-*) from crashed runs, plus
 # their shared external caches. --profile "*" so profiled emulator services
 # (localstack/gcloud/azure) are actually removed, not just non-profiled ones.
@@ -177,6 +182,64 @@ done
 docker compose -f compose.test.yaml --profile "*" down -v 2>/dev/null || true
 docker volume rm suve-test-go-cache suve-test-go-build-cache 2>/dev/null || true
 '''
+
+# -----------------------------------------------------------------------------
+# Seeding: populate the local dev-verification emulators (started by
+# `mise run bash --aws/--gcloud/--azure`) with comprehensive demo data — stacked
+# versions, tags, and a full spread of staged changes — so every CLI/GUI view has
+# something to show. Run these INSIDE a `mise run bash …` shell so the emulator
+# env is injected; a service whose env is absent is skipped with a hint.
+#
+# Leaf tasks do the work; the seed-{aws,gcloud,azure} and seed-all aliases just
+# fan out via depends. All share seed-build so the throwaway CLI binary
+# (bin/suve-seed, kept apart from a GUI-enabled bin/suve) is compiled once.
+# -----------------------------------------------------------------------------
+
+[tasks.seed-build]
+hide = true
+description = "Compile the throwaway CLI binary used by the seed tasks"
+run = "go build -o bin/suve-seed ./cmd/suve"
+
+[tasks.seed-aws-param]
+description = "Seed AWS Parameter Store (versions, tags, staged add/edit/delete/tag changes)"
+depends = ["seed-build"]
+run = "bash scripts/seed.sh aws-param"
+
+[tasks.seed-aws-secret]
+description = "Seed AWS Secrets Manager (versions, tags, staged add/edit/delete/tag changes)"
+depends = ["seed-build"]
+run = "bash scripts/seed.sh aws-secret"
+
+[tasks.seed-aws]
+description = "Seed AWS Parameter Store + Secrets Manager"
+depends = ["seed-aws-param", "seed-aws-secret"]
+
+[tasks.seed-gcloud-secret]
+description = "Seed Google Cloud Secret Manager (versions, labels, staged add/edit/delete/tag changes)"
+depends = ["seed-build"]
+run = "bash scripts/seed.sh gcloud-secret"
+
+[tasks.seed-gcloud]
+description = "Seed Google Cloud (Secret Manager)"
+depends = ["seed-gcloud-secret"]
+
+[tasks.seed-azure-secret]
+description = "Seed Azure Key Vault (versions with per-version tags, staged add/edit/delete/tag changes)"
+depends = ["seed-build"]
+run = "bash scripts/seed.sh azure-secret"
+
+[tasks.seed-azure-param]
+description = "Seed Azure App Configuration ((NULL)/dev/prd labels, per-label tags, staged add/edit/delete/tag changes)"
+depends = ["seed-build"]
+run = "bash scripts/seed.sh azure-param"
+
+[tasks.seed-azure]
+description = "Seed Azure Key Vault + App Configuration"
+depends = ["seed-azure-secret", "seed-azure-param"]
+
+[tasks.seed-all]
+description = "Seed every configured cloud (AWS + Google Cloud + Azure)"
+depends = ["seed-aws", "seed-gcloud", "seed-azure"]
 
 [tasks.coverage]
 description = "Run unit tests with coverage"

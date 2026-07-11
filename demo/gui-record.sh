@@ -24,8 +24,6 @@ cleanup() {
         echo "Stopping wails dev..."
         kill "$WAILS_PID" 2>/dev/null || true
     fi
-    echo "Stopping staging agent..."
-    "$PROJECT_DIR/bin/suve" stage agent stop 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -36,18 +34,26 @@ export AWS_ENDPOINT_URL="http://localhost:${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}
 export AWS_ACCESS_KEY_ID="test"
 export AWS_SECRET_ACCESS_KEY="test"
 export AWS_DEFAULT_REGION="us-east-1"
+# Pin a deterministic staging data key so both the setup CLI and the GUI (wails
+# dev, launched below with this env inherited) share one staging store without a
+# macOS keychain prompt (matches `mise test` and scripts/seed.sh).
+export SUVE_STAGING_KEY="${SUVE_STAGING_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
+
+# This demo owns the /demo/* namespace, kept deliberately separate from the
+# `mise run seed-*` fixtures (/suve-demo/*), so recording and manual seeding
+# never clobber each other.
 
 echo "=== Setting up demo environment ==="
 
-# Build suve if needed
-if [[ ! -f bin/suve ]]; then
-    echo "Building suve..."
-    mise build
-fi
+# Always build the full GUI binary (bin/suve) so it matches the current bindings
+# and API arity — a stale or CLI-only binary can drift out of sync.
+echo "Building suve (GUI)..."
+mise build-gui
 
-# Reset LocalStack (clean slate)
+# Reset LocalStack (clean slate). --profile "*" so the profile-gated localstack
+# service is actually torn down (a bare `down` leaves profiled services running).
 echo "Resetting LocalStack..."
-docker compose down -v
+docker compose --profile "*" down -v
 docker compose --profile aws up -d
 echo "Waiting for LocalStack to be ready..."
 sleep 3
@@ -77,17 +83,9 @@ echo "=== Starting wails dev ==="
 # Clean up previous test artifacts
 rm -rf "$FRONTEND_DIR/test-results-recording" 2>/dev/null || true
 
-# Start daemon manually before wails dev to prevent hot-reload loop
-# SUVE_DAEMON_MANUAL_MODE=1 prevents auto-start/stop which causes
-# file changes that trigger wails hot-reload in an infinite loop
-export SUVE_DAEMON_MANUAL_MODE=1
-echo "Starting staging agent manually..."
-# Stop any existing daemon first (from previous runs)
-"$PROJECT_DIR/bin/suve" stage agent stop 2>/dev/null || true
-# Start daemon (auto-backgrounds via launcher)
-"$PROJECT_DIR/bin/suve" stage agent start
-
-# Start wails dev in background (same as mise gui-dev)
+# Start wails dev in background (same as mise gui-dev). The GUI reads and writes
+# the staging store directly — there is no longer a background staging agent to
+# start (the daemon was removed).
 cd "$GUI_DIR"
 wails dev -skipbindings -tags dev &
 WAILS_PID=$!
