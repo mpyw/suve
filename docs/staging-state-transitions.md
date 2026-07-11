@@ -202,6 +202,8 @@ When applying changes, suve checks for conflicts by comparing the `BaseModifiedA
 
 Use `--ignore-conflicts` to force apply despite conflicts.
 
+> **Timestamp precision.** Update/Delete conflicts are detected only when the remote `LastModified` is *strictly after* the recorded `BaseModifiedAt`. On providers whose modified time is second-granular (notably Azure Key Vault), an out-of-band write that lands in the same wall-clock second as the recorded base compares as equal, so it is not flagged as a conflict and can be overwritten on apply. The window is narrow and inherent to the provider's timestamp precision.
+
 ## Implementation
 
 The state machine is implemented in `internal/staging/transition/`:

@@ -14,7 +14,7 @@ Azure splits into two services under `suve azure`:
 
 Azure also supports the local **staging workflow** via `suve azure stage` (or the bare `suve stage` alias when Azure is the only active staging backend). It is **per-service**, because Key Vault and App Configuration keep separate staging state:
 
-- `suve azure stage secret` — Key Vault secrets. Full workflow (`add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`export`/`import`). Versions are immutable, so a staged `edit` applies as a new version.
+- `suve azure stage secret` — Key Vault secrets. Full workflow (`add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`export`/`import`). Versions are immutable, so a staged `edit` applies as a new version. Key Vault's modified time is **second-granular**, so conflict detection cannot see an out-of-band write that lands in the same wall-clock second as the recorded base — such a write is not flagged and can be overwritten on apply (see [Conflict Detection](./staging-state-transitions.md#conflict-detection)).
 - `suve azure stage param` — App Configuration settings. Because App Configuration is **unversioned**, staging uses **last-write-wins** (no modified-after conflict check). Tags are writable via a GET-merge-PUT, so `tag`/`untag` are available. Workflow: `add`/`edit`/`delete`/`status`/`diff`/`apply`/`reset`/`tag`/`untag`/`export`/`import`.
 
 The two services keep distinct staging scopes, but provider-wide `azure stage status`/`diff`/`apply`/`reset` span both — each resolves its own scope and any service that is not configured (no `--store-name`/`--vault-name`) is skipped. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.

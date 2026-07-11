@@ -94,7 +94,10 @@ func CheckConflicts(ctx context.Context, resolve ApplyStrategyResolver, entries 
 			continue
 		}
 
-		// If AWS was modified after the base value was fetched, it's a conflict
+		// If AWS was modified after the base value was fetched, it's a conflict.
+		// Strict After: on second-granular providers (e.g. Azure Key Vault) an
+		// out-of-band write in the same wall-clock second compares as equal and
+		// escapes detection. See docs/staging-state-transitions.md.
 		if awsModified.After(*entry.BaseModifiedAt) {
 			conflicts[key] = struct{}{}
 		}
