@@ -125,7 +125,7 @@ func TestResetUseCase_Execute_UnstageCreate_DiscardsTags(t *testing.T) {
 
 	// Both entry and tags must be gone.
 	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
-	assert.ErrorIs(t, err, staging.ErrNotStaged)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new", Namespace: ""})
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
