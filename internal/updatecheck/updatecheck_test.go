@@ -182,9 +182,38 @@ func TestNotice_FetchError_NoCrash(t *testing.T) {
 
 	assert.Empty(t, c.notice(context.Background(), "v1.2.3"))
 
-	// A failed fetch must not create/refresh the cache.
-	_, ok := readCache(path)
-	assert.False(t, ok, "failed fetch must not write the cache")
+	// A failed fetch records a short-lived negative marker (empty
+	// LatestVersion) so subsequent invocations within the TTL do not retry.
+	entry, ok := readCache(path)
+	require.True(t, ok, "failed fetch must record a negative marker")
+	assert.Empty(t, entry.LatestVersion, "negative marker carries no version")
+	assert.WithinDuration(t, now, entry.CheckedAt, time.Second)
+}
+
+func TestNotice_FetchError_SuppressesRetriesWithinTTL(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "update-check.json")
+
+	fetches := 0
+	c := &checker{
+		now:       fixedNow(now),
+		lookupEnv: noEnv,
+		cachePath: func() (string, error) { return path, nil },
+		fetchLatest: func(context.Context) (string, error) {
+			fetches++
+
+			return "", errors.New("boom")
+		},
+	}
+
+	const calls = 5
+	for range calls {
+		assert.Empty(t, c.notice(context.Background(), "v1.2.3"))
+	}
+
+	assert.Equal(t, 1, fetches, "a failed probe must be attempted at most once within the TTL")
 }
 
 func TestNotice_CachePathError_StillFetches(t *testing.T) {

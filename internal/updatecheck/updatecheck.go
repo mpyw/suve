@@ -129,7 +129,9 @@ func (c *checker) notice(ctx context.Context, current string) string {
 
 // resolveLatest returns the latest known version tag. It uses a fresh cache
 // entry (younger than cacheTTL) without any network access; otherwise it
-// fetches from GitHub and refreshes the cache. Any error yields "".
+// fetches from GitHub and refreshes the cache. On fetch failure it records a
+// short-lived negative marker so retries are suppressed within the TTL. Any
+// error yields "".
 func (c *checker) resolveLatest(ctx context.Context) string {
 	path, pathErr := c.cachePath()
 	if pathErr == nil {
@@ -142,8 +144,14 @@ func (c *checker) resolveLatest(ctx context.Context) string {
 
 	latest, err := c.fetchLatest(ctx)
 	if err != nil || latest == "" {
-		// On fetch failure we intentionally leave the cache untouched rather
-		// than nagging or recording an empty result.
+		// On fetch failure, record a short-lived negative marker (an empty
+		// LatestVersion, treated as "checked, nothing to report") so a failed
+		// probe suppresses retries within the TTL rather than paying the HTTP
+		// timeout on every invocation.
+		if pathErr == nil {
+			_ = writeCache(path, cacheEntry{CheckedAt: c.now()})
+		}
+
 		return ""
 	}
 
