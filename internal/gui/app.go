@@ -246,6 +246,19 @@ func (a *App) GetCurrentScope() *ScopeSelection {
 	return selectionFromScope(a.currentScope())
 }
 
+// EnvScope returns the env-derived scope defaults for an ARBITRARY provider,
+// hydrated from the ambient environment (GOOGLE_CLOUD_PROJECT / AZURE_KEYVAULT_NAME
+// / AZURE_APPCONFIG_NAME / AZURE_APPCONFIG_NAMESPACE). It is the direct analog of
+// the CLI's per-provider env resolution: each provider group reads its own env
+// independently of detect, so an explicitly-selected provider always resolves its
+// scope from env even in a mixed-env shell. GetCurrentScope only surfaces the
+// launch provider's env-derived scope; the frontend calls this to fill the scope
+// form for any OTHER provider it switches to. An unknown provider yields the AWS
+// default (hydrateScope's fallback).
+func (a *App) EnvScope(providerName string) *ScopeSelection {
+	return selectionFromScope(hydrateScope(provider.Scope{Provider: provider.Provider(providerName)}))
+}
+
 // selectionFromScope is the inverse of scopeFromSelection: it projects a
 // provider.Scope back to the frontend DTO. Fields irrelevant to the provider
 // stay empty.

@@ -233,3 +233,61 @@ func TestApp_GetCurrentScope_EnvDerivedAzure_StoreOnly(t *testing.T) {
 	assert.Empty(t, got.VaultName)
 	assert.Equal(t, "env-store", got.StoreName)
 }
+
+// TestApp_EnvScope verifies EnvScope resolves each provider's scope from env
+// INDEPENDENTLY of the launch provider (#518): the app is launched as AWS, yet
+// EnvScope("googlecloud") / EnvScope("azure") still hydrate their fields from
+// the ambient environment — the direct analog of the CLI resolving each provider
+// group's scope from its own env regardless of detect.
+func TestApp_EnvScope(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "env-project")
+	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
+	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
+	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "env-ns")
+
+	// Launched as AWS — EnvScope must not be gated on the launch provider.
+	app := NewApp(provider.Scope{Provider: provider.ProviderAWS}, "")
+
+	tests := []struct {
+		name     string
+		provider string
+		want     ScopeSelection
+	}{
+		{
+			name:     "googlecloud resolves project from env",
+			provider: "googlecloud",
+			want:     ScopeSelection{Provider: "googlecloud", ProjectID: "env-project"},
+		},
+		{
+			name:     "azure resolves vault/store/namespace from env",
+			provider: "azure",
+			want: ScopeSelection{
+				Provider:  "azure",
+				VaultName: "env-vault",
+				StoreName: "env-store",
+				Namespace: "env-ns",
+			},
+		},
+		{
+			name:     "aws carries no env-derived resource fields",
+			provider: "aws",
+			want:     ScopeSelection{Provider: "aws"},
+		},
+		{
+			// An unknown provider falls back to the AWS default (hydrateScope's
+			// default branch), so the form never prefills bogus fields.
+			name:     "unknown provider falls back to aws default",
+			provider: "oracle",
+			want:     ScopeSelection{Provider: "aws"},
+		},
+	}
+
+	//nolint:paralleltest // parent uses t.Setenv, so subtests cannot run in parallel
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := app.EnvScope(tt.provider)
+			require.NotNil(t, got)
+			assert.Equal(t, &tt.want, got)
+		})
+	}
+}

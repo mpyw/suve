@@ -6,6 +6,8 @@ export function Capabilities():Promise<Array<gui.ProviderCapability>>;
 
 export function DetectProviders():Promise<gui.DetectResult>;
 
+export function EnvScope(arg1:string):Promise<gui.ScopeSelection>;
+
 export function GetAWSIdentity():Promise<gui.AWSIdentityResult>;
 
 export function GetCurrentScope():Promise<gui.ScopeSelection>;

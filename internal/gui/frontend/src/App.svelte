@@ -3,6 +3,7 @@
   import {
     Capabilities,
     DetectProviders,
+    EnvScope,
     GetAWSIdentity,
     GetCurrentScope,
     InitialProvider,
@@ -144,18 +145,19 @@
 
   // buildSelection assembles the auto-apply candidate for provider p.
   //
-  // Launch wins, cache fills gaps: the launch-derived backend scope (from --gui
-  // flags + env, via GetCurrentScope) takes precedence PER FIELD, and the
-  // localStorage cache only supplies fields the launch left empty. This keeps
-  // `AZURE_APPCONFIG_NAMESPACE=dev` / `--namespace dev` (and --vault-name /
-  // --store-name / --project) authoritative over a stale cache, while a bare
-  // `suve --gui` (launch scope has only the provider) still restores the cached
-  // resource fields.
-  function buildSelection(p: string): gui.ScopeSelection {
+  // Per-field precedence is launch/flag > env > cache, mirroring the CLI: an
+  // explicit --gui flag (surfaced via GetCurrentScope as the launch scope) beats
+  // the env, the env (EnvScope resolves GOOGLE_CLOUD_PROJECT / AZURE_* for ANY
+  // provider) beats a stale localStorage cache, and the cache fills whatever is
+  // still empty. The launch scope only carries env for the launch provider, so
+  // EnvScope is what lets a provider switched to in a mixed-env shell resolve its
+  // own scope defaults (e.g. GOOGLE_CLOUD_PROJECT while AWS creds are also set).
+  async function buildSelection(p: string): Promise<gui.ScopeSelection> {
     const cached = readCachedScope(p);
     const launch = scope?.provider === p ? scope : null;
+    const env = await withRetry(() => EnvScope(p)).catch(() => null);
     const pick = (field: keyof gui.ScopeSelection): string =>
-      (launch?.[field] || cached?.[field] || '') as string;
+      (launch?.[field] || env?.[field] || cached?.[field] || '') as string;
     return {
       provider: p,
       projectId: p === 'googlecloud' ? pick('projectId') : '',
@@ -218,7 +220,7 @@
   async function handleSelectProvider(p: string) {
     scopeError = '';
 
-    const sel = buildSelection(p);
+    const sel = await buildSelection(p);
     if (hasRequiredScope(sel)) {
       await applyScope(sel);
     } else {

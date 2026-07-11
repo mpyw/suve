@@ -190,4 +190,34 @@ test.describe('Provider selection', () => {
       await expect(page.locator('.staging-count')).toHaveCount(0);
     });
   });
+
+  test.describe('Per-provider env scope (#518)', () => {
+    // Mixed env: AWS + Google Cloud both active → detection is ambiguous, so the
+    // app preselects nothing. Switching to Google Cloud must still resolve its
+    // project from GOOGLE_CLOUD_PROJECT (via EnvScope) and auto-apply, without
+    // any manual entry — mirroring the CLI's per-provider env resolution.
+    // Before the fix, buildSelection only consulted the launch provider's env,
+    // so a switched-to provider fell back to the (empty) cache and forced the
+    // user to hand-type the project.
+    test('switching to Google Cloud in a mixed env prefills project from env', async ({ page }) => {
+      await setupWailsMocks(page, {
+        ...createAmbiguousProviderState(),
+        envScopes: { googlecloud: { projectId: 'env-project' } },
+      });
+      await page.goto('/');
+
+      // Ambiguous detection → nothing preselected.
+      await expect(page.getByText('Select a provider to begin.')).toBeVisible();
+      await expect(page.locator('#provider-select')).toHaveValue('');
+
+      // Switch to Google Cloud WITHOUT touching the project field.
+      await page.locator('#provider-select').selectOption('googlecloud');
+
+      // Env-derived project auto-applies: the secret view mounts and the sidebar
+      // shows the project — no scope-entry prompt.
+      await waitForItemList(page);
+      await expect(page.getByText('env-project')).toBeVisible();
+      await expect(page.getByText('Enter the required scope in the sidebar to continue.')).toHaveCount(0);
+    });
+  });
 });

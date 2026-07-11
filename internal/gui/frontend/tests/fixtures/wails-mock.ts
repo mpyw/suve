@@ -175,6 +175,11 @@ export interface MockState {
   // mirroring the Go App.InitialService binding. Drives the initial view.
   initialService: string;
   currentScope: ScopeSelection;
+  // envScopes holds the per-provider env-derived scope defaults returned by the
+  // EnvScope binding (Go hydrateScope for an ARBITRARY provider). Keyed by
+  // provider; only the fields the environment supplies need be set. Defaults
+  // empty so specs without a mixed env are unaffected.
+  envScopes: Record<string, Partial<ScopeSelection>>;
   detectResult: DetectResult;
   capabilities: ProviderCapability[];
   // Error simulation
@@ -352,6 +357,7 @@ export const defaultMockState: MockState = {
   initialProvider: 'aws',
   initialService: '',
   currentScope: awsScopeSelection,
+  envScopes: {},
   detectResult: awsOnlyDetectResult,
   capabilities: defaultCapabilities,
 };
@@ -812,6 +818,19 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       InitialProvider: async () => state.initialProvider,
       InitialService: async () => state.initialService,
       GetCurrentScope: async () => state.currentScope,
+      // Per-provider env-derived scope defaults for an ARBITRARY provider,
+      // mirroring the Go hydrateScope: only provider-relevant fields carry env
+      // values (from state.envScopes), the rest are empty.
+      EnvScope: async (p: string) => {
+        const env = state.envScopes?.[p] ?? {};
+        return {
+          provider: p,
+          projectId: env.projectId ?? '',
+          vaultName: env.vaultName ?? '',
+          storeName: env.storeName ?? '',
+          namespace: env.namespace ?? '',
+        };
+      },
       SelectScope: async (sel: any) => {
         calls.push('SelectScope');
         // Record the exact payload so specs can assert it (incl. vault vs store
