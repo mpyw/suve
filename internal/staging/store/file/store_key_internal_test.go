@@ -115,7 +115,7 @@ func TestNewWorkingStore_KeyConfigured(t *testing.T) {
 	userHomeDirFunc = func() (string, error) { return t.TempDir(), nil }
 
 	key := newTestKey()
-	resolveKeyFunc = func() ([]byte, bool, error) { return key, false, nil }
+	resolveKeyFunc = func() ([]byte, bool, bool, error) { return key, false, false, nil }
 
 	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestNewWorkingStore_PlaintextFallback(t *testing.T) {
 
 	userHomeDirFunc = func() (string, error) { return t.TempDir(), nil }
 
-	resolveKeyFunc = func() ([]byte, bool, error) { return nil, true, nil }
+	resolveKeyFunc = func() ([]byte, bool, bool, error) { return nil, true, false, nil }
 
 	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.NoError(t, err)
@@ -159,7 +159,7 @@ func TestNewWorkingStore_ResolveError(t *testing.T) {
 
 	userHomeDirFunc = func() (string, error) { return t.TempDir(), nil }
 
-	resolveKeyFunc = func() ([]byte, bool, error) { return nil, false, errors.New("bad key") }
+	resolveKeyFunc = func() ([]byte, bool, bool, error) { return nil, false, false, errors.New("bad key") }
 
 	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.Error(t, err)
@@ -182,8 +182,8 @@ func TestNewWorkingStore_KeychainError_NoEncryptedState_Plaintext(t *testing.T) 
 	}()
 
 	userHomeDirFunc = func() (string, error) { return t.TempDir(), nil }
-	resolveKeyFunc = func() ([]byte, bool, error) {
-		return nil, false, &keyprovider.KeychainUnavailableError{Err: errors.New("dbus down")}
+	resolveKeyFunc = func() ([]byte, bool, bool, error) {
+		return nil, false, false, &keyprovider.KeychainUnavailableError{Err: errors.New("dbus down")}
 	}
 
 	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
@@ -224,8 +224,8 @@ func TestNewWorkingStore_KeychainError_EncryptedStateExists_Fatal(t *testing.T) 
 	}
 	require.NoError(t, seed.WriteState(t.Context(), "", state))
 
-	resolveKeyFunc = func() ([]byte, bool, error) {
-		return nil, false, &keyprovider.KeychainUnavailableError{Err: errors.New("keychain locked")}
+	resolveKeyFunc = func() ([]byte, bool, bool, error) {
+		return nil, false, false, &keyprovider.KeychainUnavailableError{Err: errors.New("keychain locked")}
 	}
 
 	s, err := NewWorkingStore(scope)
@@ -233,6 +233,94 @@ func TestNewWorkingStore_KeychainError_EncryptedStateExists_Fatal(t *testing.T) 
 	assert.Nil(t, s)
 	assert.Contains(t, err.Error(), "keychain locked")
 	assert.Contains(t, err.Error(), "encrypted state exists")
+}
+
+// TestNewWorkingStore_NeedsMint_NoEncryptedState_Mints verifies that on a
+// genuine first run (keychain reachable but empty, no encrypted state) the
+// constructor mints a key and configures it.
+//
+//nolint:paralleltest // overrides package-level hook vars.
+func TestNewWorkingStore_NeedsMint_NoEncryptedState_Mints(t *testing.T) {
+	origResolve := resolveKeyFunc
+	origMint := mintKeyFunc
+	origHome := userHomeDirFunc
+
+	defer func() {
+		resolveKeyFunc = origResolve
+		mintKeyFunc = origMint
+		userHomeDirFunc = origHome
+	}()
+
+	userHomeDirFunc = func() (string, error) { return t.TempDir(), nil }
+	resolveKeyFunc = func() ([]byte, bool, bool, error) { return nil, false, true, nil }
+
+	key := newTestKey()
+
+	minted := false
+	mintKeyFunc = func() ([]byte, error) {
+		minted = true
+
+		return key, nil
+	}
+
+	s, err := NewWorkingStore(provider.AWSScope("123456789012", "ap-northeast-1"))
+	require.NoError(t, err)
+	assert.True(t, minted, "expected a key to be minted on first run")
+	assert.Equal(t, key, s.key)
+}
+
+// TestNewWorkingStore_NeedsMint_EncryptedStateExists_Fatal guards #475: if the
+// keychain entry is lost while encrypted working state persists, the next
+// constructor call must surface the real cause and MUST NOT mint (and thereby
+// silently store) a replacement key that could never decrypt that state.
+//
+//nolint:paralleltest // overrides package-level hook vars.
+func TestNewWorkingStore_NeedsMint_EncryptedStateExists_Fatal(t *testing.T) {
+	origResolve := resolveKeyFunc
+	origMint := mintKeyFunc
+	origHome := userHomeDirFunc
+
+	defer func() {
+		resolveKeyFunc = origResolve
+		mintKeyFunc = origMint
+		userHomeDirFunc = origHome
+	}()
+
+	home := t.TempDir()
+	userHomeDirFunc = func() (string, error) { return home, nil }
+
+	scope := provider.AWSScope("123456789012", "ap-northeast-1")
+
+	// Seed an ENCRYPTED param.json under the scope directory, as if written
+	// earlier with a now-lost key.
+	seed, err := NewStore(scope)
+	require.NoError(t, err)
+
+	seed.key = newTestKey()
+
+	state := staging.NewEmptyState()
+	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("v"),
+	}
+	require.NoError(t, seed.WriteState(t.Context(), "", state))
+
+	// The keychain now reports the key as absent (deleted/reset).
+	resolveKeyFunc = func() ([]byte, bool, bool, error) { return nil, false, true, nil }
+
+	minted := false
+	mintKeyFunc = func() ([]byte, error) {
+		minted = true
+
+		return newTestKey(), nil
+	}
+
+	s, err := NewWorkingStore(scope)
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.False(t, minted, "must not mint a replacement key when encrypted state exists")
+	assert.Contains(t, err.Error(), "encrypted state exists")
+	assert.ErrorIs(t, err, keyprovider.ErrKeychainKeyNotFound)
 }
 
 // TestWriteFileAtomic guards #325: writes go through a temp file + rename, so

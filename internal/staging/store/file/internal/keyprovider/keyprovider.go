@@ -5,8 +5,11 @@
 //
 //  1. SUVE_STAGING_KEY env var, if set: base64-standard of exactly 32 bytes.
 //     If set but invalid, a clear error is returned (no silent fall-through).
-//  2. Otherwise the OS keychain (get-or-create): fetch the stored key, or
-//     generate 32 random bytes, store them, and use them.
+//  2. Otherwise the OS keychain: fetch the stored key. When the keychain is
+//     reachable but empty, Resolve reports needsMint instead of generating a
+//     key itself, so the caller can refuse to mint a replacement when encrypted
+//     working state already exists (a fresh key could not decrypt it). Minting
+//     the 32 random bytes and storing them happens in Mint.
 //  3. Otherwise (no keyring backend on this platform): plaintext, with the
 //     caller expected to warn the user once.
 //
@@ -58,6 +61,12 @@ var (
 	randReader     = rand.Reader
 )
 
+// ErrKeychainKeyNotFound signals that the OS keychain is reachable but holds no
+// stored staging data key. It is the cause reported when a lost keychain entry
+// is detected alongside encrypted working state.
+var ErrKeychainKeyNotFound = errors.New(
+	"no staging data key found in the OS keychain (it may have been deleted or reset)")
+
 // KeychainUnavailableError wraps a hard OS-keychain failure — a locked
 // keychain, an unreachable dbus, a corrupted stored key, or a failed store.
 //
@@ -76,33 +85,41 @@ func (e *KeychainUnavailableError) Unwrap() error { return e.Err }
 
 // Resolve returns the data key for the working staging store.
 //
-// The returned key is 32 bytes when plaintext is false. When plaintext is
-// true, key is nil and the caller should operate without encryption (and warn
-// the user once). err is non-nil for an invalid SUVE_STAGING_KEY value or for a
+// The returned key is 32 bytes when plaintext and needsMint are both false.
+// When plaintext is true, key is nil and the caller should operate without
+// encryption (and warn the user once). When needsMint is true, the keychain is
+// reachable but has no stored key yet: key is nil and the caller must decide
+// whether to mint one (safe only when no encrypted working state exists) by
+// calling Mint. err is non-nil for an invalid SUVE_STAGING_KEY value or for a
 // hard keychain failure (as a *KeychainUnavailableError).
-func Resolve() (key []byte, plaintext bool, err error) {
+func Resolve() (key []byte, plaintext, needsMint bool, err error) {
 	// 1. Environment variable override.
 	if raw, ok := lookupEnvFunc(EnvStagingKey); ok {
 		envKey, decErr := decodeEnvKey(raw)
 		if decErr != nil {
-			return nil, false, decErr
+			return nil, false, false, decErr
 		}
 
-		return envKey, false, nil
+		return envKey, false, false, nil
 	}
 
-	// 2. OS keychain get-or-create.
-	k, kcErr := getOrCreateKeychainKey()
+	// 2. OS keychain lookup (minting is deferred to Mint so the caller can gate
+	// it on the absence of encrypted state).
+	k, found, kcErr := getKeychainKey()
 
 	switch {
-	case kcErr == nil:
-		return k, false, nil
+	case kcErr == nil && found:
+		return k, false, false, nil
+	case kcErr == nil && !found:
+		// Keychain reachable but empty: genuine first run OR the entry was lost
+		// while state persists. The caller gates minting accordingly.
+		return nil, false, true, nil
 	case errors.Is(kcErr, keyring.ErrUnsupportedPlatform):
 		// 3. No keyring backend on this platform: documented plaintext fallback.
-		return nil, true, nil
+		return nil, true, false, nil
 	default:
 		// Hard keychain failure: surfaced, never silently downgraded.
-		return nil, false, &KeychainUnavailableError{Err: kcErr}
+		return nil, false, false, &KeychainUnavailableError{Err: kcErr}
 	}
 }
 
@@ -120,29 +137,37 @@ func decodeEnvKey(raw string) ([]byte, error) {
 	return decoded, nil
 }
 
-// getOrCreateKeychainKey fetches the stored key from the OS keychain, or
-// generates, stores, and returns a new 32-byte key if none exists.
-func getOrCreateKeychainKey() ([]byte, error) {
+// getKeychainKey fetches the stored key from the OS keychain. found is false
+// with a nil error when the keychain is reachable but holds no key yet
+// (keyring.ErrNotFound); minting is deferred to Mint.
+func getKeychainKey() (key []byte, found bool, err error) {
 	stored, err := keyringGetFunc(keychainService, keychainAccount)
 	switch {
 	case err == nil:
-		key, decErr := base64.StdEncoding.DecodeString(stored)
+		decoded, decErr := base64.StdEncoding.DecodeString(stored)
 		if decErr != nil {
-			return nil, fmt.Errorf("stored keychain key is corrupted: %w", decErr)
+			return nil, false, fmt.Errorf("stored keychain key is corrupted: %w", decErr)
 		}
 
-		if len(key) != keyLen {
-			return nil, fmt.Errorf("stored keychain key has wrong length %d", len(key))
+		if len(decoded) != keyLen {
+			return nil, false, fmt.Errorf("stored keychain key has wrong length %d", len(decoded))
 		}
 
-		return key, nil
+		return decoded, true, nil
 
 	case errors.Is(err, keyring.ErrNotFound):
-		return generateAndStoreKey()
+		return nil, false, nil
 
 	default:
-		return nil, fmt.Errorf("failed to read key from keychain: %w", err)
+		return nil, false, fmt.Errorf("failed to read key from keychain: %w", err)
 	}
+}
+
+// Mint generates a new random 32-byte data key, stores it in the OS keychain,
+// and returns it. Callers must confirm no encrypted working state exists before
+// minting: a fresh key cannot decrypt state written with a previous key.
+func Mint() ([]byte, error) {
+	return generateAndStoreKey()
 }
 
 // generateAndStoreKey creates a new random 32-byte key and stores it in the
