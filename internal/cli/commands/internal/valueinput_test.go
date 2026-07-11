@@ -3,6 +3,7 @@ package internal_test
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -76,8 +77,10 @@ func TestResolveValue_FromStdin(t *testing.T) {
 		})
 		require.ErrorIs(t, err, cliinternal.ErrValueStdinNeedsYes)
 		assert.False(t, proceed)
-		// Stdin must be left untouched so a caller could still use it.
-		assert.Equal(t, reader.Len(), len("sk-12345\n"))
+		// Stdin must be left untouched so the value is never silently consumed.
+		rest, rerr := io.ReadAll(reader)
+		require.NoError(t, rerr)
+		assert.Equal(t, "sk-12345\n", string(rest))
 	})
 
 	t.Run("reads stdin when confirmation is skipped via --yes", func(t *testing.T) {
