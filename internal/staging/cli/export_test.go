@@ -235,6 +235,48 @@ func TestGlobalExport(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "param", env.Service)
 	})
+
+	// Regression for #471: with --passphrase-stdin against a pre-existing target,
+	// the overwrite confirmation must NOT read the passphrase line as a y/N answer
+	// and silently cancel at exit 0. Without --yes it errors clearly; the passphrase
+	// line is never consumed as a confirmation.
+	t.Run("--passphrase-stdin against existing target errors instead of silently cancelling", func(t *testing.T) {
+		scope := setupExportImportEnv(t)
+		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
+
+		stdin := bytes.NewBufferString("pw123\n")
+		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), stdin, dir, "--passphrase-stdin")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already exist")
+		assert.Contains(t, err.Error(), "--yes")
+		// It must NOT report a successful/cancelled no-op on stdout.
+		assert.NotContains(t, stdout, "Operation cancelled.")
+	})
+
+	// With --passphrase-stdin AND --yes, the overwrite is allowed and the passphrase
+	// line is consumed by the passphrase reader (not the confirmation), producing an
+	// encrypted envelope.
+	t.Run("--passphrase-stdin with --yes overwrites and encrypts using the stdin passphrase", func(t *testing.T) {
+		scope := setupExportImportEnv(t)
+		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
+
+		stdin := bytes.NewBufferString("pw123\n")
+		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), stdin, dir, "--passphrase-stdin", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "encrypted")
+
+		env, err := file.ReadEnvelopeFile(filepath.Join(dir, "param.json"))
+		require.NoError(t, err)
+		enc, err := env.IsEncryptedPayload()
+		require.NoError(t, err)
+		assert.True(t, enc)
+	})
 }
 
 //nolint:paralleltest // uses t.Setenv (HOME/SUVE_STAGING_KEY); cannot run in parallel
