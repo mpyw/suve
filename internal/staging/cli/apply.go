@@ -6,8 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/samber/lo"
-
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
@@ -130,9 +128,10 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 		return err
 	}
 
-	// Output conflicts if any
-	for _, name := range maputil.SortedKeys(lo.SliceToMap(result.Conflicts, func(s string) (string, struct{}) { return s, struct{}{} })) {
-		output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", name)
+	// Output conflicts if any. result.Conflicts is already sorted by (name,
+	// namespace); render each with the namespace badge (bare name when empty).
+	for _, key := range result.Conflicts {
+		output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", key.Label())
 	}
 
 	// Handle "nothing staged" case

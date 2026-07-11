@@ -4,6 +4,7 @@ package staging
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -23,6 +24,17 @@ import (
 type EntryKey struct {
 	Name      string
 	Namespace string
+}
+
+// Label renders the key for display, appending the namespace as a [badge] when
+// present. The empty (default) namespace — the only value for AWS, Google Cloud
+// and Key Vault — renders as the bare name, matching status/diff output.
+func (k EntryKey) Label() string {
+	if k.Namespace == "" {
+		return k.Name
+	}
+
+	return fmt.Sprintf("%s [%s]", k.Name, k.Namespace)
 }
 
 // SortedEntryKeys returns the keys of m sorted by (name, namespace) for

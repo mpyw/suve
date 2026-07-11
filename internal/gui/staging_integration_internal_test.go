@@ -1316,3 +1316,20 @@ func TestApp_StagingApply_ExecuteError(t *testing.T) {
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list boom")
 }
+
+// TestApp_StagingApply_NoStagedChanges covers the success return of StagingApply
+// (nothing staged -> the use case returns early with no error), which exercises
+// the EntryKey->label mapping for result.Conflicts on the happy path. With no
+// staged entries there are no conflicts, so the mapping yields an empty slice.
+func TestApp_StagingApply_NoStagedChanges(t *testing.T) {
+	t.Parallel()
+
+	app := setupTestApp(t)
+
+	result, err := app.StagingApply(string(staging.ServiceParam), false)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Empty(t, result.Conflicts)
+	assert.Zero(t, result.EntrySucceeded)
+	assert.Zero(t, result.EntryFailed)
+}

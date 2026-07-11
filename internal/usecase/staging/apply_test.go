@@ -253,7 +253,7 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "conflict")
 	assert.Len(t, output.Conflicts, 1)
-	assert.Equal(t, "/app/conflict", output.Conflicts[0])
+	assert.Equal(t, staging.EntryKey{Name: "/app/conflict"}, output.Conflicts[0])
 }
 
 func TestApplyUseCase_Execute_ListError(t *testing.T) {

@@ -67,8 +67,10 @@ type ApplyOutput struct {
 	TagResults   []ApplyTagResult
 	TagSucceeded int
 	TagFailed    int
-	// Conflicts
-	Conflicts []string
+	// Conflicts carries the full EntryKey (name + namespace) of each conflicting
+	// entry so callers can render the namespace badge; empty namespace renders as
+	// the bare name.
+	Conflicts []staging.EntryKey
 }
 
 // ApplyUseCase executes apply operations.
@@ -151,11 +153,11 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 
 	// Check for conflicts (only for entries, as tags don't have value conflicts)
 	if !input.IgnoreConflicts && len(entries) > 0 {
-		conflicts := staging.CheckConflicts(ctx, u.Strategy, entries)
+		conflicts := staging.CheckConflicts(ctx, u.strategyForNamespace, entries)
 		if len(conflicts) > 0 {
-			for key := range conflicts {
-				output.Conflicts = append(output.Conflicts, key.Name)
-			}
+			// Report the full EntryKey (sorted for determinism) so callers can
+			// render the namespace badge.
+			output.Conflicts = append(output.Conflicts, staging.SortedEntryKeys(conflicts)...)
 
 			return output, fmt.Errorf("apply rejected: %d conflict(s) detected", len(conflicts))
 		}
