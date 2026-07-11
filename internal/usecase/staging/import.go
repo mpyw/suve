@@ -3,6 +3,8 @@ package staging
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -17,6 +19,14 @@ const (
 	ImportOpWrite       ImportOp = "write"
 	ImportOpReadWorking ImportOp = "read-working"
 )
+
+// ReAnchorResolver resolves the ApplyStrategy that can fetch a resource's
+// current LastModified in the TARGET (current) scope, for a service and
+// namespace. It mirrors the apply/conflict resolver so a cross-scope import can
+// re-base each staged item's conflict-detection timestamp against the scope it
+// is imported INTO rather than the foreign scope it was exported FROM. For
+// namespace-agnostic providers the namespace is always empty.
+type ReAnchorResolver func(svc staging.Service, namespace string) (staging.ApplyStrategy, error)
 
 // EnvelopeReader reads a single service's staged state from an import source
 // (typically a per-service envelope file). Adapters bind the source path, scope
@@ -36,6 +46,13 @@ type ImportInput struct {
 	// ImportModeMerge combines the imported state with the working area.
 	// ImportModeOverwrite replaces the working area with the imported state.
 	Mode ImportMode
+	// ReAnchor requests re-basing each staged item's BaseModifiedAt against the
+	// target scope's current LastModified. It is set for a cross-scope import
+	// (CLI --allow-scope-mismatch / GUI force), where the envelope's
+	// BaseModifiedAt belongs to a foreign scope's timeline and would make apply's
+	// conflict detection meaningless. It is a no-op unless the use case also has
+	// a ReAnchor resolver configured.
+	ReAnchor bool
 }
 
 // ImportOutput holds the result of the import use case.
@@ -47,6 +64,10 @@ type ImportOutput struct {
 	EntryCount int
 	// TagCount is the number of tag entries in the final working state.
 	TagCount int
+	// Warnings holds non-fatal diagnostics produced during import, e.g. an item
+	// left unanchored because its LastModified could not be fetched from the
+	// target scope during a cross-scope re-anchor.
+	Warnings []string
 }
 
 // ImportUseCase reads an export source into the working staging area. It keeps
@@ -58,6 +79,11 @@ type ImportUseCase struct {
 	Source EnvelopeReader
 	// Working is the working staging area (param.json/secret.json).
 	Working store.WorkingStore
+	// ReAnchor, when set, resolves a strategy that fetches the target scope's
+	// current LastModified so a cross-scope import (ImportInput.ReAnchor) re-bases
+	// each staged item's conflict-detection timestamp. Nil disables re-anchoring
+	// even when ImportInput.ReAnchor is set (same-scope import needs none).
+	ReAnchor ReAnchorResolver
 }
 
 // Execute runs the import use case.
@@ -73,6 +99,14 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 	}
 
 	output := &ImportOutput{}
+
+	// For a cross-scope import, the envelope's BaseModifiedAt values track a
+	// foreign scope's timeline; re-base them against the target scope's current
+	// LastModified BEFORE reconciling so apply's conflict detection is meaningful
+	// for the scope the items land in.
+	if input.ReAnchor && u.ReAnchor != nil {
+		u.reAnchorState(ctx, sourceState, output)
+	}
 
 	// Reconcile the source into the working area as a single atomic
 	// read-modify-write. Update re-reads the working state fresh under the store
@@ -100,6 +134,73 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 	}
 
 	return output, nil
+}
+
+// reAnchorState re-bases every staged item that carries a BaseModifiedAt onto
+// the target scope's current LastModified, mutating sourceState in place. A
+// Create entry carries no base and is left untouched. When the target resource
+// does not exist (or reports no modification time) the item is left unanchored
+// (BaseModifiedAt = nil) so it never trips a spurious conflict against a
+// timeline it never belonged to; a genuine fetch failure is recorded as a
+// warning and likewise unanchors the item rather than aborting the whole import.
+func (u *ImportUseCase) reAnchorState(ctx context.Context, sourceState *staging.State, output *ImportOutput) {
+	for svc, entries := range sourceState.Entries {
+		for key, entry := range entries {
+			if entry.BaseModifiedAt == nil {
+				continue
+			}
+
+			entry.BaseModifiedAt = u.currentBase(ctx, svc, key, output)
+			entries[key] = entry
+		}
+	}
+
+	for svc, tags := range sourceState.Tags {
+		for key, tag := range tags {
+			if tag.BaseModifiedAt == nil {
+				continue
+			}
+
+			tag.BaseModifiedAt = u.currentBase(ctx, svc, key, output)
+			tags[key] = tag
+		}
+	}
+}
+
+// currentBase fetches key's current LastModified in the target scope and returns
+// it as a conflict-detection base, or nil when the resource is missing, reports
+// no modification time, or cannot be fetched. A fetch failure (anything other
+// than a not-found) appends a warning to output.
+func (u *ImportUseCase) currentBase(
+	ctx context.Context, svc staging.Service, key staging.EntryKey, output *ImportOutput,
+) *time.Time {
+	strategy, err := u.ReAnchor(svc, key.Namespace)
+	if err != nil {
+		output.Warnings = append(output.Warnings, fmt.Sprintf(
+			"could not re-anchor %s: %v; left unanchored (conflict detection skipped)", key.Label(), err))
+
+		return nil
+	}
+
+	lastModified, err := strategy.FetchLastModified(ctx, key.Name)
+	if err != nil {
+		// A missing resource has no base to anchor to; leave it unanchored without
+		// a warning. Any other error is surfaced so the unanchored item is visible.
+		if notFound := (*staging.ResourceNotFoundError)(nil); !errors.As(err, &notFound) {
+			output.Warnings = append(output.Warnings, fmt.Sprintf(
+				"could not re-anchor %s: %v; left unanchored (conflict detection skipped)", key.Label(), err))
+		}
+
+		return nil
+	}
+
+	if lastModified.IsZero() {
+		// The resource exists but carries no modification time (or the provider
+		// disables conflict detection): there is nothing to anchor to.
+		return nil
+	}
+
+	return &lastModified
 }
 
 // reconcileImport merges sourceState into workingState in place per the import

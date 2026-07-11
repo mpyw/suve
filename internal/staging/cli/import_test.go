@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/provider"
@@ -14,6 +15,14 @@ import (
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	usestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
+
+// globalImportCmd builds the global import command for a fixed scope resolver.
+// The global command re-anchors via the config's per-service factories; these
+// tests exercise same-scope and refused cross-scope paths, so a bare resolver
+// (no factories) is enough.
+func globalImportCmd(resolver staging.ScopeResolver) *cli.Command {
+	return stgcli.NewGlobalImportCommand(stgcli.GlobalConfig{ScopeResolver: resolver})
+}
 
 // exportDir stages the given entries, exports them to a fresh directory (which
 // clears the working area), and returns the directory. It is the setup shared by
@@ -41,7 +50,7 @@ func TestGlobalImport(t *testing.T) {
 
 		require.True(t, workingState(t, scope).IsEmpty())
 
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir)
+		stdout, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil, dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "imported")
 
@@ -59,7 +68,7 @@ func TestGlobalImport(t *testing.T) {
 		// New change in the working area.
 		stageEntry(t, scope, staging.ServiceParam, "/app/param2", "v2")
 
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir, "--merge")
+		stdout, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil, dir, "--merge")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "merged")
 
@@ -76,7 +85,7 @@ func TestGlobalImport(t *testing.T) {
 
 		stageEntry(t, scope, staging.ServiceParam, "/app/param2", "v2")
 
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir, "--overwrite")
+		_, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil, dir, "--overwrite")
 		require.NoError(t, err)
 
 		entries := workingState(t, scope).Entries[staging.ServiceParam]
@@ -91,7 +100,7 @@ func TestGlobalImport(t *testing.T) {
 		})
 
 		// Only param.json exists in the dir.
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir)
+		stdout, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil, dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "imported")
 
@@ -110,7 +119,7 @@ func TestGlobalImport(t *testing.T) {
 		_, _, err := runLeafCmd(t, stgcli.NewExportCommand(secretExportImportConfig(fixedResolver(scope))), nil, fpath)
 		require.NoError(t, err)
 
-		_, _, err = runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir)
+		_, _, err = runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil, dir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "expected")
 	})
@@ -119,7 +128,7 @@ func TestGlobalImport(t *testing.T) {
 		scope := setupExportImportEnv(t)
 		dir := t.TempDir()
 
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir)
+		stdout, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil, dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No staged changes to import.")
 	})
@@ -127,7 +136,7 @@ func TestGlobalImport(t *testing.T) {
 	t.Run("missing dir argument", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
 
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil)
+		_, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage")
 	})
@@ -140,13 +149,13 @@ func TestGlobalImport(t *testing.T) {
 
 		scopeB := provider.AWSScope("999999999999", "eu-west-1")
 
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scopeB)), nil, dir)
+		_, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scopeB)), nil, dir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), scopeA.Key())
 		assert.Contains(t, err.Error(), scopeB.Key())
 
 		// --allow-scope-mismatch overrides.
-		_, _, err = runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scopeB)), nil, dir, "--allow-scope-mismatch")
+		_, _, err = runLeafCmd(t, globalImportCmd(fixedResolver(scopeB)), nil, dir, "--allow-scope-mismatch")
 		require.NoError(t, err)
 		assert.False(t, workingState(t, scopeB).ExtractService(staging.ServiceParam).IsEmpty())
 	})
@@ -157,7 +166,7 @@ func TestGlobalImport(t *testing.T) {
 			stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 		})
 
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir, "--force")
+		_, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil, dir, "--force")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "force")
 	})
@@ -171,7 +180,7 @@ func TestGlobalImport(t *testing.T) {
 		require.NoError(t, err)
 
 		// No --passphrase-stdin and a non-TTY writer: cannot prompt.
-		_, _, err = runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), nil, dir)
+		_, _, err = runLeafCmd(t, globalImportCmd(fixedResolver(scope)), nil, dir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "non-TTY")
 	})
@@ -184,7 +193,7 @@ func TestGlobalImport(t *testing.T) {
 		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), bytes.NewBufferString("right-pw\n"), dir, "--passphrase-stdin")
 		require.NoError(t, err)
 
-		_, _, err = runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), bytes.NewBufferString("wrong-pw\n"), dir, "--passphrase-stdin")
+		_, _, err = runLeafCmd(t, globalImportCmd(fixedResolver(scope)), bytes.NewBufferString("wrong-pw\n"), dir, "--passphrase-stdin")
 		require.Error(t, err)
 	})
 
@@ -204,7 +213,7 @@ func TestGlobalImport(t *testing.T) {
 		stageEntry(t, scope, staging.ServiceParam, "/app/param2", "v2")
 
 		// Only the passphrase is on stdin (no merge/overwrite answer line).
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
+		stdout, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "merged")
 
@@ -222,7 +231,7 @@ func TestGlobalImport(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, workingState(t, scope).IsEmpty())
 
-		_, _, err = runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
+		_, _, err = runLeafCmd(t, globalImportCmd(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
 		require.NoError(t, err)
 		assert.False(t, workingState(t, scope).ExtractService(staging.ServiceParam).IsEmpty())
 	})
@@ -248,7 +257,7 @@ func TestGlobalImport_ProviderMismatch(t *testing.T) {
 
 	// --allow-scope-mismatch bypasses the scope check but the provider guard
 	// still refuses.
-	_, _, err := runLeafCmd(t, stgcli.NewGlobalImportCommand(fixedResolver(awsScope)), nil, dir, "--allow-scope-mismatch")
+	_, _, err := runLeafCmd(t, globalImportCmd(fixedResolver(awsScope)), nil, dir, "--allow-scope-mismatch")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "provider")
 	assert.Contains(t, err.Error(), string(provider.ProviderAzure))

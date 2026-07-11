@@ -48,6 +48,155 @@ func sourceState(svc staging.Service, name, value string) *staging.State {
 	return s
 }
 
+// reAnchorSourceState builds a ServiceParam state carrying one Update entry and
+// one tag change, both anchored to foreignBase (the source scope's timeline), so
+// a re-anchor test can assert the base is rewritten.
+func reAnchorSourceState(name string, foreignBase time.Time) *staging.State {
+	s := staging.NewEmptyState()
+	s.Entries[staging.ServiceParam][staging.EntryKey{Name: name}] = staging.Entry{
+		Operation:      staging.OperationUpdate,
+		Value:          lo.ToPtr("v"),
+		StagedAt:       time.Now(),
+		BaseModifiedAt: lo.ToPtr(foreignBase),
+	}
+	s.Tags[staging.ServiceParam][staging.EntryKey{Name: name}] = staging.TagEntry{
+		Add:            map[string]string{"env": "prod"},
+		StagedAt:       time.Now(),
+		BaseModifiedAt: lo.ToPtr(foreignBase),
+	}
+
+	return s
+}
+
+func TestImportUseCase_ReAnchor(t *testing.T) {
+	t.Parallel()
+
+	foreignBase := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	name := "/app/config"
+
+	t.Run("cross-scope import re-bases BaseModifiedAt onto the target scope", func(t *testing.T) {
+		t.Parallel()
+
+		targetBase := time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)
+
+		reader := &cannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: reAnchorSourceState(name, foreignBase),
+		}}
+		working := testutil.NewMockStore()
+
+		strategy := newMockApplyStrategy()
+		strategy.lastModified[name] = targetBase
+
+		usecase := &stagingusecase.ImportUseCase{
+			Source:  reader,
+			Working: working,
+			ReAnchor: func(_ staging.Service, _ string) (staging.ApplyStrategy, error) {
+				return strategy, nil
+			},
+		}
+
+		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{ReAnchor: true})
+		require.NoError(t, err)
+		assert.Empty(t, output.Warnings)
+
+		entry, err := working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name})
+		require.NoError(t, err)
+		require.NotNil(t, entry.BaseModifiedAt)
+		assert.Equal(t, targetBase, *entry.BaseModifiedAt)
+
+		tag, err := working.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name})
+		require.NoError(t, err)
+		require.NotNil(t, tag.BaseModifiedAt)
+		assert.Equal(t, targetBase, *tag.BaseModifiedAt)
+	})
+
+	t.Run("missing target resource leaves the item unanchored without a warning", func(t *testing.T) {
+		t.Parallel()
+
+		reader := &cannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: reAnchorSourceState(name, foreignBase),
+		}}
+		working := testutil.NewMockStore()
+
+		strategy := newMockApplyStrategy()
+		strategy.fetchModifiedErr = &staging.ResourceNotFoundError{}
+
+		usecase := &stagingusecase.ImportUseCase{
+			Source:  reader,
+			Working: working,
+			ReAnchor: func(_ staging.Service, _ string) (staging.ApplyStrategy, error) {
+				return strategy, nil
+			},
+		}
+
+		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{ReAnchor: true})
+		require.NoError(t, err)
+		assert.Empty(t, output.Warnings)
+
+		entry, err := working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name})
+		require.NoError(t, err)
+		assert.Nil(t, entry.BaseModifiedAt)
+	})
+
+	t.Run("fetch failure warns and leaves the item unanchored", func(t *testing.T) {
+		t.Parallel()
+
+		reader := &cannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: reAnchorSourceState(name, foreignBase),
+		}}
+		working := testutil.NewMockStore()
+
+		strategy := newMockApplyStrategy()
+		strategy.fetchModifiedErr = errors.New("network down")
+
+		usecase := &stagingusecase.ImportUseCase{
+			Source:  reader,
+			Working: working,
+			ReAnchor: func(_ staging.Service, _ string) (staging.ApplyStrategy, error) {
+				return strategy, nil
+			},
+		}
+
+		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{ReAnchor: true})
+		require.NoError(t, err)
+		assert.NotEmpty(t, output.Warnings)
+
+		entry, err := working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name})
+		require.NoError(t, err)
+		assert.Nil(t, entry.BaseModifiedAt)
+	})
+
+	t.Run("without ReAnchor input the foreign base is kept", func(t *testing.T) {
+		t.Parallel()
+
+		reader := &cannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: reAnchorSourceState(name, foreignBase),
+		}}
+		working := testutil.NewMockStore()
+
+		strategy := newMockApplyStrategy()
+		strategy.lastModified[name] = time.Now()
+
+		usecase := &stagingusecase.ImportUseCase{
+			Source:  reader,
+			Working: working,
+			ReAnchor: func(_ staging.Service, _ string) (staging.ApplyStrategy, error) {
+				return strategy, nil
+			},
+		}
+
+		// ReAnchor is false: the resolver must not be consulted and the foreign
+		// base survives untouched.
+		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{})
+		require.NoError(t, err)
+
+		entry, err := working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name})
+		require.NoError(t, err)
+		require.NotNil(t, entry.BaseModifiedAt)
+		assert.Equal(t, foreignBase, *entry.BaseModifiedAt)
+	})
+}
+
 //nolint:funlen // Many subtests covering merge/overwrite and service/global cases
 func TestImportUseCase_Execute(t *testing.T) {
 	t.Parallel()
