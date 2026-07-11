@@ -272,3 +272,23 @@ func TestListUseCase_Execute_WithValue_Empty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, output.Entries)
 }
+
+// TestListUseCase_Execute_SortsNames verifies the list use case emits names in a
+// stable alphabetical order regardless of the provider's native ordering (#480).
+func TestListUseCase_Execute_SortsNames(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{ListFunc: listNames("/app/charlie", "/app/alpha", "/app/bravo")}
+
+	uc := &param.ListUseCase{Reader: store}
+
+	output, err := uc.Execute(t.Context(), param.ListInput{})
+	require.NoError(t, err)
+
+	names := make([]string, len(output.Entries))
+	for i, e := range output.Entries {
+		names[i] = e.Name
+	}
+
+	assert.Equal(t, []string{"/app/alpha", "/app/bravo", "/app/charlie"}, names)
+}

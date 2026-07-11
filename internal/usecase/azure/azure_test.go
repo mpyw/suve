@@ -221,3 +221,27 @@ func TestListNamespacesUseCase(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to list entries")
 	})
 }
+
+// TestListUseCase_SortsNames verifies the list use case emits names in a stable
+// alphabetical order regardless of the provider's native ordering. This covers
+// Key Vault, whose API returns names in an unspecified order (#480).
+func TestListUseCase_SortsNames(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		ListFunc: func(_ context.Context) ([]string, error) {
+			return []string{"charlie", "alpha", "bravo"}, nil
+		},
+	}
+
+	uc := &azure.ListUseCase{Reader: store}
+	out, err := uc.Execute(t.Context(), azure.ListInput{})
+	require.NoError(t, err)
+
+	names := make([]string, len(out.Entries))
+	for i, e := range out.Entries {
+		names[i] = e.Name
+	}
+
+	assert.Equal(t, []string{"alpha", "bravo", "charlie"}, names)
+}
