@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // diffJSONOutput represents the JSON output structure for the diff command.
@@ -30,14 +30,14 @@ type diffJSONOutput struct {
 // diffPresenter renders Secrets Manager diff output byte-for-byte as before.
 type diffPresenter struct {
 	uc     *secret.DiffUseCase
-	spec1  *secretversion.Spec
-	spec2  *secretversion.Spec
+	spec1  *awssecretversion.Spec
+	spec2  *awssecretversion.Spec
 	result *secret.DiffOutput
 }
 
 // NewDiffPresenter builds a secret diff presenter over the given reader and specs.
 // It is exported for the shared golden-output test harness.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *secretversion.Spec) genericdiff.Presenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *awssecretversion.Spec) genericdiff.Presenter {
 	return &diffPresenter{uc: &secret.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
@@ -56,8 +56,8 @@ func (p *diffPresenter) OldValue() string { return p.result.OldValue }
 func (p *diffPresenter) NewValue() string { return p.result.NewValue }
 
 func (p *diffPresenter) Labels() (string, string) {
-	return fmt.Sprintf("%s#%s", p.result.OldName, secretversion.TruncateVersionID(p.result.OldVersionID)),
-		fmt.Sprintf("%s#%s", p.result.NewName, secretversion.TruncateVersionID(p.result.NewVersionID))
+	return fmt.Sprintf("%s#%s", p.result.OldName, awssecretversion.TruncateVersionID(p.result.OldVersionID)),
+		fmt.Sprintf("%s#%s", p.result.NewName, awssecretversion.TruncateVersionID(p.result.NewVersionID))
 }
 
 func (p *diffPresenter) RenderJSON(stdout io.Writer, oldValue, newValue string, identical bool, diff string) error {
@@ -82,7 +82,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the Secrets Manager diff command.
 func DiffCommand() *cli.Command {
-	return genericdiff.Command(genericdiff.Config[*secretversion.Spec]{
+	return genericdiff.Command(genericdiff.Config[*awssecretversion.Spec]{
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
 		Description: `Compare two versions of a secret in unified diff format.
@@ -104,8 +104,8 @@ EXAMPLES:
   suve secret diff --output=json my-secret~          Output comparison as JSON
 
 For comparing staged values, use: suve stage secret diff`,
-		ParseDiffArgs: secretversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *secretversion.Spec) (genericdiff.Presenter, error) {
+		ParseDiffArgs: awssecretversion.ParseDiffArgs,
+		NewPresenter: func(ctx context.Context, spec1, spec2 *awssecretversion.Spec) (genericdiff.Presenter, error) {
 			store, err := cliinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err

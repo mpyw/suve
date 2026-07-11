@@ -11,14 +11,14 @@ import (
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 	"github.com/mpyw/suve/internal/version/azurekvversion"
 	"github.com/mpyw/suve/internal/version/gcloudversion"
-	"github.com/mpyw/suve/internal/version/paramversion"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // Per-provider version-spec parsing.
 //
-// The param/secret usecases the GUI drives are typed to *paramversion.Spec /
-// *secretversion.Spec, but the grammar that is legal depends on the active
+// The param/secret usecases the GUI drives are typed to *awsparamversion.Spec /
+// *awssecretversion.Spec, but the grammar that is legal depends on the active
 // provider. Parsing every input with the AWS grammar mis-handles other
 // providers — most visibly it splits an Azure App Configuration key that
 // legally contains '#' or '~' into a bogus name+version. These helpers select
@@ -29,17 +29,17 @@ import (
 // usecase reconstructs a suffix string from the returned spec and hands
 // name+suffix to provider.Reader.Resolve, which re-parses it with the
 // provider's OWN grammar (see each adapter's Resolve). So carrying the parsed
-// name and an equivalent absolute/shift in a paramversion/secretversion spec is
+// name and an equivalent absolute/shift in a awsparamversion/awssecretversion spec is
 // sufficient — the suffix bytes are grammar-agnostic (#id / :label / ~N).
 
 // parseParamSpec parses a parameter version spec with the grammar of the active
-// provider and adapts it to the *paramversion.Spec the param usecase expects.
+// provider and adapts it to the *awsparamversion.Spec the param usecase expects.
 //
-//   - AWS   -> paramversion (name#N~shift).
+//   - AWS   -> awsparamversion (name#N~shift).
 //   - Azure -> App Configuration is unversioned; azureappconfigversion accepts a
 //     bare name only and rejects any specifier, so a key containing '#'/'~' gets
 //     a clean error instead of a mis-split.
-func (a *App) parseParamSpec(specStr string) (*paramversion.Spec, error) {
+func (a *App) parseParamSpec(specStr string) (*awsparamversion.Spec, error) {
 	switch a.currentScope().Provider {
 	case provider.ProviderAzure:
 		spec, err := azureappconfigversion.Parse(specStr)
@@ -48,20 +48,20 @@ func (a *App) parseParamSpec(specStr string) (*paramversion.Spec, error) {
 		}
 
 		// App Configuration has no absolute/shift specifier, so the equivalent
-		// paramversion spec is a bare name (empty suffix).
-		return &paramversion.Spec{Name: spec.Name}, nil
+		// awsparamversion spec is a bare name (empty suffix).
+		return &awsparamversion.Spec{Name: spec.Name}, nil
 	default:
-		return paramversion.Parse(specStr)
+		return awsparamversion.Parse(specStr)
 	}
 }
 
 // parseSecretSpec parses a secret version spec with the grammar of the active
-// provider and adapts it to the *secretversion.Spec the secret usecase expects.
+// provider and adapts it to the *awssecretversion.Spec the secret usecase expects.
 //
-//   - AWS          -> secretversion (name#id | :label, plus ~shift).
+//   - AWS          -> awssecretversion (name#id | :label, plus ~shift).
 //   - Google Cloud -> gcloudversion (integer #N, ~shift; ':' labels rejected).
 //   - Azure        -> azurekvversion (opaque #id, ~shift; ':' labels rejected).
-func (a *App) parseSecretSpec(specStr string) (*secretversion.Spec, error) {
+func (a *App) parseSecretSpec(specStr string) (*awssecretversion.Spec, error) {
 	switch a.currentScope().Provider {
 	case provider.ProviderGoogleCloud:
 		spec, err := gcloudversion.Parse(specStr)
@@ -69,7 +69,7 @@ func (a *App) parseSecretSpec(specStr string) (*secretversion.Spec, error) {
 			return nil, err
 		}
 
-		out := &secretversion.Spec{Name: spec.Name, Shift: spec.Shift}
+		out := &awssecretversion.Spec{Name: spec.Name, Shift: spec.Shift}
 		if spec.Absolute.Version != nil {
 			out.Absolute.ID = lo.ToPtr(strconv.FormatInt(*spec.Absolute.Version, 10))
 		}
@@ -81,12 +81,12 @@ func (a *App) parseSecretSpec(specStr string) (*secretversion.Spec, error) {
 			return nil, err
 		}
 
-		return &secretversion.Spec{
+		return &awssecretversion.Spec{
 			Name:     spec.Name,
-			Absolute: secretversion.AbsoluteSpec{ID: spec.Absolute.ID},
+			Absolute: awssecretversion.AbsoluteSpec{ID: spec.Absolute.ID},
 			Shift:    spec.Shift,
 		}, nil
 	default:
-		return secretversion.Parse(specStr)
+		return awssecretversion.Parse(specStr)
 	}
 }

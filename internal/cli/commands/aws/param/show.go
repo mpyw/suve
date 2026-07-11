@@ -18,7 +18,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 // showJSONOutput represents the JSON output structure for the show command.
@@ -35,14 +35,14 @@ type showJSONOutput struct {
 // showPresenter renders SSM Parameter Store show output byte-for-byte as before.
 type showPresenter struct {
 	uc         *param.ShowUseCase
-	spec       *paramversion.Spec
+	spec       *awsparamversion.Spec
 	result     *param.ShowOutput
 	jsonParsed bool
 }
 
 // NewShowPresenter builds a param show presenter over the given reader and spec.
 // It is exported for the shared golden-output test harness.
-func NewShowPresenter(reader provider.Reader, spec *paramversion.Spec) genericshow.Presenter {
+func NewShowPresenter(reader provider.Reader, spec *awsparamversion.Spec) genericshow.Presenter {
 	return &showPresenter{uc: &param.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -133,7 +133,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the SSM Parameter Store show command.
 func ShowCommand() *cli.Command {
-	return genericshow.Command(genericshow.Config[*paramversion.Spec]{
+	return genericshow.Command(genericshow.Config[*awsparamversion.Spec]{
 		Usage:     "Show parameter value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Display a parameter's value along with its metadata (name, version, type, modification date).
@@ -154,8 +154,8 @@ EXAMPLES:
   suve param show --output=json /app/config                 Output as JSON
   DB_URL=$(suve param show --raw /app/config)               Use in shell variable`,
 		UsageError: "usage: suve param show <name>",
-		ParseSpec:  paramversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *paramversion.Spec) (genericshow.Presenter, error) {
+		ParseSpec:  awsparamversion.Parse,
+		NewPresenter: func(ctx context.Context, spec *awsparamversion.Spec) (genericshow.Presenter, error) {
 			store, err := cliinternal.ParamStore(ctx)
 			if err != nil {
 				return nil, err

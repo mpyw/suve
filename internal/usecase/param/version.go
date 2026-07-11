@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 // specSuffix reconstructs the version-spec suffix (the part after the name)
@@ -16,7 +16,7 @@ import (
 //	{Shift:2}            -> "~2"
 //	{Version:5, Shift:2} -> "#5~2"
 //	{}                   -> ""  (latest)
-func specSuffix(spec *paramversion.Spec) string {
+func specSuffix(spec *awsparamversion.Spec) string {
 	var b strings.Builder
 
 	if spec.Absolute.Version != nil {

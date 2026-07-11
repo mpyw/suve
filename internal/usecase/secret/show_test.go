@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // showStore builds a mock reader that resolves to the latest ref and returns the
@@ -28,10 +28,10 @@ func showStore(entry *domain.Entry) *providermock.Store {
 	}
 }
 
-func mustParseSpec(t *testing.T, s string) *secretversion.Spec {
+func mustParseSpec(t *testing.T, s string) *awssecretversion.Spec {
 	t.Helper()
 
-	spec, err := secretversion.Parse(s)
+	spec, err := awssecretversion.Parse(s)
 	require.NoError(t, err)
 
 	return spec

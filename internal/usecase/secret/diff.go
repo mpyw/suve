@@ -5,13 +5,13 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // DiffInput holds input for the diff use case.
 type DiffInput struct {
-	Spec1 *secretversion.Spec
-	Spec2 *secretversion.Spec
+	Spec1 *awssecretversion.Spec
+	Spec2 *awssecretversion.Spec
 }
 
 // DiffOutput holds the result of the diff use case.
@@ -52,7 +52,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 }
 
 // resolveAndGet resolves a spec to a version ref and fetches the entry.
-func (u *DiffUseCase) resolveAndGet(ctx context.Context, spec *secretversion.Spec) (*domain.Entry, error) {
+func (u *DiffUseCase) resolveAndGet(ctx context.Context, spec *awssecretversion.Spec) (*domain.Entry, error) {
 	ref, err := u.Reader.Resolve(ctx, spec.Name, specSuffix(spec))
 	if err != nil {
 		return nil, err

@@ -1,4 +1,4 @@
-package paramversion_test
+package awsparamversion_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 //nolint:funlen // Table-driven test with many cases
@@ -272,7 +272,7 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := paramversion.Parse(tt.input)
+			spec, err := awsparamversion.Parse(tt.input)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -293,22 +293,22 @@ func TestSpec_HasShift(t *testing.T) {
 
 	tests := []struct {
 		name string
-		spec *paramversion.Spec
+		spec *awsparamversion.Spec
 		want bool
 	}{
 		{
 			name: "no shift",
-			spec: &paramversion.Spec{Name: "/my/param", Shift: 0},
+			spec: &awsparamversion.Spec{Name: "/my/param", Shift: 0},
 			want: false,
 		},
 		{
 			name: "with shift 1",
-			spec: &paramversion.Spec{Name: "/my/param", Shift: 1},
+			spec: &awsparamversion.Spec{Name: "/my/param", Shift: 1},
 			want: true,
 		},
 		{
 			name: "with shift 5",
-			spec: &paramversion.Spec{Name: "/my/param", Shift: 5},
+			spec: &awsparamversion.Spec{Name: "/my/param", Shift: 5},
 			want: true,
 		},
 	}
@@ -327,43 +327,43 @@ func TestParseDiffArgs(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       []string
-		wantSpec1  *paramversion.Spec
-		wantSpec2  *paramversion.Spec
+		wantSpec1  *awsparamversion.Spec
+		wantSpec2  *awsparamversion.Spec
 		wantErrMsg string
 	}{
 		{
 			name: "one arg with version",
 			args: []string{"/app/param#3"},
-			wantSpec1: &paramversion.Spec{
+			wantSpec1: &awsparamversion.Spec{
 				Name:     "/app/param",
-				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
+				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
 			},
-			wantSpec2: &paramversion.Spec{
+			wantSpec2: &awsparamversion.Spec{
 				Name: "/app/param",
 			},
 		},
 		{
 			name: "two args",
 			args: []string{"/app/param#1", "#2"},
-			wantSpec1: &paramversion.Spec{
+			wantSpec1: &awsparamversion.Spec{
 				Name:     "/app/param",
-				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &paramversion.Spec{
+			wantSpec2: &awsparamversion.Spec{
 				Name:     "/app/param",
-				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
 			},
 		},
 		{
 			name: "three args",
 			args: []string{"/app/param", "#1", "#2"},
-			wantSpec1: &paramversion.Spec{
+			wantSpec1: &awsparamversion.Spec{
 				Name:     "/app/param",
-				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &paramversion.Spec{
+			wantSpec2: &awsparamversion.Spec{
 				Name:     "/app/param",
-				Absolute: paramversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
 			},
 		},
 		{
@@ -382,7 +382,7 @@ func TestParseDiffArgs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec1, spec2, err := paramversion.ParseDiffArgs(tt.args)
+			spec1, spec2, err := awsparamversion.ParseDiffArgs(tt.args)
 
 			if tt.wantErrMsg != "" {
 				require.Error(t, err)

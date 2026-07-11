@@ -1,7 +1,7 @@
 // Package param implements the provider.Store contract for AWS Systems Manager
 // Parameter Store. It confines all SSM SDK types to this package: version
 // resolution (absolute #version and ~shift against history) lives here, while
-// spec PARSING stays generic via paramversion.Parse.
+// spec PARSING stays generic via awsparamversion.Parse.
 package param
 
 import (
@@ -19,7 +19,7 @@ import (
 	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 // Client is the narrow SSM Parameter Store surface this adapter needs. The
@@ -60,7 +60,7 @@ func New(client Client) *Store {
 // an opaque VersionRef holding the concrete version number. An empty/latest
 // spec resolves to the latest ref (empty id).
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
-	parsed, err := paramversion.Parse(name + spec)
+	parsed, err := awsparamversion.Parse(name + spec)
 	if err != nil {
 		return provider.VersionRef{}, err
 	}

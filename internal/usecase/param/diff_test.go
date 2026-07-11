@@ -11,7 +11,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 // resolveBySuffix returns a ResolveFunc mapping a version-spec suffix to a ref.
@@ -45,8 +45,8 @@ func TestDiffUseCase_Execute(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := paramversion.Parse("/app/config#1")
-	spec2, _ := paramversion.Parse("/app/config#2")
+	spec1, _ := awsparamversion.Parse("/app/config#1")
+	spec2, _ := awsparamversion.Parse("/app/config#2")
 
 	output, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
 	require.NoError(t, err)
@@ -72,8 +72,8 @@ func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := paramversion.Parse("/app/config#1")
-	spec2, _ := paramversion.Parse("/app/config#2")
+	spec1, _ := awsparamversion.Parse("/app/config#1")
+	spec2, _ := awsparamversion.Parse("/app/config#2")
 
 	_, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
 	assert.Error(t, err)
@@ -95,8 +95,8 @@ func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := paramversion.Parse("/app/config#1")
-	spec2, _ := paramversion.Parse("/app/config#2")
+	spec1, _ := awsparamversion.Parse("/app/config#1")
+	spec2, _ := awsparamversion.Parse("/app/config#2")
 
 	_, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
 	assert.Error(t, err)
@@ -112,8 +112,8 @@ func TestDiffUseCase_Execute_WithLatest(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := paramversion.Parse("/app/config#3")
-	spec2, _ := paramversion.Parse("/app/config")
+	spec1, _ := awsparamversion.Parse("/app/config#3")
+	spec2, _ := awsparamversion.Parse("/app/config")
 
 	output, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
 	require.NoError(t, err)
@@ -132,8 +132,8 @@ func TestDiffUseCase_Execute_WithShift(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := paramversion.Parse("/app/config~2") // 2 versions back from latest (v3 -> v1)
-	spec2, _ := paramversion.Parse("/app/config~1") // 1 version back from latest (v3 -> v2)
+	spec1, _ := awsparamversion.Parse("/app/config~2") // 2 versions back from latest (v3 -> v1)
+	spec2, _ := awsparamversion.Parse("/app/config~1") // 1 version back from latest (v3 -> v2)
 
 	output, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
 	require.NoError(t, err)
@@ -154,8 +154,8 @@ func TestDiffUseCase_Execute_WithShift_Error(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := paramversion.Parse("/app/config~1")
-	spec2, _ := paramversion.Parse("/app/config")
+	spec1, _ := awsparamversion.Parse("/app/config~1")
+	spec2, _ := awsparamversion.Parse("/app/config")
 
 	_, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
 	assert.Error(t, err)

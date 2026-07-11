@@ -69,7 +69,7 @@ import (
 // # Parameters
 //
 //   - args: Command line arguments (1-3 arguments supported)
-//   - parse: Service-specific parser function (e.g., paramversion.Parse, secretversion.Parse)
+//   - parse: Service-specific parser function (e.g., awsparamversion.Parse, awssecretversion.Parse)
 //   - hasAbsolute: Returns true if the absolute specifier is set (non-zero).
 //     Used to distinguish "mixed" pattern from "partial spec" pattern in 2-arg case.
 //     For SSM Parameter Store: func(abs) bool { return abs.Version != nil }
@@ -92,8 +92,8 @@ import (
 //
 //	spec1, spec2, err := ParseArgs(
 //	    args,
-//	    paramversion.Parse,
-//	    func(abs paramversion.AbsoluteSpec) bool { return abs.Version != nil },
+//	    awsparamversion.Parse,
+//	    func(abs awsparamversion.AbsoluteSpec) bool { return abs.Version != nil },
 //	    "#~",
 //	    "usage: suve param diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 //	)
@@ -102,8 +102,8 @@ import (
 //
 //	spec1, spec2, err := ParseArgs(
 //	    args,
-//	    secretversion.Parse,
-//	    func(abs secretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
+//	    awssecretversion.Parse,
+//	    func(abs awssecretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
 //	    "#:~",
 //	    "usage: suve secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 //	)

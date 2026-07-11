@@ -15,7 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // logJSONItem represents a single version entry in JSON output.
@@ -112,7 +112,7 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, _ int) {
 	}
 
 	output.Printf(stdout, "%s%s  %s%s\n",
-		colors.For(stdout).Version(secretversion.TruncateVersionID(entry.VersionID)),
+		colors.For(stdout).Version(awssecretversion.TruncateVersionID(entry.VersionID)),
 		labelsStr,
 		colors.For(stdout).FieldLabel(dateStr),
 		"",
@@ -122,7 +122,7 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, _ int) {
 func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 	entry := p.result.Entries[i]
 
-	versionLabel := fmt.Sprintf("Version %s", secretversion.TruncateVersionID(entry.VersionID))
+	versionLabel := fmt.Sprintf("Version %s", awssecretversion.TruncateVersionID(entry.VersionID))
 	if len(entry.VersionStage) > 0 {
 		versionLabel += " " + colors.For(stdout).Current(fmt.Sprintf("%v", entry.VersionStage))
 	}
@@ -175,14 +175,14 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 			return
 		}
 
-		oldName = fmt.Sprintf("%s#%s", p.result.Name, secretversion.TruncateVersionID(oldEntry.VersionID))
+		oldName = fmt.Sprintf("%s#%s", p.result.Name, awssecretversion.TruncateVersionID(oldEntry.VersionID))
 
 		if parseJSON {
 			oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, stderr, "")
 		}
 	}
 
-	newName := fmt.Sprintf("%s#%s", p.result.Name, secretversion.TruncateVersionID(newEntry.VersionID))
+	newName := fmt.Sprintf("%s#%s", p.result.Name, awssecretversion.TruncateVersionID(newEntry.VersionID))
 
 	diff := output.Diff(stdout, oldName, newName, oldValue, newValue)
 	if diff != "" {

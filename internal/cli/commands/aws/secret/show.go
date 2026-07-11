@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // showJSONOutput represents the JSON output structure for the show command.
@@ -31,13 +31,13 @@ type showJSONOutput struct {
 // showPresenter renders Secrets Manager show output byte-for-byte as before.
 type showPresenter struct {
 	uc     *secret.ShowUseCase
-	spec   *secretversion.Spec
+	spec   *awssecretversion.Spec
 	result *secret.ShowOutput
 }
 
 // NewShowPresenter builds a secret show presenter over the given reader and spec.
 // It is exported for the shared golden-output test harness.
-func NewShowPresenter(reader provider.Reader, spec *secretversion.Spec) genericshow.Presenter {
+func NewShowPresenter(reader provider.Reader, spec *awssecretversion.Spec) genericshow.Presenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -124,7 +124,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Secrets Manager show command.
 func ShowCommand() *cli.Command {
-	return genericshow.Command(genericshow.Config[*secretversion.Spec]{
+	return genericshow.Command(genericshow.Config[*awssecretversion.Spec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION | :LABEL][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
@@ -146,8 +146,8 @@ EXAMPLES:
   suve secret show --output=json my-secret                Output as JSON
   API_KEY=$(suve secret show --raw my-secret)             Use in shell variable`,
 		UsageError: "usage: suve secret show <name>",
-		ParseSpec:  secretversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *secretversion.Spec) (genericshow.Presenter, error) {
+		ParseSpec:  awssecretversion.Parse,
+		NewPresenter: func(ctx context.Context, spec *awssecretversion.Spec) (genericshow.Presenter, error) {
 			store, err := cliinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err

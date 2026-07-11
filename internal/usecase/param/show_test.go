@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 func TestShowUseCase_Execute(t *testing.T) {
@@ -39,7 +39,7 @@ func TestShowUseCase_Execute(t *testing.T) {
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	spec, err := paramversion.Parse("/app/config")
+	spec, err := awsparamversion.Parse("/app/config")
 	require.NoError(t, err)
 
 	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
@@ -72,7 +72,7 @@ func TestShowUseCase_Execute_WithVersion(t *testing.T) {
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	spec, err := paramversion.Parse("/app/config#3")
+	spec, err := awsparamversion.Parse("/app/config#3")
 	require.NoError(t, err)
 
 	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
@@ -103,7 +103,7 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	spec, err := paramversion.Parse("/app/config~1")
+	spec, err := awsparamversion.Parse("/app/config~1")
 	require.NoError(t, err)
 
 	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
@@ -127,7 +127,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	spec, err := paramversion.Parse("/app/config")
+	spec, err := awsparamversion.Parse("/app/config")
 	require.NoError(t, err)
 
 	_, err = uc.Execute(t.Context(), param.ShowInput{Spec: spec})
@@ -145,7 +145,7 @@ func TestShowUseCase_Execute_ResolveError(t *testing.T) {
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	spec, err := paramversion.Parse("/app/config")
+	spec, err := awsparamversion.Parse("/app/config")
 	require.NoError(t, err)
 
 	_, err = uc.Execute(t.Context(), param.ShowInput{Spec: spec})
@@ -171,7 +171,7 @@ func TestShowUseCase_Execute_NoLastModified(t *testing.T) {
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	spec, err := paramversion.Parse("/app/config")
+	spec, err := awsparamversion.Parse("/app/config")
 	require.NoError(t, err)
 
 	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
@@ -202,7 +202,7 @@ func TestShowUseCase_Execute_WithTags(t *testing.T) {
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	spec, err := paramversion.Parse("/app/config")
+	spec, err := awsparamversion.Parse("/app/config")
 	require.NoError(t, err)
 
 	output, err := uc.Execute(t.Context(), param.ShowInput{Spec: spec})
