@@ -70,6 +70,7 @@
   let showExportPassphrase = $state(false);
   let exportService = $state('');
   let exportPath = $state('');
+  let exportKeep = $state(false);
   let exportLoading = $state(false);
   let exportError = $state('');
   let exportResult: gui.StagingExportResult | null = $state(null);
@@ -339,6 +340,7 @@
     showTransferDropdown = false;
     exportError = '';
     exportResult = null;
+    exportKeep = false;
     exportService = service;
     try {
       const path = await PickExportPath(`${service}.json`);
@@ -354,7 +356,7 @@
     exportLoading = true;
     exportError = '';
     try {
-      const result = await StagingExport(exportPath, exportService, passphrase, false);
+      const result = await StagingExport(exportPath, exportService, passphrase, exportKeep);
       exportResult = result;
       showExportPassphrase = false;
       await loadStatus();
@@ -798,6 +800,8 @@
   show={showExportPassphrase}
   mode="encrypt"
   title="Export {serviceLabel(exportService)}"
+  keepOption={true}
+  bind:keep={exportKeep}
   onsubmit={handleExport}
   oncancel={closeExportModal}
   loading={exportLoading}
