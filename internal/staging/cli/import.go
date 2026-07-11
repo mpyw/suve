@@ -60,7 +60,7 @@ func importFlags() []cli.Flag {
 			Usage: usagePassphraseStdin,
 		},
 		&cli.BoolFlag{
-			Name:  flagForce,
+			Name:  flagAllowScopeMismatch,
 			Usage: "Import even if the file's scope differs from the current scope",
 		},
 	}
@@ -157,7 +157,7 @@ type presentEnvelope struct {
 // prompted. For a service-specific import the single file must exist and its
 // header service must match. For a global import it reads whichever of
 // param.json / secret.json exist (missing ones are skipped); neither present is
-// an error. Scope mismatches are refused unless --force.
+// an error. Scope mismatches are refused unless --allow-scope-mismatch.
 func collectImportEnvelopes(
 	cmd *cli.Command, service staging.Service, pathFor func(staging.Service) string, wantScope string,
 ) ([]presentEnvelope, error) {
@@ -188,7 +188,7 @@ func collectImportEnvelopes(
 
 		// The file's header service must match what is expected here: the command's
 		// service for a service-specific import, or the per-service filename for a
-		// global import. A mismatch is a hard error (no --force override): importing
+		// global import. A mismatch is a hard error (no override): importing
 		// another service's data under the wrong service would corrupt the working
 		// area, and export always writes matching names/headers.
 		if env.Service != string(svc) {
@@ -198,9 +198,9 @@ func collectImportEnvelopes(
 			)
 		}
 
-		if env.Scope != wantScope && !cmd.Bool(flagForce) {
+		if env.Scope != wantScope && !cmd.Bool(flagAllowScopeMismatch) {
 			return nil, fmt.Errorf(
-				"export file scope %q does not match the current scope %q; re-run with --force to import anyway",
+				"export file scope %q does not match the current scope %q; re-run with --allow-scope-mismatch to import anyway",
 				env.Scope, wantScope,
 			)
 		}
@@ -402,8 +402,9 @@ Reads one file per service:
    <dir>/secret.json   Secrets Manager staged changes
 
 Missing files are skipped; it is an error only when neither exists. Each file's
-scope is validated against the current scope (override with --force). A
-Merge / Overwrite prompt appears only when the working staging area already
+scope is validated against the current scope (override with
+--allow-scope-mismatch). A Merge / Overwrite prompt appears only when the
+working staging area already
 holds changes; use --merge / --overwrite to choose non-interactively.
 
 EXAMPLES:
@@ -431,8 +432,9 @@ func NewImportCommand(cfg CommandConfig) *cli.Command {
 
 The file's service must match (%s); importing another service's file is a hard
 error. The file's scope is validated against the current scope (override with
---force). A Merge / Overwrite prompt appears only when the working staging area
-already holds changes; use --merge / --overwrite to choose non-interactively.
+--allow-scope-mismatch). A Merge / Overwrite prompt appears only when the working
+staging area already holds changes; use --merge / --overwrite to choose
+non-interactively.
 
 EXAMPLES:
    suve stage %s import ./%s.json                     Import staged %s changes

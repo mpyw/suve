@@ -882,11 +882,11 @@ Export writes the working staging area out to portable snapshot files (one per s
 |---------|----------|---------|-------------|
 | `suve stage export` | `<dir>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export every service with staged changes to `<dir>/param.json` + `<dir>/secret.json` |
 | `suve stage {param,secret} export` | `<file>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export a single service to `<file>` |
-| `suve stage import` | `<dir>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--force` | Import `param.json` / `secret.json` from `<dir>` (missing files skipped; nothing imported if both absent) |
-| `suve stage {param,secret} import` | `<file>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--force` | Import a single service from `<file>` (missing file or service mismatch is a hard error) |
+| `suve stage import` | `<dir>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--allow-scope-mismatch` | Import `param.json` / `secret.json` from `<dir>` (missing files skipped; nothing imported if both absent) |
+| `suve stage {param,secret} import` | `<file>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--allow-scope-mismatch` | Import a single service from `<file>` (missing file or service mismatch is a hard error) |
 
 - **`export`** writes the working area out wholesale; there is no `--merge` / `--overwrite`. By default it clears the working staging area; `--keep` retains it. `--yes` / `--force` skip the overwrite confirmation.
-- **`import`** has no `--keep` (it is read-only on the file). `--merge` / `--overwrite` are mutually exclusive and only matter when the working area already holds changes; otherwise the file is applied directly. `--force` imports even when the file's embedded scope differs from the current scope.
+- **`import`** has no `--keep` (it is read-only on the file). `--merge` / `--overwrite` are mutually exclusive and only matter when the working area already holds changes; otherwise the file is applied directly. `--allow-scope-mismatch` imports even when the file's embedded scope differs from the current scope.
 
 ## Environment Variables
 

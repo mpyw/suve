@@ -583,9 +583,9 @@ func TestGlobal_ImportScopeMismatch(t *testing.T) {
 		assert.Contains(t, err.Error(), "scope")
 	})
 
-	// --force overrides.
+	// --allow-scope-mismatch overrides.
 	t.Run("forced", func(t *testing.T) {
-		_, _, err := runSubCommand(t, globalstage.Command(), "import", dir, "--force")
+		_, _, err := runSubCommand(t, globalstage.Command(), "import", dir, "--allow-scope-mismatch")
 		require.NoError(t, err)
 
 		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
