@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -112,9 +113,8 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, maxValueLength int) {
 		currentMark = colors.For(stdout).Current(" (current)")
 	}
 
-	output.Printf(stdout, "%s%d%s  %s  %s\n",
-		colors.For(stdout).Version(""),
-		entry.Version,
+	output.Printf(stdout, "%s%s  %s  %s\n",
+		colors.For(stdout).Version(strconv.FormatInt(entry.Version, 10)),
 		currentMark,
 		colors.For(stdout).FieldLabel(dateStr),
 		value,
