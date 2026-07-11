@@ -90,9 +90,10 @@ func setupTempHome(t *testing.T) {
 //
 // It uses NewWorkingStore (not NewStore) so the read path shares the exact key
 // resolution the CLI uses when it writes: SUVE_STAGING_KEY env var -> OS
-// keychain -> plaintext. Under the Dockerized runner SUVE_STAGING_KEY is set,
-// so the working store is encrypted and this must decrypt with the same key; on
-// keyless/no-keychain environments both sides fall back to plaintext.
+// keychain -> plaintext. Both the Dockerized runner and the CI e2e jobs set
+// SUVE_STAGING_KEY, so the working store is encrypted and this must decrypt with
+// the same key. (A keychain-less runner with no key would otherwise fall back to
+// plaintext, which is now refused for non-interactive writes without consent.)
 func newStore() *file.Store {
 	s, err := file.NewWorkingStore(provider.AWSScope("000000000000", "us-east-1"))
 	if err != nil {

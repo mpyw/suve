@@ -644,7 +644,7 @@ The staging workflow allows you to prepare changes locally before applying them 
 Working state is split per service and namespaced by provider scope: `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/param.json` and `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/secret.json` — there is no single combined state file. To save or move this state, `stage export <dir>` / `stage import <dir>` write and read portable per-service snapshot files (`param.json` / `secret.json`) at a path you choose; these snapshots are not kept under `~/.suve/staging/`.
 
 > [!NOTE]
-> The working-state files are encrypted at rest. The encryption key is resolved from the `SUVE_STAGING_KEY` environment variable (base64-encoded 32 bytes) if set, otherwise from an OS keychain (created on first use), otherwise the state is stored as plaintext with a warning.
+> The working-state files are encrypted at rest. The encryption key is resolved from the `SUVE_STAGING_KEY` environment variable (base64-encoded 32 bytes) if set, otherwise from an OS keychain (created on first use). When neither is available, an interactive session stores the state as plaintext with a warning, while a non-interactive session refuses to write unencrypted unless `SUVE_STAGING_ALLOW_PLAINTEXT` is set (`SUVE_STAGING_KEY` is preferred, as it actually encrypts).
 
 ### Workflow Overview
 
@@ -1709,7 +1709,7 @@ The staging workflow allows you to prepare changes locally before applying them 
 Working state is split per service and namespaced by provider scope: `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/param.json` and `~/.suve/staging/aws/<ACCOUNT_ID>/<REGION>/secret.json` — there is no single combined state file. To save or move this state, `stage export <dir>` / `stage import <dir>` write and read portable per-service snapshot files (`param.json` / `secret.json`) at a path you choose; these snapshots are not kept under `~/.suve/staging/`.
 
 > [!NOTE]
-> The working-state files are encrypted at rest. The encryption key is resolved from the `SUVE_STAGING_KEY` environment variable (base64-encoded 32 bytes) if set, otherwise from an OS keychain (created on first use), otherwise the state is stored as plaintext with a warning.
+> The working-state files are encrypted at rest. The encryption key is resolved from the `SUVE_STAGING_KEY` environment variable (base64-encoded 32 bytes) if set, otherwise from an OS keychain (created on first use). When neither is available, an interactive session stores the state as plaintext with a warning, while a non-interactive session refuses to write unencrypted unless `SUVE_STAGING_ALLOW_PLAINTEXT` is set (`SUVE_STAGING_KEY` is preferred, as it actually encrypts).
 
 ### Workflow Overview
 

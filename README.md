@@ -30,7 +30,7 @@ A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud S
 - **Version navigation**: `#VERSION`, `~SHIFT`, `:LABEL` syntax
 - **Colored diff output**: Easy-to-read unified diff format
 - **Multi-cloud**: [AWS SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) / [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html), [Google Cloud Secret Manager](https://cloud.google.com/secret-manager/docs), and [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/) / [App Configuration](https://learn.microsoft.com/en-us/azure/azure-app-configuration/)
-- **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`; plaintext fallback with a warning if unavailable). Exported snapshot files carry a separately passphrase-encrypted payload ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode); an empty passphrase writes plaintext).
+- **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`). When no key is available (no keychain backend and no `SUVE_STAGING_KEY`), an interactive session falls back to plaintext with a warning, while a non-interactive one refuses to write unencrypted unless `SUVE_STAGING_ALLOW_PLAINTEXT` is set. Exported snapshot files carry a separately passphrase-encrypted payload ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode); an empty passphrase writes plaintext).
 - **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
 
 ### Metadata terminology
@@ -1014,6 +1014,7 @@ message bodies at all.
 | Variable | Description |
 |----------|-------------|
 | `SUVE_STAGING_KEY` | Base64-encoded 32-byte key that overrides the OS keychain for encrypting the working staging state |
+| `SUVE_STAGING_ALLOW_PLAINTEXT` | Set to a truthy value to permit writing the working staging state UNENCRYPTED in a non-interactive session when no key is available. Prefer `SUVE_STAGING_KEY`, which actually encrypts |
 
 ## AWS Configuration
 
