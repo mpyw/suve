@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"golang.org/x/mod/semver"
@@ -61,6 +62,45 @@ type checker struct {
 	lookupEnv   func(string) (string, bool)
 	cachePath   func() (string, error)
 	fetchLatest func(ctx context.Context) (string, error)
+
+	// readMemo / writeMemo are the in-process fallback marker. Production wires
+	// them to a package-level, process-wide store (see defaultChecker); tests
+	// may leave them nil (fallback disabled) or supply isolated closures.
+	readMemo  func() (cacheEntry, bool)
+	writeMemo func(cacheEntry)
+}
+
+// procMemoMu guards the process-wide in-memory fallback below.
+//
+//nolint:gochecknoglobals // process-wide mutex for the in-process fallback marker
+var procMemoMu sync.Mutex
+
+// procMemo is the process-wide in-memory fallback for resolveLatest. It bounds
+// network probing to once per cacheTTL even when the on-disk cache is unusable
+// (e.g. an unwritable ~/.suve), so a failed writeCache does not re-pay the HTTP
+// timeout on every invocation within a single process.
+//
+//nolint:gochecknoglobals // process-wide fallback marker; guarded by procMemoMu
+var procMemo cacheEntry
+
+// procMemoValid reports whether procMemo has been populated in this process.
+//
+//nolint:gochecknoglobals // process-wide fallback marker; guarded by procMemoMu
+var procMemoValid bool
+
+func readProcMemo() (cacheEntry, bool) {
+	procMemoMu.Lock()
+	defer procMemoMu.Unlock()
+
+	return procMemo, procMemoValid
+}
+
+func writeProcMemo(entry cacheEntry) {
+	procMemoMu.Lock()
+	defer procMemoMu.Unlock()
+
+	procMemo = entry
+	procMemoValid = true
 }
 
 // Notice returns a one-line update notice when a newer release of mpyw/suve is
@@ -84,6 +124,8 @@ func defaultChecker() *checker {
 		fetchLatest: func(ctx context.Context) (string, error) {
 			return fetchLatestRelease(ctx, client)
 		},
+		readMemo:  readProcMemo,
+		writeMemo: writeProcMemo,
 	}
 }
 
@@ -142,25 +184,42 @@ func (c *checker) resolveLatest(ctx context.Context) string {
 		}
 	}
 
+	// In-process fallback: when the on-disk cache is unusable (no path, or an
+	// unwritable file whose marker never persisted), a fresh in-memory marker
+	// still bounds probing to once per TTL within this process.
+	if c.readMemo != nil {
+		if entry, ok := c.readMemo(); ok && c.now().Sub(entry.CheckedAt) < cacheTTL {
+			return entry.LatestVersion
+		}
+	}
+
 	latest, err := c.fetchLatest(ctx)
 	if err != nil || latest == "" {
 		// On fetch failure, record a short-lived negative marker (an empty
 		// LatestVersion, treated as "checked, nothing to report") so a failed
 		// probe suppresses retries within the TTL rather than paying the HTTP
 		// timeout on every invocation.
-		if pathErr == nil {
-			_ = writeCache(path, cacheEntry{CheckedAt: c.now()})
-		}
+		c.record(path, pathErr, cacheEntry{CheckedAt: c.now()})
 
 		return ""
 	}
 
-	if pathErr == nil {
-		// Best-effort cache write; errors are ignored on purpose.
-		_ = writeCache(path, cacheEntry{CheckedAt: c.now(), LatestVersion: latest})
-	}
+	c.record(path, pathErr, cacheEntry{CheckedAt: c.now(), LatestVersion: latest})
 
 	return latest
+}
+
+// record persists a resolved marker to the on-disk cache (best-effort; ignored
+// on error) and always to the in-process fallback, so an unwritable cache path
+// still limits probing to once per process.
+func (c *checker) record(path string, pathErr error, entry cacheEntry) {
+	if pathErr == nil {
+		_ = writeCache(path, entry)
+	}
+
+	if c.writeMemo != nil {
+		c.writeMemo(entry)
+	}
 }
 
 // normalize ensures a version tag carries a leading "v" so it is comparable
