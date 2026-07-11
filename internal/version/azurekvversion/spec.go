@@ -110,7 +110,7 @@ func ParseDiffArgs(args []string) (*Spec, *Spec, error) {
 		Parse,
 		hasAbsoluteSpec,
 		"#~",
-		"usage: suve azure secret diff <spec1> [spec2] | <name> <version1> [version2]",
+		"usage: suve azure secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 	)
 }
 

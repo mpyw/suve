@@ -95,7 +95,7 @@ import (
 //	    paramversion.Parse,
 //	    func(abs paramversion.AbsoluteSpec) bool { return abs.Version != nil },
 //	    "#~",
-//	    "usage: suve param diff <spec1> [spec2] | <name> <version1> [version2]",
+//	    "usage: suve param diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 //	)
 //
 // Secrets Manager usage:
@@ -105,7 +105,7 @@ import (
 //	    secretversion.Parse,
 //	    func(abs secretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
 //	    "#:~",
-//	    "usage: suve secret diff <spec1> [spec2] | <name> <version1> [version2]",
+//	    "usage: suve secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 //	)
 func ParseArgs[A any](
 	args []string,
@@ -124,7 +124,7 @@ func ParseArgs[A any](
 	case 2: //nolint:mnd // two-arg case for version comparison
 		return parseTwoArgs(args[0], args[1], parse, hasAbsolute, prefixes)
 	default: // case 3
-		return parseThreeArgs(args[0], args[1], args[2], parse)
+		return parseThreeArgs(args[0], args[1], args[2], parse, prefixes)
 	}
 }
 
@@ -254,13 +254,28 @@ func parseTwoArgs[A any](
 //	"my-secret" ":AWSPREVIOUS" ":AWSCURRENT"     → compare AWSPREVIOUS with AWSCURRENT
 //	"/app/config" "~2" "~1"                      → compare 2-versions-ago with 1-version-ago
 //
-// Note: The specifiers don't need to start with a prefix character in this format,
-// because we always concatenate name + specifier. However, in practice they usually
-// do start with #, :, or ~ to avoid ambiguity.
+// Each version argument MUST start with a specifier prefix (#, :, or ~ depending
+// on the service). A bare token such as "3" is rejected with a hard error rather
+// than silently concatenated onto the name: allowing it would turn
+// `diff /app/config 3 1` into a comparison of parameters *named* "/app/config3"
+// and "/app/config1", targeting the wrong resources. Requiring the prefix keeps
+// this format aligned with the usage text.
 func parseThreeArgs[A any](
 	name, version1, version2 string,
 	parse func(string) (*version.Spec[A], error),
+	prefixes string,
 ) (*version.Spec[A], *version.Spec[A], error) {
+	// Both version arguments must be specifier-only (start with #, :, or ~).
+	// Otherwise "name" + "3" would build the resource name "name3" instead of
+	// selecting version 3 of "name".
+	if err := requireSpecifier("version1", version1, prefixes); err != nil {
+		return nil, nil, err
+	}
+
+	if err := requireSpecifier("version2", version2, prefixes); err != nil {
+		return nil, nil, err
+	}
+
 	// Parse name + first specifier
 	spec1, err := parse(name + version1)
 	if err != nil {
@@ -274,4 +289,30 @@ func parseThreeArgs[A any](
 	}
 
 	return spec1, spec2, nil
+}
+
+// requireSpecifier verifies that a version argument in the 3-arg form starts
+// with one of the service's specifier prefix characters. A bare token (e.g.
+// "3") is rejected with a message that names the valid prefixes and suggests
+// the prefixed form.
+func requireSpecifier(label, arg, prefixes string) error {
+	if len(arg) > 0 && strings.ContainsRune(prefixes, rune(arg[0])) {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"%s %q must start with a version specifier (%s); did you mean %q?",
+		label, arg, formatPrefixes(prefixes), string(prefixes[0])+arg,
+	)
+}
+
+// formatPrefixes renders the specifier prefix characters as a human-readable
+// comma-separated list, e.g. "#~" → "#, ~".
+func formatPrefixes(prefixes string) string {
+	parts := make([]string, 0, len(prefixes))
+	for _, r := range prefixes {
+		parts = append(parts, string(r))
+	}
+
+	return strings.Join(parts, ", ")
 }
