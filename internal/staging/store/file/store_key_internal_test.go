@@ -145,6 +145,48 @@ func TestNewWorkingStore_PlaintextFallback(t *testing.T) {
 	assert.Nil(t, s.key)
 }
 
+// TestNewWorkingStore_Plaintext_EncryptedStateExists_Fatal guards #523: when no
+// key is available on this platform (plaintext fallback) but encrypted state
+// already exists, the constructor must hard-fail like the keychain-unavailable
+// and lost-key branches instead of silently degrading to plaintext.
+//
+//nolint:paralleltest // overrides package-level resolveKeyFunc.
+func TestNewWorkingStore_Plaintext_EncryptedStateExists_Fatal(t *testing.T) {
+	origResolve := resolveKeyFunc
+	origHome := userHomeDirFunc
+
+	defer func() {
+		resolveKeyFunc = origResolve
+		userHomeDirFunc = origHome
+	}()
+
+	home := t.TempDir()
+	userHomeDirFunc = func() (string, error) { return home, nil }
+
+	scope := provider.AWSScope("123456789012", "ap-northeast-1")
+
+	// Seed an ENCRYPTED param.json under the scope directory.
+	seed, err := NewStore(scope)
+	require.NoError(t, err)
+
+	seed.key = newTestKey()
+
+	state := staging.NewEmptyState()
+	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("v"),
+	}
+	require.NoError(t, seed.WriteState(t.Context(), "", state))
+
+	resolveKeyFunc = func() ([]byte, bool, bool, error) { return nil, true, false, nil }
+
+	s, err := NewWorkingStore(scope)
+	require.Error(t, err)
+	assert.Nil(t, s)
+	assert.Contains(t, err.Error(), "encrypted state exists")
+	assert.ErrorIs(t, err, keyprovider.ErrNoKeyAvailable)
+}
+
 // TestNewWorkingStore_ResolveError verifies a provider error propagates.
 //
 //nolint:paralleltest // overrides package-level resolveKeyFunc.

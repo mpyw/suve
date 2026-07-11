@@ -67,6 +67,13 @@ var (
 var ErrKeychainKeyNotFound = errors.New(
 	"no staging data key found in the OS keychain (it may have been deleted or reset)")
 
+// ErrNoKeyAvailable signals that no staging encryption key is available on this
+// platform: SUVE_STAGING_KEY is unset and the platform has no keyring backend,
+// so the store would fall back to plaintext. It is the cause reported when that
+// fallback collides with existing encrypted working state.
+var ErrNoKeyAvailable = errors.New(
+	"no staging encryption key is available on this platform; set SUVE_STAGING_KEY")
+
 // KeychainUnavailableError wraps a hard OS-keychain failure — a locked
 // keychain, an unreachable dbus, a corrupted stored key, or a failed store.
 //
