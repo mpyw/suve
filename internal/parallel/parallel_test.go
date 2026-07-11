@@ -3,6 +3,7 @@ package parallel_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -147,6 +148,39 @@ func TestExecuteMapWithLimit(t *testing.T) {
 		require.Len(t, results, 5)
 		// Should not exceed limit of 2
 		assert.LessOrEqual(t, maxConcurrent, int32(2))
+	})
+
+	t.Run("non-positive limit falls back to default without deadlocking", func(t *testing.T) {
+		t.Parallel()
+
+		for _, limit := range []int{0, -1} {
+			t.Run(fmt.Sprintf("limit=%d", limit), func(t *testing.T) {
+				t.Parallel()
+
+				entries := map[int]string{1: "a", 2: "b", 3: "c"}
+
+				// A non-positive limit used to deadlock on errgroup's zero-capacity
+				// semaphore; guard with a timeout so a regression fails instead of
+				// hanging the suite.
+				done := make(chan map[int]*parallel.Result[string], 1)
+
+				go func() {
+					done <- parallel.ExecuteMapWithLimit(t.Context(), entries, limit, func(_ context.Context, _ int, value string) (string, error) {
+						return value, nil
+					})
+				}()
+
+				select {
+				case results := <-done:
+					require.Len(t, results, 3)
+					assert.Equal(t, "a", results[1].Value)
+					assert.Equal(t, "b", results[2].Value)
+					assert.Equal(t, "c", results[3].Value)
+				case <-time.After(5 * time.Second):
+					t.Fatalf("ExecuteMapWithLimit deadlocked with limit %d", limit)
+				}
+			})
+		}
 	})
 
 	t.Run("limit of 1 is sequential", func(t *testing.T) {

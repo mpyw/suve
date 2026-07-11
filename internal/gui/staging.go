@@ -59,6 +59,10 @@ type StagingApplyEntryResult struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`
+	// UnstageError is set when the cloud apply succeeded but clearing the entry
+	// from the staging store afterwards failed. The entry is still staged, so a
+	// later apply would re-run it; the frontend surfaces this as a warning row.
+	UnstageError string `json:"unstageError,omitempty"`
 }
 
 // StagingApplyTagResult represents a single tag apply result.
@@ -67,6 +71,9 @@ type StagingApplyTagResult struct {
 	AddTags    map[string]string `json:"addTags,omitempty"`
 	RemoveTags []string          `json:"removeTags,omitempty"`
 	Error      string            `json:"error,omitempty"`
+	// UnstageError is set when the cloud tag apply succeeded but clearing the
+	// staged tag afterwards failed (see StagingApplyEntryResult.UnstageError).
+	UnstageError string `json:"unstageError,omitempty"`
 }
 
 // StagingApplyResult represents the result of applying staged changes.
@@ -328,6 +335,14 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 		return nil, err
 	}
 
+	return newStagingApplyResult(result), nil
+}
+
+// newStagingApplyResult maps the apply use case's output into the frontend DTO.
+// A post-apply unstage failure (UnstageError: the cloud write succeeded but the
+// entry/tag could not be cleared from staging) is carried through so the
+// frontend can warn, mirroring the CLI (internal/staging/cli/apply.go).
+func newStagingApplyResult(result *stagingusecase.ApplyOutput) *StagingApplyResult {
 	// Render each conflict's EntryKey with its namespace badge (bare name for the
 	// empty/default namespace, so AWS/GCloud/Key Vault output is unchanged).
 	conflicts := lo.Map(result.Conflicts, func(key staging.EntryKey, _ int) string { return key.Label() })
@@ -350,6 +365,10 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 			entry.Error = r.Error.Error()
 		}
 
+		if r.UnstageError != nil {
+			entry.UnstageError = r.UnstageError.Error()
+		}
+
 		output.EntryResults = append(output.EntryResults, entry)
 	}
 
@@ -363,10 +382,14 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 			tagResult.Error = r.Error.Error()
 		}
 
+		if r.UnstageError != nil {
+			tagResult.UnstageError = r.UnstageError.Error()
+		}
+
 		output.TagResults = append(output.TagResults, tagResult)
 	}
 
-	return output, nil
+	return output
 }
 
 // StagingReset resets (unstages) all staged changes for a service.
