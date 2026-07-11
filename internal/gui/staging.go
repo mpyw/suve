@@ -331,7 +331,14 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 	result, err := uc.Execute(a.ctx, stagingusecase.ApplyInput{
 		IgnoreConflicts: ignoreConflicts,
 	})
-	if err != nil {
+	// A conflict rejection or a per-entry/tag failure returns a POPULATED result
+	// alongside the error; the failure detail lives in the result's fields
+	// (Conflicts, EntryFailed, TagFailed, per-entry Error). Surface that result so
+	// the frontend can render the conflict panel and per-entry rows instead of
+	// discarding everything into a bare error message, mirroring the CLI's
+	// apply.go (which prints the result before returning the error). Only a nil
+	// result (e.g. a store read failure) is a hard error with nothing to show.
+	if result == nil {
 		return nil, err
 	}
 
