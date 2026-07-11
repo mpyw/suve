@@ -102,3 +102,67 @@ func CheckConflicts(ctx context.Context, resolve ApplyStrategyResolver, entries 
 
 	return conflicts
 }
+
+// CheckTagConflicts checks if the remote resource behind each staged tag change
+// was modified after the tags were fetched. Returns the set of EntryKeys that
+// have conflicts.
+//
+// It mirrors the Update/Delete path of CheckConflicts using the tag's own
+// TagEntry.BaseModifiedAt: if the remote's last-modified time is after that base
+// time, someone changed the resource since the tags were staged and the apply is
+// a conflict rather than a silent overwrite. Each tag change is probed through
+// the strategy resolved for its own namespace (App Configuration); other
+// providers resolve the single strategy under the empty namespace.
+//
+// A tag change with no BaseModifiedAt cannot be checked and is never a conflict.
+// A remote that no longer exists (zero time) is skipped too — the tag apply will
+// fail on its own.
+func CheckTagConflicts(ctx context.Context, resolve ApplyStrategyResolver, tags map[EntryKey]TagEntry) map[EntryKey]struct{} {
+	conflicts := make(map[EntryKey]struct{})
+
+	toCheck := make(map[EntryKey]TagEntry)
+
+	for key, tag := range tags {
+		if tag.BaseModifiedAt != nil {
+			toCheck[key] = tag
+		}
+	}
+
+	if len(toCheck) == 0 {
+		return conflicts
+	}
+
+	// Fetch last modified times in parallel, resolving the strategy per entry so
+	// the probe targets the tagged item's own namespace.
+	results := parallel.ExecuteMap(ctx, toCheck, func(ctx context.Context, key EntryKey, _ TagEntry) (time.Time, error) {
+		strategy, err := resolve(key.Namespace)
+		if err != nil {
+			return time.Time{}, err
+		}
+
+		return strategy.FetchLastModified(ctx, key.Name)
+	})
+
+	for key, tag := range toCheck {
+		result := results[key]
+		if result.Err != nil {
+			// If we can't fetch, assume no conflict (will fail on apply anyway)
+			continue
+		}
+
+		awsModified := result.Value
+
+		// Zero time means the resource no longer exists - the tag apply will fail
+		// on its own, so don't report it as a conflict here.
+		if awsModified.IsZero() {
+			continue
+		}
+
+		// If the remote was modified after the tags were fetched, it's a conflict.
+		if awsModified.After(*tag.BaseModifiedAt) {
+			conflicts[key] = struct{}{}
+		}
+	}
+
+	return conflicts
+}

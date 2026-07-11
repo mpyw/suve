@@ -255,6 +255,135 @@ func TestCheckConflicts(t *testing.T) {
 	})
 }
 
+func TestCheckTagConflicts(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	laterTime := time.Date(2024, 1, 1, 13, 0, 0, 0, time.UTC)
+
+	t.Run("empty tags returns empty conflicts", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{}
+		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), map[staging.EntryKey]staging.TagEntry{})
+		assert.Empty(t, conflicts)
+	})
+
+	t.Run("tag without base time is never a conflict", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return laterTime, nil // modified, but no base to compare against
+			},
+		}
+		tags := map[staging.EntryKey]staging.TagEntry{
+			{Name: "item1"}: {Add: map[string]string{"env": "prod"}},
+		}
+		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		assert.Empty(t, conflicts)
+	})
+
+	t.Run("conflict - remote modified after base", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return laterTime, nil
+			},
+		}
+		tags := map[staging.EntryKey]staging.TagEntry{
+			{Name: "existing-item"}: {
+				Add:            map[string]string{"env": "prod"},
+				BaseModifiedAt: &baseTime,
+			},
+		}
+		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		assert.Contains(t, conflicts, staging.EntryKey{Name: "existing-item"})
+	})
+
+	t.Run("no conflict - remote unchanged since base", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return baseTime, nil // same time as base
+			},
+		}
+		tags := map[staging.EntryKey]staging.TagEntry{
+			{Name: "existing-item"}: {
+				Add:            map[string]string{"env": "prod"},
+				BaseModifiedAt: &baseTime,
+			},
+		}
+		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		assert.Empty(t, conflicts)
+	})
+
+	t.Run("no conflict - remote no longer exists", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return time.Time{}, nil // zero time: resource gone
+			},
+		}
+		tags := map[staging.EntryKey]staging.TagEntry{
+			{Name: "existing-item"}: {
+				Add:            map[string]string{"env": "prod"},
+				BaseModifiedAt: &baseTime,
+			},
+		}
+		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		assert.Empty(t, conflicts)
+	})
+
+	t.Run("fetch error - no conflict assumed", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return time.Time{}, errors.New("access denied")
+			},
+		}
+		tags := map[staging.EntryKey]staging.TagEntry{
+			{Name: "existing-item"}: {
+				Add:            map[string]string{"env": "prod"},
+				BaseModifiedAt: &baseTime,
+			},
+		}
+		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		assert.Empty(t, conflicts)
+	})
+
+	t.Run("per-namespace - each probed against its own remote", func(t *testing.T) {
+		t.Parallel()
+
+		remoteByNamespace := map[string]time.Time{
+			"":    baseTime,  // unchanged since base -> no conflict
+			"dev": laterTime, // modified after base -> conflict
+		}
+
+		resolve := func(namespace string) (staging.ApplyStrategy, error) {
+			return &mockApplyStrategy{
+				fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+					return remoteByNamespace[namespace], nil
+				},
+			}, nil
+		}
+
+		tags := map[staging.EntryKey]staging.TagEntry{
+			{Name: "k", Namespace: ""}:    {Add: map[string]string{"a": "1"}, BaseModifiedAt: &baseTime},
+			{Name: "k", Namespace: "dev"}: {Add: map[string]string{"a": "1"}, BaseModifiedAt: &baseTime},
+		}
+
+		conflicts := staging.CheckTagConflicts(t.Context(), resolve, tags)
+		assert.Len(t, conflicts, 1)
+		assert.Contains(t, conflicts, staging.EntryKey{Name: "k", Namespace: "dev"})
+		assert.NotContains(t, conflicts, staging.EntryKey{Name: "k", Namespace: ""})
+	})
+}
+
 // TestCheckConflicts_ResolverError verifies that a per-namespace resolver which
 // fails to resolve a strategy is treated like a fetch error: the entry is
 // skipped (no conflict) and the failure surfaces later on the apply attempt.
