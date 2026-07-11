@@ -19,11 +19,13 @@
     onapply: () => void;
     onreset: () => void;
     onedit: (entry: gui.StagingDiffEntry) => void;
-    onunstage: (name: string, namespace: string) => void;
+    // Inline row actions may return a promise so the per-row busy guard can await
+    // the backend call and keep the button disabled until it settles (#568).
+    onunstage: (name: string, namespace: string) => void | Promise<void>;
     onaddtag: (entryName: string, namespace: string) => void;
     onedittag: (entryName: string, namespace: string, key: string, value: string) => void;
-    onremovetag: (entryName: string, namespace: string, key: string) => void;
-    oncanceluntag: (entryName: string, namespace: string, key: string) => void;
+    onremovetag: (entryName: string, namespace: string, key: string) => void | Promise<void>;
+    oncanceluntag: (entryName: string, namespace: string, key: string) => void | Promise<void>;
   }
 
   let {
@@ -44,6 +46,25 @@
     onremovetag,
     oncanceluntag,
   }: Props = $props();
+
+  // Per-row in-flight guard: an inline action (Unstage / tag × / ↩) fires an
+  // async backend call; without a guard a double-click double-fires and the
+  // second call targets an already-removed key and flashes a false error. Track
+  // the in-flight action keys and disable / ignore re-entry until the call
+  // settles (#568).
+  let busyActions = $state(new Set<string>());
+
+  async function runRowAction(key: string, action: () => void | Promise<void>) {
+    if (busyActions.has(key)) return; // ignore re-entry (double-click)
+    busyActions = new Set(busyActions).add(key);
+    try {
+      await action();
+    } finally {
+      const next = new Set(busyActions);
+      next.delete(key);
+      busyActions = next;
+    }
+  }
 
   function getOperationColor(op: string): string {
     switch (op?.toLowerCase()) {
@@ -111,7 +132,7 @@
               {#if showEditButton(entry)}
                 <button class="btn-entry" onclick={() => onedit(entry)}>Edit</button>
               {/if}
-              <button class="btn-entry btn-unstage" onclick={() => onunstage(entry.name, entry.namespace)}>Unstage</button>
+              <button class="btn-entry btn-unstage" disabled={busyActions.has(`u:${entry.namespace}:${entry.name}`)} onclick={() => runRowAction(`u:${entry.namespace}:${entry.name}`, () => onunstage(entry.name, entry.namespace))}>Unstage</button>
             </div>
           </div>
           <div class="entry-tags">
@@ -122,7 +143,7 @@
                 {#each Object.entries(tagEntry.addTags) as [key, value]}
                   <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(entry.name, entry.namespace, key, value)}>
                     {key}={value}
-                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); onremovetag(entry.name, entry.namespace, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') onremovetag(entry.name, entry.namespace, key); }}>×</span>
+                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); runRowAction(`rt:${entry.namespace}:${entry.name}:${key}`, () => onremovetag(entry.name, entry.namespace, key)); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') runRowAction(`rt:${entry.namespace}:${entry.name}:${key}`, () => onremovetag(entry.name, entry.namespace, key)); }}>×</span>
                   </button>
                 {/each}
               </div>
@@ -133,7 +154,7 @@
                 {#each Object.entries(tagEntry.removeTags) as [key, value]}
                   <span class="tag-item">
                     {value ? `${key}=${value}` : key}
-                    <button class="tag-cancel-btn" onclick={() => oncanceluntag(entry.name, entry.namespace, key)} title="Cancel untag">↩</button>
+                    <button class="tag-cancel-btn" disabled={busyActions.has(`cu:${entry.namespace}:${entry.name}:${key}`)} onclick={() => runRowAction(`cu:${entry.namespace}:${entry.name}:${key}`, () => oncanceluntag(entry.name, entry.namespace, key))} title="Cancel untag">↩</button>
                   </span>
                 {/each}
               </div>
@@ -182,7 +203,7 @@
               <span class="namespace-badge">{tagEntry.namespace || '(NULL)'}</span>
             {/if}
             <div class="entry-actions">
-              <button class="btn-entry btn-unstage" onclick={() => onunstage(tagEntry.name, tagEntry.namespace)}>Unstage</button>
+              <button class="btn-entry btn-unstage" disabled={busyActions.has(`u:${tagEntry.namespace}:${tagEntry.name}`)} onclick={() => runRowAction(`u:${tagEntry.namespace}:${tagEntry.name}`, () => onunstage(tagEntry.name, tagEntry.namespace))}>Unstage</button>
             </div>
           </div>
           <div class="entry-tags">
@@ -193,7 +214,7 @@
                 {#each Object.entries(tagEntry.addTags) as [key, value]}
                   <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(tagEntry.name, tagEntry.namespace, key, value)}>
                     {key}={value}
-                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); onremovetag(tagEntry.name, tagEntry.namespace, key); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') onremovetag(tagEntry.name, tagEntry.namespace, key); }}>×</span>
+                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); runRowAction(`rt:${tagEntry.namespace}:${tagEntry.name}:${key}`, () => onremovetag(tagEntry.name, tagEntry.namespace, key)); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') runRowAction(`rt:${tagEntry.namespace}:${tagEntry.name}:${key}`, () => onremovetag(tagEntry.name, tagEntry.namespace, key)); }}>×</span>
                   </button>
                 {/each}
               </div>
@@ -204,7 +225,7 @@
                 {#each Object.entries(tagEntry.removeTags) as [key, value]}
                   <span class="tag-item">
                     {value ? `${key}=${value}` : key}
-                    <button class="tag-cancel-btn" onclick={() => oncanceluntag(tagEntry.name, tagEntry.namespace, key)} title="Cancel untag">↩</button>
+                    <button class="tag-cancel-btn" disabled={busyActions.has(`cu:${tagEntry.namespace}:${tagEntry.name}:${key}`)} onclick={() => runRowAction(`cu:${tagEntry.namespace}:${tagEntry.name}:${key}`, () => oncanceluntag(tagEntry.name, tagEntry.namespace, key))} title="Cancel untag">↩</button>
                   </span>
                 {/each}
               </div>
@@ -315,15 +336,20 @@
     color: #fff;
   }
 
-  .btn-entry:hover {
+  .btn-entry:hover:not(:disabled) {
     background: #3d3d54;
+  }
+
+  .btn-entry:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .btn-unstage {
     background: #666;
   }
 
-  .btn-unstage:hover {
+  .btn-unstage:hover:not(:disabled) {
     background: #888;
   }
 
@@ -460,8 +486,13 @@
     color: #f44336;
   }
 
-  .tag-cancel-btn:hover {
+  .tag-cancel-btn:hover:not(:disabled) {
     color: #4caf50;
+  }
+
+  .tag-cancel-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .btn-add-tag {
