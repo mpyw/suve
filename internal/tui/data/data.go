@@ -365,9 +365,10 @@ func (s *paramSource) VersionContents(
 	}, nil
 }
 
-// TODO(step-6/followup): a param value can be a SecureString (secret); mask its
-// diff too once a real value-type capability flag replaces the !HasNamespaces
-// proxy. Until then a param diff is treated as non-secret (plaintext content).
+// TODO(#677): a param value can be a SecureString (secret) but is currently
+// treated as non-secret here, so its diff renders in plaintext. Fix by
+// surfacing the value type from param.DiffUseCase and setting DiffContent.Secret
+// from it (the diff page already masks on that flag).
 
 func (s *paramSource) Namespaces(ctx context.Context) ([]string, error) {
 	if !s.svcCap.HasNamespaces {

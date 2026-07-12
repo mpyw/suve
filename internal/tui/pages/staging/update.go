@@ -214,7 +214,7 @@ func (m *Model) unstageSelected() tea.Cmd {
 	return m.unstageCmd(row.section, row.key)
 }
 
-// editSelected reuses the Step-4 entry form to edit a staged create/update's
+// editSelected reuses the mutation entry form to edit a staged create/update's
 // value; it is a no-op on a tag row or a staged delete (nothing to edit).
 func (m *Model) editSelected() tea.Cmd {
 	row, ok := m.selectedRow()
@@ -235,7 +235,7 @@ func (m *Model) editSelected() tea.Cmd {
 	}
 }
 
-// tagSelected reuses the Step-4 tag form to stage a tag add on the selected
+// tagSelected reuses the tag form to stage a tag add on the selected
 // row's item.
 func (m *Model) tagSelected() tea.Cmd {
 	row, ok := m.selectedRow()

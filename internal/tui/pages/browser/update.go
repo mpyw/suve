@@ -176,7 +176,7 @@ func (m *Model) onNamespacesLoaded(msg namespacesLoadedMsg) {
 
 	// Preserve the currently-selected namespace VALUE across the rebuild, so an
 	// inserted discovered namespace never silently changes what the current index
-	// points at (#Step-3 review).
+	// points at.
 	current := m.currentNamespace()
 	m.namespaces = namespaceOptions(msg.names)
 

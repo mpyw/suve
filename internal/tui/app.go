@@ -65,8 +65,8 @@ type config struct {
 	identity *components.AWSIdentity
 	// sourceFor builds the read source and staging probe for a service tab. It is
 	// the data seam: production wires it to the registry-backed sourceFactory,
-	// tests to a providermock-backed one. When nil (the Step 2 skeleton and the
-	// staging tab), a tab shows its placeholder.
+	// tests to a providermock-backed one. When nil (an uninitialized shell and
+	// the staging tab), a tab shows its placeholder.
 	sourceFor func(service string) (data.Source, data.StagingProbe)
 	// mutatorFor builds the write-path Mutator for a service tab (the mutation
 	// dialogs' seam). Production wires it to the registry-backed sourceFactory,
@@ -382,7 +382,7 @@ func (m *App) openRestore(req nav.OpenRestore) tea.Cmd {
 }
 
 // mutatorForService resolves the write seam for a service, or nil when none is
-// wired (the Step 2 skeleton, or a service with no mutator).
+// wired (an uninitialized shell, or a service with no mutator).
 func (m *App) mutatorForService(service string) data.Mutator {
 	if m.mutatorFor == nil {
 		return nil
