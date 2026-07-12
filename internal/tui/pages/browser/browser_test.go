@@ -3,6 +3,8 @@ package browser
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -300,4 +302,235 @@ func TestStagingJump(t *testing.T) {
 	require.NotNil(t, cmd)
 	_, ok := cmd().(nav.OpenStaging)
 	assert.True(t, ok, "S emits nav.OpenStaging")
+}
+
+// wheel builds a mouse-wheel event at a page-local point.
+func wheel(button tea.MouseButton, x, y int) tea.MouseWheelMsg {
+	return tea.MouseWheelMsg{Button: button, X: x, Y: y}
+}
+
+// listTopRow returns the row index currently at the top of the list viewport.
+// The list widget exposes its scroll offset only indirectly, through the same
+// RowAtLine hit test clicks use, so line 0 maps to the top visible row (== the
+// scroll offset). Reading it this way asserts real scroll state without reaching
+// into the widget's private offset.
+func listTopRow(t *testing.T, m *Model) int {
+	t.Helper()
+
+	idx, ok := m.list.RowAtLine(0)
+	require.True(t, ok, "list has a visible top row")
+
+	return idx
+}
+
+// historyTopRow returns the row index at the top of the history viewport (its
+// scroll offset), read through the widget's own RowAtLine hit test.
+func historyTopRow(t *testing.T, m *Model) int {
+	t.Helper()
+
+	idx, ok := m.history.RowAtLine(0)
+	require.True(t, ok, "history has a visible top row")
+
+	return idx
+}
+
+// loadedWheelModel builds a browser over a versioned (aws param) source with
+// enough list items, history rows, and value lines that every pane can actually
+// scroll, renders it once (recording geometry and sizing the widgets/value
+// viewport), and returns the ready model.
+func loadedWheelModel(t *testing.T) *Model {
+	t.Helper()
+
+	const (
+		nItems   = 60
+		nHistory = 40
+		nValue   = 20
+	)
+
+	items := make([]data.Item, nItems)
+	for i := range items {
+		items[i] = data.Item{Name: fmt.Sprintf("/app/k%02d", i)}
+	}
+
+	history := make([]data.HistoryRow, nHistory)
+	for i := range history {
+		v := nHistory - i
+		history[i] = data.HistoryRow{Version: fmt.Sprintf("%d", v), Label: fmt.Sprintf("#%d", v), IsCurrent: i == 0}
+	}
+
+	valueLines := make([]string, nValue)
+	for i := range valueLines {
+		valueLines[i] = fmt.Sprintf("value-line-%02d", i)
+	}
+
+	src := &stubSource{svcCap: awsParamCap(), history: history}
+	m := newModel(t, src)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: items}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: items[0].Name, Value: strings.Join(valueLines, "\n")}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: history})
+
+	_ = m.View(m.width, m.height) // records geometry, sizes the widgets and the value viewport
+
+	require.Positive(t, m.geom.listRows, "the list region is drawn")
+	require.Positive(t, m.geom.historyRows, "the history region is drawn")
+
+	return m
+}
+
+// TestMouseWheelOverListScrollsList pins issue #653's missing wheel coverage: a
+// wheel over the list region scrolls the LIST (and only the list), with the
+// coordinate derived from the recorded geometry — never hard-coded.
+func TestMouseWheelOverListScrollsList(t *testing.T) {
+	t.Parallel()
+
+	m := loadedWheelModel(t)
+
+	require.Zero(t, listTopRow(t, m), "the list starts at the top")
+	require.Zero(t, historyTopRow(t, m), "the history starts at the top")
+	valueBefore := m.valuePane.View()
+
+	x, y := m.geom.listLeft, m.geom.listTop
+
+	m, cmd := update(t, m, wheel(tea.MouseWheelDown, x, y))
+	assert.Nil(t, cmd, "a list wheel emits no command")
+	assert.Equal(t, 1, listTopRow(t, m), "wheel-down over the list scrolls the list one row down")
+	assert.Zero(t, historyTopRow(t, m), "the list wheel must not scroll history")
+	assert.Equal(t, valueBefore, m.valuePane.View(), "the list wheel must not scroll the value pane")
+
+	m, _ = update(t, m, wheel(tea.MouseWheelUp, x, y))
+	assert.Zero(t, listTopRow(t, m), "wheel-up over the list scrolls back to the top")
+}
+
+// TestMouseWheelDirectionOverList pins wheelDelta's sign at the Update layer:
+// wheel-down and wheel-up move the viewport in opposite directions. Two downs
+// then one up net to one row below the start.
+func TestMouseWheelDirectionOverList(t *testing.T) {
+	t.Parallel()
+
+	m := loadedWheelModel(t)
+	x, y := m.geom.listLeft, m.geom.listTop
+
+	m, _ = update(t, m, wheel(tea.MouseWheelDown, x, y))
+	m, _ = update(t, m, wheel(tea.MouseWheelDown, x, y))
+	require.Equal(t, 2, listTopRow(t, m), "two wheel-downs scroll two rows down")
+
+	m, _ = update(t, m, wheel(tea.MouseWheelUp, x, y))
+	assert.Equal(t, 1, listTopRow(t, m), "wheel-up moves opposite to wheel-down")
+}
+
+// TestWheelDeltaDirection pins the pure delta mapping: down is +1, up is -1, and
+// a non-wheel button yields no scroll.
+func TestWheelDeltaDirection(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 1, wheelDelta(tea.MouseWheelDown), "wheel-down scrolls toward later rows")
+	assert.Equal(t, -1, wheelDelta(tea.MouseWheelUp), "wheel-up scrolls toward earlier rows")
+	assert.Equal(t, 0, wheelDelta(tea.MouseLeft), "a non-wheel button does not scroll")
+}
+
+// TestMouseWheelOverHistoryScrollsHistory pins that a wheel over the history
+// region scrolls the HISTORY (and only history): the list and value pane stay
+// put. Before the detail-pane hit-region fix, the unbounded list band shadowed
+// this point and the list scrolled instead.
+func TestMouseWheelOverHistoryScrollsHistory(t *testing.T) {
+	t.Parallel()
+
+	m := loadedWheelModel(t)
+
+	require.Zero(t, listTopRow(t, m), "the list starts at the top")
+	require.Zero(t, historyTopRow(t, m), "the history starts at the top")
+	valueBefore := m.valuePane.View()
+
+	x, y := m.geom.historyLeft, m.geom.historyTop
+	require.True(t, m.geom.inHistory(x, y), "the point is inside the history region")
+	require.False(t, m.geom.inList(x, y), "the point is NOT inside the list region (bounded on the right)")
+
+	m, cmd := update(t, m, wheel(tea.MouseWheelDown, x, y))
+	assert.Nil(t, cmd, "a history wheel emits no command")
+	assert.Equal(t, 1, historyTopRow(t, m), "wheel-down over the history scrolls the history one row down")
+	assert.Zero(t, listTopRow(t, m), "the history wheel must not scroll the list")
+	assert.Equal(t, valueBefore, m.valuePane.View(), "the history wheel must not scroll the value pane")
+
+	m, _ = update(t, m, wheel(tea.MouseWheelUp, x, y))
+	assert.Zero(t, historyTopRow(t, m), "wheel-up over the history scrolls back to the top")
+}
+
+// TestMouseWheelOverValueRegionScrollsValuePane pins the documented default: a
+// wheel over the value/meta region (the detail pane, above the history band)
+// scrolls the value pane — not the list, not the history. The point is derived
+// from the recorded geometry: the detail pane's left content column at the list's
+// top content row, which sits above the history band.
+func TestMouseWheelOverValueRegionScrollsValuePane(t *testing.T) {
+	t.Parallel()
+
+	m := loadedWheelModel(t)
+
+	require.Zero(t, listTopRow(t, m))
+	require.Zero(t, historyTopRow(t, m))
+	valueBefore := m.valuePane.View()
+
+	// Detail pane, value/meta region: right pane's left column, above the history.
+	x, y := m.geom.historyLeft, m.geom.listTop
+	require.Less(t, y, m.geom.historyTop, "the point is above the history band")
+	require.False(t, m.geom.inList(x, y), "the point is NOT in the list region")
+	require.False(t, m.geom.inHistory(x, y), "the point is NOT in the history region")
+
+	m, _ = update(t, m, wheel(tea.MouseWheelDown, x, y))
+	assert.NotEqual(t, valueBefore, m.valuePane.View(), "a wheel over the value region scrolls the value pane")
+	assert.Zero(t, listTopRow(t, m), "the value wheel must not scroll the list")
+	assert.Zero(t, historyTopRow(t, m), "the value wheel must not scroll history")
+}
+
+// TestMouseClickInDetailRegionDoesNotSelectListRow pins the click side of the
+// same hit-region fix: a left click in the detail pane (the value/meta region,
+// which shares the list's vertical band in the two-pane layout) must NOT
+// re-select a list row. Before the fix, the unbounded list band mapped this
+// click onto a list row and reloaded its detail.
+func TestMouseClickInDetailRegionDoesNotSelectListRow(t *testing.T) {
+	t.Parallel()
+
+	m := loadedWheelModel(t)
+
+	m.list.SelectIndex(0)
+	require.Equal(t, 0, m.list.Selected())
+
+	// Value/meta region: detail pane, above the history band.
+	x, y := m.geom.historyLeft, m.geom.listTop
+	require.False(t, m.geom.inList(x, y), "the point is not in the list region")
+	require.False(t, m.geom.inHistory(x, y), "the point is not in the history region")
+
+	m, cmd := update(t, m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	assert.Nil(t, cmd, "a detail-region click loads nothing (it is not a list row)")
+	assert.Equal(t, 0, m.list.Selected(), "a detail-region click must not move the list selection")
+}
+
+// TestMouseClickHistoryRowInCompareSelectsRow pins that, in compare mode, a click
+// on a history row selects that row and marks it as a compare pick — the click
+// counterpart of the keyboard compare flow. The row coordinate is derived from
+// the history geometry, never hard-coded.
+func TestMouseClickHistoryRowInCompareSelectsRow(t *testing.T) {
+	t.Parallel()
+
+	m := loadedWheelModel(t)
+
+	// Enter compare mode (focuses the history).
+	m, _ = update(t, m, keyPress('c'))
+	require.True(t, m.history.Compare())
+	require.Equal(t, focusHistory, m.focus)
+
+	// Click the history row the geometry maps to line 1 (index 1).
+	x, y := m.geom.historyLeft, m.geom.historyTop+1
+	line, ok := m.geom.historyLine(x, y)
+	require.True(t, ok, "the point is inside the history region")
+	require.Equal(t, 1, line)
+
+	m, _ = update(t, m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	assert.Equal(t, 1, m.history.Selected(), "a history-row click selects that row")
+
+	// Click a second row so exactly two picks are marked, then confirm both.
+	x2, y2 := m.geom.historyLeft, m.geom.historyTop
+	m, _ = update(t, m, tea.MouseClickMsg{X: x2, Y: y2, Button: tea.MouseLeft})
+	i, j, picked := m.history.PickedVersions()
+	require.True(t, picked, "two history-row clicks mark two compare picks")
+	assert.ElementsMatch(t, []int{0, 1}, []int{i, j}, "the two clicked rows are the picks")
 }
