@@ -800,11 +800,12 @@ export namespace gui {
 	    stagedValue?: string;
 	    description?: string;
 	    warning?: string;
-	
+	    secret: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new StagingDiffEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -816,6 +817,7 @@ export namespace gui {
 	        this.stagedValue = source["stagedValue"];
 	        this.description = source["description"];
 	        this.warning = source["warning"];
+	        this.secret = source["secret"];
 	    }
 	}
 	export class StagingDiffTagEntry {
