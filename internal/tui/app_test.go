@@ -209,6 +209,57 @@ func TestUpdate_CopyToClipboard(t *testing.T) {
 	assert.False(t, called, "y with no value does not clear the clipboard")
 }
 
+// TestUpdate_FocusedFilterCapturesGlobalKeys pins the headline fix: while the
+// browser's filter input is focused, the global key map must NOT steal
+// keystrokes — typing `q` and `1` types text (never quits, never switches tabs).
+// Only ctrl+c stays global as a force-quit escape.
+func TestUpdate_FocusedFilterCapturesGlobalKeys(t *testing.T) {
+	t.Parallel()
+
+	// Control: with nothing focused, `q` quits (proves q IS normally a global key).
+	control := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+	control = updateApp(t, control, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
+	require.False(t, control.activePageCapturesInput(), "the list, not an input, is focused at first")
+
+	_, quitCmd := control.Update(keyPress('q'))
+	require.NotNil(t, quitCmd, "q emits a command when unfocused")
+	assert.IsType(t, tea.QuitMsg{}, quitCmd(), "q quits while no input is focused")
+
+	// Now focus the filter and type q then 1.
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
+
+	m = updateApp(t, m, keyPress('/')) // browser: focus the filter input
+	require.True(t, m.activePageCapturesInput(), "the filter input is now focused")
+
+	// q must NOT quit: the returned command is text-input machinery, never Quit.
+	_, qCmd := m.Update(keyPress('q'))
+	if qCmd != nil {
+		assert.NotEqual(t, tea.QuitMsg{}, qCmd(), "q typed into the filter must not quit")
+	}
+
+	m = updateApp(t, m, keyPress('q'))
+	m = updateApp(t, m, keyPress('1'))
+
+	assert.Equal(t, 0, m.activeTab, "1 typed into the filter must not switch tabs")
+
+	// The characters reached the input: the rendered header echoes the filter value.
+	assert.Contains(t, m.render(), "q1", "q and 1 were typed into the filter")
+
+	// ctrl+c still force-quits even while the input is focused.
+	_, escCmd := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	require.NotNil(t, escCmd, "ctrl+c emits a command")
+	assert.IsType(t, tea.QuitMsg{}, escCmd(), "ctrl+c force-quits even while an input is focused")
+}
+
 // keyForBinding returns a key press whose String() matches keystroke, resolving
 // special keys (tab/shift+tab/esc) that are not single printable runes.
 func (m *App) keyForBinding(t *testing.T, keystroke string) tea.KeyPressMsg {

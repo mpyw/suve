@@ -9,6 +9,8 @@
 package tui
 
 import (
+	"cmp"
+	"context"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -18,9 +20,17 @@ import (
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/tui/components"
+	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/keys"
+	"github.com/mpyw/suve/internal/tui/nav"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
+
+// forceQuitKey is the one global escape that survives even while a page captures
+// text input: ctrl+c always quits, so a focused filter can never trap the user.
+//
+//nolint:gochecknoglobals // immutable global escape binding
+var forceQuitKey = key.NewBinding(key.WithKeys("ctrl+c"))
 
 // Layout row heights for the fixed chrome around the page body.
 const (
@@ -51,6 +61,15 @@ type config struct {
 	// identity, when non-nil, seeds the AWS identity directly (used by tests and
 	// any already-resolved launch), bypassing the async fetch.
 	identity *components.AWSIdentity
+	// sourceFor builds the read source and staging probe for a service tab. It is
+	// the data seam: production wires it to the registry-backed sourceFactory,
+	// tests to a providermock-backed one. When nil (the Step 2 skeleton and the
+	// staging tab), a tab shows its placeholder.
+	sourceFor func(service string) (data.Source, data.StagingProbe)
+	// runCtx is the Run context threaded into pages so their fetch commands are
+	// cancelled when the program exits. Tests may leave it nil (newApp defaults it
+	// to context.Background()).
+	runCtx context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
 }
 
 // dialog is a modal overlay in the app shell's dialog stack. While any dialog
@@ -99,6 +118,11 @@ type App struct {
 	fetchIdentity   identityFetcher
 	identity        *components.AWSIdentity
 	identityLoading bool
+
+	// sourceFor is the injected data seam (see config); runCtx is the Run context
+	// threaded into pages.
+	sourceFor func(service string) (data.Source, data.StagingProbe)
+	runCtx    context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
 }
 
 // newApp builds the root model from a launch config: it derives the tab set
@@ -119,13 +143,16 @@ func newApp(cfg config) *App {
 		help:          help.New(),
 		fetchIdentity: cfg.fetchIdentity,
 		identity:      cfg.identity,
+		sourceFor:     cfg.sourceFor,
+		runCtx:        cmp.Or(cfg.runCtx, context.Background()),
 	}
 
 	m.identityLoading = cfg.scope.Provider == provider.ProviderAWS &&
 		cfg.identity == nil && cfg.fetchIdentity != nil
 
 	if len(tabs) > 0 {
-		m.pages = []page{m.pageForTab(active)}
+		p, _ := m.pageForTab(active)
+		m.pages = []page{p}
 	} else {
 		m.pages = []page{newPlaceholderPage(st, "", "no services available for this scope")}
 	}
@@ -133,13 +160,30 @@ func newApp(cfg config) *App {
 	return m
 }
 
-// Init kicks off the async AWS identity fetch (AWS scope only).
-func (m *App) Init() tea.Cmd {
-	if m.identityLoading {
-		return m.fetchIdentityCmd()
+// initialPageCmd returns the active page's Init command, so the initial page's
+// async loads run when the program starts (Bubble Tea calls only the root Init).
+func (m *App) initialPageCmd() tea.Cmd {
+	if len(m.pages) == 0 {
+		return nil
 	}
 
-	return nil
+	return initPage(m.pages[len(m.pages)-1])
+}
+
+// Init kicks off the async AWS identity fetch (AWS scope only) and the initial
+// page's own loads.
+func (m *App) Init() tea.Cmd {
+	var cmds []tea.Cmd
+
+	if m.identityLoading {
+		cmds = append(cmds, m.fetchIdentityCmd())
+	}
+
+	if cmd := m.initialPageCmd(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	return tea.Batch(cmds...)
 }
 
 // fetchIdentityCmd runs the injected identity fetcher off the update loop.
@@ -182,9 +226,63 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouseClick(msg)
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
+	case nav.OpenStaging:
+		m.openStaging()
+
+		return m, nil
+	case nav.OpenDiff:
+		return m, m.pushDiff(msg)
+	case nav.PopPage:
+		m.popPage()
+
+		return m, nil
 	default:
 		return m.routeToFocused(msg)
 	}
+}
+
+// openStaging switches to the Staging tab (the browser's `S` jump). The staging
+// page is a placeholder until Step 5; landing on the tab is enough.
+func (m *App) openStaging() {
+	for i, t := range m.tabs {
+		if t.Service == stagingService {
+			m.setTab(i)
+
+			return
+		}
+	}
+}
+
+// pushDiff pushes a diff page onto the stack for a browser compare request and
+// returns its Init command.
+func (m *App) pushDiff(req nav.OpenDiff) tea.Cmd {
+	p := newDiffPage(m.runCtx, req, m.styles, m.keys)
+	m.pages = append(m.pages, p)
+	m.forwardResizeToTop()
+
+	return p.Init()
+}
+
+// popPage pops the top page (a pushed diff), leaving the base tab page in place.
+func (m *App) popPage() {
+	if len(m.pages) > 1 {
+		m.pages = m.pages[:len(m.pages)-1]
+	}
+}
+
+// forwardResizeToTop hands the current size to the newly-pushed top page so it
+// lays out before its first render.
+func (m *App) forwardResizeToTop() {
+	if len(m.pages) == 0 || m.width <= 0 || m.height <= 0 {
+		return
+	}
+
+	chrome := statusBarHeight + tabBarHeight + separatorHeight + lipgloss.Height(m.helpView())
+	pageHeight := max(m.height-chrome, 0)
+
+	top := len(m.pages) - 1
+	p, _ := m.pages[top].Update(tea.WindowSizeMsg{Width: m.width, Height: pageHeight})
+	m.pages[top] = p
 }
 
 // handleKey applies the dialogs → global keys → active page order for a key
@@ -202,11 +300,20 @@ func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateTopDialog(msg)
 	}
 
+	// A page with a focused text input (e.g. the browser's prefix/filter field)
+	// owns every keystroke: the global map must not steal q/1/2/3/y/?/tab from an
+	// edit. Only ctrl+c stays global, as a force-quit escape hatch.
+	if m.activePageCapturesInput() {
+		if key.Matches(msg, forceQuitKey) {
+			return m, tea.Quit
+		}
+
+		return m.updateActivePage(msg)
+	}
+
 	// Numbered tab jumps (1/2/3) map to a tab index directly.
 	if i, ok := numberedTabJump(m.keys, msg); ok {
-		m.jumpTab(i)
-
-		return m, nil
+		return m, m.jumpTab(i)
 	}
 
 	switch {
@@ -217,13 +324,9 @@ func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 	case key.Matches(msg, m.keys.NextTab):
-		m.cycleTab(1)
-
-		return m, nil
+		return m, m.cycleTab(1)
 	case key.Matches(msg, m.keys.PrevTab):
-		m.cycleTab(-1)
-
-		return m, nil
+		return m, m.cycleTab(-1)
 	case key.Matches(msg, m.keys.Copy):
 		return m, m.copyFocusedValue()
 	}
@@ -257,13 +360,26 @@ func (m *App) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	if m.width >= minWidth && m.height >= minHeight &&
 		msg.Button == tea.MouseLeft && msg.Y == m.tabBarRow() {
 		if i, ok := m.tabBar().TabAtX(msg.X); ok {
-			m.jumpTab(i)
-
-			return m, nil
+			return m, m.jumpTab(i)
 		}
 	}
 
-	return m.updateActivePage(msg)
+	return m.updateActivePage(m.translateMouseClick(msg))
+}
+
+// translateMouseClick shifts a click's Y from screen coordinates into the active
+// page's local coordinates (the page body sits below the fixed chrome), so a
+// page hit-tests its own layout without knowing the shell's row offsets.
+func (m *App) translateMouseClick(msg tea.MouseClickMsg) tea.MouseClickMsg {
+	msg.Y -= m.pageBodyTop()
+
+	return msg
+}
+
+// pageBodyTop is the screen row the active page's body starts on (below the
+// status bar, tab bar, and separator).
+func (m *App) pageBodyTop() int {
+	return statusBarHeight + tabBarHeight + separatorHeight
 }
 
 // handleMouseWheel routes a wheel event to the top dialog when modal, else to
@@ -272,6 +388,8 @@ func (m *App) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if len(m.dialogs) > 0 {
 		return m.updateTopDialog(msg)
 	}
+
+	msg.Y -= m.pageBodyTop()
 
 	return m.updateActivePage(msg)
 }
@@ -339,52 +457,58 @@ func (m *App) popDialog() {
 	}
 }
 
-// cycleTab moves the active tab by delta, wrapping around the ends.
-func (m *App) cycleTab(delta int) {
+// cycleTab moves the active tab by delta, wrapping around the ends, and returns
+// the new page's Init command.
+func (m *App) cycleTab(delta int) tea.Cmd {
 	n := len(m.tabs)
 	if n == 0 {
-		return
+		return nil
 	}
 
-	m.setTab(((m.activeTab+delta)%n + n) % n)
+	return m.setTab(((m.activeTab+delta)%n + n) % n)
 }
 
 // jumpTab selects tab i directly, ignoring an index past the last tab (so "3"
-// with two tabs is a no-op rather than snapping to the last).
-func (m *App) jumpTab(i int) {
+// with two tabs is a no-op rather than snapping to the last), and returns the
+// new page's Init command.
+func (m *App) jumpTab(i int) tea.Cmd {
 	if i < 0 || i >= len(m.tabs) {
-		return
+		return nil
 	}
 
-	m.setTab(i)
+	return m.setTab(i)
 }
 
-// setTab switches to a valid tab index and swaps in that tab's page.
-func (m *App) setTab(i int) {
+// setTab switches to a valid tab index, swaps in that tab's page (resetting any
+// pushed sub-page), and returns the page's Init command.
+func (m *App) setTab(i int) tea.Cmd {
 	if i == m.activeTab {
-		return
+		return nil
 	}
 
 	m.activeTab = i
-	m.setActivePage(m.pageForTab(i))
+
+	p, cmd := m.pageForTab(i)
+	m.pages = []page{p}
+	m.forwardResizeToTop()
+
+	return cmd
 }
 
-// pageForTab builds the placeholder page for a tab index.
-func (m *App) pageForTab(i int) page {
+// pageForTab builds the page for a tab index: a real browser page for a
+// param/secret service when a data source is wired, else the placeholder.
+func (m *App) pageForTab(i int) (page, tea.Cmd) {
 	tab := m.tabs[i]
 
-	return newPlaceholderPage(m.styles, tab.Title, placeholderNotice(tab))
-}
+	if tab.Service != stagingService && m.sourceFor != nil {
+		if source, staging := m.sourceFor(tab.Service); source != nil {
+			p := newBrowserPage(m.runCtx, source, staging, m.styles, m.keys)
 
-// setActivePage replaces the top page on the stack.
-func (m *App) setActivePage(p page) {
-	if len(m.pages) == 0 {
-		m.pages = []page{p}
-
-		return
+			return p, p.Init()
+		}
 	}
 
-	m.pages[len(m.pages)-1] = p
+	return newPlaceholderPage(m.styles, tab.Title, placeholderNotice(tab)), nil
 }
 
 // copyFocusedValue copies the focused value through the OSC52 clipboard seam, or
@@ -400,11 +524,35 @@ func (m *App) copyFocusedValue() tea.Cmd {
 	return copyToClipboard(text)
 }
 
-// copyText is the value the `y` key copies. The skeleton has no focused value
-// yet (real pages supply one from Step 3), so it is empty and the copy is a
-// no-op; the wiring — key → guard → OSC52 command — is what this step lands.
+// copyText is the value the `y` key copies. A page that supplies a focused value
+// (the browser reveals its masked value pane and returns the revealed value)
+// wins; otherwise the app's own copyValue is used (empty in the skeleton, so the
+// copy is a guarded no-op).
 func (m *App) copyText() string {
+	if c, ok := m.activePage().(copyable); ok {
+		if text, has := c.CopyText(); has {
+			return text
+		}
+	}
+
 	return m.copyValue
+}
+
+// activePageCapturesInput reports whether the active page has a focused text
+// input claiming raw keystrokes, so the router bypasses the global key map.
+func (m *App) activePageCapturesInput() bool {
+	p := m.activePage()
+
+	return p != nil && p.capturesInput()
+}
+
+// activePage returns the top page, or nil when the stack is empty.
+func (m *App) activePage() page {
+	if len(m.pages) == 0 {
+		return nil
+	}
+
+	return m.pages[len(m.pages)-1]
 }
 
 // tabBarRow is the terminal row the tab bar renders on (0-based), used to

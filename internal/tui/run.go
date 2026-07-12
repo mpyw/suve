@@ -41,10 +41,18 @@ func Run(ctx context.Context, scope provider.Scope, service string) error {
 		return err
 	}
 
+	factory := newSourceFactory(ctx, scope)
+
+	// The page fetch commands receive the Run context through the model's runCtx
+	// field (config.runCtx below), not as a call parameter — contextcheck cannot
+	// see the field-threaded context, so it is silenced here.
+	//nolint:contextcheck // Run context is threaded via config.runCtx into every page fetch command
 	model := newApp(config{
 		scope:         scope,
 		service:       service,
 		fetchIdentity: awsIdentityFetcher(ctx),
+		sourceFor:     factory.sourceFor,
+		runCtx:        ctx,
 	})
 
 	// Alt-screen and mouse capture are requested through the model's returned

@@ -19,6 +19,11 @@ type page interface {
 	Update(tea.Msg) (page, tea.Cmd)
 	// View renders the page body into the given content area.
 	View(width, height int) string
+	// capturesInput reports whether the page currently has a text input focused
+	// that must receive raw keystrokes. While it does, the app suppresses its
+	// global key map (reserving only ctrl+c) and forwards keys straight to the
+	// page, so typing q/1/2/3/y/?/tab into a filter never quits or switches tabs.
+	capturesInput() bool
 }
 
 // placeholderPage is the Step 2 stand-in for a real page: it centers a muted
@@ -39,6 +44,9 @@ func newPlaceholderPage(st styles.Styles, tab, notice string) placeholderPage {
 func (p placeholderPage) Update(tea.Msg) (page, tea.Cmd) {
 	return p, nil
 }
+
+// capturesInput is always false: the placeholder has no text input.
+func (p placeholderPage) capturesInput() bool { return false }
 
 // View centers the placeholder notice in the content area.
 func (p placeholderPage) View(width, height int) string {
