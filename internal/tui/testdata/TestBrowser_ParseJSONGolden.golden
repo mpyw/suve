@@ -16,7 +16,7 @@ prefix: —   filter: —   values:off  recursive:on  ⟳
 │                                            ││                                                                        │
 │                                            ││History   enter: history · c: compare mode                              │
 │                                            ││▹ #3  2026-07-01  current                                               │
-│                                            ││                                                                        │
+│                                            ││     {"host":"db.internal","port":5432,"tls":true}                      │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 │                                            ││                                                                        │

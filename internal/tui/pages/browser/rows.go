@@ -82,6 +82,8 @@ func historyEntries(_ styles.Styles, rows []data.HistoryRow, tagsPerVersion bool
 			Date:    r.Date,
 			Current: r.IsCurrent,
 			Badges:  historyBadges(r),
+			Value:   r.Value,
+			Secret:  r.Secret,
 		}
 
 		if tagsPerVersion && len(r.Tags) > 0 {

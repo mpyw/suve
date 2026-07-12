@@ -291,6 +291,100 @@ func TestHistoryHeaderHintSuppressedWhenEmpty(t *testing.T) {
 	assert.NotContains(t, line, "enter: history", "no false enter→history affordance for a version-less entry")
 }
 
+// TestHistoryRowsShowMaskedValueThenReveal pins #733: each version row carries
+// its value, masked by default for a secret (SecureString) value, and the shared
+// reveal toggle (x) unmasks the history values in lockstep with the detail value
+// — a second `x` re-masks them.
+func TestHistoryRowsShowMaskedValueThenReveal(t *testing.T) {
+	t.Parallel()
+
+	const histValue = "postgres://db.internal:5432/app"
+
+	src := &stubSource{
+		svcCap: awsParamCap(),
+		detail: data.Detail{Name: "/app/x", Value: histValue, Secret: true},
+		history: []data.HistoryRow{
+			{Version: "14", Label: "#14", IsCurrent: true, Value: histValue, Secret: true},
+			{Version: "13", Label: "#13", Value: histValue, Secret: true},
+		},
+	}
+	m := newModel(t, src)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/x"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: src.detail})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: src.history})
+
+	// Rendering the page sizes the history widget so its View has content.
+	_ = m.View(m.width, m.height)
+	view := m.history.View()
+	assert.Contains(t, view, "•", "a secret history value is shown masked by default")
+	assert.NotContains(t, view, histValue, "the plaintext value is never shown while masked")
+
+	// The shared reveal toggle (x) unmasks the history values.
+	m, _ = update(t, m, keyPress('x'))
+	_ = m.View(m.width, m.height)
+	assert.Contains(t, m.history.View(), histValue, "pressing x reveals the history values")
+
+	// Toggling back re-masks them.
+	m, _ = update(t, m, keyPress('x'))
+	_ = m.View(m.width, m.height)
+	assert.NotContains(t, m.history.View(), histValue, "pressing x again re-masks the history values")
+}
+
+// TestHistoryPlaintextValueShownUnmasked pins that a non-secret history value is
+// shown verbatim (no reveal needed) — masking keys off Secret, not the mere
+// presence of a value.
+func TestHistoryPlaintextValueShownUnmasked(t *testing.T) {
+	t.Parallel()
+
+	const value = "keep-alive-30s"
+
+	src := &stubSource{
+		svcCap:  awsParamCap(),
+		detail:  data.Detail{Name: "/app/x", Value: value},
+		history: []data.HistoryRow{{Version: "1", Label: "#1", IsCurrent: true, Value: value}},
+	}
+	m := newModel(t, src)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/x"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: src.detail})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: src.history})
+
+	_ = m.View(m.width, m.height)
+	view := m.history.View()
+	assert.Contains(t, view, value, "a non-secret history value is shown unmasked")
+	assert.NotContains(t, view, "•", "a non-secret history value is never masked")
+}
+
+// TestHistoryRevealResetsOnSelectionChange pins that revealing the history, then
+// selecting another entry, re-masks the new entry's values — a reveal never
+// carries across selections (mirrors the value pane resetting its mask).
+func TestHistoryRevealResetsOnSelectionChange(t *testing.T) {
+	t.Parallel()
+
+	const histValue = "s3cr3t-token-value"
+
+	src := &stubSource{
+		svcCap:  awsParamCap(),
+		detail:  data.Detail{Name: "/a", Value: histValue, Secret: true},
+		history: []data.HistoryRow{{Version: "1", Label: "#1", IsCurrent: true, Value: histValue, Secret: true}},
+	}
+	m := newModel(t, src)
+	items := []data.Item{{Name: "/a"}, {Name: "/b"}}
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: items}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: src.detail})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: src.history})
+
+	m, _ = update(t, m, keyPress('x'))
+	_ = m.View(m.width, m.height)
+	require.Contains(t, m.history.View(), histValue, "the history is revealed after x")
+
+	// Select entry /b: its history reloads (SetRows), re-masking by default.
+	_ = m.move(1)
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/b", Value: histValue, Secret: true}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: src.history})
+	_ = m.View(m.width, m.height)
+	assert.NotContains(t, m.history.View(), histValue, "selecting a new entry re-masks the history values")
+}
+
 // TestStaleErrorClearedByLaterSuccessfulLoad pins #688: a transient history (or
 // detail) error must not linger over a later successful load. The single
 // selection funnel clears the per-source detail/history errors up front, and each

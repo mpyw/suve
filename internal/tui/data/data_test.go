@@ -170,6 +170,69 @@ func TestParamSourceListFilters(t *testing.T) {
 	assert.Len(t, res.Items, 2, "prefix filters to the /app subtree")
 }
 
+// TestParamSourceHistoryCarriesValues pins #733: each history row carries its
+// version's raw value (fetched via the sanctioned Resolve+Get path) and is
+// flagged secret for a SecureString so the UI masks it by default.
+func TestParamSourceHistoryCarriesValues(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
+			return []domain.Version{{ID: "2"}, {ID: "1"}}, nil
+		},
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			// spec is "#<id>"; carry the id through so Get can vary the value.
+			return provider.NewVersionRef(spec[1:]), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name: name, Value: "secret-v" + ref.ID(), Type: domain.ValueTypeSecret,
+				Version: domain.Version{ID: ref.ID()},
+			}, nil
+		},
+	}
+
+	src := data.NewParamSource(capFor(t, "aws", "param"), func(context.Context, string) (provider.Store, error) {
+		return store, nil
+	})
+
+	rows, err := src.History(context.Background(), "/app/x", "")
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	assert.Equal(t, "secret-v2", rows[0].Value, "the newest version's value is carried")
+	assert.Equal(t, "secret-v1", rows[1].Value)
+	assert.True(t, rows[0].Secret, "a SecureString history value is flagged secret")
+}
+
+// TestSecretSourceHistoryCarriesValues pins #733 for the secret service: every
+// history row carries its value and is flagged secret.
+func TestSecretSourceHistoryCarriesValues(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
+			return []domain.Version{{ID: "v2"}, {ID: "v1"}}, nil
+		},
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(spec[1:]), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name: name, Value: "token-" + ref.ID(), Type: domain.ValueTypeSecret,
+				Version: domain.Version{ID: ref.ID()},
+			}, nil
+		},
+	}
+
+	src := data.NewSecretSource(capFor(t, "aws", "secret"), store)
+
+	rows, err := src.History(context.Background(), "prod/key", "")
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	assert.Equal(t, "token-v2", rows[0].Value)
+	assert.True(t, rows[0].Secret, "every secret history value is masked by default")
+}
+
 func metaLabels(rows []data.MetaRow) []string {
 	labels := make([]string, len(rows))
 	for i, r := range rows {

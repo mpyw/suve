@@ -21,6 +21,13 @@ type HistoryEntry struct {
 	Current bool
 	// Badges are trailing chips (state or staging labels).
 	Badges []string
+	// Value is this version's raw value, shown on an indented line beneath the
+	// version header (masked by default when Secret is set). Empty when there is no
+	// value to show, in which case no value line is drawn.
+	Value string
+	// Secret reports whether Value is secret material, so it is masked with bullets
+	// unless the table is revealed.
+	Secret bool
 	// TagsLine is an indented per-version tag line (Azure Key Vault), empty when
 	// the provider keeps tags at the resource level.
 	TagsLine string
@@ -44,6 +51,11 @@ type HistoryTable struct {
 	focused bool
 	// picks holds the row indices selected for comparison (0, 1, or 2 entries).
 	picks []int
+	// revealed unmasks the per-version value lines for secret rows. It is driven in
+	// lockstep with the detail value pane's reveal (the shared `x` toggle), so the
+	// single reveal governs both the current value and the history values (GUI
+	// parity), and it resets to masked whenever the rows are replaced.
+	revealed bool
 }
 
 // NewHistoryTable builds an empty history table.
@@ -51,14 +63,22 @@ func NewHistoryTable(st styles.Styles) HistoryTable {
 	return HistoryTable{styles: st}
 }
 
-// SetRows replaces the rows and resets scrolling/compare picks.
+// SetRows replaces the rows and resets scrolling/compare picks. Reveal resets to
+// masked so a previous entry's reveal never carries forward onto a new one
+// (mirrors the value pane resetting its mask on SetValue).
 func (t *HistoryTable) SetRows(rows []HistoryEntry) {
 	t.rows = rows
 	t.selected = 0
 	t.offset = 0
 	t.picks = nil
+	t.revealed = false
 	t.ensureVisible()
 }
+
+// SetReveal unmasks (or re-masks) the per-version value lines. The owning page
+// drives it from the detail value pane's mask state, so the shared `x` toggle
+// reveals the current value and the history values together (GUI parity).
+func (t *HistoryTable) SetReveal(revealed bool) { t.revealed = revealed }
 
 // SetFocused sets whether the history pane holds keyboard focus, which selects
 // the active vs dimmed selection style the next View draws with.
@@ -150,40 +170,19 @@ func (t *HistoryTable) PickedVersions() (int, int, bool) {
 }
 
 // RowAtLine maps a 0-based content line to a row index, or (0, false) when the
-// line is past the last visible row.
+// line is past the last visible row. A row's header, value, and tag lines all
+// map back to that row, so a click anywhere in a row selects it.
 func (t *HistoryTable) RowAtLine(line int) (int, bool) {
 	if line < 0 || len(t.rows) == 0 {
 		return 0, false
 	}
 
-	visible := t.visibleRows()
-
-	// Each entry occupies one line, plus one for its tag line when present.
-	row := t.offset
-	consumed := 0
-
-	for row < len(t.rows) && consumed < visible {
-		if consumed == line {
-			return row, true
-		}
-
-		consumed++
-
-		// A tag line is drawn only when View still has room for it (len(lines) <
-		// visible); mirror that guard so a click on the last visible line never maps
-		// to a tag line View clipped away.
-		if t.rows[row].TagsLine != "" && consumed < visible {
-			if consumed == line {
-				return row, true
-			}
-
-			consumed++
-		}
-
-		row++
+	_, rowOf := t.window()
+	if line >= len(rowOf) {
+		return 0, false
 	}
 
-	return 0, false
+	return rowOf[line], true
 }
 
 // View renders the table body into width×height.
@@ -192,25 +191,79 @@ func (t *HistoryTable) View() string {
 		return ""
 	}
 
-	visible := t.visibleRows()
-	lines := make([]string, 0, t.height)
-	row := t.offset
-
-	for row < len(t.rows) && len(lines) < visible {
-		lines = append(lines, t.renderRow(row))
-
-		if tags := t.rows[row].TagsLine; tags != "" && len(lines) < visible {
-			lines = append(lines, t.styles.PageHint.Render(truncate("     "+tags, t.width)))
-		}
-
-		row++
-	}
+	lines, _ := t.window()
 
 	for len(lines) < t.height {
 		lines = append(lines, "")
 	}
 
 	return strings.Join(lines[:t.height], "\n")
+}
+
+// window renders the visible content lines for the current offset (capped at the
+// visible height) and, parallel to them, the row index each line belongs to — so
+// View draws them and RowAtLine maps a clicked line back to its row without the
+// two drifting apart.
+func (t *HistoryTable) window() (lines []string, rowOf []int) {
+	visible := t.visibleRows()
+
+	for row := t.offset; row < len(t.rows) && len(lines) < visible; row++ {
+		for _, line := range t.rowLines(row) {
+			if len(lines) >= visible {
+				break
+			}
+
+			lines = append(lines, line)
+			rowOf = append(rowOf, row)
+		}
+	}
+
+	return lines, rowOf
+}
+
+// rowLines returns one row's rendered lines: the version header, an indented
+// value line (masked unless revealed for a secret), and the per-version tag line
+// when present. The value and tag lines share the same indent so they read as
+// details of the header above them.
+func (t *HistoryTable) rowLines(idx int) []string {
+	row := t.rows[idx]
+	lines := []string{t.renderRow(idx)}
+
+	if value, ok := t.valueLine(row); ok {
+		lines = append(lines, value)
+	}
+
+	if row.TagsLine != "" {
+		lines = append(lines, t.styles.PageHint.Render(truncate("     "+row.TagsLine, t.width)))
+	}
+
+	return lines
+}
+
+// valueLine renders a row's indented value line, masked with bullets unless the
+// value is non-secret or the table is revealed. Multi-line values are flattened
+// onto the single line, mirroring the list preview. It returns ok=false when the
+// row carries no value (an unversioned or fetch-failed entry), so no blank line
+// is drawn.
+func (t *HistoryTable) valueLine(row HistoryEntry) (string, bool) {
+	if row.Value == "" {
+		return "", false
+	}
+
+	value := flattenValue(row.Value)
+	if row.Secret && !t.revealed {
+		value = MaskValue(value)
+	}
+
+	return t.styles.PageHint.Render(truncate("     "+value, t.width)), true
+}
+
+// flattenValue collapses a (possibly multi-line) value onto a single line so the
+// history value fits one row; newlines and tabs become single spaces.
+func flattenValue(value string) string {
+	replacer := strings.NewReplacer("\n", " ", "\r", " ", "\t", " ")
+
+	return replacer.Replace(value)
 }
 
 // renderRow renders one version row: a cursor/compare marker, the version label
