@@ -11,17 +11,35 @@ package staging
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/mpyw/suve/internal/tui/data"
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
 // serviceSecret is the secret service key (the sections' masking axis).
 const serviceSecret = "secret"
+
+// Clickable region IDs for the staging hit map. The fixed-header affordances have
+// stable IDs; a section's apply/reset buttons and a selectable row carry their
+// index as a suffix (secApplyID / secResetID / rowID) so a click resolves to the
+// exact section or row it lands on.
+const (
+	regionNotice     = "notice"
+	regionViewToggle = "view-toggle"
+	regionApplyAll   = "apply-all"
+	regionResetAll   = "reset-all"
+	regionRefresh    = "refresh"
+	prefixSecApply   = "sec-apply-"
+	prefixSecReset   = "sec-reset-"
+	prefixRow        = "row-"
+)
 
 // Page-local key bindings not present in the global map.
 //
@@ -108,10 +126,31 @@ type Model struct {
 	// scroll the body so the selected row is visible.
 	scrollToSelection bool
 
-	// geom records the last-rendered line hit-map so mouse handlers hit-test what
-	// is actually on screen (never a hard-coded coordinate) — the browser geom
-	// pattern, kept consistent for the #663 compositor migration.
-	geom stagingGeom
+	// hits is the last-rendered hit map: one compositor region per clickable area
+	// (the header toggle/apply-all/reset-all/refresh, the dismissible notice, each
+	// section's apply/reset buttons, and each selectable row), rebuilt every View
+	// so a mouse coordinate is hit-tested against the layers rather than a
+	// hand-maintained geometry.
+	hits *hit.Map
+}
+
+// secApplyID / secResetID / rowID build the suffixed region IDs for a section's
+// apply/reset buttons and a selectable row.
+func secApplyID(section int) string { return prefixSecApply + strconv.Itoa(section) }
+func secResetID(section int) string { return prefixSecReset + strconv.Itoa(section) }
+func rowID(row int) string          { return prefixRow + strconv.Itoa(row) }
+
+// idIndex parses the integer suffix an ID carries after prefix (e.g. "row-3"→3),
+// reporting ok=false when id does not carry that prefix + integer.
+func idIndex(id, prefix string) (int, bool) {
+	rest, found := strings.CutPrefix(id, prefix)
+	if !found {
+		return 0, false
+	}
+
+	n, err := strconv.Atoi(rest)
+
+	return n, err == nil
 }
 
 // New builds the staging page over the offered services' staging seams (param

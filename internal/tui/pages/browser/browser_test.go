@@ -87,6 +87,18 @@ func newModel(t *testing.T, src *stubSource) *Model {
 
 func keyPress(r rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Text: string(r)} }
 
+// regionOrigin returns the drawn top-left of a hit region, so a mouse test
+// derives its click coordinate from the rendered layout instead of hard-coding
+// one. It fails when the region was not drawn.
+func regionOrigin(t *testing.T, m *Model, id string) (int, int) {
+	t.Helper()
+
+	x, y, ok := m.hits.Origin(id)
+	require.True(t, ok, "region %q was drawn", id)
+
+	return x, y
+}
+
 func update(t *testing.T, m *Model, msg tea.Msg) (*Model, tea.Cmd) {
 	t.Helper()
 
@@ -484,9 +496,10 @@ func TestMouseClickSelectEqualsKeySelect(t *testing.T) {
 	// Mouse: click the row the geometry maps to index 2.
 	clicked := newModel(t, &stubSource{svcCap: awsParamCap()})
 	clicked, _ = update(t, clicked, listLoadedMsg{seq: clicked.listSeq, res: data.ListResult{Items: items}})
-	_ = clicked.View(clicked.width, clicked.height) // records geometry
+	_ = clicked.View(clicked.width, clicked.height) // rebuilds the hit map
 
-	x, y := clicked.geom.listLeft, clicked.geom.listTop+2 // row index 2
+	lx, ly := regionOrigin(t, clicked, regionList)
+	x, y := lx, ly+2 // row index 2
 	c, cmd := update(t, clicked, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 
 	assert.Equal(t, keyed.list.Selected(), c.list.Selected(), "click selects the same row as the key move")
@@ -1050,10 +1063,13 @@ func loadedWheelModel(t *testing.T) *Model {
 	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: items[0].Name, Value: strings.Join(valueLines, "\n")}})
 	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: history})
 
-	_ = m.View(m.width, m.height) // records geometry, sizes the widgets and the value viewport
+	_ = m.View(m.width, m.height) // rebuilds the hit map, sizes the widgets and the value viewport
 
-	require.Positive(t, m.geom.listRows, "the list region is drawn")
-	require.Positive(t, m.geom.historyRows, "the history region is drawn")
+	_, _, listDrawn := m.hits.Origin(regionList)
+	require.True(t, listDrawn, "the list region is drawn")
+
+	_, _, historyDrawn := m.hits.Origin(regionHistory)
+	require.True(t, historyDrawn, "the history region is drawn")
 
 	return m
 }
@@ -1070,7 +1086,7 @@ func TestMouseWheelOverListScrollsList(t *testing.T) {
 	require.Zero(t, historyTopRow(t, m), "the history starts at the top")
 	valueBefore := m.valuePane.View()
 
-	x, y := m.geom.listLeft, m.geom.listTop
+	x, y := regionOrigin(t, m, regionList)
 
 	m, cmd := update(t, m, wheel(tea.MouseWheelDown, x, y))
 	assert.Nil(t, cmd, "a list wheel emits no command")
@@ -1089,7 +1105,7 @@ func TestMouseWheelDirectionOverList(t *testing.T) {
 	t.Parallel()
 
 	m := loadedWheelModel(t)
-	x, y := m.geom.listLeft, m.geom.listTop
+	x, y := regionOrigin(t, m, regionList)
 
 	m, _ = update(t, m, wheel(tea.MouseWheelDown, x, y))
 	m, _ = update(t, m, wheel(tea.MouseWheelDown, x, y))
@@ -1122,9 +1138,10 @@ func TestMouseWheelOverHistoryScrollsHistory(t *testing.T) {
 	require.Zero(t, historyTopRow(t, m), "the history starts at the top")
 	valueBefore := m.valuePane.View()
 
-	x, y := m.geom.historyLeft, m.geom.historyTop
-	require.True(t, m.geom.inHistory(x, y), "the point is inside the history region")
-	require.False(t, m.geom.inList(x, y), "the point is NOT inside the list region (bounded on the right)")
+	x, y := regionOrigin(t, m, regionHistory)
+	id, _, _, ok := m.hits.At(x, y)
+	require.True(t, ok, "the point is inside a region")
+	require.Equal(t, regionHistory, id, "the point resolves to the history region, not the list")
 
 	m, cmd := update(t, m, wheel(tea.MouseWheelDown, x, y))
 	assert.Nil(t, cmd, "a history wheel emits no command")
@@ -1150,11 +1167,12 @@ func TestMouseWheelOverValueRegionScrollsValuePane(t *testing.T) {
 	require.Zero(t, historyTopRow(t, m))
 	valueBefore := m.valuePane.View()
 
-	// Detail pane, value/meta region: right pane's left column, above the history.
-	x, y := m.geom.historyLeft, m.geom.listTop
-	require.Less(t, y, m.geom.historyTop, "the point is above the history band")
-	require.False(t, m.geom.inList(x, y), "the point is NOT in the list region")
-	require.False(t, m.geom.inHistory(x, y), "the point is NOT in the history region")
+	// Detail pane, value/meta region: the value-label row, above the history band.
+	x, y := regionOrigin(t, m, regionValueLabel)
+	id, _, _, ok := m.hits.At(x, y)
+	require.True(t, ok, "the point is inside a region")
+	require.Contains(t, []string{regionValueLabel, regionDetail}, id,
+		"the point is in the detail/value region, not the list or history")
 
 	m, _ = update(t, m, wheel(tea.MouseWheelDown, x, y))
 	assert.NotEqual(t, valueBefore, m.valuePane.View(), "a wheel over the value region scrolls the value pane")
@@ -1175,10 +1193,13 @@ func TestMouseClickInDetailRegionDoesNotSelectListRow(t *testing.T) {
 	m.list.SelectIndex(0)
 	require.Equal(t, 0, m.list.Selected())
 
-	// Value/meta region: detail pane, above the history band.
-	x, y := m.geom.historyLeft, m.geom.listTop
-	require.False(t, m.geom.inList(x, y), "the point is not in the list region")
-	require.False(t, m.geom.inHistory(x, y), "the point is not in the history region")
+	// Detail body region: a few rows below the value label (the value-pane area),
+	// which shares the list's vertical band in the two-pane layout.
+	dx, dy := regionOrigin(t, m, regionDetail)
+	x, y := dx, dy+3
+	id, _, _, ok := m.hits.At(x, y)
+	require.True(t, ok, "the point is inside a region")
+	require.Equal(t, regionDetail, id, "the point is in the detail body, not a list row")
 
 	m, cmd := update(t, m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	assert.Nil(t, cmd, "a detail-region click loads nothing (it is not a list row)")
@@ -1186,9 +1207,11 @@ func TestMouseClickInDetailRegionDoesNotSelectListRow(t *testing.T) {
 }
 
 // TestMouseClickHistoryRowInCompareSelectsRow pins that, in compare mode, a click
-// on a history row selects that row and marks it as a compare pick — the click
-// counterpart of the keyboard compare flow. The row coordinate is derived from
-// the history geometry, never hard-coded.
+// on a history row selects and picks that row — the click counterpart of the
+// keyboard compare flow — and that the click completing the second pick OPENS the
+// diff, reducing to the same nav.OpenDiff enter produces (#663 closes the "compare
+// can pick but not open via mouse" gap). Coordinates are derived from the history
+// region, never hard-coded.
 func TestMouseClickHistoryRowInCompareSelectsRow(t *testing.T) {
 	t.Parallel()
 
@@ -1199,19 +1222,117 @@ func TestMouseClickHistoryRowInCompareSelectsRow(t *testing.T) {
 	require.True(t, m.history.Compare())
 	require.Equal(t, focusHistory, m.focus)
 
-	// Click the history row the geometry maps to line 1 (index 1).
-	x, y := m.geom.historyLeft, m.geom.historyTop+1
-	line, ok := m.geom.historyLine(x, y)
+	// Click the history row the region maps to line 1 (index 1).
+	hx, hy := regionOrigin(t, m, regionHistory)
+	x, y := hx, hy+1
+	id, _, dy, ok := m.hits.At(x, y)
 	require.True(t, ok, "the point is inside the history region")
-	require.Equal(t, 1, line)
+	require.Equal(t, regionHistory, id)
+	require.Equal(t, 1, dy, "the in-region offset is the clicked line")
 
-	m, _ = update(t, m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	m, cmd := update(t, m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
 	assert.Equal(t, 1, m.history.Selected(), "a history-row click selects that row")
+	assert.Nil(t, cmd, "the first pick click does not open the diff yet")
 
-	// Click a second row so exactly two picks are marked, then confirm both.
-	x2, y2 := m.geom.historyLeft, m.geom.historyTop
-	m, _ = update(t, m, tea.MouseClickMsg{X: x2, Y: y2, Button: tea.MouseLeft})
+	// Click a second row so exactly two picks are marked: the completing click opens
+	// the diff, exactly as enter would after two keyboard picks.
+	x2, y2 := hx, hy
+	m, cmd = update(t, m, tea.MouseClickMsg{X: x2, Y: y2, Button: tea.MouseLeft})
 	i, j, picked := m.history.PickedVersions()
 	require.True(t, picked, "two history-row clicks mark two compare picks")
 	assert.ElementsMatch(t, []int{0, 1}, []int{i, j}, "the two clicked rows are the picks")
+
+	require.NotNil(t, cmd, "the click completing the second pick opens the diff")
+	_, isDiff := cmd().(nav.OpenDiff)
+	assert.True(t, isDiff, "a compare click that completes two picks opens the diff (like enter)")
+}
+
+// TestMouseClickHeaderRegionsMatchKeys pins #663's browser-header coverage: a
+// click on each header affordance reduces to the SAME action its key equivalent
+// performs — focusing the prefix/filter inputs (p, /), toggling values/recursive
+// (v, r), and refreshing (⟳). Coordinates come from the drawn header regions.
+func TestMouseClickHeaderRegionsMatchKeys(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/a"}}}})
+	_ = m.View(m.width, m.height)
+
+	// prefix field click focuses the prefix input (like `p`).
+	px, py := regionOrigin(t, m, regionPrefix)
+	m, _ = update(t, m, tea.MouseClickMsg{X: px, Y: py, Button: tea.MouseLeft})
+	assert.Equal(t, focusPrefix, m.focus, "clicking the prefix field focuses it (like p)")
+
+	// Commit (esc), then the filter field click focuses the filter (like `/`).
+	m, _ = update(t, m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	_ = m.View(m.width, m.height)
+	fx, fy := regionOrigin(t, m, regionFilter)
+	m, _ = update(t, m, tea.MouseClickMsg{X: fx, Y: fy, Button: tea.MouseLeft})
+	assert.Equal(t, focusFilter, m.focus, "clicking the filter field focuses it (like /)")
+
+	m, _ = update(t, m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	_ = m.View(m.width, m.height)
+
+	// values chip click toggles values-mode and reloads (like `v`).
+	vx, vy := regionOrigin(t, m, regionValues)
+	valSeq := m.listSeq
+	m, cmd := update(t, m, tea.MouseClickMsg{X: vx, Y: vy, Button: tea.MouseLeft})
+	assert.True(t, m.valuesOn, "clicking values toggles it on (like v)")
+	assert.NotNil(t, cmd, "the values toggle reloads")
+	assert.Greater(t, m.listSeq, valSeq)
+
+	_ = m.View(m.width, m.height)
+
+	// recursive chip click toggles recursive and reloads (like `r`).
+	rx, ry := regionOrigin(t, m, regionRecursive)
+	recBefore := m.recursive
+	m, cmd = update(t, m, tea.MouseClickMsg{X: rx, Y: ry, Button: tea.MouseLeft})
+	assert.Equal(t, !recBefore, m.recursive, "clicking recursive toggles it (like r)")
+	assert.NotNil(t, cmd, "the recursive toggle reloads")
+
+	_ = m.View(m.width, m.height)
+
+	// refresh (⟳) click reloads the list.
+	gx, gy := regionOrigin(t, m, regionRefresh)
+	refSeq := m.listSeq
+	_, cmd = update(t, m, tea.MouseClickMsg{X: gx, Y: gy, Button: tea.MouseLeft})
+	assert.NotNil(t, cmd, "clicking the refresh affordance reloads the list")
+	assert.Greater(t, m.listSeq, refSeq)
+}
+
+// TestMouseClickNamespaceBadgeCyclesFilter pins that clicking the App Config
+// namespace badge cycles the namespace filter, reducing to the same action space
+// performs there.
+func TestMouseClickNamespaceBadgeCyclesFilter(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: appConfigCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "app/x"}}}})
+	_ = m.View(m.width, m.height)
+	require.Equal(t, 0, m.nsIndex, "the namespace filter starts at the first option")
+
+	nx, ny := regionOrigin(t, m, regionNamespace)
+	m, cmd := update(t, m, tea.MouseClickMsg{X: nx, Y: ny, Button: tea.MouseLeft})
+	assert.Equal(t, 1, m.nsIndex, "clicking the ns badge cycles the namespace (like space)")
+	assert.NotNil(t, cmd, "cycling the namespace reloads the list")
+}
+
+// TestMouseClickValueLabelTogglesMask pins that clicking the "Value (x to reveal)"
+// label toggles the mask, reducing to the same action `x` performs.
+func TestMouseClickValueLabelTogglesMask(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/s"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/s", Value: "hunter2", Secret: true}})
+	_ = m.View(m.width, m.height)
+	require.True(t, m.valuePane.Masked(), "the secret value starts masked")
+
+	vx, vy := regionOrigin(t, m, regionValueLabel)
+	m, _ = update(t, m, tea.MouseClickMsg{X: vx, Y: vy, Button: tea.MouseLeft})
+	assert.False(t, m.valuePane.Masked(), "clicking the value label reveals (like x)")
+
+	_ = m.View(m.width, m.height)
+	m, _ = update(t, m, tea.MouseClickMsg{X: vx, Y: vy, Button: tea.MouseLeft})
+	assert.True(t, m.valuePane.Masked(), "clicking the value label again re-masks")
 }

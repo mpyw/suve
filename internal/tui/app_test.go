@@ -291,6 +291,84 @@ func columnForTab(tb components.TabBar, target int) (int, bool) {
 	return 0, false
 }
 
+// TestUpdate_DialogClickTranslatedToContentLocal pins the #663 dialog-offset fix:
+// a click inside a centered dialog box reaches the dialog translated into its own
+// content-local coordinates — the box origin (from the overlay hit region) and
+// the frame inset subtracted — so a dialog hit-tests its controls without knowing
+// the shell's centering math. The screen coordinate is derived from the drawn
+// overlay region, never hard-coded.
+func TestUpdate_DialogClickTranslatedToContentLocal(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	fd := &fakeDialog{}
+	m.dialogs = []dialog{fd}
+	_ = m.View() // composes the overlay and builds the dialog hit map
+
+	bx, by, ok := m.dialogHits.Origin("0")
+	require.True(t, ok, "the top dialog's box region is drawn")
+
+	left, top := m.dialogFrameOffset()
+
+	// Click a point 3 columns into the dialog content; the dialog must see (3, 0).
+	const dx, dy = 3, 0
+
+	_ = updateApp(t, m, tea.MouseClickMsg{X: bx + left + dx, Y: by + top + dy, Button: tea.MouseLeft})
+
+	var click *tea.MouseClickMsg
+
+	for _, msg := range fd.got {
+		if c, isClick := msg.(tea.MouseClickMsg); isClick {
+			c := c
+			click = &c
+		}
+	}
+
+	require.NotNil(t, click, "the click reached the dialog")
+	assert.Equal(t, dx, click.X, "X is translated to content-local (box origin + frame subtracted)")
+	assert.Equal(t, dy, click.Y, "Y is translated to content-local")
+}
+
+// TestUpdate_DialogClickOutsideBoxSwallowed pins that a modal click landing
+// outside the dialog box is swallowed — it never reaches the dialog and never
+// leaks to the page beneath (modality is preserved).
+func TestUpdate_DialogClickOutsideBoxSwallowed(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	fd := &fakeDialog{}
+	m.dialogs = []dialog{fd}
+	_ = m.View()
+
+	// (0,0) is the top-left corner, well outside the centered box.
+	_ = updateApp(t, m, tea.MouseClickMsg{X: 0, Y: 0, Button: tea.MouseLeft})
+
+	for _, msg := range fd.got {
+		_, isClick := msg.(tea.MouseClickMsg)
+		assert.False(t, isClick, "a click outside the box is swallowed, not forwarded to the dialog")
+	}
+}
+
+// TestUpdate_HelpBarClickTogglesHelp pins that a click on the bottom help bar
+// toggles the short/full help, reducing to the same toggle `?` performs.
+func TestUpdate_HelpBarClickTogglesHelp(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
+	require.False(t, m.help.ShowAll, "help starts collapsed")
+
+	m = updateApp(t, m, tea.MouseClickMsg{X: 1, Y: m.helpBarTop(), Button: tea.MouseLeft})
+	assert.True(t, m.help.ShowAll, "clicking the help bar expands the help (like ?)")
+
+	m = updateApp(t, m, tea.MouseClickMsg{X: 1, Y: m.helpBarTop(), Button: tea.MouseLeft})
+	assert.False(t, m.help.ShowAll, "clicking again collapses it")
+}
+
 // TestUpdate_CopyToClipboard pins that the `y` key routes a non-empty focused
 // value through the OSC52 clipboard seam (asserted via a stub, never real escape
 // bytes), and — the guard — that with no value it does NOT touch the clipboard:

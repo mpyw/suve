@@ -4,9 +4,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// handleMouseClick maps a left click onto the drawn geometry: a list row click
-// selects that row and loads its detail (reducing to the same selection a key
-// move performs), and — in compare mode — a history row click picks it.
+// handleMouseClick resolves a left click against the last-rendered hit map and
+// reduces it to the SAME internal action its keyboard equivalent performs: a list
+// row click selects that row and loads its detail (like a key move); a history
+// row click focuses/selects it and, in compare mode, picks it (opening the diff
+// once two rows are picked, like enter); the value label toggles the mask (like
+// x); and each header region focuses a field or toggles/refreshes (like p / / /
+// v / r / ⟳).
 func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
 	// A mouse interaction dismisses the transient invalid-action status, matching
 	// the key path and the staging page.
@@ -16,45 +20,83 @@ func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if line, ok := m.geom.listLine(msg.X, msg.Y); ok {
-		if idx, rowOK := m.list.RowAtLine(line); rowOK {
+	id, _, dy, ok := m.hits.At(msg.X, msg.Y)
+	if !ok {
+		return m, nil
+	}
+
+	switch id {
+	case regionList:
+		if idx, rowOK := m.list.RowAtLine(dy); rowOK {
 			m.focus = focusList
 			m.list.SelectIndex(idx)
 
 			return m, m.selectionCmd()
 		}
-	}
-
-	if line, ok := m.geom.historyLine(msg.X, msg.Y); ok {
-		if idx, rowOK := m.history.RowAtLine(line); rowOK {
-			m.focus = focusHistory
-			m.history.SelectIndex(idx)
-
-			if m.history.Compare() {
-				m.history.TogglePick()
-			}
-
-			return m, nil
+	case regionHistory:
+		if idx, rowOK := m.history.RowAtLine(dy); rowOK {
+			return m, m.clickHistoryRow(idx)
 		}
+	case regionValueLabel:
+		m.valuePane.ToggleMask()
+	case regionNamespace:
+		return m, m.cycleNamespace()
+	case regionPrefix:
+		m.focusPrefix()
+	case regionFilter:
+		m.focusFilter()
+	case regionValues:
+		return m, m.toggleValues()
+	case regionRecursive:
+		return m, m.toggleRecursive()
+	case regionRefresh:
+		return m, m.refreshList()
 	}
 
 	return m, nil
 }
 
-// handleMouseWheel scrolls whichever pane the pointer is over: the list, the
-// history, or (when the pointer is elsewhere in the detail) the value pane.
+// clickHistoryRow focuses and selects a history row; in compare mode it picks the
+// row and, once two rows are picked, opens the diff — the click counterpart of the
+// keyboard space-pick / enter-diff flow, reducing to the same nav.OpenDiff.
+func (m *Model) clickHistoryRow(idx int) tea.Cmd {
+	m.focus = focusHistory
+	m.history.SelectIndex(idx)
+
+	if !m.history.Compare() {
+		return nil
+	}
+
+	m.history.TogglePick()
+
+	if _, _, ok := m.history.PickedVersions(); ok {
+		return m.openDiff()
+	}
+
+	return nil
+}
+
+// handleMouseWheel routes a wheel to the region under the pointer: the list, the
+// history, or the value pane (a wheel anywhere else in the detail also scrolls the
+// value pane). A wheel over the header or off the page is dropped — it never falls
+// through to the value pane.
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) (*Model, tea.Cmd) {
 	delta := wheelDelta(msg.Button)
 	if delta == 0 {
 		return m, nil
 	}
 
-	switch {
-	case m.geom.inList(msg.X, msg.Y):
+	id, _, _, ok := m.hits.At(msg.X, msg.Y)
+	if !ok {
+		return m, nil
+	}
+
+	switch id {
+	case regionList:
 		m.list.Scroll(delta)
-	case m.geom.inHistory(msg.X, msg.Y):
+	case regionHistory:
 		m.history.Scroll(delta)
-	default:
+	case regionDetail, regionValueLabel:
 		return m, m.valuePane.Update(msg)
 	}
 
@@ -71,40 +113,4 @@ func wheelDelta(button tea.MouseButton) int {
 	default:
 		return 0
 	}
-}
-
-// listLine maps a screen point to a 0-based list content line, or (0, false)
-// when the point is outside the list content region. The right-edge bound
-// (x < g.listRight) keeps the list from claiming the detail pane, which shares
-// its vertical band in the two-pane layout.
-func (g geom) listLine(x, y int) (int, bool) {
-	if x < g.listLeft || x >= g.listRight || y < g.listTop || y >= g.listTop+g.listRows {
-		return 0, false
-	}
-
-	return y - g.listTop, true
-}
-
-// historyLine maps a screen point to a 0-based history content line, bounded on
-// all four sides so a point outside the drawn history content never maps in.
-func (g geom) historyLine(x, y int) (int, bool) {
-	if x < g.historyLeft || x >= g.historyRight || y < g.historyTop || y >= g.historyTop+g.historyRows {
-		return 0, false
-	}
-
-	return y - g.historyTop, true
-}
-
-// inList reports whether a point is within the list content region.
-func (g geom) inList(x, y int) bool {
-	_, ok := g.listLine(x, y)
-
-	return ok
-}
-
-// inHistory reports whether a point is within the history content region.
-func (g geom) inHistory(x, y int) bool {
-	_, ok := g.historyLine(x, y)
-
-	return ok
 }

@@ -475,11 +475,23 @@ func TestUpdate_BadgeCountAuthoritative(t *testing.T) {
 	assert.Equal(t, 2, msg.Count, "one entry + one tag change counts as two")
 }
 
+// regionOrigin returns the drawn top-left of a hit region, so a mouse test
+// derives its click coordinate from the rendered layout instead of hard-coding
+// one. It fails when the region was not drawn.
+func regionOrigin(t *testing.T, m *Model, id string) (int, int) {
+	t.Helper()
+
+	x, y, ok := m.hits.Origin(id)
+	require.True(t, ok, "region %q was drawn", id)
+
+	return x, y
+}
+
 // TestUpdate_MouseClickApplyResetSelectRow pins the mouse rule: a click on a
 // section's apply/reset button reduces to the SAME internal action its key
 // equivalent performs, and a click on a tag row only selects it (never the
 // destructive cancel — removal is `u`-only, #682), with coordinates read from
-// the rendered geometry (never hard-coded).
+// the drawn hit regions (never hard-coded).
 func TestUpdate_MouseClickApplyResetSelectRow(t *testing.T) {
 	t.Parallel()
 
@@ -496,11 +508,8 @@ func TestUpdate_MouseClickApplyResetSelectRow(t *testing.T) {
 	m := newModel(t, sec)
 
 	// Click the section header's apply button → apply confirmation for the section.
-	headerLine, header := findHeaderLine(m)
-	require.GreaterOrEqual(t, headerLine, 0, "a section header was rendered")
-
-	x := (header.apply[0] + header.apply[1]) / 2
-	_, cmd := m.Update(tea.MouseClickMsg{X: x, Y: m.geom.bodyTop + headerLine, Button: tea.MouseLeft})
+	ax, ay := regionOrigin(t, m, secApplyID(0))
+	_, cmd := m.Update(tea.MouseClickMsg{X: ax, Y: ay, Button: tea.MouseLeft})
 	require.NotNil(t, cmd)
 	applyMsg, ok := cmd().(nav.OpenApply)
 	require.True(t, ok, "clicking apply opens the apply confirmation")
@@ -508,42 +517,87 @@ func TestUpdate_MouseClickApplyResetSelectRow(t *testing.T) {
 	assert.False(t, applyMsg.Global)
 
 	// Click the reset button → reset confirmation.
-	x = (header.reset[0] + header.reset[1]) / 2
-	_, cmd = m.Update(tea.MouseClickMsg{X: x, Y: m.geom.bodyTop + headerLine, Button: tea.MouseLeft})
+	rx, ry := regionOrigin(t, m, secResetID(0))
+	_, cmd = m.Update(tea.MouseClickMsg{X: rx, Y: ry, Button: tea.MouseLeft})
 	require.NotNil(t, cmd)
 	_, ok = cmd().(nav.OpenReset)
 	assert.True(t, ok, "clicking reset opens the reset confirmation")
 
-	// Click the tag-add row → it only selects the row (no destructive cancel).
-	tagLine := findRowLine(m, 1) // row 1 is the tag add (row 0 is the entry)
-	require.GreaterOrEqual(t, tagLine, 0, "the tag row was rendered")
-
+	// Click the tag-add row (row 1; row 0 is the entry) → it only selects the row
+	// (no destructive cancel). The coordinate is the row region's origin.
+	tx, ty := regionOrigin(t, m, rowID(1))
 	m.selected = 0
-	_, cmd = m.Update(tea.MouseClickMsg{X: 4, Y: m.geom.bodyTop + tagLine, Button: tea.MouseLeft})
-	assert.Nil(t, cmd, "clicking a tag row dispatches nothing (enter is a no-op there)")
+	_, cmd = m.Update(tea.MouseClickMsg{X: tx, Y: ty, Button: tea.MouseLeft})
+	assert.Nil(t, cmd, "clicking a tag row dispatches nothing (it only selects)")
 	assert.Equal(t, 1, m.selected, "clicking the tag row selects it")
 	assert.Empty(t, sec.cancelAdds, "clicking a tag row never cancels its staged add")
 }
 
-// findHeaderLine returns the body-relative line index of the first section header
-// and its descriptor.
-func findHeaderLine(m *Model) (int, lineDesc) {
-	for i, d := range m.geom.lines {
-		if d.section >= 0 {
-			return i, d
-		}
-	}
+// TestUpdate_MouseClickEntryRowSelectsOnly pins the resolved row-click model: a
+// click on an entry row only SELECTS it — it does not open the detail page (enter
+// stays the key path), matching the browser's click-selects behavior.
+func TestUpdate_MouseClickEntryRowSelectsOnly(t *testing.T) {
+	t.Parallel()
 
-	return -1, lineDesc{}
+	sec := &stubService{
+		service: "param", label: "Param", svcCap: capFor("aws", "param"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{
+			{Name: "/app/one", Type: data.StagedDiffNormal, Operation: "update", StagedValue: "a"},
+			{Name: "/app/two", Type: data.StagedDiffNormal, Operation: "update", StagedValue: "b"},
+		}},
+	}
+	m := newModel(t, sec)
+	m.selected = 0
+
+	x, y := regionOrigin(t, m, rowID(1))
+	_, cmd := m.Update(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	assert.Nil(t, cmd, "clicking an entry row only selects it (no detail-page open)")
+	assert.Equal(t, 1, m.selected, "clicking the entry row selects it")
 }
 
-// findRowLine returns the body-relative line index of the given selectable row.
-func findRowLine(m *Model, row int) int {
-	for i, d := range m.geom.lines {
-		if d.row == row {
-			return i
-		}
-	}
+// TestUpdate_MouseClickHeaderMatchesKeys pins #663's staging-header coverage: a
+// click on the view toggle, apply-all, reset-all, and refresh affordances reduces
+// to the same action v / A / R / ctrl+r perform, with coordinates from the drawn
+// header regions.
+func TestUpdate_MouseClickHeaderMatchesKeys(t *testing.T) {
+	t.Parallel()
 
-	return -1
+	param := &stubService{
+		service: "param", label: "Param", svcCap: capFor("aws", "param"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{{Name: "/p", Operation: "update", StagedValue: "v"}}},
+	}
+	secret := &stubService{
+		service: "secret", label: "Secret", svcCap: capFor("aws", "secret"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{{Name: "s", Operation: "create", StagedValue: "v"}}},
+	}
+	m := newModel(t, param, secret)
+
+	// View toggle click flips diff↔value (like v).
+	require.True(t, m.diffView)
+	vx, vy := regionOrigin(t, m, regionViewToggle)
+	m, _ = m.Update(tea.MouseClickMsg{X: vx, Y: vy, Button: tea.MouseLeft})
+	assert.False(t, m.diffView, "clicking the view toggle switches to value view (like v)")
+	_ = m.View(m.width, m.height)
+
+	// apply-all click requests the apply-all fan-out (like A).
+	aax, aay := regionOrigin(t, m, regionApplyAll)
+	_, cmd := m.Update(tea.MouseClickMsg{X: aax, Y: aay, Button: tea.MouseLeft})
+	require.NotNil(t, cmd, "clicking apply-all dispatches")
+	applyMsg, ok := cmd().(nav.OpenApply)
+	require.True(t, ok, "apply-all opens the apply-all confirmation")
+	assert.True(t, applyMsg.Global)
+	assert.ElementsMatch(t, []string{"param", "secret"}, applyMsg.Services)
+
+	// reset-all click requests the reset-all fan-out (like R).
+	rax, ray := regionOrigin(t, m, regionResetAll)
+	_, cmd = m.Update(tea.MouseClickMsg{X: rax, Y: ray, Button: tea.MouseLeft})
+	require.NotNil(t, cmd, "clicking reset-all dispatches")
+	resetMsg, ok := cmd().(nav.OpenReset)
+	require.True(t, ok, "reset-all opens the reset-all confirmation")
+	assert.True(t, resetMsg.Global)
+
+	// refresh click reloads every section (like ctrl+r).
+	fx, fy := regionOrigin(t, m, regionRefresh)
+	_, cmd = m.Update(tea.MouseClickMsg{X: fx, Y: fy, Button: tea.MouseLeft})
+	require.NotNil(t, cmd, "clicking refresh reloads the sections")
 }

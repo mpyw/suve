@@ -285,26 +285,17 @@ func (m *Model) handleInputKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch {
 	case key.Matches(msg, prefixKey):
-		m.focus = focusPrefix
-		m.prefix.Focus()
+		m.focusPrefix()
 
 		return true, nil
 	case key.Matches(msg, filterKey):
-		m.focus = focusFilter
-		m.filter.Focus()
+		m.focusFilter()
 
 		return true, nil
 	case key.Matches(msg, valuesKey):
-		m.valuesOn = !m.valuesOn
-
-		return true, m.loadListCmd(false)
+		return true, m.toggleValues()
 	case key.Matches(msg, recursiveKey):
-		// Param supports recursive listing; elsewhere `r` is a plain refresh.
-		if m.svcCap.Service == "param" && !m.svcCap.HasNamespaces {
-			m.recursive = !m.recursive
-		}
-
-		return true, m.loadListCmd(false)
+		return true, m.toggleRecursive()
 	case key.Matches(msg, loadMoreKey):
 		return true, m.loadMore()
 	case key.Matches(msg, revealKey):
@@ -360,6 +351,43 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	}
 
 	return false, nil
+}
+
+// focusPrefix / focusFilter move focus into the header prefix/filter input (the
+// `p` / `/` keys, and a click on that field). CapturesInput then routes raw
+// keystrokes to the input until it is committed.
+func (m *Model) focusPrefix() {
+	m.focus = focusPrefix
+	m.prefix.Focus()
+}
+
+func (m *Model) focusFilter() {
+	m.focus = focusFilter
+	m.filter.Focus()
+}
+
+// toggleValues flips values-mode and reloads the list (the `v` key and a click on
+// the values chip).
+func (m *Model) toggleValues() tea.Cmd {
+	m.valuesOn = !m.valuesOn
+
+	return m.loadListCmd(false)
+}
+
+// toggleRecursive flips recursive listing (param only; elsewhere `r`/⟳ is a plain
+// refresh) and reloads the list (the `r` key and a click on the recursive chip).
+func (m *Model) toggleRecursive() tea.Cmd {
+	// Param supports recursive listing; elsewhere `r` is a plain refresh.
+	if m.svcCap.Service == "param" && !m.svcCap.HasNamespaces {
+		m.recursive = !m.recursive
+	}
+
+	return m.loadListCmd(false)
+}
+
+// refreshList reloads the list (a click on the ⟳ refresh affordance).
+func (m *Model) refreshList() tea.Cmd {
+	return m.loadListCmd(false)
 }
 
 // selectedIsDeleteStaged reports whether the currently-selected entry is staged

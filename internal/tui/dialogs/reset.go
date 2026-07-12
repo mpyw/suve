@@ -7,8 +7,10 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/tui/data"
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
@@ -18,6 +20,12 @@ type resetControl int
 const (
 	ctrlReset resetControl = iota
 	ctrlResetCancel
+)
+
+// Reset-button region IDs.
+const (
+	resetRegionReset  = "reset"
+	resetRegionCancel = "reset-cancel"
 )
 
 // resetResultsMsg carries the aggregated fan-out reset results back.
@@ -39,6 +47,9 @@ type resetDialog struct {
 
 	focus int
 	busy  bool
+	// hits maps a click on the Reset/Cancel button to focusing and activating it —
+	// the same reduction navigating to it and pressing enter performs.
+	hits *hit.Map
 }
 
 // ResetInput configures a reset dialog.
@@ -84,12 +95,40 @@ func (d *resetDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 		return d, doneCmd("", resetSummary(msg.results), true)
+	case tea.MouseClickMsg:
+		if d.busy {
+			return d, nil // double-submit guard
+		}
+
+		return d.handleClick(msg)
 	case tea.KeyPressMsg:
 		if d.busy {
 			return d, nil // double-submit guard
 		}
 
 		return d.handleKey(msg)
+	}
+
+	return d, nil
+}
+
+// handleClick reduces a click on the Reset/Cancel button to focusing then
+// activating it — the same as the arrow+enter key path.
+func (d *resetDialog) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
+	id, _, _, ok := d.hits.At(msg.X, msg.Y)
+	if !ok {
+		return d, nil
+	}
+
+	switch id {
+	case resetRegionReset:
+		d.focus = int(ctrlReset)
+
+		return d.activate()
+	case resetRegionCancel:
+		d.focus = int(ctrlResetCancel)
+
+		return d.activate()
 	}
 
 	return d, nil
@@ -140,23 +179,42 @@ func (d *resetDialog) resetCmd() tea.Cmd {
 func (d *resetDialog) View() string {
 	var b strings.Builder
 
-	b.WriteString(d.fit(d.styles.PaneTitle.Render(d.title)))
+	title := d.fit(d.styles.PaneTitle.Render(d.title))
+	b.WriteString(title)
 	b.WriteString("\n\n")
 
 	if d.busy {
+		d.hits = hit.New() // no buttons while resetting
 		b.WriteString(d.styles.PageHint.Render("resetting…"))
 
 		return b.String()
 	}
 
-	b.WriteString(d.fit("Unstage every staged change for the target(s)?") + "\n\n")
-	b.WriteString(d.resetRow(ctrlReset, d.styles.ErrorText.Render("[ Reset ]")) + "    " +
-		d.resetRow(ctrlResetCancel, "[ Cancel ]"))
+	prompt := d.fit("Unstage every staged change for the target(s)?")
+	b.WriteString(prompt + "\n\n")
+
+	resetBtn := d.resetRow(ctrlReset, d.styles.ErrorText.Render("[ Reset ]"))
+	cancelBtn := d.resetRow(ctrlResetCancel, "[ Cancel ]")
+	b.WriteString(resetBtn + "    " + cancelBtn)
 	b.WriteString("\n\n")
 	b.WriteString(d.styles.PageHint.Render("↑↓: move · enter: confirm · esc: cancel"))
 
+	// The Reset/Cancel buttons sit on one line below the title, its blank line, the
+	// prompt, and its blank line. The 4-space gap separates the two button regions.
+	buttonRow := lipgloss.Height(title) + 1 + lipgloss.Height(prompt) + 1
+	resetW := lipgloss.Width(resetBtn)
+	cancelX := resetW + buttonGap
+	d.hits = hit.New(
+		hit.Region(resetRegionReset, 0, buttonRow, resetW, 1),
+		hit.Region(resetRegionCancel, cancelX, buttonRow, lipgloss.Width(cancelBtn), 1),
+	)
+
 	return b.String()
 }
+
+// buttonGap is the column gap between two side-by-side confirm buttons (the
+// "    " separator), used to place the second button's hit region.
+const buttonGap = 4
 
 func (d *resetDialog) resetRow(c resetControl, label string) string {
 	if resetControl(d.focus) == c {

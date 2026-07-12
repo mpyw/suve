@@ -23,6 +23,7 @@ import (
 	"github.com/mpyw/suve/internal/tui/components"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/dialogs"
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/nav"
 	"github.com/mpyw/suve/internal/tui/styles"
@@ -126,6 +127,13 @@ type App struct {
 	// overlay stack; the top dialog captures input while any dialog is open.
 	pages   []page
 	dialogs []dialog
+
+	// dialogHits is the last-rendered overlay hit map: one region per dialog box at
+	// its centered screen position. A click while modal is resolved against it, and
+	// the hit region's bounds give the box origin the click is translated by — so a
+	// click reaching a dialog is un-offset via the compositor's layer origin rather
+	// than by re-deriving the centering math (the #663 dialog-offset fix).
+	dialogHits *hit.Map
 
 	keys   keys.Map
 	styles styles.Styles
@@ -582,20 +590,56 @@ func numberedTabJump(k keys.Map, msg tea.KeyPressMsg) (int, bool) {
 // jump keys perform), else to the active page.
 func (m *App) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	if len(m.dialogs) > 0 {
-		return m.updateTopDialog(msg)
+		return m.forwardDialogClick(msg)
 	}
 
 	// Below the minimum size the shell draws only the too-small notice — no tab
-	// bar — so a click at the tab-bar row must not hit-test (and switch) an
-	// invisible tab. Gate mouse tab selection on the same size the shell renders.
-	if m.width >= minWidth && m.height >= minHeight &&
-		msg.Button == tea.MouseLeft && msg.Y == m.tabBarRow() {
+	// bar or help bar — so a click on those rows must not hit-test invisible
+	// chrome. Gate mouse chrome selection on the same size the shell renders.
+	if m.width < minWidth || m.height < minHeight {
+		return m.updateActivePage(m.translateMouseClick(msg))
+	}
+
+	if msg.Button == tea.MouseLeft && msg.Y == m.tabBarRow() {
 		if i, ok := m.tabBar().TabAtX(msg.X); ok {
 			return m, m.jumpTab(i)
 		}
 	}
 
+	// A click on the help bar toggles the short/full help, the same as `?`.
+	if msg.Button == tea.MouseLeft && msg.Y >= m.helpBarTop() {
+		m.help.ShowAll = !m.help.ShowAll
+
+		return m, nil
+	}
+
 	return m.updateActivePage(m.translateMouseClick(msg))
+}
+
+// forwardDialogClick resolves a modal click against the overlay hit map and, when
+// it lands on the top dialog's box, forwards it translated into that dialog's
+// content-local coordinates (box origin from the hit region's bounds, plus the
+// frame inset). A click outside the top box is swallowed — a modal never leaks a
+// click to the page beneath it.
+func (m *App) forwardDialogClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	top := len(m.dialogs) - 1
+
+	id, dx, dy, ok := m.dialogHits.At(msg.X, msg.Y)
+	if !ok || id != strconv.Itoa(top) {
+		return m, nil
+	}
+
+	left, topInset := m.dialogFrameOffset()
+	msg.X = dx - left
+	msg.Y = dy - topInset
+
+	return m.updateTopDialog(msg)
+}
+
+// helpBarTop is the first terminal row the (short or full) help bar occupies, so
+// a click at or below it is a help-toggle rather than a page-body click.
+func (m *App) helpBarTop() int {
+	return m.height - lipgloss.Height(m.helpView())
 }
 
 // translateMouseClick shifts a click's Y from screen coordinates into the active
@@ -1048,20 +1092,37 @@ func (m *App) helpView() string {
 	return m.styles.HelpBar.Render(" " + m.help.View(m.keys))
 }
 
-// overlayDialogs draws each dialog as a centered lipgloss v2 layer over the
-// page, later dialogs on top.
+// overlayDialogs draws each dialog as a centered lipgloss v2 layer over the page
+// (later dialogs on top) and rebuilds the overlay hit map: one region per dialog
+// box at the same centered position, so a modal click is resolved and un-offset
+// against the very layer that was drawn.
 func (m *App) overlayDialogs(base string) string {
 	canvas := lipgloss.NewCanvas(m.width, m.height)
 	canvas.Compose(lipgloss.NewLayer(base))
 
-	for _, d := range m.dialogs {
+	regions := make([]*lipgloss.Layer, 0, len(m.dialogs))
+
+	for i, d := range m.dialogs {
 		box := m.styles.Dialog.Render(d.View())
 		x := max((m.width-lipgloss.Width(box))/2, 0)   //nolint:mnd // centered horizontally
 		y := max((m.height-lipgloss.Height(box))/2, 0) //nolint:mnd // centered vertically
 		canvas.Compose(lipgloss.NewLayer(box).X(x).Y(y))
+		regions = append(regions,
+			hit.Region(strconv.Itoa(i), x, y, lipgloss.Width(box), lipgloss.Height(box)).Z(i))
 	}
 
+	m.dialogHits = hit.New(regions...)
+
 	return canvas.Render()
+}
+
+// dialogFrameOffset is the (left, top) content inset the shell's dialog frame
+// adds around a dialog's View content: the rounded border plus horizontal
+// padding. Subtracting it (plus the box origin) from a screen click yields the
+// dialog's content-local coordinate.
+func (m *App) dialogFrameOffset() (left, top int) {
+	return m.styles.Dialog.GetBorderLeftSize() + m.styles.Dialog.GetPaddingLeft(),
+		m.styles.Dialog.GetBorderTopSize() + m.styles.Dialog.GetPaddingTop()
 }
 
 // placeholderNotice is the muted text a tab's placeholder page shows, naming

@@ -16,11 +16,13 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/tui/components"
 	"github.com/mpyw/suve/internal/tui/data"
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
@@ -160,27 +162,32 @@ type Model struct {
 	nsSeq       int
 	debounceSeq int
 
-	// geom is the last-rendered geometry, used to hit-test mouse clicks against
-	// what is actually on screen (never a hard-coded coordinate).
-	geom geom
+	// hits is the last-rendered hit map: one compositor region per clickable/
+	// scrollable area (header fields and toggles, the list, the detail pane, the
+	// value label, and the history band), rebuilt every View so a mouse coordinate
+	// is hit-tested against the layers rather than a hand-maintained geometry.
+	hits *hit.Map
+	// regions is the scratch slice View appends region layers to before building
+	// hits, reused across frames to avoid per-frame allocation churn.
+	regions []*lipgloss.Layer
 }
 
-// geom records where the list and history content sit in page-local coordinates
-// after the last View, so mouse handlers hit-test the drawn layout. Each region
-// is bounded on all four sides: left/right columns and top/rows. The right edge
-// matters because in the two-pane layout the list sits to the LEFT of the detail
-// pane and shares its vertical band with the value/meta/history content — without
-// a right edge the list would swallow every wheel/click aimed at the detail pane.
-type geom struct {
-	listTop      int
-	listLeft     int
-	listRight    int // exclusive right column of the list content
-	listRows     int
-	historyTop   int
-	historyLeft  int
-	historyRight int // exclusive right column of the history content
-	historyRows  int
-}
+// Clickable/scrollable region IDs for the browser hit map. The list and history
+// bands map a click to a row (via the in-region offset); the detail and value
+// regions route the wheel to the value pane; the header regions each reduce a
+// click to the same action their key equivalent performs.
+const (
+	regionList       = "list"
+	regionDetail     = "detail"
+	regionHistory    = "history"
+	regionValueLabel = "value-label"
+	regionNamespace  = "ns"
+	regionPrefix     = "prefix"
+	regionFilter     = "filter"
+	regionValues     = "values"
+	regionRecursive  = "recursive"
+	regionRefresh    = "refresh"
+)
 
 // New builds a browser page over a data source. ctx is the Run context threaded
 // through every fetch. staging may be nil when the service has no staging
