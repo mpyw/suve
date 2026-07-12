@@ -395,7 +395,21 @@ func (m *App) mutatorForService(service string) data.Mutator {
 // pushDialog appends a dialog to the modal stack, seeds it with the current size
 // (so its embedded form lays out before the first render), clears any transient
 // status, and returns the dialog's Init command.
+//
+// Dialog-open requests arrive as async commands (a page emits
+// func() tea.Msg { return nav.Open*{...} }), so a rapid double-press of a
+// dialog-open key (e/n/d/t/a) can emit two Open* commands before the first
+// dialog lands, and both would otherwise push an identical dialog — Esc then
+// reveals the duplicate underneath. Guard against that here, the single choke
+// point every dialog push flows through: a dialog is modal (once one is on the
+// stack it captures all input, so the page can no longer emit Open*), so any
+// Open* arriving while a dialog is already open is a stale in-flight duplicate.
+// Drop it rather than stack a second dialog.
 func (m *App) pushDialog(d dialogs.Model, initCmd tea.Cmd) tea.Cmd {
+	if len(m.dialogs) > 0 {
+		return nil
+	}
+
 	m.status = ""
 	m.dialogs = append(m.dialogs, dialogAdapter{m: d})
 
