@@ -71,13 +71,13 @@ func (u *ListNamespacesUseCase) Execute(ctx context.Context, input ListNamespace
 
 	out := &ListNamespacesOutput{}
 
-	for _, row := range rows {
+	out.Entries = lo.FilterMap(rows, func(row appconfig.KeyNamespace, _ int) (ListNamespacesEntry, bool) {
 		if input.Prefix != "" && !strings.HasPrefix(row.Key, input.Prefix) {
-			continue
+			return ListNamespacesEntry{}, false
 		}
 
 		if filterRegex != nil && !filterRegex.MatchString(row.Key) {
-			continue
+			return ListNamespacesEntry{}, false
 		}
 
 		entry := ListNamespacesEntry{Namespace: row.Namespace, Name: row.Key}
@@ -85,8 +85,8 @@ func (u *ListNamespacesUseCase) Execute(ctx context.Context, input ListNamespace
 			entry.Value = lo.ToPtr(row.Value)
 		}
 
-		out.Entries = append(out.Entries, entry)
-	}
+		return entry, true
+	})
 
 	debug.From(ctx).Logf("azure list (namespaces): provider returned %d rows, %d after filters (prefix=%q, filter=%q)\n",
 		len(rows), len(out.Entries), input.Prefix, input.Filter)

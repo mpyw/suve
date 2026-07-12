@@ -91,16 +91,16 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, names []s
 	output := &ListOutput{}
 
 	if !withValue {
-		for _, name := range names {
-			output.Entries = append(output.Entries, ListEntry{Name: name})
-		}
+		output.Entries = lo.Map(names, func(name string, _ int) ListEntry {
+			return ListEntry{Name: name}
+		})
 
 		return output
 	}
 
 	values, errs := u.fetchValues(ctx, names)
 
-	for _, name := range names {
+	output.Entries = lo.Map(names, func(name string, _ int) ListEntry {
 		entry := ListEntry{Name: name}
 
 		if err, hasErr := errs[name]; hasErr {
@@ -109,8 +109,8 @@ func (u *ListUseCase) buildOutput(ctx context.Context, withValue bool, names []s
 			entry.Value = lo.ToPtr(val)
 		}
 
-		output.Entries = append(output.Entries, entry)
-	}
+		return entry
+	})
 
 	return output
 }

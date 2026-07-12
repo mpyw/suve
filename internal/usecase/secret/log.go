@@ -6,6 +6,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 )
@@ -83,27 +85,26 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 
 	// Apply date filters BEFORE the count limit: -n must return up to N versions
 	// that match --since/--until, not N newest-then-filtered to fewer (#351).
-	if input.Since != nil || input.Until != nil {
-		kept := versions[:0]
-
-		for _, v := range versions {
-			if v.Created == nil {
-				continue
-			}
-
-			if input.Since != nil && v.Created.Before(*input.Since) {
-				continue
-			}
-
-			if input.Until != nil && v.Created.After(*input.Until) {
-				continue
-			}
-
-			kept = append(kept, v)
+	versions = lo.Filter(versions, func(v domain.Version, _ int) bool {
+		if input.Since == nil && input.Until == nil {
+			return true
 		}
 
-		versions = kept
-	}
+		// Skip versions without a timestamp when date filters are applied.
+		if v.Created == nil {
+			return false
+		}
+
+		if input.Since != nil && v.Created.Before(*input.Since) {
+			return false
+		}
+
+		if input.Until != nil && v.Created.After(*input.Until) {
+			return false
+		}
+
+		return true
+	})
 
 	// History is newest first; MaxResults caps the number of versions shown.
 	if input.MaxResults > 0 && len(versions) > int(input.MaxResults) {
@@ -115,12 +116,10 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 		slices.Reverse(versions)
 	}
 
-	entries := make([]LogEntry, 0, len(versions))
-
-	for _, v := range versions {
+	entries := lo.Map(versions, func(v domain.Version, _ int) LogEntry {
 		value, fetchErr := u.getValue(ctx, input.Name, v.ID)
 
-		entries = append(entries, LogEntry{
+		return LogEntry{
 			VersionID:    v.ID,
 			VersionStage: stages(v.StagingLabels),
 			State:        v.State,
@@ -129,8 +128,8 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			IsCurrent:    v.ID == currentVersion,
 			Tags:         v.Tags,
 			Error:        fetchErr,
-		})
-	}
+		}
+	})
 
 	return &LogOutput{
 		Name:    input.Name,
