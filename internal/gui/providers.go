@@ -3,6 +3,8 @@
 package gui
 
 import (
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/detect"
 )
@@ -82,12 +84,7 @@ func uniqueActiveProvider(r detect.Result) provider.Provider {
 }
 
 func providerStrings(ps []provider.Provider) []string {
-	out := make([]string, 0, len(ps))
-	for _, p := range ps {
-		out = append(out, string(p))
-	}
-
-	return out
+	return lo.Map(ps, func(p provider.Provider, _ int) string { return string(p) })
 }
 
 // =============================================================================

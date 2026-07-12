@@ -5,6 +5,9 @@ package gui
 import (
 	"time"
 
+	"github.com/samber/lo"
+
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -138,13 +141,12 @@ func (a *App) SecretList(prefix string, withValue bool, filter string, _ int, _ 
 		return nil, err
 	}
 
-	entries := make([]SecretListEntry, len(result.Entries))
-	for i, e := range result.Entries {
-		entries[i] = SecretListEntry{
+	entries := lo.Map(result.Entries, func(e secret.ListEntry, _ int) SecretListEntry {
+		return SecretListEntry{
 			Name:  e.Name,
 			Value: e.Value,
 		}
-	}
+	})
 
 	return &SecretListResult{Entries: entries, NextToken: result.NextToken}, nil
 }
@@ -176,17 +178,12 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 		State:         result.State,
 		Value:         result.Value,
 		Description:   result.Description,
-		Tags:          make([]SecretShowTag, 0, len(result.Tags)),
+		Tags: lo.Map(result.Tags, func(tag secret.ShowTag, _ int) SecretShowTag {
+			return SecretShowTag{Key: tag.Key, Value: tag.Value}
+		}),
 	}
 	if result.CreatedDate != nil {
 		r.CreatedDate = timeutil.FormatRFC3339(*result.CreatedDate)
-	}
-
-	for _, tag := range result.Tags {
-		r.Tags = append(r.Tags, SecretShowTag{
-			Key:   tag.Key,
-			Value: tag.Value,
-		})
 	}
 
 	return r, nil
@@ -209,26 +206,23 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 		return nil, err
 	}
 
-	entries := make([]SecretLogEntry, len(result.Entries))
-	for i, e := range result.Entries {
+	entries := lo.Map(result.Entries, func(e secret.LogEntry, _ int) SecretLogEntry {
 		entry := SecretLogEntry{
 			VersionID:     e.VersionID,
 			StagingLabels: e.VersionStage,
 			State:         e.State,
 			Value:         e.Value,
 			IsCurrent:     e.IsCurrent,
-			Tags:          make([]SecretShowTag, 0, len(e.Tags)),
+			Tags: lo.Map(e.Tags, func(tag domain.Tag, _ int) SecretShowTag {
+				return SecretShowTag{Key: tag.Key, Value: tag.Value}
+			}),
 		}
 		if e.CreatedDate != nil {
 			entry.Created = timeutil.FormatRFC3339(*e.CreatedDate)
 		}
 
-		for _, tag := range e.Tags {
-			entry.Tags = append(entry.Tags, SecretShowTag{Key: tag.Key, Value: tag.Value})
-		}
-
-		entries[i] = entry
-	}
+		return entry
+	})
 
 	return &SecretLogResult{Name: result.Name, Entries: entries}, nil
 }
