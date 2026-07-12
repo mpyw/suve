@@ -76,6 +76,39 @@ func TestGoogleCloudSecretStrategy_Apply(t *testing.T) {
 		assert.True(t, putCalled)
 	})
 
+	t.Run("staged description reaches the store on apply", func(t *testing.T) {
+		t.Parallel()
+
+		var createDesc, putDesc string
+
+		store := &providermock.Store{
+			CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption) (domain.Version, error) {
+				createDesc = description
+
+				return domain.Version{ID: "1"}, nil
+			},
+			PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption) (domain.Version, error) {
+				putDesc = description
+
+				return domain.Version{ID: "2"}, nil
+			},
+		}
+		s := staging.NewGoogleCloudSecretStrategy(store)
+
+		// A staged create carries the description to Create (#666: previously the
+		// value was accepted, shown in status/diff, then dropped on apply).
+		require.NoError(t, s.Apply(t.Context(), "sec", staging.Entry{
+			Operation: staging.OperationCreate, Value: lo.ToPtr("v1"), Description: lo.ToPtr("app credentials"),
+		}))
+		assert.Equal(t, "app credentials", createDesc)
+
+		// A staged edit carries it to Put.
+		require.NoError(t, s.Apply(t.Context(), "sec", staging.Entry{
+			Operation: staging.OperationUpdate, Value: lo.ToPtr("v2"), Description: lo.ToPtr("rotated key"),
+		}))
+		assert.Equal(t, "rotated key", putDesc)
+	})
+
 	t.Run("delete", func(t *testing.T) {
 		t.Parallel()
 

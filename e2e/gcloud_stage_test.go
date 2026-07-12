@@ -129,6 +129,41 @@ func TestGoogleCloudStage_Workflow(t *testing.T) {
 	})
 }
 
+// TestGoogleCloudStage_DescriptionApplied confirms that a staged description is
+// carried through apply to the "description" annotation and shown in the read
+// view — #666's fix for the previously silent no-op (the value was accepted and
+// shown in status/diff, then dropped on apply for non-AWS providers).
+func TestGoogleCloudStage_DescriptionApplied(t *testing.T) {
+	setupGoogleCloud(t)
+	setupTempHome(t)
+
+	const (
+		project = "suve-e2e"
+		name    = "suve-e2e-gcloud-stage-desc/create"
+	)
+
+	cleanup := func() { _, _ = runGcloud(t, "secret", "delete", "--yes", name) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	store := newGoogleCloudStore(project)
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: name}, staging.Entry{
+		Operation:   staging.OperationCreate,
+		Value:       lo.ToPtr("created-value"),
+		Description: lo.ToPtr("staged description"),
+		StagedAt:    time.Now(),
+	}))
+
+	_, err := runGcloud(t, "stage", "apply", "--yes")
+	require.NoError(t, err)
+
+	stdout, err := runGcloud(t, "secret", "show", name)
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "created-value")
+	assert.Contains(t, stdout, "Description")
+	assert.Contains(t, stdout, "staged description")
+}
+
 // TestGoogleCloudStage_FlatAliasReachesEmulator confirms the flat `suve stage`
 // alias, when forced to Google Cloud, resolves the project and drives the same
 // emulator-backed staging store.

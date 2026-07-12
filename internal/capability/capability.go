@@ -56,10 +56,12 @@ type ServiceCapability struct {
 	// delete immediately or govern retention by policy, so no "recoverable until"
 	// date is shown.
 	HasRecoveryWindow bool `json:"hasRecoveryWindow"`
-	// HasDescription is true when a write carries a free-text description (AWS
-	// Parameter Store + Secrets Manager only). The gcloud, Azure Key Vault, and
-	// Azure App Configuration writers ignore a description, so the frontend hides
-	// the description field for them (GUI parity: only AWS forms offer it).
+	// HasDescription is true when a write carries a free-text description: AWS
+	// Parameter Store + Secrets Manager (native) and Google Cloud Secret Manager
+	// (stored as the "description" secret annotation). The Azure Key Vault and
+	// App Configuration writers have no description concept (only tags), so the
+	// frontend hides the description field for them and the staged CLI does not
+	// register a --description flag.
 	HasDescription bool `json:"hasDescription"`
 }
 
@@ -110,7 +112,7 @@ func All() []ProviderCapability {
 				{
 					Service: serviceSecret, DisplayName: displayNameSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
-					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
 				},
 			},
 		},

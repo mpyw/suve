@@ -11,8 +11,9 @@ import (
 
 // UpdateInput holds input for the update use case.
 type UpdateInput struct {
-	Name  string
-	Value string
+	Name        string
+	Value       string
+	Description string
 }
 
 // UpdateOutput holds the result of the update use case.
@@ -55,7 +56,7 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 		return nil, err
 	}
 
-	version, err := u.Store.Put(ctx, input.Name, input.Value, domain.ValueTypeSecret, "")
+	version, err := u.Store.Put(ctx, input.Name, input.Value, domain.ValueTypeSecret, input.Description)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update secret: %w", err)
 	}

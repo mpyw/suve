@@ -28,6 +28,7 @@ type ShowOutput struct {
 	Value       string
 	Version     string // integer version number, or "" for an unknown/latest version
 	State       string // enabled/disabled/destroyed (best-effort), may be ""
+	Description string // the "description" annotation, "" when unset
 	CreatedDate *time.Time
 	Tags        []ShowTag
 }
@@ -55,6 +56,7 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 		Value:       entry.Value,
 		Version:     entry.Version.ID,
 		State:       entry.Version.State,
+		Description: entry.Description,
 		CreatedDate: entry.Version.Created,
 		Tags: lo.Map(entry.Tags, func(tag domain.Tag, _ int) ShowTag {
 			return ShowTag{Key: tag.Key, Value: tag.Value}

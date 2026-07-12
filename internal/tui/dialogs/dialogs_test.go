@@ -31,6 +31,7 @@ type fakeMutator struct {
 	key            data.StagedKey
 	value          string
 	typeLabel      string
+	description    string
 	staged         bool
 	force          bool
 	recoveryWindow int
@@ -43,16 +44,16 @@ type fakeMutator struct {
 
 func (m *fakeMutator) Capability() capability.ServiceCapability { return m.svcCap }
 
-func (m *fakeMutator) Create(_ context.Context, key data.StagedKey, value, typeLabel, _ string, staged bool) (data.WriteOutcome, error) {
+func (m *fakeMutator) Create(_ context.Context, key data.StagedKey, value, typeLabel, description string, staged bool) (data.WriteOutcome, error) {
 	m.createCalled = true
-	m.key, m.value, m.typeLabel, m.staged = key, value, typeLabel, staged
+	m.key, m.value, m.typeLabel, m.description, m.staged = key, value, typeLabel, description, staged
 
 	return m.outcome, m.err
 }
 
-func (m *fakeMutator) Update(_ context.Context, key data.StagedKey, value, typeLabel, _ string, staged bool) (data.WriteOutcome, error) {
+func (m *fakeMutator) Update(_ context.Context, key data.StagedKey, value, typeLabel, description string, staged bool) (data.WriteOutcome, error) {
 	m.updateCalled = true
-	m.key, m.value, m.typeLabel, m.staged = key, value, typeLabel, staged
+	m.key, m.value, m.typeLabel, m.description, m.staged = key, value, typeLabel, description, staged
 
 	return m.outcome, m.err
 }
@@ -100,7 +101,7 @@ func awsSecretCap() capability.ServiceCapability {
 }
 
 func gcloudSecretCap() capability.ServiceCapability {
-	return capability.ServiceCapability{Service: "secret", HasTags: true, HasStaging: true}
+	return capability.ServiceCapability{Service: "secret", HasTags: true, HasStaging: true, HasDescription: true}
 }
 
 func noStagingParamCap() capability.ServiceCapability {
@@ -379,8 +380,9 @@ func TestEntryForm_StagedOnlyEditPreservesType(t *testing.T) {
 }
 
 // TestEntryForm_DescriptionGating pins that the Description field is drawn only
-// for a service that honors it (AWS param/secret). The gcloud, Azure Key Vault,
-// and App Configuration writers ignore a description, so their forms omit it.
+// for a service that honors it: AWS param/secret (native) and Google Cloud
+// secret (stored as the "description" annotation). The Azure Key Vault and App
+// Configuration writers have no description concept, so their forms omit it.
 func TestEntryForm_DescriptionGating(t *testing.T) {
 	t.Parallel()
 
@@ -390,11 +392,11 @@ func TestEntryForm_DescriptionGating(t *testing.T) {
 	awsSecret, _ := newEntry(t, awsSecretCap(), false)
 	assert.Contains(t, awsSecret.View(), "Description", "AWS secret offers a description")
 
-	appConfig := newAppConfigEntry(t, false, "prod")
-	assert.NotContains(t, appConfig.View(), "Description", "App Configuration ignores a description")
-
 	gcloudSecret, _ := newEntry(t, gcloudSecretCap(), false)
-	assert.NotContains(t, gcloudSecret.View(), "Description", "gcloud secret ignores a description")
+	assert.Contains(t, gcloudSecret.View(), "Description", "gcloud secret offers a description (annotation-backed)")
+
+	appConfig := newAppConfigEntry(t, false, "prod")
+	assert.NotContains(t, appConfig.View(), "Description", "App Configuration has no description concept")
 }
 
 // TestEntryForm_SubmitRoutesStaged pins that a staged submit routes through the
@@ -415,6 +417,34 @@ func TestEntryForm_SubmitRoutesStaged(t *testing.T) {
 	assert.True(t, mut.staged)
 	assert.Equal(t, data.StagedKey{Name: "/app/NEW"}, mut.key)
 	assert.Equal(t, "v1", mut.value)
+}
+
+// TestEntryForm_GCloudDescriptionThreaded pins that a Google Cloud secret submit
+// carries the Description through to the mutator (annotation-backed), for both a
+// staged create and an immediate edit — the write axis of #666's gcloud support.
+func TestEntryForm_GCloudDescriptionThreaded(t *testing.T) {
+	t.Parallel()
+
+	create, createMut := newEntry(t, gcloudSecretCap(), false)
+	create.name = "my-secret"
+	create.value = "v1"
+	create.description = "app credentials"
+	create.staged = true
+
+	execCmd(t, create.submit())
+
+	assert.True(t, createMut.createCalled)
+	assert.Equal(t, "app credentials", createMut.description, "staged create threads the description")
+
+	edit, editMut := newEntry(t, gcloudSecretCap(), true)
+	edit.value = "v2"
+	edit.description = "rotated key"
+	edit.staged = false
+
+	execCmd(t, edit.submit())
+
+	assert.True(t, editMut.updateCalled)
+	assert.Equal(t, "rotated key", editMut.description, "immediate edit threads the description")
 }
 
 // TestEntryForm_EditSubmitImmediate pins an edit dialog in immediate mode routes
