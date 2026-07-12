@@ -25,6 +25,18 @@ type StagingProbe interface {
 	StagedKeys(ctx context.Context) (map[StagedKey]struct{}, error)
 }
 
+// StoreUnavailableError marks a StagingProbe failure that comes from CONSTRUCTING
+// the on-disk staging store (a keychain hard-fail / key-loss while encrypted state
+// exists), as opposed to a transient status read. This class of failure is
+// persistent and actionable, so the browser surfaces it on the error line, while
+// keeping ordinary probe read errors quiet (badges just do not show). The epic
+// requires a key-loss to be visible on the read path, not only the write path.
+type StoreUnavailableError struct{ Err error }
+
+func (e *StoreUnavailableError) Error() string { return e.Err.Error() }
+
+func (e *StoreUnavailableError) Unwrap() error { return e.Err }
+
 // stagingProbe wraps the staging StatusUseCase, mirroring the GUI's
 // StagingStatus read (strategy parser + read store).
 type stagingProbe struct {

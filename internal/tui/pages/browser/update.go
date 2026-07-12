@@ -1,12 +1,14 @@
 package browser
 
 import (
+	"errors"
 	"time"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/nav"
 )
@@ -30,9 +32,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 
 		return m, nil
 	case stagedLoadedMsg:
-		m.onStagedLoaded(msg)
-
-		return m, nil
+		return m, m.onStagedLoaded(msg)
+	case ReloadMsg:
+		return m, m.reload()
 	case namespacesLoadedMsg:
 		m.onNamespacesLoaded(msg)
 
@@ -124,15 +126,45 @@ func (m *Model) onHistoryLoaded(msg historyLoadedMsg) {
 	m.historyVersions = versionIDs(msg.rows)
 }
 
-// onStagedLoaded records the staged-key set and rebuilds the rows so badges
-// appear. A probe error is non-fatal (badges simply do not show).
-func (m *Model) onStagedLoaded(msg stagedLoadedMsg) {
-	if msg.seq != m.stagedSeq || msg.err != nil {
-		return
+// onStagedLoaded records the staged-key set, rebuilds the rows so badges appear,
+// and reports the staged count to the app for the Staging tab badge. An ordinary
+// probe read error is non-fatal (badges simply do not show), but a
+// store-construction hard-fail (a staging key-loss while encrypted state exists)
+// is surfaced on the error line so a launch-time key-loss is visible on the read
+// path, not only when the user attempts a write.
+func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
+	if msg.seq != m.stagedSeq {
+		return nil
+	}
+
+	if msg.err != nil {
+		var storeErr *data.StoreUnavailableError
+		if errors.As(msg.err, &storeErr) {
+			m.err = storeErr.Error()
+		}
+
+		return nil
 	}
 
 	m.stagedKeys = msg.keys
 	m.rebuildRows()
+
+	service := m.svcCap.Service
+	count := len(msg.keys)
+
+	return func() tea.Msg { return nav.StagedCount{Service: service, Count: count} }
+}
+
+// reload re-fetches the list and staged flags after a mutation (the app forwards
+// ReloadMsg). The list load re-issues the selection's detail/history on landing,
+// so the value and badges reflect the write.
+func (m *Model) reload() tea.Cmd {
+	cmds := []tea.Cmd{m.loadListCmd(false)}
+	if m.staging != nil {
+		cmds = append(cmds, m.loadStagedCmd())
+	}
+
+	return tea.Batch(cmds...)
 }
 
 // onNamespacesLoaded merges discovered namespaces into the header filter,
@@ -239,9 +271,103 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return true, nil
 	case key.Matches(msg, spaceKey):
 		return true, m.handleSpace()
+	case key.Matches(msg, newKey):
+		return true, m.openNew()
+	case key.Matches(msg, editKey):
+		return true, m.openEdit()
+	case key.Matches(msg, deleteKey):
+		return true, m.openDelete()
+	case key.Matches(msg, tagKey):
+		return true, m.openTag()
+	case key.Matches(msg, restoreKey):
+		return true, m.openRestore()
 	}
 
 	return false, nil
+}
+
+// openNew requests the create dialog. Creating while viewing all/multiple App
+// Configuration namespaces is blocked (a write targets one concrete namespace —
+// GUI parity); the browser surfaces the block as an error dialog.
+func (m *Model) openNew() tea.Cmd {
+	if m.svcCap.HasNamespaces && m.currentNamespace() == aznamespace.AllNamespacesFilter {
+		return func() tea.Msg {
+			return nav.OpenError{
+				Title:   "Cannot create here",
+				Message: "Select a single namespace (not *) before creating a setting.",
+			}
+		}
+	}
+
+	return func() tea.Msg {
+		return nav.OpenEntryForm{Service: m.svcCap.Service, Namespace: m.currentNamespace()}
+	}
+}
+
+// openEdit requests the edit dialog, seeded from the loaded detail (value/type/
+// description). It is a no-op until a detail is loaded.
+func (m *Model) openEdit() tea.Cmd {
+	if !m.detailOK {
+		return nil
+	}
+
+	req := nav.OpenEntryForm{
+		Service:     m.svcCap.Service,
+		Edit:        true,
+		Name:        m.detail.Name,
+		Namespace:   m.detail.Namespace,
+		Value:       m.detail.Value,
+		TypeLabel:   m.detail.TypeLabel,
+		Description: m.detail.Description,
+	}
+
+	return func() tea.Msg { return req }
+}
+
+// openDelete requests the delete-confirm dialog for the selected entry.
+func (m *Model) openDelete() tea.Cmd {
+	item, ok := m.selectedItem()
+	if !ok {
+		return nil
+	}
+
+	return func() tea.Msg {
+		return nav.OpenDelete{Service: m.svcCap.Service, Name: item.Name, Namespace: item.Namespace}
+	}
+}
+
+// openTag requests the tag add/remove dialog for the selected entry (only when
+// the service supports tags).
+func (m *Model) openTag() tea.Cmd {
+	if !m.svcCap.HasTags {
+		return nil
+	}
+
+	item, ok := m.selectedItem()
+	if !ok {
+		return nil
+	}
+
+	return func() tea.Msg {
+		return nav.OpenTag{Service: m.svcCap.Service, Name: item.Name, Namespace: item.Namespace}
+	}
+}
+
+// openRestore requests the restore dialog (name input), only when the service
+// supports restoring soft-deleted entries. The selected entry seeds the name.
+func (m *Model) openRestore() tea.Cmd {
+	if !m.svcCap.HasRestore {
+		return nil
+	}
+
+	var name string
+	if item, ok := m.selectedItem(); ok {
+		name = item.Name
+	}
+
+	return func() tea.Msg {
+		return nav.OpenRestore{Service: m.svcCap.Service, Name: name}
+	}
 }
 
 // handleNavKey drives the focused list/history widget and the enter/esc

@@ -17,6 +17,55 @@ type PopPage struct{}
 // staging page itself is a placeholder until Step 5).
 type OpenStaging struct{}
 
+// OpenEntryForm asks the app to open the create/edit dialog. Edit fixes the name
+// and seeds the value/type/description from the selected entry; create seeds only
+// the App Configuration namespace default (the concrete namespace being viewed).
+type OpenEntryForm struct {
+	Service     string
+	Edit        bool
+	Name        string
+	Namespace   string
+	Value       string
+	TypeLabel   string
+	Description string
+}
+
+// OpenDelete asks the app to open the delete-confirm dialog for the selected
+// entry.
+type OpenDelete struct {
+	Service   string
+	Name      string
+	Namespace string
+}
+
+// OpenTag asks the app to open the tag add/remove dialog for the selected entry.
+type OpenTag struct {
+	Service   string
+	Name      string
+	Namespace string
+}
+
+// OpenRestore asks the app to open the restore dialog (a name input) for a
+// soft-deleted entry.
+type OpenRestore struct {
+	Service string
+	Name    string
+}
+
+// OpenError asks the app to open a plain error dialog (a blocked operation or a
+// staging key-loss hard-fail).
+type OpenError struct {
+	Title   string
+	Message string
+}
+
+// StagedCount reports the number of staged items a browser page counted for its
+// service, so the app can total them into the Staging tab's count badge.
+type StagedCount struct {
+	Service string
+	Count   int
+}
+
 // OpenDiff asks the app to push the diff page for two versions of one entry. It
 // carries the data source and version identifiers so the app can build the diff
 // page without knowing the browser's internals.

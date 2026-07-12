@@ -52,6 +52,7 @@ func Run(ctx context.Context, scope provider.Scope, service string) error {
 		service:       service,
 		fetchIdentity: awsIdentityFetcher(ctx),
 		sourceFor:     factory.sourceFor,
+		mutatorFor:    factory.mutatorFor,
 		runCtx:        ctx,
 	})
 

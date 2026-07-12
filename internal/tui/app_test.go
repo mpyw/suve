@@ -14,6 +14,8 @@ import (
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/tui/components"
+	"github.com/mpyw/suve/internal/tui/dialogs"
+	"github.com/mpyw/suve/internal/tui/nav"
 )
 
 // awsIdentityFixture is the deterministic identity used in AWS goldens so the
@@ -37,9 +39,11 @@ func specialKey(code rune) tea.KeyPressMsg {
 }
 
 // fakeDialog is a test-only dialog that records the messages routed to it, so
-// modality (input reaching the dialog, not the page) can be asserted.
+// modality (input reaching the dialog, not the page) can be asserted. busyFlag
+// drives the dismissal-suppression path.
 type fakeDialog struct {
-	got []tea.Msg
+	got      []tea.Msg
+	busyFlag bool
 }
 
 func (d *fakeDialog) Update(msg tea.Msg) (dialog, tea.Cmd) {
@@ -49,6 +53,9 @@ func (d *fakeDialog) Update(msg tea.Msg) (dialog, tea.Cmd) {
 }
 
 func (d *fakeDialog) View() string { return "fake dialog" }
+
+// busy reports whether the dialog is mid-operation (drives dismissal suppression).
+func (d *fakeDialog) busy() bool { return d.busyFlag }
 
 // updateApp applies one message to the model and returns it as *App.
 func updateApp(t *testing.T, m *App, msg tea.Msg) *App {
@@ -117,6 +124,91 @@ func TestUpdate_DialogModality(t *testing.T) {
 	m = updateApp(t, m, specialKey(tea.KeyEscape))
 	assert.Empty(t, m.dialogs, "esc closes the dialog")
 	assert.Len(t, fd.got, 1, "esc is consumed by the close, not forwarded")
+}
+
+// TestUpdate_DialogCapturesGlobalKeys pins the Step-2 carried-over fix: while a
+// modal dialog is open, only ctrl+c stays global (force-quit); every other key —
+// q, digits, letters — is forwarded into the dialog so a focused text field
+// types normally, and does not quit or switch tabs.
+func TestUpdate_DialogCapturesGlobalKeys(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	fd := &fakeDialog{}
+	m.dialogs = []dialog{fd}
+
+	// q and 1 reach the dialog; neither quits nor switches tabs.
+	m = updateApp(t, m, keyPress('q'))
+	m = updateApp(t, m, keyPress('1'))
+
+	assert.Equal(t, 0, m.activeTab, "digits typed into a dialog do not switch tabs")
+	require.Len(t, m.dialogs, 1, "q does not quit/close the dialog")
+	assert.Len(t, fd.got, 2, "both keys were forwarded to the dialog")
+
+	// ctrl+c still force-quits even while the dialog is modal.
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	require.NotNil(t, cmd)
+	assert.IsType(t, tea.QuitMsg{}, cmd(), "ctrl+c force-quits through a modal dialog")
+}
+
+// TestUpdate_BusyDialogSuppressesDismiss pins GUI "Modal busy" parity: a busy
+// dialog is not dismissed by Esc (the key is forwarded instead); an idle dialog
+// is.
+func TestUpdate_BusyDialogSuppressesDismiss(t *testing.T) {
+	t.Parallel()
+
+	busy := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	fdBusy := &fakeDialog{busyFlag: true}
+	busy.dialogs = []dialog{fdBusy}
+
+	busy = updateApp(t, busy, specialKey(tea.KeyEscape))
+	require.Len(t, busy.dialogs, 1, "a busy dialog is not dismissed by esc")
+	assert.Len(t, fdBusy.got, 1, "esc is forwarded to the busy dialog instead of closing it")
+
+	idle := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	idle.dialogs = []dialog{&fakeDialog{}}
+	idle = updateApp(t, idle, specialKey(tea.KeyEscape))
+	assert.Empty(t, idle.dialogs, "an idle dialog is dismissed by esc")
+}
+
+// TestUpdate_StagedCountBadge pins that a staged-count report updates the Staging
+// tab's count badge, and zero clears it.
+func TestUpdate_StagedCountBadge(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+
+	m = updateApp(t, m, nav.StagedCount{Service: "param", Count: 2})
+	m = updateApp(t, m, nav.StagedCount{Service: "secret", Count: 1})
+	assert.Equal(t, "Staging(3)", stagingTabTitle(m), "the badge totals both services")
+
+	m = updateApp(t, m, nav.StagedCount{Service: "param", Count: 0})
+	m = updateApp(t, m, nav.StagedCount{Service: "secret", Count: 0})
+	assert.Equal(t, "Staging", stagingTabTitle(m), "zero clears the badge")
+}
+
+// TestUpdate_MutationDoneClosesDialog pins that a completed mutation pops the
+// dialog and voices its status.
+func TestUpdate_MutationDoneClosesDialog(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m.dialogs = []dialog{&fakeDialog{}}
+
+	m = updateApp(t, m, dialogs.MutationDoneMsg{Service: "param", Status: "Staged create."})
+	assert.Empty(t, m.dialogs, "a completed mutation closes the dialog")
+	assert.Equal(t, "Staged create.", m.status, "the outcome is voiced in the status line")
+}
+
+// stagingTabTitle returns the current Staging tab title.
+func stagingTabTitle(m *App) string {
+	for _, t := range m.tabs {
+		if t.Service == stagingService {
+			return t.Title
+		}
+	}
+
+	return ""
 }
 
 // TestUpdate_MouseClickReducesToTabSelect pins the epic's mouse rule: a tab-bar

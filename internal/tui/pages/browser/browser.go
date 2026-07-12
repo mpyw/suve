@@ -74,6 +74,13 @@ var (
 	compareKey   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "compare"))
 	stagingKey   = key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "staging"))
 	spaceKey     = key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "pick/namespace"))
+
+	// Mutation keys: open the create/edit/delete/tag/restore dialogs.
+	newKey     = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new"))
+	editKey    = key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit"))
+	deleteKey  = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete"))
+	tagKey     = key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tag"))
+	restoreKey = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "restore"))
 )
 
 // Model is the browser page.
