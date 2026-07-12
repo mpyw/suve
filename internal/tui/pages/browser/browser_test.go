@@ -299,6 +299,177 @@ func TestSelectedItemByIndexWithDuplicateNames(t *testing.T) {
 	assert.Equal(t, "prod", got.Namespace, "index 2 resolves to the prod duplicate")
 }
 
+// TestSelectionSurvivesReloadByIdentity pins #699: a mutation reload that inserts
+// a row above the selection must keep the detail on the SAME entry. Selecting
+// /zzz then reloading with /aaa inserted at the top (which shifts /zzz down one
+// index) re-resolves the selection to /zzz's new index rather than leaving the
+// clamped index pointing at the neighbor that inherited /zzz's old slot.
+func TestSelectionSurvivesReloadByIdentity(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+
+	// Initial list; select /zzz (index 1).
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+	m.list.SelectIndex(1)
+	sel, ok := m.selectedItem()
+	require.True(t, ok)
+	require.Equal(t, "/zzz", sel.Name)
+
+	// A mutation reload inserts /aaa at the top: /zzz moves from index 1 to 2.
+	_ = m.loadListCmd(false) // advance listSeq as a reload would
+	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/aaa"}, {Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+
+	got, ok := m.selectedItem()
+	require.True(t, ok)
+	assert.Equal(t, "/zzz", got.Name, "selection re-resolves to the same entry after an insert above it")
+	assert.Equal(t, 2, m.list.Selected(), "the selection index followed /zzz to its new position")
+	assert.NotNil(t, cmd, "the reload (re)loads the resolved selection's detail")
+}
+
+// TestSelectionSurvivesReloadWithDuplicateNamespaces pins that the re-resolve is
+// keyed on name+namespace, not name alone: App Configuration lists the same key
+// under several namespaces, so an insert above the selection must keep it on the
+// exact (name, namespace) pair, never collapsing onto the first same-name row.
+func TestSelectionSurvivesReloadWithDuplicateNamespaces(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: appConfigCap()})
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "app/Feature", Namespace: ""},
+		{Name: "app/Feature", Namespace: "prod"},
+	}}})
+	m.list.SelectIndex(1) // the prod duplicate
+	sel, ok := m.selectedItem()
+	require.True(t, ok)
+	require.Equal(t, "prod", sel.Namespace)
+
+	// Reload inserts a staging duplicate above prod: prod moves from 1 to 2.
+	_ = m.loadListCmd(false)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "app/Feature", Namespace: ""},
+		{Name: "app/Feature", Namespace: "staging"},
+		{Name: "app/Feature", Namespace: "prod"},
+	}}})
+
+	got, ok := m.selectedItem()
+	require.True(t, ok)
+	assert.Equal(t, "prod", got.Namespace, "selection stays on the exact (name, namespace), not the first same-name row")
+	assert.Equal(t, 2, m.list.Selected())
+}
+
+// TestSelectionSurvivesDeleteAboveSelection pins that a deletion which removes a
+// row ABOVE the selection keeps the detail on the same entry. Selecting /bbb then
+// deleting /aaa shifts /bbb from index 1 to 0; the OLD index-clamp would have held
+// index 1 and landed on /zzz, so this fails against the pre-fix behavior (#699).
+func TestSelectionSurvivesDeleteAboveSelection(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/aaa"}, {Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+	m.list.SelectIndex(1) // select /bbb
+	sel, ok := m.selectedItem()
+	require.True(t, ok)
+	require.Equal(t, "/bbb", sel.Name)
+
+	// Delete /aaa (above the selection): /bbb moves from index 1 to 0.
+	_ = m.loadListCmd(false)
+	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+
+	got, ok := m.selectedItem()
+	require.True(t, ok)
+	assert.Equal(t, "/bbb", got.Name, "selection follows /bbb after the row above it is deleted")
+	assert.Equal(t, 0, m.list.Selected())
+	assert.NotNil(t, cmd, "the resolved selection's detail (re)loads")
+}
+
+// TestSelectionFallsBackWhenSelectedDeleted pins the graceful fallback half of
+// #699: when the SELECTED entry itself is gone after a reload, the selection
+// clamps into range and the fallback detail loads; when the list drains to empty
+// the detail is cleared (no stale value, no phantom-entry data).
+func TestSelectionFallsBackWhenSelectedDeleted(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/aaa"}, {Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+	m.list.SelectIndex(1) // select /bbb
+	sel, ok := m.selectedItem()
+	require.True(t, ok)
+	require.Equal(t, "/bbb", sel.Name)
+
+	// Delete /bbb (the selected entry): it is gone, so the selection clamps.
+	_ = m.loadListCmd(false)
+	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/aaa"}, {Name: "/zzz"},
+	}}})
+
+	got, ok := m.selectedItem()
+	require.True(t, ok, "a non-empty list still has a selection")
+	assert.Equal(t, "/zzz", got.Name, "selection clamps into range when the selected entry is gone")
+	assert.NotNil(t, cmd, "the fallback selection loads its detail")
+
+	// A further reload draining the list to empty clears the detail rather than
+	// pointing it at a phantom entry.
+	m.detailOK = true // pretend a detail is currently shown
+	_ = m.loadListCmd(false)
+	m, cmd = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{}}})
+	_, ok = m.selectedItem()
+	assert.False(t, ok, "an empty list has no selection")
+	assert.False(t, m.detailOK, "the detail is cleared when nothing is selected")
+	assert.Nil(t, cmd, "an empty list issues no detail load")
+}
+
+// TestLoadMoreInFlightGuard pins #700: loadMore issues an append when a next page
+// is present, but a second loadMore fired while that append is still pending is a
+// no-op — no new fetch (listSeq does not advance), so a hammered `L` can never
+// splice a duplicate or stale page.
+func TestLoadMoreInFlightGuard(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsSecretCap()})
+
+	// A loaded page reports a real next page.
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{
+		Items: []data.Item{{Name: "prod/a"}}, NextToken: "tok",
+	}})
+	require.Equal(t, "tok", m.nextToken)
+	require.False(t, m.loading, "no fetch is in flight after the page loads")
+
+	// First loadMore issues the append and marks the fetch in flight.
+	seqBefore := m.listSeq
+	cmd := m.loadMore()
+	require.NotNil(t, cmd, "loadMore with a next page issues an append")
+	require.True(t, m.loading, "the append is now in flight")
+	require.Equal(t, seqBefore+1, m.listSeq, "the append advanced the list sequence")
+
+	// A second loadMore while the first is still pending is a no-op.
+	seqDuring := m.listSeq
+	assert.Nil(t, m.loadMore(), "a second loadMore while one is in-flight is a no-op")
+	assert.Equal(t, seqDuring, m.listSeq, "the blocked loadMore issues no fetch (no duplicate/stale splice)")
+
+	// loadMore is likewise suppressed during an ordinary (non-append) reload.
+	m2 := newModel(t, &stubSource{svcCap: awsSecretCap()})
+	m2, _ = update(t, m2, listLoadedMsg{seq: m2.listSeq, res: data.ListResult{
+		Items: []data.Item{{Name: "prod/a"}}, NextToken: "tok",
+	}})
+	_ = m2.loadListCmd(false) // a filter/mutation reload is now in flight
+	require.True(t, m2.loading)
+	assert.Nil(t, m2.loadMore(), "loadMore is a no-op while a full reload is pending")
+}
+
 // TestStagingJump pins that S emits the OpenStaging navigation request.
 func TestStagingJump(t *testing.T) {
 	t.Parallel()
