@@ -8,11 +8,11 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 	"github.com/mpyw/suve/internal/version/azurekvversion"
 	"github.com/mpyw/suve/internal/version/gcloudversion"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // Per-provider version-spec parsing.
