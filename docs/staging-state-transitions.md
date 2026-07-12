@@ -17,7 +17,7 @@ The staging system manages two types of state:
 | State | Description |
 |-------|-------------|
 | `NotStaged` | No pending changes for this resource |
-| `Create` | Resource will be created (doesn't exist in AWS) |
+| `Create` | Resource will be created (doesn't exist on the remote) |
 | `Update` | Resource value will be modified |
 | `Delete` | Resource will be deleted |
 
@@ -27,18 +27,18 @@ The staging system manages two types of state:
 stateDiagram-v2
     [*] --> NotStaged
 
-    NotStaged --> Create: add (resource NOT in AWS)
-    NotStaged --> Update: edit (value != AWS)
-    NotStaged --> NotStaged: edit (value = AWS) [auto-skip]
-    NotStaged --> Delete: delete (resource in AWS)
+    NotStaged --> Create: add (resource NOT on remote)
+    NotStaged --> Update: edit (value != remote)
+    NotStaged --> NotStaged: edit (value = remote) [auto-skip]
+    NotStaged --> Delete: delete (resource on remote)
 
     Create --> Create: add (update draft)
     Create --> Create: edit (update draft)
     Create --> NotStaged: delete [also unstage tags]
     Create --> NotStaged: reset
 
-    Update --> Update: edit (value != AWS)
-    Update --> NotStaged: edit (value = AWS) [auto-unstage]
+    Update --> Update: edit (value != remote)
+    Update --> NotStaged: edit (value = remote) [auto-unstage]
     Update --> Delete: delete
     Update --> NotStaged: reset
 
@@ -46,9 +46,9 @@ stateDiagram-v2
     Delete --> Delete: delete [no-op]
 
     note right of NotStaged
-        add (resource in AWS) -> ERROR
-        delete (resource NOT in AWS) -> ERROR
-        tag/untag (resource NOT in AWS) -> ERROR
+        add (resource on remote) -> ERROR
+        delete (resource NOT on remote) -> ERROR
+        tag/untag (resource NOT on remote) -> ERROR
     end note
 
     note right of Delete
@@ -62,20 +62,20 @@ stateDiagram-v2
 
 | Current State | Action | Condition | New State | Notes |
 |---------------|--------|-----------|-----------|-------|
-| NotStaged | `add` | resource NOT in AWS | Create | Stage new resource |
-| NotStaged | `add` | resource in AWS | **ERROR** | Use `edit` instead |
-| NotStaged | `edit` | value != AWS | Update | Stage modification |
-| NotStaged | `edit` | value = AWS | NotStaged | Auto-skip (no change needed) |
-| NotStaged | `delete` | resource in AWS | Delete | Stage deletion |
-| NotStaged | `delete` | resource NOT in AWS | **ERROR** | Resource doesn't exist |
-| NotStaged | `tag/untag` | resource NOT in AWS | **ERROR** | Resource doesn't exist |
+| NotStaged | `add` | resource NOT on remote | Create | Stage new resource |
+| NotStaged | `add` | resource on remote | **ERROR** | Use `edit` instead |
+| NotStaged | `edit` | value != remote | Update | Stage modification |
+| NotStaged | `edit` | value = remote | NotStaged | Auto-skip (no change needed) |
+| NotStaged | `delete` | resource on remote | Delete | Stage deletion |
+| NotStaged | `delete` | resource NOT on remote | **ERROR** | Resource doesn't exist |
+| NotStaged | `tag/untag` | resource NOT on remote | **ERROR** | Resource doesn't exist |
 | Create | `add` | - | Create | Update draft value |
 | Create | `edit` | - | Create | Update draft value |
 | Create | `delete` | - | NotStaged | Unstage + discard tags |
 | Create | `reset` | - | NotStaged | Unstage only |
 | Create | `tag/untag` | - | HasChanges | Tags apply on resource creation |
-| Update | `edit` | value != AWS | Update | Update draft value |
-| Update | `edit` | value = AWS | NotStaged | Auto-unstage (reverted) |
+| Update | `edit` | value != remote | Update | Update draft value |
+| Update | `edit` | value = remote | NotStaged | Auto-unstage (reverted) |
 | Update | `delete` | - | Delete | Convert to delete |
 | Update | `reset` | - | NotStaged | Unstage |
 | Delete | `edit` | - | **ERROR** | Must reset first |
@@ -86,20 +86,20 @@ stateDiagram-v2
 ### Special Behaviors
 
 #### Auto-Skip
-When editing a resource that is not staged, if the new value matches the current AWS value, the operation is skipped entirely (no staging occurs).
+When editing a resource that is not staged, if the new value matches the current remote value, the operation is skipped entirely (no staging occurs).
 
 ```
-AWS value: "foo"
--> edit "foo" -> Skipped (same as AWS)
+remote value: "foo"
+-> edit "foo" -> Skipped (same as remote)
 ```
 
 #### Auto-Unstage
-When editing a staged resource, if the new value matches the current AWS value, the resource is automatically unstaged.
+When editing a staged resource, if the new value matches the current remote value, the resource is automatically unstaged.
 
 ```
-AWS value: "foo"
+remote value: "foo"
 -> edit "bar" -> Update staged (value="bar")
--> edit "foo" -> Unstaged (reverted to AWS)
+-> edit "foo" -> Unstaged (reverted to remote)
 ```
 
 #### Tag Cascade on Create Delete
@@ -112,13 +112,13 @@ When a `Create`-staged resource is deleted (unstaged), any associated tag change
 ```
 
 #### Resource Existence Checks
-Before staging operations, suve validates that the resource state in AWS is compatible with the requested action:
+Before staging operations, suve validates that the resource state on the remote is compatible with the requested action:
 
 | Action | Requirement | Error |
 |--------|-------------|-------|
-| `add` | Resource must NOT exist in AWS | "cannot add: resource already exists, use edit instead" |
-| `delete` | Resource must exist in AWS (or be staged as Create) | "cannot delete: resource not found" |
-| `tag/untag` | Resource must exist in AWS (or be staged as Create) | "cannot tag/untag: resource not found" |
+| `add` | Resource must NOT exist on the remote | "cannot add: resource already exists, use edit instead" |
+| `delete` | Resource must exist on the remote (or be staged as Create) | "cannot delete: resource not found" |
+| `tag/untag` | Resource must exist on the remote (or be staged as Create) | "cannot tag/untag: resource not found" |
 
 This prevents common mistakes like:
 ```
@@ -144,17 +144,17 @@ For staged `Create` resources, `delete` unstages instead of erroring, and `tag/u
 stateDiagram-v2
     [*] --> Empty
 
-    Empty --> HasChanges: tag (value != AWS)
-    Empty --> Empty: tag (value = AWS) [auto-skip]
-    Empty --> HasChanges: untag (key exists on AWS)
-    Empty --> Empty: untag (key not on AWS) [auto-skip]
+    Empty --> HasChanges: tag (value != remote)
+    Empty --> Empty: tag (value = remote) [auto-skip]
+    Empty --> HasChanges: untag (key exists on remote)
+    Empty --> Empty: untag (key not on remote) [auto-skip]
 
     HasChanges --> HasChanges: tag (add/update)
     HasChanges --> HasChanges: untag
     HasChanges --> Empty: all changes cleared [auto-unstage]
 
     note right of Empty
-        Resource NOT in AWS
+        Resource NOT on remote
         AND NOT staged as Create
         -> ERROR for tag/untag
     end note
@@ -174,12 +174,12 @@ Tags are tracked with two sets:
 
 | Action | Condition | Result |
 |--------|-----------|--------|
-| `tag key=value` | key not in AWS or value differs | Add to ToSet |
-| `tag key=value` | key in AWS with same value | Auto-skip |
+| `tag key=value` | key not on remote or value differs | Add to ToSet |
+| `tag key=value` | key on remote with same value | Auto-skip |
 | `tag key=value` | key in ToUnset | Remove from ToUnset, add to ToSet |
-| `untag key` | key exists in AWS | Add to ToUnset |
-| `untag key` | key not in AWS | Auto-skip |
-| `untag key` | key in ToSet | Remove from ToSet, add to ToUnset if in AWS |
+| `untag key` | key exists on remote | Add to ToUnset |
+| `untag key` | key not on remote | Auto-skip |
+| `untag key` | key in ToSet | Remove from ToSet, add to ToUnset if on remote |
 
 ### Delete-Staged Restriction
 
@@ -192,13 +192,13 @@ Tag operations (`tag`/`untag`) are blocked when the entry is staged for deletion
 
 ## Conflict Detection
 
-When applying changes, suve checks for conflicts by comparing the `BaseModifiedAt` timestamp (recorded at staging time) with the current AWS `LastModified` time.
+When applying changes, suve checks for conflicts by comparing the `BaseModifiedAt` timestamp (recorded at staging time) with the current remote `LastModified` time.
 
 | Operation | Conflict Condition |
 |-----------|-------------------|
-| Create | Resource now exists in AWS |
-| Update | AWS modified after staging |
-| Delete | AWS modified after staging |
+| Create | Resource now exists on the remote |
+| Update | Remote modified after staging |
+| Delete | Remote modified after staging |
 
 Use `--ignore-conflicts` to force apply despite conflicts.
 
