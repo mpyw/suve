@@ -4,6 +4,7 @@ package tui
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -266,6 +267,37 @@ func TestStaging_ApplyResultsGolden(t *testing.T) { //nolint:paralleltest // gol
 
 	// Focus Apply (row 1) and confirm to reach the results view.
 	raw := captureDialogWithKeys(t, newDialogHost(d, nil), "Apply results",
+		keyDownMsg(), keyEnterMsg())
+	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+}
+
+// TestStaging_ApplyResultsScrollableGolden pins the #687 fix: an apply result set
+// taller than the terminal is capped into a scrollable viewport with the title and
+// close hint pinned — so the tail and the hint are never clipped off-screen. The
+// 40-entry body cannot fit the 30-row golden terminal, so the frame shows the
+// viewport-capped head plus the pinned "scroll · enter/esc: close" hint.
+func TestStaging_ApplyResultsScrollableGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	entries := make([]data.ApplyEntryResult, 40)
+	for i := range entries {
+		entries[i] = data.ApplyEntryResult{Name: fmt.Sprintf("/app/web/PARAM_%02d", i), Status: "updated"}
+	}
+
+	svc := &goldenStaging{
+		service: "param", label: "Param",
+		applyResult: data.StagingApplyResult{ServiceLabel: "Param", Entries: entries},
+	}
+
+	// TargetLine is omitted: it appears only on the confirm view, and this golden
+	// captures the results view.
+	d := dialogs.NewApply(dialogs.ApplyInput{
+		Ctx: context.Background(), Targets: []data.StagingService{svc},
+		Title: "Apply staged changes — Param", EntryCount: len(entries), Styles: styles.New(),
+	})
+
+	// Focus Apply (row 1) and confirm to reach the results view.
+	raw := captureDialogWithKeys(t, newDialogHost(d, nil), "enter/esc: close",
 		keyDownMsg(), keyEnterMsg())
 	golden.RequireEqual(t, renderVisibleScreen(t, raw))
 }
