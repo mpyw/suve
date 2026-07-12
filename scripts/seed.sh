@@ -88,7 +88,7 @@ seed_aws_param() {
   run aws param tag /suve-demo/app/database-url env=production team=payments managed-by=suve
 
   run aws param create /suve-demo/app/database-password "correct-horse-battery-staple" --secure --description "DB password (rotated quarterly)"
-  run aws param update --yes /suve-demo/app/database-password "Tr0ub4dour-and-3-more"
+  run aws param update --yes /suve-demo/app/database-password "Tr0ub4dour-and-3-more" --secure
   run aws param tag /suve-demo/app/database-password rotation=90d env=production
 
   run aws param create /suve-demo/app/feature-flags "beta,dark-mode" --type StringList --description "Enabled feature flags"
