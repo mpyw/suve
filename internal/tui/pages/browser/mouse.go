@@ -70,18 +70,21 @@ func wheelDelta(button tea.MouseButton) int {
 }
 
 // listLine maps a screen point to a 0-based list content line, or (0, false)
-// when the point is outside the list content region.
+// when the point is outside the list content region. The right-edge bound
+// (x < g.listRight) keeps the list from claiming the detail pane, which shares
+// its vertical band in the two-pane layout.
 func (g geom) listLine(x, y int) (int, bool) {
-	if x < g.listLeft || y < g.listTop || y >= g.listTop+g.listRows {
+	if x < g.listLeft || x >= g.listRight || y < g.listTop || y >= g.listTop+g.listRows {
 		return 0, false
 	}
 
 	return y - g.listTop, true
 }
 
-// historyLine maps a screen point to a 0-based history content line.
+// historyLine maps a screen point to a 0-based history content line, bounded on
+// all four sides so a point outside the drawn history content never maps in.
 func (g geom) historyLine(x, y int) (int, bool) {
-	if x < g.historyLeft || y < g.historyTop || y >= g.historyTop+g.historyRows {
+	if x < g.historyLeft || x >= g.historyRight || y < g.historyTop || y >= g.historyTop+g.historyRows {
 		return 0, false
 	}
 

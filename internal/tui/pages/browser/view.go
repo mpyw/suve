@@ -113,6 +113,7 @@ func (m *Model) renderListPane(width, height, paneTop, paneLeft int) string {
 
 	m.geom.listTop = paneTop + paneContentTop
 	m.geom.listLeft = paneLeft + paneBorderLeft
+	m.geom.listRight = m.geom.listLeft + innerW
 	m.geom.listRows = innerH
 
 	title := "entries (" + strconv.Itoa(m.list.Len()) + ")"
@@ -135,6 +136,7 @@ func (m *Model) renderDetailPane(width, height, paneTop, paneLeft int) string {
 	// History content sits at: pane top + border + title + lines before history.
 	m.geom.historyTop = paneTop + paneContentTop + historyLocalTop
 	m.geom.historyLeft = paneLeft + paneBorderLeft
+	m.geom.historyRight = m.geom.historyLeft + innerW
 	m.geom.historyRows = historyRows
 
 	return components.Pane(m.styles, title, body, width, height)

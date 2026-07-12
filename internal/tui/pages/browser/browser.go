@@ -142,14 +142,20 @@ type Model struct {
 }
 
 // geom records where the list and history content sit in page-local coordinates
-// after the last View, so mouse handlers hit-test the drawn layout.
+// after the last View, so mouse handlers hit-test the drawn layout. Each region
+// is bounded on all four sides: left/right columns and top/rows. The right edge
+// matters because in the two-pane layout the list sits to the LEFT of the detail
+// pane and shares its vertical band with the value/meta/history content — without
+// a right edge the list would swallow every wheel/click aimed at the detail pane.
 type geom struct {
-	listTop     int
-	listLeft    int
-	listRows    int
-	historyTop  int
-	historyLeft int
-	historyRows int
+	listTop      int
+	listLeft     int
+	listRight    int // exclusive right column of the list content
+	listRows     int
+	historyTop   int
+	historyLeft  int
+	historyRight int // exclusive right column of the history content
+	historyRows  int
 }
 
 // New builds a browser page over a data source. ctx is the Run context threaded
