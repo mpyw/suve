@@ -30,6 +30,8 @@ type resetResultsMsg struct {
 // fans out one ResetUseCase per target and voices the aggregated outcome. While
 // busy it swallows input and reports Busy() so the shell suppresses dismissal.
 type resetDialog struct {
+	dialogLayout
+
 	ctx     context.Context //nolint:containedctx // the reset command needs the Run context; mirrors the browser
 	targets []data.StagingService
 	title   string
@@ -66,6 +68,10 @@ func (d *resetDialog) Busy() bool { return d.busy }
 
 func (d *resetDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		d.setSize(msg)
+
+		return d, nil
 	case resetResultsMsg:
 		d.busy = false
 
@@ -134,7 +140,7 @@ func (d *resetDialog) resetCmd() tea.Cmd {
 func (d *resetDialog) View() string {
 	var b strings.Builder
 
-	b.WriteString(d.styles.PaneTitle.Render(d.title))
+	b.WriteString(d.fit(d.styles.PaneTitle.Render(d.title)))
 	b.WriteString("\n\n")
 
 	if d.busy {
@@ -143,7 +149,7 @@ func (d *resetDialog) View() string {
 		return b.String()
 	}
 
-	b.WriteString("Unstage every staged change for the target(s)?\n\n")
+	b.WriteString(d.fit("Unstage every staged change for the target(s)?") + "\n\n")
 	b.WriteString(d.resetRow(ctrlReset, d.styles.ErrorText.Render("[ Reset ]")) + "    " +
 		d.resetRow(ctrlResetCancel, "[ Cancel ]"))
 	b.WriteString("\n\n")

@@ -30,13 +30,41 @@ func capFor(prov, service string) capability.ServiceCapability {
 	return sc
 }
 
-// staticProbe is a test staging probe returning a fixed staged-key set, so a
-// golden can exercise the [staged] badge and the staged-changes banner without a
-// keychain.
-type staticProbe struct{ keys map[data.StagedKey]struct{} }
+// staticProbe is a test staging probe returning a fixed staged snapshot, so a
+// golden can exercise the [staged] badge, the staged-changes banner, and the
+// delete-staged affordance gate without a keychain. deleteKeys/entryKeys/tagKeys
+// and entryCount/tagCount are optional; when both counts are left zero they
+// default to one staged entry per key, and when neither entryKeys nor tagKeys is
+// set every key defaults to an entry (value) change — so an existing golden that
+// sets only keys keeps its Staging(n) badge and its value-change banner.
+type staticProbe struct {
+	keys       map[data.StagedKey]struct{}
+	deleteKeys map[data.StagedKey]struct{}
+	entryKeys  map[data.StagedKey]struct{}
+	tagKeys    map[data.StagedKey]struct{}
+	entryCount int
+	tagCount   int
+}
 
-func (p staticProbe) StagedKeys(context.Context) (map[data.StagedKey]struct{}, error) {
-	return p.keys, nil
+func (p staticProbe) Staged(context.Context) (data.StagingSnapshot, error) {
+	entryCount, tagCount := p.entryCount, p.tagCount
+	if entryCount == 0 && tagCount == 0 {
+		entryCount = len(p.keys)
+	}
+
+	entryKeys, tagKeys := p.entryKeys, p.tagKeys
+	if entryKeys == nil && tagKeys == nil {
+		entryKeys = p.keys
+	}
+
+	return data.StagingSnapshot{
+		Keys:       p.keys,
+		DeleteKeys: p.deleteKeys,
+		EntryKeys:  entryKeys,
+		TagKeys:    tagKeys,
+		EntryCount: entryCount,
+		TagCount:   tagCount,
+	}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +132,80 @@ func awsParamDiffSource() data.Source {
 				Type:    domain.ValueTypePlaintext,
 				Version: domain.Version{ID: ref.ID()},
 			}, nil
+		},
+	}
+
+	return data.NewParamSource(capFor("aws", "param"), func(context.Context, string) (provider.Store, error) {
+		return store, nil
+	})
+}
+
+// secureStringDiffValue is a SecureString param's value the diff golden must
+// NEVER render revealed — masking keys off the value type, not the service.
+// Its length differs from the old value so the masked bullet runs differ,
+// proving a change WITHOUT revealing content (below the 24-bullet mask cap).
+const secureStringDiffValue = "db-secret-password-v2"
+
+// secureStringDiffOldValue is the older SecureString value, also never revealed.
+const secureStringDiffOldValue = "db-pass-old"
+
+// awsParamSecureStringDiffSource is a param source whose value is a
+// SecureString (secret) value type. Its two versions differ, so a naive diff
+// would leak both cleartext values; the diff page must mask both sides because
+// DiffContent.Secret is set from the value type (#677).
+func awsParamSecureStringDiffSource() data.Source {
+	values := map[string]string{
+		"13": secureStringDiffOldValue,
+		"14": secureStringDiffValue,
+	}
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(specID(spec)), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:    name,
+				Value:   values[ref.ID()],
+				Type:    domain.ValueTypeSecret,
+				Version: domain.Version{ID: ref.ID()},
+			}, nil
+		},
+	}
+
+	return data.NewParamSource(capFor("aws", "param"), func(context.Context, string) (provider.Store, error) {
+		return store, nil
+	})
+}
+
+// awsParamJSONSource is a param source whose single entry holds a NON-SECRET
+// compact JSON value, so the browser detail value pane's parse-JSON toggle (`J`)
+// has something to pretty-print (#690). Plaintext (not a SecureString) so the
+// value is unmasked and `J` applies without a reveal first.
+func awsParamJSONSource() data.Source {
+	const value = `{"host":"db.internal","port":5432,"tls":true}`
+
+	store := &providermock.Store{
+		ListFunc: func(context.Context) ([]string, error) { return []string{"/app/web/CONFIG"}, nil },
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(specID(spec)), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			id := ref.ID()
+			if id == "" {
+				id = "3"
+			}
+
+			return &domain.Entry{
+				Name:     name,
+				Value:    value,
+				Type:     domain.ValueTypePlaintext,
+				Version:  domain.Version{ID: id, Created: &fxT1},
+				Modified: &fxT1,
+			}, nil
+		},
+		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
+			return []domain.Version{{ID: "3", Created: &fxT1}}, nil
 		},
 	}
 

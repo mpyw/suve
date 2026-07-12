@@ -124,6 +124,24 @@ func newEntry(t *testing.T, svcCap capability.ServiceCapability, edit bool) (*en
 	return d, mut
 }
 
+// newStagedOnlyEntry builds a staged-only edit form (the staging review page's
+// edit path): the mode toggle is hidden and the write is forced staged.
+func newStagedOnlyEntry(t *testing.T, svcCap capability.ServiceCapability) *entryForm {
+	t.Helper()
+
+	mut := &fakeMutator{svcCap: svcCap}
+
+	m, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: svcCap.Service, Styles: styles.New(),
+		Edit: true, Name: "/app/X", Value: "old", StagedOnly: true,
+	})
+
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+
+	return d
+}
+
 // execCmd runs a command for its side effect on the recording mutator.
 func execCmd(t *testing.T, cmd tea.Cmd) {
 	t.Helper()
@@ -142,6 +160,103 @@ func TestEntryForm_StagedByDefault(t *testing.T) {
 
 	immediate, _ := newEntry(t, noStagingParamCap(), false)
 	assert.False(t, immediate.staged, "without staging the write is always immediate")
+}
+
+// TestEntryForm_StagedOnlyHidesModeToggle pins the #679 fix: a dialog launched
+// from a staged-only surface (the staging review page) hides the Stage/Apply-
+// immediately mode toggle and forces a staged write, so the review screen offers
+// no immediate-write escape hatch that would bypass the staging store. A default
+// (browser) launch still shows the toggle.
+func TestEntryForm_StagedOnlyHidesModeToggle(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+
+	browser, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		Edit: true, Name: "/app/X", Value: "old",
+	})
+	b, ok := browser.(*entryForm)
+	require.True(t, ok)
+	assert.True(t, b.staged, "browser launch defaults to staged")
+	assert.Contains(t, b.View(), "Apply immediately", "browser launch keeps the mode toggle")
+
+	staged, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		Edit: true, Name: "/app/X", Value: "old", StagedOnly: true,
+	})
+	s, ok := staged.(*entryForm)
+	require.True(t, ok)
+	assert.True(t, s.staged, "a staged-only launch forces staged")
+	assert.NotContains(t, s.View(), "Apply immediately", "a staged-only launch hides the mode toggle")
+
+	// The forced-staged write still routes through the staging path.
+	execCmd(t, s.submit())
+	assert.True(t, mut.staged, "a staged-only submit writes staged, never immediate")
+}
+
+// TestTagForm_StagedOnlyHidesModeToggle pins the #679 fix for the tag dialog: a
+// staged-only launch hides the mode toggle and forces a staged tag write; a
+// browser launch keeps the toggle.
+func TestTagForm_StagedOnlyHidesModeToggle(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+
+	browser, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+	})
+	b, ok := browser.(*tagForm)
+	require.True(t, ok)
+	assert.True(t, b.staged, "browser launch defaults to staged")
+	assert.Contains(t, b.View(), "Apply immediately", "browser launch keeps the mode toggle")
+
+	staged, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		Name: "/app/X", StagedOnly: true,
+	})
+	s, ok := staged.(*tagForm)
+	require.True(t, ok)
+	assert.True(t, s.staged, "a staged-only launch forces staged")
+	assert.NotContains(t, s.View(), "Apply immediately", "a staged-only launch hides the mode toggle")
+
+	s.tagKey = "owner"
+	execCmd(t, s.submit())
+	assert.True(t, mut.staged, "a staged-only submit writes staged, never immediate")
+}
+
+// TestEntryForm_CreateNameRejectsDeleteStaged pins the create-name client-side
+// validation half of #692: the name field's validator rejects a name that is
+// already staged for deletion with an inline friendly message, so the write never
+// reaches the reducer's raw post-submit "cannot add to delete-staged" error. The
+// key is (name, namespace), so a same-name entry under a different namespace does
+// not collide, and a required-name error still fires for an empty name.
+func TestEntryForm_CreateNameRejectsDeleteStaged(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+
+	m, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		DeleteStagedKeys: map[data.StagedKey]struct{}{{Name: "/app/doomed"}: {}},
+	})
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+
+	validate := d.nameValidator()
+
+	err := validate("/app/doomed")
+	require.Error(t, err, "a delete-staged name is rejected client-side")
+	assert.Contains(t, err.Error(), "staged for deletion", "the message names the reason")
+
+	require.NoError(t, validate("/app/fresh"), "a name that is not delete-staged is accepted")
+	require.Error(t, validate(""), "the required-name check still fires")
+
+	// The key is (name, namespace): the same name under a different namespace is
+	// not the delete-staged (empty-namespace) key, so it is accepted.
+	d.namespace = "other"
+
+	require.NoError(t, validate("/app/doomed"), "a same-name entry under a different namespace does not collide")
 }
 
 // newAppConfigEntry builds an App Configuration (namespaced) create/edit form
@@ -183,19 +298,19 @@ func TestEntryForm_NamespaceReadOnlyOnEdit(t *testing.T) {
 	assert.Equal(t, "(default)", namespaceDisplay(""))
 }
 
-// TestEntryForm_TypeSelectGating pins the Type select is offered only for the
-// typed AWS SSM param service (App Configuration is untyped; secret has none)
-// AND only in immediate mode: containment for #664, since the staged path drops
-// the value type (staging apply hardcodes a plaintext String), so a staged
-// SecureString would silently downgrade to plaintext. Staged mode must not
-// present a Type control that can't take effect.
+// TestEntryForm_TypeSelectGating pins the Type select is offered for the typed
+// AWS SSM param service (App Configuration is untyped; secret has none) in BOTH
+// modes: the value type flows through the staged path as well as the immediate
+// path (the #664 fix), so the select is reachable regardless of the mode toggle
+// — where it was previously hidden in staged mode as a #664 containment. It must
+// stay absent for the untyped services.
 func TestEntryForm_TypeSelectGating(t *testing.T) {
 	t.Parallel()
 
 	awsParam, _ := newEntry(t, awsParamCap(), false)
 	require.True(t, awsParam.staged, "AWS param defaults to staged")
-	assert.False(t, awsParam.showType(), "staged mode hides the Type select (#664 containment)")
-	assert.NotContains(t, awsParam.View(), "Type", "staged form draws no Type row")
+	assert.True(t, awsParam.showType(), "staged mode still offers the Type select")
+	assert.Contains(t, awsParam.View(), "Type", "the staged form draws the Type row (default mode)")
 
 	awsParam.staged = false
 	require.NotNil(t, awsParam.rebuildForm())
@@ -203,14 +318,65 @@ func TestEntryForm_TypeSelectGating(t *testing.T) {
 	assert.Contains(t, awsParam.View(), "Type", "immediate form draws the Type row")
 
 	appConfig, _ := newEntry(t, appConfigCap(), false)
+	assert.False(t, appConfig.showType(), "App Configuration is untyped in either mode")
 	appConfig.staged = false
 	require.NotNil(t, appConfig.rebuildForm())
-	assert.False(t, appConfig.showType(), "App Configuration is untyped even in immediate mode")
+	assert.False(t, appConfig.showType(), "App Configuration is untyped in either mode")
 
 	secret, _ := newEntry(t, awsSecretCap(), false)
+	assert.False(t, secret.showType(), "secret has no value type in either mode")
 	secret.staged = false
 	require.NotNil(t, secret.rebuildForm())
-	assert.False(t, secret.showType(), "secret has no value type even in immediate mode")
+	assert.False(t, secret.showType(), "secret has no value type in either mode")
+
+	// A staged-only surface (the staging review page's edit) hides the Type select:
+	// the write is always a staged edit that preserves the existing type, and the
+	// dialog cannot seed the entry's current type.
+	stagedOnly := newStagedOnlyEntry(t, awsParamCap())
+	assert.False(t, stagedOnly.showType(), "a staged-only edit hides the Type select")
+	assert.NotContains(t, stagedOnly.View(), "Type", "a staged-only edit draws no Type row")
+}
+
+// TestEntryForm_StagedCarriesType pins that a staged param create routes the
+// selected value type (e.g. SecureString) through to the mutator — the TUI half
+// of the #664/#680 fix. Previously the staged path dropped the type, silently
+// creating the parameter as plaintext String.
+func TestEntryForm_StagedCarriesType(t *testing.T) {
+	t.Parallel()
+
+	d, mut := newEntry(t, awsParamCap(), false)
+	d.name = "/app/SECRET"
+	d.value = "s3cr3t"
+	d.valueType = "SecureString"
+	d.staged = true
+
+	execCmd(t, d.submit())
+
+	assert.True(t, mut.createCalled)
+	assert.True(t, mut.staged, "the write is staged")
+	assert.Equal(t, "SecureString", mut.typeLabel, "the staged create carries the selected type")
+}
+
+// TestEntryForm_StagedOnlyEditPreservesType pins that a staged-only edit (the
+// staging review page's edit, which shows no Type control and cannot seed the
+// entry's current type) submits an EMPTY type label. An empty label preserves the
+// existing staged/cloud type in the staging apply, so re-editing a staged
+// SecureString from the review page never silently downgrades it to plaintext —
+// the failure this would otherwise reintroduce once the Type select is reachable.
+func TestEntryForm_StagedOnlyEditPreservesType(t *testing.T) {
+	t.Parallel()
+
+	d := newStagedOnlyEntry(t, awsParamCap())
+	d.value = "new"
+
+	mut, ok := d.mutator.(*fakeMutator)
+	require.True(t, ok)
+
+	execCmd(t, d.submit())
+
+	assert.True(t, mut.updateCalled)
+	assert.True(t, mut.staged, "a staged-only edit is staged")
+	assert.Empty(t, mut.typeLabel, "a staged-only edit passes no type, so the existing type is preserved")
 }
 
 // TestEntryForm_DescriptionGating pins that the Description field is drawn only
@@ -373,6 +539,40 @@ func TestEntryForm_ResultVoicing(t *testing.T) {
 	assert.Contains(t, entryStatus(true, true, data.WriteOutcome{Unstaged: true}), "auto-unstaged")
 	assert.Equal(t, "Staged update.", entryStatus(true, true, data.WriteOutcome{}))
 	assert.Equal(t, "Applied create.", entryStatus(false, false, data.WriteOutcome{}))
+	// #691: an immediate create that upserted onto an existing entry voices an
+	// update, matching the GUI/CLI create-or-update semantics.
+	assert.Equal(t, "Applied update.", entryStatus(false, false, data.WriteOutcome{Updated: true}))
+}
+
+// TestEntryForm_ImmediateCreateUpsertVoicesUpdate pins the #691 fix at the dialog
+// layer: when an immediate param create upserts onto an existing entry, the
+// mutator reports WriteOutcome{Updated: true}; the dialog must voice "Applied
+// update." (never surface the raw already-exists error) and emit MutationDoneMsg.
+func TestEntryForm_ImmediateCreateUpsertVoicesUpdate(t *testing.T) {
+	t.Parallel()
+
+	d, mut := newEntry(t, awsParamCap(), false)
+	d.name = "/app/EXISTS"
+	d.value = "new"
+	d.staged = false
+	// The data layer upserted onto an existing param: create fell back to update.
+	mut.outcome = data.WriteOutcome{Updated: true}
+
+	// Run the create submit and feed its result back through Update (the real loop).
+	cmd := d.submit()
+	require.NotNil(t, cmd)
+
+	m, done := d.Update(cmd())
+
+	dd, ok := m.(*entryForm)
+	require.True(t, ok)
+	assert.True(t, mut.createCalled, "an immediate create routes through Create")
+	assert.False(t, mut.staged, "the write is immediate")
+	assert.Empty(t, dd.err, "no raw already-exists error is surfaced")
+
+	msg, ok := done().(MutationDoneMsg)
+	require.True(t, ok, "a successful upsert emits MutationDoneMsg")
+	assert.Equal(t, "Applied update.", msg.Status, "an upsert voices an update, not a create")
 }
 
 // TestDeleteConfirm_ForceRecoveryGating pins that force/recovery rows appear only

@@ -11,11 +11,11 @@ import (
 )
 
 // fakeCopyPage is a page that supplies a copy value (and records that CopyText
-// revealed it), so the app-level `y` wiring can be asserted without a real
+// was consulted), so the app-level `y` wiring can be asserted without a real
 // browser page or an async load.
 type fakeCopyPage struct {
-	text     string
-	revealed bool
+	text       string
+	copyCalled bool
 }
 
 func (p *fakeCopyPage) Update(tea.Msg) (page, tea.Cmd) { return p, nil }
@@ -23,7 +23,7 @@ func (p *fakeCopyPage) View(int, int) string           { return "" }
 func (p *fakeCopyPage) capturesInput() bool            { return false }
 
 func (p *fakeCopyPage) CopyText() (string, bool) {
-	p.revealed = true
+	p.copyCalled = true
 	if p.text == "" {
 		return "", false
 	}
@@ -58,7 +58,7 @@ func TestApp_CopyWritesActivePageValue(t *testing.T) {
 
 	assert.True(t, called, "y copies the active page's value")
 	assert.Equal(t, "s3cr3t", copied)
-	assert.True(t, fp.revealed, "CopyText reveals before returning — never copies a masked value")
+	assert.True(t, fp.copyCalled, "the app consults the active page's CopyText for the `y` copy")
 
 	// An empty value must not reach the clipboard (an OSC52 with "" clears it).
 	called = false

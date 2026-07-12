@@ -226,6 +226,120 @@ func TestParamStrategy_Apply(t *testing.T) {
 	})
 }
 
+// TestParamStrategy_Apply_ValueType covers #664: a staged param create/update
+// must apply with the staged value type instead of a hardcoded plaintext String.
+func TestParamStrategy_Apply_ValueType(t *testing.T) {
+	t.Parallel()
+
+	t.Run("create operation - SecureString applies as SecureString", func(t *testing.T) {
+		t.Parallel()
+
+		var gotType domain.ValueType
+
+		mock := &providermock.Store{
+			CreateFunc: func(
+				_ context.Context, name, value string, valueType domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				gotType = valueType
+
+				assert.Equal(t, "/app/secure", name)
+				assert.Equal(t, "secret-value", value)
+
+				return domain.Version{ID: "1"}, nil
+			},
+		}
+
+		s := staging.NewAWSParamStrategy(mock)
+		err := s.Apply(t.Context(), "/app/secure", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("secret-value"),
+			ValueType: domain.ValueTypeSecret,
+		})
+		require.NoError(t, err)
+		// The staged SecureString must NOT be silently downgraded to plaintext (#664).
+		assert.Equal(t, domain.ValueTypeSecret, gotType)
+	})
+
+	t.Run("create operation - StringList applies as StringList", func(t *testing.T) {
+		t.Parallel()
+
+		var gotType domain.ValueType
+
+		mock := &providermock.Store{
+			CreateFunc: func(
+				_ context.Context, _, _ string, valueType domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				gotType = valueType
+
+				return domain.Version{ID: "1"}, nil
+			},
+		}
+
+		s := staging.NewAWSParamStrategy(mock)
+		err := s.Apply(t.Context(), "/app/list", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("a,b,c"),
+			ValueType: domain.ValueTypeList,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, domain.ValueTypeList, gotType)
+	})
+
+	t.Run("create operation - unset type defaults to plaintext", func(t *testing.T) {
+		t.Parallel()
+
+		var gotType domain.ValueType
+
+		mock := &providermock.Store{
+			CreateFunc: func(
+				_ context.Context, _, _ string, valueType domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				gotType = valueType
+
+				return domain.Version{ID: "1"}, nil
+			},
+		}
+
+		s := staging.NewAWSParamStrategy(mock)
+		err := s.Apply(t.Context(), "/app/plain", staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("plain"),
+			// ValueType intentionally unset (mirrors an entry staged before #664).
+		})
+		require.NoError(t, err)
+		assert.Equal(t, domain.ValueTypePlaintext, gotType)
+	})
+
+	t.Run("update operation - staged type overrides existing", func(t *testing.T) {
+		t.Parallel()
+
+		var gotType domain.ValueType
+
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Value: "old-value", Type: domain.ValueTypePlaintext}, nil
+			},
+			PutFunc: func(
+				_ context.Context, _, _ string, valueType domain.ValueType, _ string, _ ...provider.WriteOption,
+			) (domain.Version, error) {
+				gotType = valueType
+
+				return domain.Version{ID: "2"}, nil
+			},
+		}
+
+		s := staging.NewAWSParamStrategy(mock)
+		err := s.Apply(t.Context(), "/app/param", staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("updated"),
+			ValueType: domain.ValueTypeSecret,
+		})
+		require.NoError(t, err)
+		// An explicit staged type upgrades the existing String to SecureString.
+		assert.Equal(t, domain.ValueTypeSecret, gotType)
+	})
+}
+
 func TestParamStrategy_FetchCurrent(t *testing.T) {
 	t.Parallel()
 
@@ -243,6 +357,22 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "current-value", result.Value)
 		assert.Equal(t, "#5", result.Identifier)
+		assert.False(t, result.Secret, "a String param is not secret")
+	})
+
+	t.Run("securestring is secret", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Value: "current-secret", Type: domain.ValueTypeSecret, Version: domain.Version{ID: "5"}}, nil
+			},
+		}
+
+		s := staging.NewAWSParamStrategy(mock)
+		result, err := s.FetchCurrent(t.Context(), "/app/param")
+		require.NoError(t, err)
+		assert.True(t, result.Secret, "a SecureString param must be flagged secret (#677)")
 	})
 
 	t.Run("error", func(t *testing.T) {

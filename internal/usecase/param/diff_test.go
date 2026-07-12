@@ -56,6 +56,42 @@ func TestDiffUseCase_Execute(t *testing.T) {
 	assert.Equal(t, "/app/config", output.NewName)
 	assert.Equal(t, int64(2), output.NewVersion)
 	assert.Equal(t, "new-value", output.NewValue)
+	assert.False(t, output.Secret, "a plaintext (String) param diff is not secret")
+}
+
+// getByRefTyped is getByRef but stamps every entry with a fixed value type, so a
+// test can exercise the SecureString-secret path.
+func getByRefTyped(values map[string]string, typ domain.ValueType) func(context.Context, string, provider.VersionRef) (*domain.Entry, error) {
+	return func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+		id := ref.ID()
+
+		val, ok := values[id]
+		if !ok {
+			return nil, errUnexpectedCall
+		}
+
+		return &domain.Entry{Name: name, Value: val, Type: typ, Version: domain.Version{ID: id}}, nil
+	}
+}
+
+// TestDiffUseCase_Execute_SecureStringIsSecret pins that a SecureString param
+// diff carries Secret=true, so both frontends mask it (#677/#702).
+func TestDiffUseCase_Execute_SecureStringIsSecret(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		ResolveFunc: resolveBySuffix(map[string]string{"#1": "1", "#2": "2"}),
+		GetFunc:     getByRefTyped(map[string]string{"1": "old-secret", "2": "new-secret"}, domain.ValueTypeSecret),
+	}
+
+	uc := &param.DiffUseCase{Reader: store}
+
+	spec1, _ := awsparamversion.Parse("/app/config#1")
+	spec2, _ := awsparamversion.Parse("/app/config#2")
+
+	output, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
+	require.NoError(t, err)
+	assert.True(t, output.Secret, "a SecureString param diff must be flagged secret")
 }
 
 func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {

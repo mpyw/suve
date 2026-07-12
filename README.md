@@ -714,20 +714,20 @@ Keymap (the in-app `?` toggles full help, which is the source of truth):
 | Global | `↑`/`k`, `↓`/`j` | move selection |
 | Global | `enter` | select / open detail |
 | Global | `esc` | back / close |
-| Global | `y` | copy value (revealed first; masked never auto-copied) |
+| Global | `y` | copy value to the clipboard (the on-screen value stays masked) |
 | Browser | `p` / `/` | edit prefix / filter |
 | Browser | `v` | toggle value display |
 | Browser | `r` | recursive toggle / refresh |
 | Browser | `L` | load more (paged secrets) |
 | Browser | `x` | reveal a masked value |
+| Browser / Diff | `J` | pretty-print a JSON value (parity with `--parse-json`) |
 | Browser | `c`, `space`, `enter` | compare mode: toggle, pick a version, open diff |
 | Browser | `space` | pick namespace (App Configuration) |
 | Browser | `S` | jump to the Staging tab |
 | Browser | `n` / `e` / `d` / `t` / `R` | new / edit / delete / tag / restore |
-| Diff | `J` | re-diff with JSON normalization (parity with `--parse-json`) |
 | Staging | `v` | toggle diff / value view |
 | Staging | `e` / `u` / `t` | edit staged / unstage (entry + tags) / add staged tag |
-| Staging | `x` | cancel a staged tag change |
+| Staging | `x` | reveal the selected row's masked value |
 | Staging | `enter` | open the full-diff detail |
 | Staging | `a` / `A` | apply this section / apply all |
 | Staging | `r` / `R` | reset this section / reset all |

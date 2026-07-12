@@ -34,8 +34,17 @@ type Styles struct {
 
 	// Pane frames a titled content pane (the list and detail boxes).
 	Pane lipgloss.Style
+	// PaneFocused frames the pane that currently holds keyboard focus, with an
+	// accent border so the active pane reads as distinct from the idle one.
+	PaneFocused lipgloss.Style
 	// PaneTitle styles a pane's title line.
 	PaneTitle lipgloss.Style
+	// Selection styles the selected row in the pane that currently holds focus
+	// (the active cursor).
+	Selection lipgloss.Style
+	// SelectionInactive styles the selected row in a pane that does NOT hold focus,
+	// dimmed so the two panes never look equally selected at once.
+	SelectionInactive lipgloss.Style
 	// FieldLabel styles a metadata row label (e.g. "Version").
 	FieldLabel lipgloss.Style
 	// Banner styles the detail pane's staged-changes warning banner.
@@ -67,14 +76,19 @@ func New() Styles {
 			HelpBar:     lipgloss.NewStyle(),
 			Dialog:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
 			Pane:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-			PaneTitle:   lipgloss.NewStyle().Bold(true),
-			FieldLabel:  lipgloss.NewStyle(),
-			Banner:      lipgloss.NewStyle(),
-			ErrorText:   lipgloss.NewStyle().Bold(true),
-			DiffHeader:  lipgloss.NewStyle().Bold(true),
-			DiffHunk:    lipgloss.NewStyle(),
-			DiffAdded:   lipgloss.NewStyle(),
-			DiffRemoved: lipgloss.NewStyle(),
+			// No color to distinguish the focused pane border under NO_COLOR; the
+			// selection marker and the adaptive hint carry the focus cue instead.
+			PaneFocused:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
+			PaneTitle:         lipgloss.NewStyle().Bold(true),
+			Selection:         lipgloss.NewStyle().Bold(true),
+			SelectionInactive: lipgloss.NewStyle(),
+			FieldLabel:        lipgloss.NewStyle(),
+			Banner:            lipgloss.NewStyle(),
+			ErrorText:         lipgloss.NewStyle().Bold(true),
+			DiffHeader:        lipgloss.NewStyle().Bold(true),
+			DiffHunk:          lipgloss.NewStyle(),
+			DiffAdded:         lipgloss.NewStyle(),
+			DiffRemoved:       lipgloss.NewStyle(),
 		}
 	}
 
@@ -89,23 +103,26 @@ func New() Styles {
 	)
 
 	return Styles{
-		StatusBar:   lipgloss.NewStyle().Bold(true).Foreground(fgBright),
-		StatusKey:   lipgloss.NewStyle().Foreground(muted),
-		StatusValue: lipgloss.NewStyle().Foreground(accent).Bold(true),
-		TabActive:   lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(accent).Padding(0, 1),
-		TabInactive: lipgloss.NewStyle().Foreground(subtle).Padding(0, 1),
-		Separator:   lipgloss.NewStyle().Foreground(muted),
-		PageHint:    lipgloss.NewStyle().Foreground(muted).Italic(true),
-		HelpBar:     lipgloss.NewStyle().Foreground(muted),
-		Dialog:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Foreground(fgBright).Padding(0, 1),
-		Pane:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted),
-		PaneTitle:   lipgloss.NewStyle().Bold(true).Foreground(accent),
-		FieldLabel:  lipgloss.NewStyle().Foreground(muted),
-		Banner:      lipgloss.NewStyle().Foreground(yellow),
-		ErrorText:   lipgloss.NewStyle().Bold(true).Foreground(red),
-		DiffHeader:  lipgloss.NewStyle().Bold(true).Foreground(accent),
-		DiffHunk:    lipgloss.NewStyle().Foreground(muted),
-		DiffAdded:   lipgloss.NewStyle().Foreground(green),
-		DiffRemoved: lipgloss.NewStyle().Foreground(red),
+		StatusBar:         lipgloss.NewStyle().Bold(true).Foreground(fgBright),
+		StatusKey:         lipgloss.NewStyle().Foreground(muted),
+		StatusValue:       lipgloss.NewStyle().Foreground(accent).Bold(true),
+		TabActive:         lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(accent).Padding(0, 1),
+		TabInactive:       lipgloss.NewStyle().Foreground(subtle).Padding(0, 1),
+		Separator:         lipgloss.NewStyle().Foreground(muted),
+		PageHint:          lipgloss.NewStyle().Foreground(muted).Italic(true),
+		HelpBar:           lipgloss.NewStyle().Foreground(muted),
+		Dialog:            lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Foreground(fgBright).Padding(0, 1),
+		Pane:              lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted),
+		PaneFocused:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent),
+		PaneTitle:         lipgloss.NewStyle().Bold(true).Foreground(accent),
+		Selection:         lipgloss.NewStyle().Foreground(accent).Bold(true),
+		SelectionInactive: lipgloss.NewStyle().Foreground(subtle),
+		FieldLabel:        lipgloss.NewStyle().Foreground(muted),
+		Banner:            lipgloss.NewStyle().Foreground(yellow),
+		ErrorText:         lipgloss.NewStyle().Bold(true).Foreground(red),
+		DiffHeader:        lipgloss.NewStyle().Bold(true).Foreground(accent),
+		DiffHunk:          lipgloss.NewStyle().Foreground(muted),
+		DiffAdded:         lipgloss.NewStyle().Foreground(green),
+		DiffRemoved:       lipgloss.NewStyle().Foreground(red),
 	}
 }

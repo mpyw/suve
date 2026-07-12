@@ -190,6 +190,162 @@ func TestCompareSelectionOpensDiff(t *testing.T) {
 // keyForSpace builds the space key press (Bubble Tea v2 spells it "space").
 func keyForSpace() tea.KeyPressMsg { return tea.KeyPressMsg{Code: ' '} }
 
+// loadedHistoryModel builds a browser over a versioned source with a loaded
+// selection and history, rendered once so the widgets carry the page's focus.
+func loadedHistoryModel(t *testing.T) *Model {
+	t.Helper()
+
+	src := &stubSource{
+		svcCap: awsParamCap(),
+		history: []data.HistoryRow{
+			{Version: "14", Label: "#14", IsCurrent: true},
+			{Version: "13", Label: "#13"},
+		},
+	}
+	m := newModel(t, src)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/x"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/x"}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: src.history})
+
+	return m
+}
+
+// TestFocusHighlightDistinctBetweenPanes pins #685: the focused pane carries the
+// active selection cursor (▸) and the unfocused pane a dimmed one (▹), and the
+// two swap as focus moves list↔history — so the two panes never look equally
+// selected at once. Rendering the page sets each widget's focus from the page's
+// current focus, which the widget's own View then reflects.
+func TestFocusHighlightDistinctBetweenPanes(t *testing.T) {
+	t.Parallel()
+
+	m := loadedHistoryModel(t)
+	require.Equal(t, focusList, m.focus, "focus starts on the list")
+
+	_ = m.View(m.width, m.height)
+
+	assert.Contains(t, m.list.View(), "▸", "the focused list shows the active cursor")
+	assert.NotContains(t, m.list.View(), "▹", "the focused list does not show the dimmed cursor")
+	assert.Contains(t, m.history.View(), "▹", "the unfocused history shows the dimmed cursor")
+	assert.NotContains(t, m.history.View(), "▸", "the unfocused history does not show the active cursor")
+
+	// Enter moves focus into the history; the highlights swap.
+	m, _ = update(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	require.Equal(t, focusHistory, m.focus, "enter moves focus into the history")
+
+	_ = m.View(m.width, m.height)
+
+	assert.Contains(t, m.history.View(), "▸", "the focused history shows the active cursor")
+	assert.NotContains(t, m.history.View(), "▹", "the focused history does not show the dimmed cursor")
+	assert.Contains(t, m.list.View(), "▹", "the unfocused list shows the dimmed cursor")
+	assert.NotContains(t, m.list.View(), "▸", "the unfocused list does not show the active cursor")
+}
+
+// TestHistoryHeaderHintAdaptsToFocus pins #685's discoverability affordance: the
+// history header advertises `enter: history` while the list is focused and
+// `esc: list` once focus is in the history, so the enter→history / esc→list
+// transitions are visible rather than trial-and-error.
+func TestHistoryHeaderHintAdaptsToFocus(t *testing.T) {
+	t.Parallel()
+
+	m := loadedHistoryModel(t)
+
+	const width = 80
+
+	assert.Contains(t, m.historyHeaderLine(width), "enter: history", "the list advertises how to enter the history")
+	assert.NotContains(t, m.historyHeaderLine(width), "esc: list")
+
+	m, _ = update(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	require.Equal(t, focusHistory, m.focus)
+
+	assert.Contains(t, m.historyHeaderLine(width), "esc: list", "the history advertises how to return to the list")
+	assert.NotContains(t, m.historyHeaderLine(width), "enter: history")
+}
+
+// TestHistoryHeaderHintSuppressedWhenEmpty pins that the enter→history affordance
+// is not advertised for an entry with no versions: onSelect no-ops there, so the
+// header must not promise a transition that does nothing.
+func TestHistoryHeaderHintSuppressedWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	src := &stubSource{svcCap: awsParamCap()} // no history rows
+	m := newModel(t, src)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/x"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/x"}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: nil})
+	require.Zero(t, m.history.Len(), "the entry has no versions")
+
+	line := m.historyHeaderLine(80)
+	assert.Contains(t, line, "History", "the header title still renders")
+	assert.NotContains(t, line, "enter: history", "no false enter→history affordance for a version-less entry")
+}
+
+// TestStaleErrorClearedByLaterSuccessfulLoad pins #688: a transient history (or
+// detail) error must not linger over a later successful load. The single
+// selection funnel clears the per-source detail/history errors up front, and each
+// source also clears its own error when it next succeeds.
+func TestStaleErrorClearedByLaterSuccessfulLoad(t *testing.T) {
+	t.Parallel()
+
+	src := &stubSource{svcCap: awsParamCap()}
+	m := newModel(t, src)
+
+	items := []data.Item{{Name: "/a"}, {Name: "/b"}}
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: items}})
+
+	// Entry A: the detail loads, but the history fetch fails transiently.
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/a"}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, err: errors.New("history fetch failed")})
+	require.Contains(t, m.historyErr, "history fetch failed")
+	require.NotEmpty(t, m.errLines(), "the transient history error is shown")
+
+	// Select entry B: the selection funnel clears the stale per-source errors up
+	// front, before B's responses even land.
+	_ = m.move(1)
+	assert.Empty(t, m.historyErr, "selecting a new entry clears the stale history error immediately")
+	assert.Empty(t, m.detailErr)
+
+	// B's detail and history both succeed → the error line stays clear.
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/b"}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: nil})
+	assert.Empty(t, m.errLines(), "a successful load after an error clears the error line")
+}
+
+// TestDetailErrorClearedOnItsOwnSuccessfulLoad pins that a detail error clears the
+// moment a detail load succeeds, independent of the selection funnel — the
+// per-source clearing path onDetailLoaded owns.
+func TestDetailErrorClearedOnItsOwnSuccessfulLoad(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/a"}}}})
+
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, err: errors.New("show failed")})
+	require.Contains(t, m.detailErr, "show failed")
+
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/a"}})
+	assert.Empty(t, m.detailErr, "a successful detail load clears its own error")
+	assert.True(t, m.detailOK)
+}
+
+// TestStagedErrorSurvivesSelectionChange pins the deliberate divergence: the
+// staging-store hard-fail (a launch-time key-loss) is a persistent condition, so
+// a selection change clears the transient detail/history errors but NOT the
+// staged error.
+func TestStagedErrorSurvivesSelectionChange(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/a"}, {Name: "/b"}}}})
+
+	m.stagedErr = "cannot access the staging encryption key"
+	m.detailErr = "stale detail error"
+
+	_ = m.move(1)
+
+	assert.Empty(t, m.detailErr, "the selection funnel clears the transient detail error")
+	assert.Contains(t, m.stagedErr, "staging encryption key", "the persistent staged hard-fail survives a selection change")
+}
+
 // TestMaskToggle pins that x flips the detail value pane's mask for a secret and
 // that the golden default is masked.
 func TestMaskToggle(t *testing.T) {
@@ -209,10 +365,12 @@ func TestMaskToggle(t *testing.T) {
 	assert.True(t, m.valuePane.Masked(), "x re-masks")
 }
 
-// TestCopyRevealsThenCopies pins that a copy reveals a masked secret first (so it
-// is never copied while masked) and returns the value, and that an empty/absent
-// value is not copyable (which would otherwise clear the clipboard).
-func TestCopyRevealsThenCopies(t *testing.T) {
+// TestCopyDoesNotUnmask pins #689: copying a masked secret returns the real
+// value for the clipboard WITHOUT unmasking the on-screen pane (the mask stays
+// put, so a copy never becomes a standing disclosure), and it leaves a transient
+// "value stays masked" status. An empty/absent value is not copyable (which
+// would otherwise clear the clipboard).
+func TestCopyDoesNotUnmask(t *testing.T) {
 	t.Parallel()
 
 	src := &stubSource{svcCap: awsParamCap()}
@@ -229,7 +387,83 @@ func TestCopyRevealsThenCopies(t *testing.T) {
 	text, ok := m.CopyText()
 	require.True(t, ok)
 	assert.Equal(t, "s3cr3t", text, "copy returns the real value")
-	assert.False(t, m.valuePane.Masked(), "copy reveals first — never copies while masked")
+	assert.True(t, m.valuePane.Masked(), "copy must NOT unmask — the on-screen value stays masked (#689)")
+	assert.Equal(t, "copied (value stays masked)", m.actionStatus, "a masked copy notes the value stays masked")
+
+	// A revealed value copies too, and reports a plain "copied" note.
+	m, _ = update(t, m, keyPress('x'))
+	require.False(t, m.valuePane.Masked(), "x reveals")
+
+	text, ok = m.CopyText()
+	require.True(t, ok)
+	assert.Equal(t, "s3cr3t", text)
+	assert.False(t, m.valuePane.Masked(), "a copy never changes the mask state either way")
+	assert.Equal(t, "copied", m.actionStatus)
+}
+
+// TestParseJSONToggleFormatsValue pins #690: the detail value pane's `J` toggle
+// pretty-prints a JSON value in the browser (parity with the diff page and the
+// GUI), and toggles back to the raw compact form. A masked secret gates the
+// toggle off (the pane requires reveal first).
+func TestParseJSONToggleFormatsValue(t *testing.T) {
+	t.Parallel()
+
+	const compact = `{"host":"db.internal","port":5432}`
+
+	// The pretty-printed form indents each member on its own line — the viewport
+	// pads lines to width, so assert on a single indented member line (present only
+	// when the value is formatted) rather than the whole multi-line block.
+	const indentedMember = `  "host": "db.internal"`
+
+	src := &stubSource{svcCap: awsParamCap()}
+	m := newModel(t, src)
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/cfg"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/cfg", Value: compact}})
+
+	m.valuePane.SetSize(80, 20)
+	require.Contains(t, m.valuePane.View(), compact, "a non-secret JSON value renders raw by default")
+	require.NotContains(t, m.valuePane.View(), indentedMember, "the raw form is not indented")
+
+	// `J` pretty-prints it.
+	m, _ = update(t, m, keyPress('J'))
+	m.valuePane.SetSize(80, 20)
+	assert.Contains(t, m.valuePane.View(), indentedMember, "J pretty-prints the JSON value onto indented lines")
+	assert.NotContains(t, m.valuePane.View(), compact, "the compact single-line form is gone once formatted")
+
+	// `J` again toggles back to the compact form.
+	m, _ = update(t, m, keyPress('J'))
+	m.valuePane.SetSize(80, 20)
+	assert.Contains(t, m.valuePane.View(), compact, "J toggles back to the raw value")
+	assert.NotContains(t, m.valuePane.View(), indentedMember, "the formatting is undone")
+}
+
+// TestParseJSONToggleGatedWhileMasked pins that `J` is a no-op while a secret is
+// masked (the pane requires reveal first, so a masked secret is never
+// normalized), and works once revealed.
+func TestParseJSONToggleGatedWhileMasked(t *testing.T) {
+	t.Parallel()
+
+	const compact = `{"token":"abc"}`
+
+	src := &stubSource{svcCap: awsParamCap()}
+	m := newModel(t, src)
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/s"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/s", Value: compact, Secret: true}})
+	require.True(t, m.valuePane.Masked(), "secret starts masked")
+
+	// J while masked does nothing — the pane stays masked (no format, no reveal).
+	m, _ = update(t, m, keyPress('J'))
+	m.valuePane.SetSize(80, 20)
+	assert.True(t, m.valuePane.Masked(), "J must not reveal a masked secret")
+	assert.NotContains(t, m.valuePane.View(), "token", "J must not format (or leak) a masked secret")
+
+	// Reveal, then J formats.
+	m, _ = update(t, m, keyPress('x'))
+	m, _ = update(t, m, keyPress('J'))
+	m.valuePane.SetSize(80, 20)
+	assert.Contains(t, m.valuePane.View(), `  "token": "abc"`, "once revealed, J formats the JSON onto indented lines")
 }
 
 // TestMouseClickSelectEqualsKeySelect pins the epic's mouse rule: a click on a
@@ -299,6 +533,177 @@ func TestSelectedItemByIndexWithDuplicateNames(t *testing.T) {
 	assert.Equal(t, "prod", got.Namespace, "index 2 resolves to the prod duplicate")
 }
 
+// TestSelectionSurvivesReloadByIdentity pins #699: a mutation reload that inserts
+// a row above the selection must keep the detail on the SAME entry. Selecting
+// /zzz then reloading with /aaa inserted at the top (which shifts /zzz down one
+// index) re-resolves the selection to /zzz's new index rather than leaving the
+// clamped index pointing at the neighbor that inherited /zzz's old slot.
+func TestSelectionSurvivesReloadByIdentity(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+
+	// Initial list; select /zzz (index 1).
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+	m.list.SelectIndex(1)
+	sel, ok := m.selectedItem()
+	require.True(t, ok)
+	require.Equal(t, "/zzz", sel.Name)
+
+	// A mutation reload inserts /aaa at the top: /zzz moves from index 1 to 2.
+	_ = m.loadListCmd(false) // advance listSeq as a reload would
+	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/aaa"}, {Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+
+	got, ok := m.selectedItem()
+	require.True(t, ok)
+	assert.Equal(t, "/zzz", got.Name, "selection re-resolves to the same entry after an insert above it")
+	assert.Equal(t, 2, m.list.Selected(), "the selection index followed /zzz to its new position")
+	assert.NotNil(t, cmd, "the reload (re)loads the resolved selection's detail")
+}
+
+// TestSelectionSurvivesReloadWithDuplicateNamespaces pins that the re-resolve is
+// keyed on name+namespace, not name alone: App Configuration lists the same key
+// under several namespaces, so an insert above the selection must keep it on the
+// exact (name, namespace) pair, never collapsing onto the first same-name row.
+func TestSelectionSurvivesReloadWithDuplicateNamespaces(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: appConfigCap()})
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "app/Feature", Namespace: ""},
+		{Name: "app/Feature", Namespace: "prod"},
+	}}})
+	m.list.SelectIndex(1) // the prod duplicate
+	sel, ok := m.selectedItem()
+	require.True(t, ok)
+	require.Equal(t, "prod", sel.Namespace)
+
+	// Reload inserts a staging duplicate above prod: prod moves from 1 to 2.
+	_ = m.loadListCmd(false)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "app/Feature", Namespace: ""},
+		{Name: "app/Feature", Namespace: "staging"},
+		{Name: "app/Feature", Namespace: "prod"},
+	}}})
+
+	got, ok := m.selectedItem()
+	require.True(t, ok)
+	assert.Equal(t, "prod", got.Namespace, "selection stays on the exact (name, namespace), not the first same-name row")
+	assert.Equal(t, 2, m.list.Selected())
+}
+
+// TestSelectionSurvivesDeleteAboveSelection pins that a deletion which removes a
+// row ABOVE the selection keeps the detail on the same entry. Selecting /bbb then
+// deleting /aaa shifts /bbb from index 1 to 0; the OLD index-clamp would have held
+// index 1 and landed on /zzz, so this fails against the pre-fix behavior (#699).
+func TestSelectionSurvivesDeleteAboveSelection(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/aaa"}, {Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+	m.list.SelectIndex(1) // select /bbb
+	sel, ok := m.selectedItem()
+	require.True(t, ok)
+	require.Equal(t, "/bbb", sel.Name)
+
+	// Delete /aaa (above the selection): /bbb moves from index 1 to 0.
+	_ = m.loadListCmd(false)
+	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+
+	got, ok := m.selectedItem()
+	require.True(t, ok)
+	assert.Equal(t, "/bbb", got.Name, "selection follows /bbb after the row above it is deleted")
+	assert.Equal(t, 0, m.list.Selected())
+	assert.NotNil(t, cmd, "the resolved selection's detail (re)loads")
+}
+
+// TestSelectionFallsBackWhenSelectedDeleted pins the graceful fallback half of
+// #699: when the SELECTED entry itself is gone after a reload, the selection
+// clamps into range and the fallback detail loads; when the list drains to empty
+// the detail is cleared (no stale value, no phantom-entry data).
+func TestSelectionFallsBackWhenSelectedDeleted(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/aaa"}, {Name: "/bbb"}, {Name: "/zzz"},
+	}}})
+	m.list.SelectIndex(1) // select /bbb
+	sel, ok := m.selectedItem()
+	require.True(t, ok)
+	require.Equal(t, "/bbb", sel.Name)
+
+	// Delete /bbb (the selected entry): it is gone, so the selection clamps.
+	_ = m.loadListCmd(false)
+	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/aaa"}, {Name: "/zzz"},
+	}}})
+
+	got, ok := m.selectedItem()
+	require.True(t, ok, "a non-empty list still has a selection")
+	assert.Equal(t, "/zzz", got.Name, "selection clamps into range when the selected entry is gone")
+	assert.NotNil(t, cmd, "the fallback selection loads its detail")
+
+	// A further reload draining the list to empty clears the detail rather than
+	// pointing it at a phantom entry.
+	m.detailOK = true // pretend a detail is currently shown
+	_ = m.loadListCmd(false)
+	m, cmd = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{}}})
+	_, ok = m.selectedItem()
+	assert.False(t, ok, "an empty list has no selection")
+	assert.False(t, m.detailOK, "the detail is cleared when nothing is selected")
+	assert.Nil(t, cmd, "an empty list issues no detail load")
+}
+
+// TestLoadMoreInFlightGuard pins #700: loadMore issues an append when a next page
+// is present, but a second loadMore fired while that append is still pending is a
+// no-op — no new fetch (listSeq does not advance), so a hammered `L` can never
+// splice a duplicate or stale page.
+func TestLoadMoreInFlightGuard(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsSecretCap()})
+
+	// A loaded page reports a real next page.
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{
+		Items: []data.Item{{Name: "prod/a"}}, NextToken: "tok",
+	}})
+	require.Equal(t, "tok", m.nextToken)
+	require.False(t, m.loading, "no fetch is in flight after the page loads")
+
+	// First loadMore issues the append and marks the fetch in flight.
+	seqBefore := m.listSeq
+	cmd := m.loadMore()
+	require.NotNil(t, cmd, "loadMore with a next page issues an append")
+	require.True(t, m.loading, "the append is now in flight")
+	require.Equal(t, seqBefore+1, m.listSeq, "the append advanced the list sequence")
+
+	// A second loadMore while the first is still pending is a no-op.
+	seqDuring := m.listSeq
+	assert.Nil(t, m.loadMore(), "a second loadMore while one is in-flight is a no-op")
+	assert.Equal(t, seqDuring, m.listSeq, "the blocked loadMore issues no fetch (no duplicate/stale splice)")
+
+	// loadMore is likewise suppressed during an ordinary (non-append) reload.
+	m2 := newModel(t, &stubSource{svcCap: awsSecretCap()})
+	m2, _ = update(t, m2, listLoadedMsg{seq: m2.listSeq, res: data.ListResult{
+		Items: []data.Item{{Name: "prod/a"}}, NextToken: "tok",
+	}})
+	_ = m2.loadListCmd(false) // a filter/mutation reload is now in flight
+	require.True(t, m2.loading)
+	assert.Nil(t, m2.loadMore(), "loadMore is a no-op while a full reload is pending")
+}
+
 // TestStagingJump pins that S emits the OpenStaging navigation request.
 func TestStagingJump(t *testing.T) {
 	t.Parallel()
@@ -311,24 +716,177 @@ func TestStagingJump(t *testing.T) {
 	assert.True(t, ok, "S emits nav.OpenStaging")
 }
 
-// TestOnStagedLoadedSurfacesStoreHardFail pins the read-path key-loss surfacing:
-// a staging store-construction hard-fail (a key-loss while encrypted state exists)
-// is shown on the browser error line, while an ordinary transient probe read error
-// stays quiet (badges just do not show — no error-line spam).
-func TestOnStagedLoadedSurfacesStoreHardFail(t *testing.T) {
+// TestOnStagedLoadedSurfacesProbeErrors pins the read-path error surfacing (#695):
+// a transient probe read error shows a short "staged status unavailable" note
+// rather than being swallowed (silent swallowing would hide every [staged] badge,
+// making a staged entry look un-staged), and a store-construction hard-fail
+// (a key-loss while encrypted state exists) shows its own actionable message.
+func TestOnStagedLoadedSurfacesProbeErrors(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, &stubSource{svcCap: awsParamCap()})
 	_ = m.loadStagedCmd() // advance stagedSeq so the messages are current
 
-	// A transient probe read error is swallowed.
+	// A transient probe read error is surfaced as a non-fatal note, not swallowed.
 	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, err: errors.New("probe timeout")})
-	assert.Empty(t, m.err, "a transient probe error does not spam the error line")
+	assert.Equal(t, "staged status unavailable", m.stagedErr, "a transient probe error is surfaced, not silently dropped")
+	assert.Contains(t, m.errLines(), "staged status unavailable", "the note reaches the rendered error region")
 
-	// A store-construction hard-fail (key-loss) is surfaced.
+	// A store-construction hard-fail (key-loss) is surfaced with its own message.
 	hard := &data.StoreUnavailableError{Err: errors.New("cannot access the staging encryption key")}
 	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, err: hard})
-	assert.Contains(t, m.err, "staging encryption key", "a key-loss hard-fail is surfaced on the read path")
+	assert.Contains(t, m.stagedErr, "staging encryption key", "a key-loss hard-fail is surfaced on the read path")
+}
+
+// TestStagedCountUsesEntriesPlusTags pins #693: the browser reports the Staging
+// tab badge count as entries + tag changes (the staging page's definition), so an
+// item with both an entry change and a tag change counts as 2 — never the
+// deduplicated key count (1) the browser used before, which made the badge
+// oscillate between the two surfaces.
+func TestStagedCountUsesEntriesPlusTags(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsSecretCap()})
+	_ = m.loadStagedCmd()
+
+	key := data.StagedKey{Name: "prod/api/key"}
+	// One item carries BOTH a staged entry change and a staged tag change: one
+	// deduplicated key, but two changes.
+	snap := data.StagingSnapshot{
+		Keys:       map[data.StagedKey]struct{}{key: {}},
+		DeleteKeys: map[data.StagedKey]struct{}{},
+		EntryCount: 1,
+		TagCount:   1,
+	}
+
+	_, cmd := update(t, m, stagedLoadedMsg{seq: m.stagedSeq, snap: snap})
+	require.NotNil(t, cmd, "a fresh staged load reports the tab count")
+
+	count, ok := cmd().(nav.StagedCount)
+	require.True(t, ok, "onStagedLoaded emits nav.StagedCount")
+	assert.Equal(t, 2, count.Count, "the badge counts entries + tags (2), not the deduplicated key (1)")
+}
+
+// TestEditDeleteTagGatedOnDeleteStaged pins #692: on an entry staged for deletion,
+// e/d/t do not open their (dead-end) dialogs but set a one-line status message
+// instead — matching the GUI, which hides those controls. A non-delete-staged
+// entry keeps the affordances.
+func TestEditDeleteTagGatedOnDeleteStaged(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsSecretCap()}) // has tags
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "prod/live"}, {Name: "prod/doomed"},
+	}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "prod/live", Value: "v"}})
+
+	// prod/doomed (index 1) is staged for deletion.
+	doomed := data.StagedKey{Name: "prod/doomed"}
+	snap := data.StagingSnapshot{
+		Keys:       map[data.StagedKey]struct{}{doomed: {}},
+		DeleteKeys: map[data.StagedKey]struct{}{doomed: {}},
+		EntryCount: 1,
+	}
+	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, snap: snap})
+
+	m.list.SelectIndex(1) // select the delete-staged entry
+	require.True(t, m.selectedIsDeleteStaged(), "prod/doomed is delete-staged")
+
+	for _, tc := range []struct {
+		key  rune
+		want string
+	}{
+		{'e', "cannot edit: staged for deletion"},
+		{'d', "already staged for deletion"},
+		{'t', "cannot tag: staged for deletion"},
+	} {
+		m, cmd := update(t, m, keyPress(tc.key))
+		assert.Nil(t, cmd, "%c on a delete-staged entry opens no dialog", tc.key)
+		assert.Contains(t, m.actionStatus, tc.want, "%c surfaces the gate status", tc.key)
+		assert.Contains(t, m.errLines(), m.actionStatus, "the gate status renders in the error region")
+	}
+
+	// A non-delete-staged entry keeps the affordances: e opens the edit form.
+	m.list.SelectIndex(0)
+	require.False(t, m.selectedIsDeleteStaged(), "prod/live is not delete-staged")
+	m, cmd := update(t, m, keyPress('e'))
+	require.NotNil(t, cmd, "edit is offered on a non-delete-staged entry")
+	_, ok := cmd().(nav.OpenEntryForm)
+	assert.True(t, ok, "e opens the entry form when the entry is not delete-staged")
+	assert.Empty(t, m.actionStatus, "no gate status on a valid action")
+}
+
+// TestOpenNewCarriesDeleteStagedKeys pins that the create dialog request carries
+// the delete-staged key set, so the entry form can reject a delete-staged name
+// client-side (#692) instead of dead-ending on the reducer.
+func TestOpenNewCarriesDeleteStagedKeys(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	doomed := data.StagedKey{Name: "/app/doomed"}
+	m.deleteStagedKeys = map[data.StagedKey]struct{}{doomed: {}}
+
+	cmd := m.openNew()
+	require.NotNil(t, cmd)
+	form, ok := cmd().(nav.OpenEntryForm)
+	require.True(t, ok, "openNew emits nav.OpenEntryForm")
+	assert.False(t, form.Edit)
+	_, carried := form.DeleteStagedKeys[doomed]
+	assert.True(t, carried, "the create request carries the delete-staged keys for client-side validation")
+}
+
+// TestStagedBannerDistinguishesKind pins #701: the detail-pane staged banner
+// distinguishes a staged value change, a staged tag change, and both — matching
+// the GUI's StagingBanner — rather than collapsing every staged kind into one
+// message. Each case stages the default-selected entry with a different change
+// kind and asserts the rendered banner wording.
+func TestStagedBannerDistinguishesKind(t *testing.T) {
+	t.Parallel()
+
+	const name = "/app/x"
+
+	key := data.StagedKey{Name: name}
+	keySet := map[data.StagedKey]struct{}{key: {}}
+
+	cases := []struct {
+		label   string
+		entry   bool
+		tags    bool
+		want    string
+		notWant string
+	}{
+		{"value-only", true, false, "⚠ staged value changes — S: staging", "tag changes"},
+		{"tag-only", false, true, "⚠ staged tag changes — S: staging", "value and tag"},
+		{"both", true, true, "⚠ staged value and tag changes — S: staging", ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			t.Parallel()
+
+			m := newModel(t, &stubSource{svcCap: awsParamCap()})
+			m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: name}}}})
+			m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: name}})
+
+			snap := data.StagingSnapshot{Keys: keySet}
+			if tc.entry {
+				snap.EntryKeys = keySet
+			}
+
+			if tc.tags {
+				snap.TagKeys = keySet
+			}
+
+			m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, snap: snap})
+
+			out := m.View(m.width, m.height)
+			assert.Contains(t, out, tc.want, "banner reflects the staged change kind")
+
+			if tc.notWant != "" {
+				assert.NotContains(t, out, tc.notWant, "banner must not use another kind's wording")
+			}
+		})
+	}
 }
 
 // TestOpenNewBlocksAllNamespaces pins the App Configuration create-block: a write
@@ -381,6 +939,7 @@ func TestOpenEditNoDetailGuard(t *testing.T) {
 	assert.True(t, form.Edit, "the request is an edit")
 	assert.Equal(t, "/app/x", form.Name)
 	assert.Equal(t, "v1", form.Value, "the edit form is seeded from the loaded detail")
+	assert.False(t, form.StagedOnly, "a browser edit keeps the immediate-mode toggle (not a staged-only surface)")
 }
 
 // TestOpenTagHasTagsGate pins the tag dialog is offered only for a service with
@@ -402,6 +961,7 @@ func TestOpenTagHasTagsGate(t *testing.T) {
 	open, ok := cmd().(nav.OpenTag)
 	require.True(t, ok, "tag emits nav.OpenTag")
 	assert.Equal(t, "/x", open.Name)
+	assert.False(t, open.StagedOnly, "a browser tag keeps the immediate-mode toggle (not a staged-only surface)")
 }
 
 // TestOpenRestoreHasRestoreGate pins the restore dialog is offered only for a

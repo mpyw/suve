@@ -14,6 +14,7 @@ import (
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/tui/components"
+	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/dialogs"
 	"github.com/mpyw/suve/internal/tui/nav"
 )
@@ -198,6 +199,30 @@ func TestUpdate_MutationDoneClosesDialog(t *testing.T) {
 	m = updateApp(t, m, dialogs.MutationDoneMsg{Service: "param", Status: "Staged create."})
 	assert.Empty(t, m.dialogs, "a completed mutation closes the dialog")
 	assert.Equal(t, "Staged create.", m.status, "the outcome is voiced in the status line")
+}
+
+// TestUpdate_DialogOpenGuardPreventsStacking pins #697: dialog-open requests
+// arrive as async commands, so a rapid double-press of a dialog-open key can
+// emit two Open* commands before the first dialog lands. The app must push
+// exactly one dialog — the second (stale, in-flight) Open* is dropped rather
+// than stacking an identical duplicate that Esc would reveal underneath.
+func TestUpdate_DialogOpenGuardPreventsStacking(t *testing.T) {
+	t.Parallel()
+
+	mut := capMutator{cap: goldenCap("aws", "param")}
+	m := newApp(config{
+		scope:      provider.Scope{Provider: provider.ProviderAWS},
+		identity:   awsIdentityFixture(),
+		mutatorFor: func(string) data.Mutator { return mut },
+	})
+
+	open := nav.OpenEntryForm{Service: "param"}
+
+	m = updateApp(t, m, open)
+	require.Len(t, m.dialogs, 1, "the first open pushes the dialog")
+
+	m = updateApp(t, m, open)
+	assert.Len(t, m.dialogs, 1, "a second open while a dialog is already on the stack is dropped, not stacked")
 }
 
 // stagingTabTitle returns the current Staging tab title.

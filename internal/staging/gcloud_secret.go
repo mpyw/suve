@@ -154,6 +154,7 @@ func (s *GoogleCloudSecretStrategy) FetchCurrent(ctx context.Context, name strin
 	return &FetchResult{
 		Value:      entry.Value,
 		Identifier: "#" + entry.Version.ID,
+		Secret:     true, // Secret Manager values are always secret material.
 	}, nil
 }
 

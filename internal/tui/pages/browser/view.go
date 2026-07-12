@@ -24,8 +24,8 @@ func (m *Model) View(width, height int) string {
 	parts := []string{header}
 	offset := headerH
 
-	if m.err != "" {
-		parts = append(parts, m.styles.ErrorText.Render(clip(m.err, width)))
+	for _, line := range m.errLines() {
+		parts = append(parts, m.styles.ErrorText.Render(clip(line, width)))
 		offset++
 	}
 
@@ -106,10 +106,15 @@ func (m *Model) renderStacked(width, height, yOffset int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, listPane, detailPane)
 }
 
-// renderListPane sizes the list widget, records its geometry, and frames it.
+// renderListPane sizes the list widget, records its geometry, and frames it. The
+// pane is drawn focused (accent border, active selection cursor) when the list
+// holds keyboard focus, so the user can see where the arrow keys will land.
 func (m *Model) renderListPane(width, height, paneTop, paneLeft int) string {
 	innerW, innerH := components.PaneInner(width, height)
 	m.list.SetSize(innerW, innerH)
+
+	focused := m.focus == focusList
+	m.list.SetFocused(focused)
 
 	m.geom.listTop = paneTop + paneContentTop
 	m.geom.listLeft = paneLeft + paneBorderLeft
@@ -118,11 +123,12 @@ func (m *Model) renderListPane(width, height, paneTop, paneLeft int) string {
 
 	title := "entries (" + strconv.Itoa(m.list.Len()) + ")"
 
-	return components.Pane(m.styles, title, m.list.View(), width, height)
+	return framePane(m.styles, focused, title, m.list.View(), width, height)
 }
 
 // renderDetailPane sizes the detail widgets, records the history geometry, and
-// frames the detail.
+// frames the detail. The pane is drawn focused when the history holds keyboard
+// focus (the detail pane's only navigable widget), so the active pane is obvious.
 func (m *Model) renderDetailPane(width, height, paneTop, paneLeft int) string {
 	innerW, innerH := components.PaneInner(width, height)
 
@@ -139,7 +145,16 @@ func (m *Model) renderDetailPane(width, height, paneTop, paneLeft int) string {
 	m.geom.historyRight = m.geom.historyLeft + innerW
 	m.geom.historyRows = historyRows
 
-	return components.Pane(m.styles, title, body, width, height)
+	return framePane(m.styles, m.focus == focusHistory, title, body, width, height)
+}
+
+// framePane frames a pane with the focused border when focused, else the idle one.
+func framePane(st styles.Styles, focused bool, title, body string, width, height int) string {
+	if focused {
+		return components.PaneFocused(st, title, body, width, height)
+	}
+
+	return components.Pane(st, title, body, width, height)
 }
 
 // renderDetail builds the detail body and returns the line offset (within the
@@ -152,8 +167,8 @@ func (m *Model) renderDetail(innerW, innerH int) (string, int, int) {
 
 	var lines []string
 
-	if m.isSelectedStaged() {
-		lines = append(lines, m.styles.Banner.Render(clip("⚠ staged changes — S: staging", innerW)))
+	if text, staged := m.selectedStagedBanner(); staged {
+		lines = append(lines, m.styles.Banner.Render(clip(text, innerW)))
 		lines = append(lines, "")
 	}
 
@@ -179,15 +194,20 @@ func (m *Model) renderDetail(innerW, innerH int) (string, int, int) {
 	historyLocalTop := len(lines)
 	historyH := max(innerH-historyLocalTop, 0)
 	m.history.SetSize(innerW, historyH)
+	m.history.SetFocused(m.focus == focusHistory)
 	lines = append(lines, strings.Split(m.history.View(), "\n")...)
 
 	return fitLines(lines, innerH), historyLocalTop, historyH
 }
 
-// valueLabelLine renders the "Value  (x to reveal)" label row.
+// valueLabelLine renders the "Value  (x to reveal)" / "(J to format)" label row.
 func (m *Model) valueLabelLine(width int) string {
 	label := m.styles.PaneTitle.Render("Value")
 	if hint := m.valuePane.HintSuffix(); hint != "" {
+		label += "   " + m.styles.PageHint.Render(hint)
+	}
+
+	if hint := m.valuePane.ParseJSONHint(); hint != "" {
 		label += "   " + m.styles.PageHint.Render(hint)
 	}
 
@@ -232,28 +252,63 @@ func (m *Model) tagLine(width int) string {
 	return fieldLine(m.styles, "Tags", tagsInline(m.detail.Tags), width)
 }
 
-// historyHeaderLine renders the "History  c: compare mode" row.
+// historyHeaderLine renders the "History  <hint>" row. The hint adapts to focus so
+// the enter→history / esc→list transitions are discoverable: from the list it
+// advertises `enter: history`; in the history it advertises `esc: list`; in
+// compare mode it advertises the pick/diff/exit keys.
 func (m *Model) historyHeaderLine(width int) string {
-	hint := "c: compare mode"
-	if m.history.Compare() {
+	title := m.styles.PaneTitle.Render("History")
+
+	var hint string
+
+	switch {
+	case m.history.Compare():
 		hint = "space: pick · enter: diff · esc: exit"
+	case m.history.Len() == 0:
+		// No versions: neither entering the history nor compare mode does anything,
+		// so advertise no (false) transition.
+		return clip(title, width)
+	case m.focus == focusHistory:
+		hint = "esc: list · c: compare mode"
+	default:
+		hint = "enter: history · c: compare mode"
 	}
 
-	return clip(m.styles.PaneTitle.Render("History")+"   "+m.styles.PageHint.Render(hint), width)
+	return clip(title+"   "+m.styles.PageHint.Render(hint), width)
 }
 
-// isSelectedStaged reports whether the selected entry has staged changes. It
-// resolves the item by index (see selectedItem) so a namespaced duplicate keys
-// the banner off the correct (name, namespace) pair.
-func (m *Model) isSelectedStaged() bool {
+// selectedStagedBanner returns the detail-pane banner text for the selected
+// entry and whether it is staged at all. The text distinguishes a staged value
+// change, a staged tag change, and both — mirroring the GUI's StagingBanner
+// (internal/gui/frontend/src/lib/StagingBanner.svelte) so the affordance no
+// longer collapses every staged kind into one message (#701). It resolves the
+// item by index (see selectedItem) so a namespaced duplicate keys the banner off
+// the correct (name, namespace) pair.
+func (m *Model) selectedStagedBanner() (string, bool) {
 	item, ok := m.selectedItem()
 	if !ok {
-		return false
+		return "", false
 	}
 
-	_, staged := m.stagedKeys[dataStagedKey(item)]
+	key := dataStagedKey(item)
+	if _, staged := m.stagedKeys[key]; !staged {
+		return "", false
+	}
 
-	return staged
+	_, hasEntry := m.entryStagedKeys[key]
+	_, hasTags := m.tagStagedKeys[key]
+
+	switch {
+	case hasEntry && hasTags:
+		return "⚠ staged value and tag changes — S: staging", true
+	case hasTags:
+		return "⚠ staged tag changes — S: staging", true
+	default:
+		// A staged key with no tag change is a value/entry change (create, edit, or
+		// delete); the value wording also covers the defensive case of a staged key
+		// absent from both split sets.
+		return "⚠ staged value changes — S: staging", true
+	}
 }
 
 // fieldLine renders a "Label  value" metadata row, clipped to width.

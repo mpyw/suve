@@ -23,13 +23,28 @@ type sourceFactory struct {
 	ctx   context.Context //nolint:containedctx // the TUI resolves stores lazily against the Run context
 	scope provider.Scope
 
+	// resolveAWSIdentity resolves the AWS caller identity that keys the AWS staging
+	// scope. It is a field so tests can substitute a call-counting stub; production
+	// wires infra.GetAWSIdentity.
+	resolveAWSIdentity func(context.Context) (*infra.AWSIdentity, error)
+
 	mu            sync.Mutex
 	stagingStores map[string]store.ReadWriteOperator
+	// awsStagingScope memoizes the AWS staging scope resolved from the STS caller
+	// identity. The launched provider/scope are fixed for the process lifetime, so
+	// the identity is resolved once — not on every staging-store access. A
+	// transient STS failure is not cached, so it retries on the next access.
+	awsStagingScope *provider.Scope
 }
 
 // newSourceFactory builds a factory for a launched scope and Run context.
 func newSourceFactory(ctx context.Context, scope provider.Scope) *sourceFactory {
-	return &sourceFactory{ctx: ctx, scope: scope, stagingStores: map[string]store.ReadWriteOperator{}}
+	return &sourceFactory{
+		ctx:                ctx,
+		scope:              scope,
+		resolveAWSIdentity: infra.GetAWSIdentity,
+		stagingStores:      map[string]store.ReadWriteOperator{},
+	}
 }
 
 // sourceFor returns the read source and (best-effort) staging probe for a
@@ -289,31 +304,49 @@ func (f *sourceFactory) stagingScope(kind provider.Kind) (provider.Scope, error)
 		return f.scope, nil
 	}
 
-	identity, err := infra.GetAWSIdentity(f.ctx)
+	return f.resolveAWSStagingScope()
+}
+
+// resolveAWSStagingScope resolves (and memoizes) the AWS staging scope from the
+// STS caller identity. Because the launched provider/scope are fixed for the
+// process lifetime, the identity is resolved once and reused across every
+// staging-store access rather than issuing a fresh GetCallerIdentity per probe.
+// Only a successful resolution is cached, so a transient STS failure retries.
+func (f *sourceFactory) resolveAWSStagingScope() (provider.Scope, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.awsStagingScope != nil {
+		return *f.awsStagingScope, nil
+	}
+
+	identity, err := f.resolveAWSIdentity(f.ctx)
 	if err != nil {
 		return provider.Scope{}, err
 	}
 
-	return provider.AWSScope(identity.AccountID, identity.Region), nil
+	scope := provider.AWSScope(identity.AccountID, identity.Region)
+	f.awsStagingScope = &scope
+
+	return scope, nil
 }
 
 // lazyStagingProbe defers building the real probe (and thus the on-disk store)
-// to the first StagedKeys call, so page construction never blocks on the
-// keychain.
+// to the first Staged call, so page construction never blocks on the keychain.
 type lazyStagingProbe struct {
 	build func() (data.StagingProbe, error)
 }
 
-func (p *lazyStagingProbe) StagedKeys(ctx context.Context) (map[data.StagedKey]struct{}, error) {
+func (p *lazyStagingProbe) Staged(ctx context.Context) (data.StagingSnapshot, error) {
 	probe, err := p.build()
 	if err != nil {
 		// A build failure is a store-construction hard-fail (e.g. a keychain
 		// key-loss while encrypted state exists). Mark it so the browser surfaces it
 		// on the error line instead of silently dropping the staging badges.
-		return nil, &data.StoreUnavailableError{Err: err}
+		return data.StagingSnapshot{}, &data.StoreUnavailableError{Err: err}
 	}
 
-	return probe.StagedKeys(ctx)
+	return probe.Staged(ctx)
 }
 
 // capabilityFor looks up the ServiceCapability for a provider+service in the

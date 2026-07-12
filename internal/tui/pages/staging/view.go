@@ -59,10 +59,11 @@ func (m *Model) View(width, height int) string {
 		head = append(head, m.noticeLine(width))
 	}
 
-	// Reserve the last page row for the row-action hint so the page-local
-	// bindings (e/u/t/x/enter/v, apply/reset) are discoverable — they are not in
-	// the global keys.Map the help bar renders (#655).
-	footer := m.hintLine(width)
+	// Reserve the last page row for the footer: normally the row-action hint so
+	// the page-local bindings (e/u/t/x/enter/v, apply/reset) are discoverable —
+	// they are not in the global keys.Map the help bar renders (#655) — but a
+	// pending invalid-action status message takes that row while it is set (#684).
+	footer := m.footerLine(width)
 
 	bodyTop := len(head)
 	bodyH := max(height-bodyTop-1, 0)
@@ -81,11 +82,21 @@ func (m *Model) View(width, height int) string {
 	return strings.Join(out, "\n")
 }
 
+// footerLine renders the reserved bottom row: a pending invalid-action status
+// message when one is set (#684), otherwise the row-action hint.
+func (m *Model) footerLine(width int) string {
+	if m.status != "" {
+		return m.styles.ErrorText.Render(clip(m.status, width))
+	}
+
+	return m.hintLine(width)
+}
+
 // hintLine renders the bottom row-action hint: the per-row bindings plus
 // apply/reset. These are page-local (not in keys.Map), so the global help bar
 // never lists them; this line makes them discoverable (#655).
 func (m *Model) hintLine(width int) string {
-	const hint = "e edit · u unstage · t tags · x cancel-tag · enter detail · v view · a apply · r reset"
+	const hint = "e edit · u unstage · t tags · x reveal · enter detail · v view · a apply · r reset"
 
 	return m.styles.PageHint.Render(clip(hint, width))
 }
@@ -188,7 +199,7 @@ func (m *Model) appendSectionRows(
 		for _, ad := range t.Adds {
 			rowFirst[rowIdx] = lineCount()
 			change := m.styles.DiffAdded.Render("+" + ad.Key + "=" + ad.Value)
-			add(m.tagLine(rowIdx, name, change, "x cancel"), lineDesc{row: rowIdx, section: -1})
+			add(m.tagLine(rowIdx, name, change, "u unstage"), lineDesc{row: rowIdx, section: -1})
 			rowIdx++
 		}
 
@@ -200,7 +211,7 @@ func (m *Model) appendSectionRows(
 				change += m.styles.PageHint.Render(" (was " + rem.Value + ")")
 			}
 
-			add(m.tagLine(rowIdx, name, change, "↩ cancel"), lineDesc{row: rowIdx, section: -1})
+			add(m.tagLine(rowIdx, name, change, "u unstage"), lineDesc{row: rowIdx, section: -1})
 			rowIdx++
 		}
 	}
@@ -222,7 +233,7 @@ func (m *Model) entryLines(sec *section, e data.StagedDiffRow, rowIdx int) []str
 		// value must stay one physical row, else the body overflows its box and
 		// the mouse hit-map (logical rows) desyncs from the screen rows. Full
 		// values are viewable via enter → the diff detail page.
-		value := firstLine(m.maskValue(e.StagedValue, sec.secret))
+		value := firstLine(m.maskValue(e.StagedValue, sec.secret || e.Secret, rowIdx))
 		if e.Operation == operationDelete {
 			value = m.styles.PageHint.Render("(delete)")
 		}
@@ -230,15 +241,19 @@ func (m *Model) entryLines(sec *section, e data.StagedDiffRow, rowIdx int) []str
 		return []string{head + "   " + value}
 	}
 
-	return append([]string{head}, m.diffLines(sec, e)...)
+	return append([]string{head}, m.diffLines(sec, e, rowIdx)...)
 }
 
-// diffLines renders an entry's Remote-vs-Staged ± lines (masked for secrets).
-func (m *Model) diffLines(sec *section, e data.StagedDiffRow) []string {
+// diffLines renders an entry's Remote-vs-Staged ± lines (masked for secrets,
+// revealed only when rowIdx is the selected row — see maskValue).
+func (m *Model) diffLines(sec *section, e data.StagedDiffRow, rowIdx int) []string {
 	var lines []string
 
-	remote := m.maskValue(e.RemoteValue, sec.secret)
-	staged := m.maskValue(e.StagedValue, sec.secret)
+	// A SecureString param row is secret even in a non-secret (param) section, so
+	// OR the row's own flag into the section's (#677).
+	secret := sec.secret || e.Secret
+	remote := m.maskValue(e.RemoteValue, secret, rowIdx)
+	staged := m.maskValue(e.StagedValue, secret, rowIdx)
 
 	if e.Operation != operationCreate {
 		lines = append(lines, "    "+m.styles.DiffRemoved.Render("- "+firstLine(remote)))
@@ -252,10 +267,10 @@ func (m *Model) diffLines(sec *section, e data.StagedDiffRow) []string {
 }
 
 // tagLine renders one tag-change row: cursor, "tags", the item name, the change,
-// and the cancel affordance.
-func (m *Model) tagLine(rowIdx int, name, change, cancel string) string {
+// and the removal affordance (`u`).
+func (m *Model) tagLine(rowIdx int, name, change, unstage string) string {
 	return m.cursor(rowIdx) + m.styles.FieldLabel.Render("tags") + "  " + name + "  " + change +
-		"   " + m.styles.PageHint.Render(cancel)
+		"   " + m.styles.PageHint.Render(unstage)
 }
 
 // sectionHeader renders a section header and returns the apply/reset button

@@ -229,6 +229,100 @@ func TestParamMutator_StagedRoundTrip(t *testing.T) {
 	})
 }
 
+// TestParamMutator_StagedCarriesValueType pins the #664/#680 end-to-end fix: a
+// staged SecureString create routed through the TUI param mutator stores the
+// SecureString value type in the working staging store AND, on apply through the
+// AWS SSM param strategy, writes the parameter as SecureString (domain
+// ValueTypeSecret) rather than silently downgrading it to plaintext String.
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv
+func TestParamMutator_StagedCarriesValueType(t *testing.T) {
+	ctx := context.Background()
+
+	var (
+		appliedType  domain.ValueType
+		appliedValue string
+	)
+
+	provStore := &providermock.Store{
+		GetFunc: func(context.Context, string, provider.VersionRef) (*domain.Entry, error) {
+			return nil, provider.ErrNotFound
+		},
+		CreateFunc: func(
+			_ context.Context, _, value string, valueType domain.ValueType, _ string, _ ...provider.WriteOption,
+		) (domain.Version, error) {
+			appliedValue, appliedType = value, valueType
+
+			return domain.Version{ID: "1"}, nil
+		},
+	}
+
+	mut, st := newParamMutator(t, provStore)
+
+	// TUI staged create with Type = SecureString.
+	_, err := mut.Create(ctx, data.StagedKey{Name: "/app/SECRET"}, "s3cr3t", "SecureString", "", true)
+	require.NoError(t, err)
+
+	// The staged entry carries the SecureString value type end-to-end.
+	entry, err := st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/SECRET"})
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationCreate, entry.Operation)
+	assert.Equal(t, domain.ValueTypeSecret, entry.ValueType, "staged create carries the SecureString type")
+
+	// Apply the staged create through the AWS SSM param strategy: the parameter is
+	// written as SecureString, not the old hardcoded plaintext String.
+	strategy := staging.NewAWSParamStrategy(provStore)
+	require.NoError(t, strategy.Apply(ctx, "/app/SECRET", *entry))
+	assert.Equal(t, "s3cr3t", appliedValue)
+	assert.Equal(t, domain.ValueTypeSecret, appliedType, "apply writes the parameter as SecureString")
+}
+
+// TestParamMutator_StagedEditValueType pins the staged-edit value-type rules: an
+// explicit type is stored (so a staged edit can change the type), while an empty
+// type — passed by the staging-review edit, which cannot seed the current type —
+// preserves the existing staged type instead of downgrading it.
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv
+func TestParamMutator_StagedEditValueType(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("explicit type is stored", func(t *testing.T) {
+		mut, st := newParamMutator(t, existingParamStore("old"))
+
+		_, err := mut.Update(ctx, data.StagedKey{Name: existingParamName}, "new", "SecureString", "", true)
+		require.NoError(t, err)
+
+		entry, err := st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: existingParamName})
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationUpdate, entry.Operation)
+		assert.Equal(t, domain.ValueTypeSecret, entry.ValueType, "an explicit staged-edit type is stored")
+	})
+
+	t.Run("empty type preserves a staged SecureString create", func(t *testing.T) {
+		mut, st := newParamMutator(t, &providermock.Store{
+			GetFunc: func(context.Context, string, provider.VersionRef) (*domain.Entry, error) {
+				return nil, provider.ErrNotFound
+			},
+		})
+
+		// Stage a SecureString create, then edit its value with no type (the
+		// staging-review edit path passes an empty type): the create's SecureString
+		// type must survive rather than downgrade to plaintext.
+		_, err := mut.Create(ctx, data.StagedKey{Name: "/app/NEW"}, "v1", "SecureString", "", true)
+		require.NoError(t, err)
+
+		_, err = mut.Update(ctx, data.StagedKey{Name: "/app/NEW"}, "v2", "", "", true)
+		require.NoError(t, err)
+
+		entry, err := st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/NEW"})
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, entry.Operation, "editing a staged create keeps it a create")
+		require.NotNil(t, entry.Value)
+		assert.Equal(t, "v2", *entry.Value, "the edit updates the draft value")
+		assert.Equal(t, domain.ValueTypeSecret, entry.ValueType, "an empty edit type preserves the staged SecureString")
+	})
+}
+
 // TestParamMutator_ImmediateRouting asserts an immediate write reaches the
 // provider store directly and never touches the staging store.
 //
@@ -264,4 +358,60 @@ func TestParamMutator_ImmediateRouting(t *testing.T) {
 	// Nothing was staged.
 	_, err = st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/NEW"})
 	require.ErrorIs(t, err, staging.ErrNotStaged)
+}
+
+// TestParamMutator_ImmediateCreateUpserts pins the #691 fix: an immediate param
+// create is a create-or-update (upsert), matching the GUI (ParamSet) and the CLI
+// (`param set`). Creating over an EXISTING param no longer surfaces the raw
+// provider.ErrAlreadyExists — it falls back to update and reports the outcome as
+// an update so the dialog voices it. A create error that is NOT already-exists is
+// still surfaced unchanged (never silently swallowed as an upsert).
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv (newParamMutator)
+func TestParamMutator_ImmediateCreateUpserts(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("create over an existing param falls back to update", func(t *testing.T) {
+		var createTried, put bool
+
+		provStore := &providermock.Store{
+			CreateFunc: func(context.Context, string, string, domain.ValueType, string, ...provider.WriteOption) (domain.Version, error) {
+				createTried = true
+
+				return domain.Version{}, provider.ErrAlreadyExists
+			},
+			// UpdateUseCase reads the entry before writing; report it as present.
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Name: existingParamName, Value: "old", Type: domain.ValueTypePlaintext}, nil
+			},
+			PutFunc: func(context.Context, string, string, domain.ValueType, string, ...provider.WriteOption) (domain.Version, error) {
+				put = true
+
+				return domain.Version{ID: "2"}, nil
+			},
+		}
+
+		mut, _ := newParamMutator(t, provStore)
+
+		out, err := mut.Create(ctx, data.StagedKey{Name: existingParamName}, "new", "String", "", false)
+		require.NoError(t, err, "immediate create over an existing param upserts instead of raising already-exists")
+		assert.True(t, createTried, "create is attempted first")
+		assert.True(t, put, "the already-exists create falls back to update (Put)")
+		assert.True(t, out.Updated, "the outcome reports an update so the dialog voices it")
+	})
+
+	t.Run("a non-already-exists create error is surfaced unchanged", func(t *testing.T) {
+		sentinel := errors.New("provider exploded")
+
+		provStore := &providermock.Store{
+			CreateFunc: func(context.Context, string, string, domain.ValueType, string, ...provider.WriteOption) (domain.Version, error) {
+				return domain.Version{}, sentinel
+			},
+		}
+
+		mut, _ := newParamMutator(t, provStore)
+
+		_, err := mut.Create(ctx, data.StagedKey{Name: "/app/NEW"}, "v", "String", "", false)
+		require.ErrorIs(t, err, sentinel, "a non-already-exists error is returned, not treated as an upsert")
+	})
 }

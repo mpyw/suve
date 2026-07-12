@@ -10,9 +10,9 @@ type rowKind int
 const (
 	// rowEntry is a staged entry (create/update/delete).
 	rowEntry rowKind = iota
-	// rowTagAdd is one staged tag add (cancellable with `x`).
+	// rowTagAdd is one staged tag add (removable with `u`).
 	rowTagAdd
-	// rowTagRemove is one staged tag removal (cancellable with `↩`/enter).
+	// rowTagRemove is one staged tag removal (removable with `u`).
 	rowTagRemove
 )
 
@@ -33,8 +33,12 @@ type rowRef struct {
 }
 
 // rebuildRows flattens every section's entries and tag changes into the
-// selectable-row list, clamping the selection into range.
+// selectable-row list, clamping the selection into range. It also clears the
+// transient invalid-action status: after a reload the row it referred to may no
+// longer exist, so the message must not survive (#684).
 func (m *Model) rebuildRows() {
+	m.status = ""
+
 	var rows []rowRef
 
 	for i, sec := range m.sections {

@@ -67,9 +67,16 @@ func (s *AWSParamStrategy) applyCreate(ctx context.Context, name string, entry E
 		return nil
 	}
 
-	// Create is create-only (never overwrites an existing parameter). New
-	// parameters are created as plain String, matching the prior behavior.
-	if _, err := s.store.Create(ctx, name, *entry.Value, domain.ValueTypePlaintext, lo.FromPtr(entry.Description)); err != nil {
+	// Create is create-only (never overwrites an existing parameter). Use the
+	// staged value type (String / SecureString / StringList); an unset type
+	// defaults to plaintext String, matching entries staged before the staging
+	// model carried a type.
+	valueType := entry.ValueType
+	if valueType == "" {
+		valueType = domain.ValueTypePlaintext
+	}
+
+	if _, err := s.store.Create(ctx, name, *entry.Value, valueType, lo.FromPtr(entry.Description)); err != nil {
 		return fmt.Errorf("failed to create parameter: %w", err)
 	}
 
@@ -81,7 +88,7 @@ func (s *AWSParamStrategy) applyUpdate(ctx context.Context, name string, entry E
 		return nil
 	}
 
-	// Preserve the existing parameter type; a missing parameter is a hard error.
+	// A missing parameter is a hard error.
 	existing, err := s.store.Get(ctx, name, provider.VersionRef{})
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
@@ -91,8 +98,16 @@ func (s *AWSParamStrategy) applyUpdate(ctx context.Context, name string, entry E
 		return fmt.Errorf("failed to get existing parameter: %w", err)
 	}
 
+	// Use the staged value type when the edit specified one; otherwise preserve
+	// the existing parameter type (an unset staged type must never downgrade a
+	// SecureString to plain String).
+	valueType := existing.Type
+	if entry.ValueType != "" {
+		valueType = entry.ValueType
+	}
+
 	// Put overwrites the existing parameter.
-	if _, err := s.store.Put(ctx, name, *entry.Value, existing.Type, lo.FromPtr(entry.Description)); err != nil {
+	if _, err := s.store.Put(ctx, name, *entry.Value, valueType, lo.FromPtr(entry.Description)); err != nil {
 		return fmt.Errorf("failed to update parameter: %w", err)
 	}
 
@@ -160,6 +175,9 @@ func (s *AWSParamStrategy) FetchCurrent(ctx context.Context, name string) (*Fetc
 	return &FetchResult{
 		Value:      entry.Value,
 		Identifier: "#" + entry.Version.ID,
+		// A SecureString param is secret material even on the param service, so the
+		// staged diff must mask it (#677).
+		Secret: entry.Type == domain.ValueTypeSecret,
 	}, nil
 }
 

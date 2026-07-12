@@ -71,6 +71,7 @@ var (
 	recursiveKey = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "recursive/refresh"))
 	loadMoreKey  = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "load more"))
 	revealKey    = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal"))
+	parseJSONKey = key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "parse-json"))
 	compareKey   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "compare"))
 	stagingKey   = key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "staging"))
 	spaceKey     = key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "pick/namespace"))
@@ -115,8 +116,17 @@ type Model struct {
 	items      []data.Item
 	nextToken  string
 	stagedKeys map[data.StagedKey]struct{}
-	loading    bool
-	spinner    spinner.Model
+	// deleteStagedKeys is the subset of stagedKeys staged for deletion; the
+	// edit/delete/tag affordances are dead-end transitions on such an entry (the
+	// reducer rejects them), so they are gated on this set (#692).
+	deleteStagedKeys map[data.StagedKey]struct{}
+	// entryStagedKeys and tagStagedKeys split stagedKeys by change kind (value/entry
+	// vs tag), so the detail banner distinguishes value-only / tag-only / both,
+	// matching the GUI's StagingBanner (#701).
+	entryStagedKeys map[data.StagedKey]struct{}
+	tagStagedKeys   map[data.StagedKey]struct{}
+	loading         bool
+	spinner         spinner.Model
 
 	// Detail state.
 	valuePane       components.ValuePane
@@ -125,7 +135,21 @@ type Model struct {
 	detail          data.Detail
 	detailOK        bool
 
-	err string
+	// Error state is split per source (mirroring the staging page's per-section
+	// err and the GUI's per-source error fields) so a transient detail/history
+	// failure clears the moment that source next succeeds and never lingers over
+	// another source's correct data. listErr/detailErr/historyErr track the three
+	// content loads; stagedErr holds the launch-time staging-store hard-fail, which
+	// is a persistent condition and is not cleared by a selection change.
+	listErr    string
+	detailErr  string
+	historyErr string
+	stagedErr  string
+	// actionStatus is a transient one-line message shown when a key is pressed on
+	// a row where its transition is a dead-end (e.g. edit/delete/tag on a
+	// delete-staged entry) — the browser's parity with the staging page's #684
+	// invalid-action status. It is cleared on the next key press.
+	actionStatus string
 
 	// Monotonic sequence guards (GUI loadSeq pattern): a response is applied only
 	// when its seq still matches the latest issued one.
@@ -171,19 +195,22 @@ func New(ctx context.Context, source data.Source, staging data.StagingProbe, st 
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 
 	m := &Model{
-		ctx:        ctx,
-		source:     source,
-		staging:    staging,
-		svcCap:     source.Capability(),
-		styles:     st,
-		keys:       km,
-		prefix:     prefix,
-		filter:     filter,
-		spinner:    sp,
-		list:       components.NewEntryList(st),
-		history:    components.NewHistoryTable(st),
-		valuePane:  components.NewValuePane(),
-		stagedKeys: map[data.StagedKey]struct{}{},
+		ctx:              ctx,
+		source:           source,
+		staging:          staging,
+		svcCap:           source.Capability(),
+		styles:           st,
+		keys:             km,
+		prefix:           prefix,
+		filter:           filter,
+		spinner:          sp,
+		list:             components.NewEntryList(st),
+		history:          components.NewHistoryTable(st),
+		valuePane:        components.NewValuePane(),
+		stagedKeys:       map[data.StagedKey]struct{}{},
+		deleteStagedKeys: map[data.StagedKey]struct{}{},
+		entryStagedKeys:  map[data.StagedKey]struct{}{},
+		tagStagedKeys:    map[data.StagedKey]struct{}{},
 		// Recursive listing defaults on (GUI parity): a param browser shows the whole
 		// subtree under a prefix by default. The toggle is only shown/effective for a
 		// non-namespaced param service; elsewhere the field is inert.

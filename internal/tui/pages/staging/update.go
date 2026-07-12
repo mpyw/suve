@@ -35,10 +35,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 }
 
 // onReviewLoaded applies a staged-review response when fresh, rebuilds the rows,
-// and reports the section's authoritative staged count (entries + tag changes,
-// counted separately) so the Staging tab badge is exact — fixing the browser's
-// best-effort undercount, which deduplicates an item that has both an entry and
-// a tag change into one.
+// and reports the section's staged count as entries + tag changes (counted
+// separately). The browser's staged probe reports the same entries+tags total,
+// so the Staging tab badge reads one consistent count from either surface (#693).
 func (m *Model) onReviewLoaded(msg reviewLoadedMsg) tea.Cmd {
 	if msg.section >= len(m.sections) {
 		return nil
@@ -85,6 +84,10 @@ func (m *Model) onActionDone(msg actionDoneMsg) tea.Cmd {
 
 // handleKey routes a key press to a page action.
 func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
+	// Clear the transient invalid-action status on any key; the action below
+	// re-sets it when the pressed key is itself invalid for the selected row.
+	m.status = ""
+
 	// The auto-unstaged notice dismisses on esc while it is showing.
 	if key.Matches(msg, m.keys.Back) && m.noticeVisible() {
 		m.noticeDismissed = true
@@ -117,7 +120,9 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Select):
 		return m, m.onEnter()
 	case key.Matches(msg, revealKey):
-		return m, m.onReveal()
+		m.onReveal()
+
+		return m, nil
 	}
 
 	return m.handleActionKey(msg)
@@ -148,6 +153,9 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 }
 
 // moveSelection shifts the selection by delta (clamped) and keeps it visible.
+// It resets the reveal so a peek never persists across a selection move — the
+// reveal is scoped to the row that was selected when `x` was pressed, mirroring
+// the browser's per-entry reveal (#694).
 func (m *Model) moveSelection(delta int) {
 	if len(m.rows) == 0 {
 		return
@@ -155,54 +163,34 @@ func (m *Model) moveSelection(delta int) {
 
 	m.selected = max(0, min(m.selected+delta, len(m.rows)-1))
 	m.scrollToSelection = true
+	m.reveal = false
 }
 
-// onReveal toggles value-view masking, or — on a staged tag-add row — cancels
-// that add (the `x` cancel affordance).
-func (m *Model) onReveal() tea.Cmd {
-	if row, ok := m.selectedRow(); ok && row.kind == rowTagAdd {
-		return m.cancelTag(row)
-	}
-
+// onReveal toggles the reveal for the SELECTED row's value only (never
+// page-global): pressing `x` unmasks just the selected secret, and moving the
+// selection resets it (#694). It is reveal-only on every row kind (including tag
+// rows): removing a staged change — entry or tag — is `u`'s job, never `x`, so a
+// user who learned `x` = reveal never destroys a staged change by peeking (#682).
+func (m *Model) onReveal() {
 	m.reveal = !m.reveal
-
-	return nil
 }
 
-// onEnter opens the full-diff detail for an entry row, or cancels a staged tag
-// change for a tag row (the `↩` cancel affordance).
+// onEnter opens the full-diff detail for an entry row. On a tag row it is a
+// no-op: enter is detail-only, never a destructive cancel (#682). Removing a
+// staged tag change is `u`'s job (see unstageSelected).
 func (m *Model) onEnter() tea.Cmd {
 	row, ok := m.selectedRow()
-	if !ok {
+	if !ok || row.kind != rowEntry {
 		return nil
 	}
 
-	switch row.kind {
-	case rowEntry:
-		return m.openDetail(row)
-	case rowTagAdd, rowTagRemove:
-		return m.cancelTag(row)
-	default:
-		return nil
-	}
+	return m.openDetail(row)
 }
 
-// cancelTag cancels the selected tag add/removal (busy-guarded).
-func (m *Model) cancelTag(row rowRef) tea.Cmd {
-	if m.actionBusy {
-		return nil
-	}
-
-	m.actionBusy = true
-
-	if row.kind == rowTagRemove {
-		return m.cancelRemoveTagCmd(row.section, row.key, row.tagKey)
-	}
-
-	return m.cancelAddTagCmd(row.section, row.key, row.tagKey)
-}
-
-// unstageSelected unstages the selected row's item (entry + its tags).
+// unstageSelected removes the selected row's staged change: for an entry row the
+// whole entry (and its tags); for a tag row that single tag add/removal. `u` is
+// the one removal affordance across all row kinds — `x` reveals and enter shows
+// detail, neither ever removes (#682).
 func (m *Model) unstageSelected() tea.Cmd {
 	row, ok := m.selectedRow()
 	if !ok || m.actionBusy {
@@ -211,11 +199,21 @@ func (m *Model) unstageSelected() tea.Cmd {
 
 	m.actionBusy = true
 
-	return m.unstageCmd(row.section, row.key)
+	switch row.kind {
+	case rowTagAdd:
+		return m.cancelAddTagCmd(row.section, row.key, row.tagKey)
+	case rowTagRemove:
+		return m.cancelRemoveTagCmd(row.section, row.key, row.tagKey)
+	default: // rowEntry
+		return m.unstageCmd(row.section, row.key)
+	}
 }
 
 // editSelected reuses the mutation entry form to edit a staged create/update's
-// value; it is a no-op on a tag row or a staged delete (nothing to edit).
+// value; it is a no-op on a tag row or a staged delete (nothing to edit). The
+// form is opened staged-only (no immediate-mode escape hatch): this is a staged
+// surface, so an immediate write would bypass the staging store and orphan the
+// staged draft.
 func (m *Model) editSelected() tea.Cmd {
 	row, ok := m.selectedRow()
 	if !ok || row.kind != rowEntry || row.entry.Operation == operationDelete {
@@ -226,27 +224,41 @@ func (m *Model) editSelected() tea.Cmd {
 
 	return func() tea.Msg {
 		return nav.OpenEntryForm{
-			Service:   sec.service,
-			Edit:      true,
-			Name:      row.entry.Name,
-			Namespace: row.entry.Namespace,
-			Value:     row.entry.StagedValue,
+			Service:    sec.service,
+			Edit:       true,
+			Name:       row.entry.Name,
+			Namespace:  row.entry.Namespace,
+			Value:      row.entry.StagedValue,
+			StagedOnly: true,
 		}
 	}
 }
 
-// tagSelected reuses the tag form to stage a tag add on the selected
-// row's item.
+// tagSelected reuses the tag form to stage a tag add on the selected row's item,
+// opened staged-only (no immediate-mode escape hatch) for the same reason as
+// editSelected: this is a staged surface. Tagging a delete-staged entry is a
+// statically impossible transition (the reducer returns ErrCannotTagDelete), so
+// it is gated off at the affordance — mirroring editSelected and the GUI's
+// hidden "+ Add Tag" — with a one-line status message instead of a guaranteed
+// dead-end form (#684).
 func (m *Model) tagSelected() tea.Cmd {
 	row, ok := m.selectedRow()
 	if !ok {
 		return nil
 	}
 
+	if row.kind == rowEntry && row.entry.Operation == operationDelete {
+		m.status = "cannot tag: staged for deletion — reset first"
+
+		return nil
+	}
+
 	sec := m.sections[row.section]
 
 	return func() tea.Msg {
-		return nav.OpenTag{Service: sec.service, Name: row.key.Name, Namespace: row.key.Namespace}
+		return nav.OpenTag{
+			Service: sec.service, Name: row.key.Name, Namespace: row.key.Namespace, StagedOnly: true,
+		}
 	}
 }
 
@@ -260,7 +272,8 @@ func (m *Model) openDetail(row rowRef) tea.Cmd {
 		NewLabel: "staged",
 		OldValue: row.entry.RemoteValue,
 		NewValue: row.entry.StagedValue,
-		Secret:   sec.secret,
+		// A SecureString param row is secret even in a non-secret section (#677).
+		Secret: sec.secret || row.entry.Secret,
 	}
 
 	return func() tea.Msg { return req }
@@ -341,9 +354,13 @@ func (m *Model) noticeVisible() bool {
 	return !m.noticeDismissed && len(m.autoUnstaged()) > 0
 }
 
-// maskValue masks a secret value for value-view rendering unless revealed.
-func (m *Model) maskValue(value string, secret bool) string {
-	if secret && !m.reveal {
+// maskValue masks a secret value for rendering unless the reveal is on AND the
+// row is the selected one. The reveal is scoped to the selected row (and reset
+// on a selection move), so pressing `x` unmasks only that row's value rather
+// than every staged secret across all sections (#694).
+func (m *Model) maskValue(value string, secret bool, rowIdx int) string {
+	revealed := m.reveal && rowIdx == m.selected
+	if secret && !revealed {
 		return components.MaskValue(value)
 	}
 

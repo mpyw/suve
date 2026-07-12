@@ -32,6 +32,10 @@ type EntryList struct {
 	width    int
 	height   int
 	styles   styles.Styles
+	// focused reports whether the list pane currently holds keyboard focus. The
+	// selected row is drawn with the active cursor when focused and a dimmed cursor
+	// when not, so the list and history never look equally selected at once.
+	focused bool
 	// hasMore, when true, appends a "… load more (L)" footer occupying the last
 	// visible row. It is set only when the source reports a real next page (a
 	// non-empty NextToken); the un-loaded count is unknown, so no phantom number
@@ -52,6 +56,10 @@ func (l *EntryList) SetRows(rows []ListRow, hasMore bool) {
 	l.clampSelection()
 	l.ensureVisible()
 }
+
+// SetFocused sets whether the list pane holds keyboard focus, which selects the
+// active vs dimmed selection style the next View draws with.
+func (l *EntryList) SetFocused(focused bool) { l.focused = focused }
 
 // SetSize sets the list's inner content size (inside its border).
 func (l *EntryList) SetSize(width, height int) {
@@ -164,13 +172,18 @@ func (l *EntryList) renderRow(idx int) string {
 	row := l.rows[idx]
 
 	cursor := "  "
-	if idx == l.selected {
-		cursor = l.styles.StatusValue.Render("▸ ")
-	}
-
 	name := row.Name
+
 	if idx == l.selected {
-		name = l.styles.StatusValue.Render(name)
+		// A filled cursor + active style when focused; a hollow cursor + dimmed
+		// style when not, so the selection stays visible but clearly idle.
+		if l.focused {
+			cursor = l.styles.Selection.Render("▸ ")
+			name = l.styles.Selection.Render(name)
+		} else {
+			cursor = l.styles.SelectionInactive.Render("▹ ")
+			name = l.styles.SelectionInactive.Render(name)
+		}
 	}
 
 	left := cursor + name

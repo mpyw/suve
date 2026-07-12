@@ -72,12 +72,20 @@ func (m *Model) onListLoaded(msg listLoadedMsg) tea.Cmd {
 	m.loading = false
 
 	if msg.err != nil {
-		m.err = msg.err.Error()
+		m.listErr = msg.err.Error()
 
 		return nil
 	}
 
-	m.err = ""
+	m.listErr = ""
+
+	// Preserve the selection by IDENTITY, not index. A replace can insert or
+	// remove rows above the selection, so capture the selected entry's key first
+	// and re-resolve it to its new index after the rows rebuild — otherwise the
+	// clamped index silently slides the detail onto a neighbor after a mutation
+	// reload (the GUI tracks selection by name; #699). On append the existing
+	// rows keep their indices, so the selection index is already correct.
+	prevKey, hadSelection := m.selectedKey()
 
 	if msg.append {
 		m.items = append(m.items, msg.res.Items...)
@@ -88,50 +96,63 @@ func (m *Model) onListLoaded(msg listLoadedMsg) tea.Cmd {
 	m.nextToken = msg.res.NextToken
 	m.rebuildRows()
 
+	if !msg.append && hadSelection {
+		m.reselect(prevKey)
+	}
+
 	return m.selectionCmd()
 }
 
-// onDetailLoaded applies a detail response and loads it into the value pane.
+// onDetailLoaded applies a detail response and loads it into the value pane. A
+// successful load clears the detail error so a prior transient failure never
+// lingers over the freshly-loaded value.
 func (m *Model) onDetailLoaded(msg detailLoadedMsg) {
 	if msg.seq != m.detailSeq {
 		return
 	}
 
 	if msg.err != nil {
-		m.err = msg.err.Error()
+		m.detailErr = msg.err.Error()
 		m.detailOK = false
 
 		return
 	}
 
+	m.detailErr = ""
 	m.detail = msg.d
 	m.detailOK = true
 	m.valuePane.SetValue(msg.d.Value, msg.d.Secret)
 }
 
-// onHistoryLoaded applies a history response. A history error is surfaced on the
-// error line but never clears the already-loaded value.
+// onHistoryLoaded applies a history response. A history error is surfaced on its
+// own error line (never clearing the already-loaded value); a successful load
+// clears it so a prior transient failure never lingers over good history.
 func (m *Model) onHistoryLoaded(msg historyLoadedMsg) {
 	if msg.seq != m.historySeq {
 		return
 	}
 
 	if msg.err != nil {
-		m.err = msg.err.Error()
+		m.historyErr = msg.err.Error()
 
 		return
 	}
 
+	m.historyErr = ""
 	m.history.SetRows(historyEntries(m.styles, msg.rows, m.svcCap.TagsPerVersion))
 	m.historyVersions = versionIDs(msg.rows)
 }
 
-// onStagedLoaded records the staged-key set, rebuilds the rows so badges appear,
-// and reports the staged count to the app for the Staging tab badge. An ordinary
-// probe read error is non-fatal (badges simply do not show), but a
+// onStagedLoaded records the staged snapshot, rebuilds the rows so badges appear,
+// and reports the staged count to the app for the Staging tab badge. Any probe
+// read error is surfaced on the error line rather than swallowed: a
 // store-construction hard-fail (a staging key-loss while encrypted state exists)
-// is surfaced on the error line so a launch-time key-loss is visible on the read
-// path, not only when the user attempts a write.
+// shows its actionable message, and an ordinary transient read error shows a
+// short "staged status unavailable" note — never full silence, which would hide
+// every [staged] badge and make a staged entry look un-staged (#695). The tab
+// badge counts entries + tag changes — the same definition the staging page uses
+// — so the two surfaces share one count rather than oscillating between a
+// deduplicated-key count and entries+tags (#693).
 func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 	if msg.seq != m.stagedSeq {
 		return nil
@@ -140,19 +161,41 @@ func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 	if msg.err != nil {
 		var storeErr *data.StoreUnavailableError
 		if errors.As(msg.err, &storeErr) {
-			m.err = storeErr.Error()
+			m.stagedErr = storeErr.Error()
+		} else {
+			m.stagedErr = "staged status unavailable"
 		}
 
 		return nil
 	}
 
-	m.stagedKeys = msg.keys
+	m.stagedErr = ""
+	m.stagedKeys = msg.snap.Keys
+	m.deleteStagedKeys = msg.snap.DeleteKeys
+	m.entryStagedKeys = msg.snap.EntryKeys
+	m.tagStagedKeys = msg.snap.TagKeys
 	m.rebuildRows()
 
 	service := m.svcCap.Service
-	count := len(msg.keys)
+	count := msg.snap.EntryCount + msg.snap.TagCount
 
 	return func() tea.Msg { return nav.StagedCount{Service: service, Count: count} }
+}
+
+// errLines returns the active error lines in a stable order — list, detail,
+// history, the staging-store/probe note, then the transient invalid-action
+// status — each owned by its own source so a transient failure clears when that
+// source next succeeds without masking or lingering over another source's state.
+func (m *Model) errLines() []string {
+	lines := make([]string, 0, 5) //nolint:mnd // the four error sources plus the action status
+
+	for _, e := range []string{m.listErr, m.detailErr, m.historyErr, m.stagedErr, m.actionStatus} {
+		if e != "" {
+			lines = append(lines, e)
+		}
+	}
+
+	return lines
 }
 
 // reload re-fetches the list and staged flags after a mutation (the app forwards
@@ -201,6 +244,11 @@ func (m *Model) CapturesInput() bool {
 // handleKey routes a key: to a focused text input when editing, else to the
 // page-local bindings, else to the focused list/history widget.
 func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
+	// Clear the transient invalid-action status on any key; a dead-end action
+	// below re-sets it when the pressed key is itself invalid for the selection
+	// (mirrors the staging page's #684 status handling).
+	m.actionStatus = ""
+
 	if m.focus == focusPrefix || m.focus == focusFilter {
 		return m.handleInputKey(msg)
 	}
@@ -263,6 +311,13 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		m.valuePane.ToggleMask()
 
 		return true, nil
+	case key.Matches(msg, parseJSONKey):
+		// Parse-JSON pretty-prints a JSON value in the detail pane (parity with the
+		// diff page's `J` and the GUI). It is a no-op while a secret is masked (the
+		// pane gates it behind reveal).
+		m.valuePane.ToggleParseJSON()
+
+		return true, nil
 	case key.Matches(msg, stagingKey):
 		return true, func() tea.Msg { return nav.OpenStaging{} }
 	case key.Matches(msg, compareKey):
@@ -274,16 +329,52 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case key.Matches(msg, newKey):
 		return true, m.openNew()
 	case key.Matches(msg, editKey):
+		if m.selectedIsDeleteStaged() {
+			m.actionStatus = "cannot edit: staged for deletion — reset first"
+
+			return true, nil
+		}
+
 		return true, m.openEdit()
 	case key.Matches(msg, deleteKey):
+		if m.selectedIsDeleteStaged() {
+			m.actionStatus = "already staged for deletion — reset first"
+
+			return true, nil
+		}
+
 		return true, m.openDelete()
 	case key.Matches(msg, tagKey):
+		// A no-tags service ignores `t` entirely (openTag is a no-op there), so it
+		// must not surface a delete-staged status that implies tagging is otherwise
+		// possible.
+		if m.svcCap.HasTags && m.selectedIsDeleteStaged() {
+			m.actionStatus = "cannot tag: staged for deletion — reset first"
+
+			return true, nil
+		}
+
 		return true, m.openTag()
 	case key.Matches(msg, restoreKey):
 		return true, m.openRestore()
 	}
 
 	return false, nil
+}
+
+// selectedIsDeleteStaged reports whether the currently-selected entry is staged
+// for deletion. Editing, deleting, or tagging such an entry is a dead-end the
+// reducer rejects post-submit, so the affordance is gated with a friendly status
+// instead (#692), matching the GUI's staging tab, which hides those controls.
+func (m *Model) selectedIsDeleteStaged() bool {
+	item, ok := m.selectedItem()
+	if !ok {
+		return false
+	}
+
+	_, deleteStaged := m.deleteStagedKeys[dataStagedKey(item)]
+
+	return deleteStaged
 }
 
 // openNew requests the create dialog. Creating while viewing all/multiple App
@@ -300,7 +391,11 @@ func (m *Model) openNew() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		return nav.OpenEntryForm{Service: m.svcCap.Service, Namespace: m.currentNamespace()}
+		return nav.OpenEntryForm{
+			Service:          m.svcCap.Service,
+			Namespace:        m.currentNamespace(),
+			DeleteStagedKeys: m.deleteStagedKeys,
+		}
 	}
 }
 
@@ -479,9 +574,14 @@ func (m *Model) openDiff() tea.Cmd {
 	return func() tea.Msg { return req }
 }
 
-// loadMore appends the next secret page when a NextToken is present.
+// loadMore appends the next secret page when a NextToken is present. It is a
+// no-op while a list fetch is already in flight: m.loading is set by loadListCmd
+// for BOTH a full reload and a previous append, so a single guard mirrors the
+// GUI's `loading || loadingMore` check and stops a hammered `L` from splicing a
+// duplicate or stale page (#700). The stale-seq guard in onListLoaded is the
+// backstop; this keeps a superseded append from ever being issued.
 func (m *Model) loadMore() tea.Cmd {
-	if m.nextToken == "" {
+	if m.nextToken == "" || m.loading {
 		return nil
 	}
 
@@ -533,19 +633,26 @@ func (m *Model) currentNamespace() string {
 // order, so a picked row index maps to its version.
 func (m *Model) currentHistoryVersions() []string { return m.historyVersions }
 
-// CopyText reveals the detail value pane (so a masked secret is not copied
-// silently) and returns the revealed value for the clipboard. The app calls this
-// for the global `y` copy; false means there is nothing to copy.
+// CopyText returns the detail value pane's raw value for the clipboard WITHOUT
+// changing its mask state: a `y` copy is a clipboard write, not a reveal, so the
+// on-screen mask stays put and a copied secret never becomes a standing on-screen
+// disclosure (#689). A transient status note reports the copy (and that a masked
+// value stayed masked). The app calls this for the global `y` copy; false means
+// there is nothing to copy.
 func (m *Model) CopyText() (string, bool) {
 	if !m.detailOK {
 		return "", false
 	}
 
-	m.valuePane.Reveal()
-
-	v := m.valuePane.RevealedValue()
+	v := m.valuePane.RawValue()
 	if v == "" {
 		return "", false
+	}
+
+	if m.valuePane.Masked() {
+		m.actionStatus = "copied (value stays masked)"
+	} else {
+		m.actionStatus = "copied"
 	}
 
 	return v, true

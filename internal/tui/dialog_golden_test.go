@@ -127,6 +127,45 @@ func dialogGolden(t *testing.T, host *dialogHost, marker string) {
 	golden.RequireEqual(t, renderVisibleScreen(t, raw))
 }
 
+// captureDialogSize is captureDialog at an explicit terminal size, so a dialog
+// can be goldened at the minimum supported 60×16 (the #686 clip/wrap fix).
+func captureDialogSize(t *testing.T, host *dialogHost, marker string, w, h int) []byte {
+	t.Helper()
+
+	tm := teatest.NewTestModel(t, host, teatest.WithInitialTermSize(w, h))
+
+	var buf bytes.Buffer
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		_, _ = io.Copy(&buf, tm.Output())
+		if bytes.Contains(buf.Bytes(), []byte(marker)) {
+			break
+		}
+
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	require.Contains(t, buf.String(), marker, "dialog content never rendered")
+
+	tm.Send(hostQuitMsg{})
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	_, _ = io.Copy(&buf, tm.Output())
+
+	return buf.Bytes()
+}
+
+// dialogGoldenSize goldens a hosted dialog rendered at an explicit terminal size
+// through the same cell-grid emulator, so the golden captures exactly the
+// visible screen a user sees at that size.
+func dialogGoldenSize(t *testing.T, host *dialogHost, marker string, w, h int) {
+	t.Helper()
+
+	raw := captureDialogSize(t, host, marker, w, h)
+	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, w, h))
+}
+
 // captureDialogWithKeys drives a hosted dialog, first replaying the given key
 // presses (so a golden can capture a post-interaction state — e.g. an immediate
 // delete after the mode toggle), then captures once the marker appears. The final
@@ -175,11 +214,10 @@ func goldenCap(prov, service string) capability.ServiceCapability {
 }
 
 // TestDialog_EntryFormAWSParamGolden renders the create form for AWS SSM param in
-// its default (staged) mode: name, value textarea, Description, and the mode
-// toggle. The Type select is NOT drawn — it is offered only in immediate mode
-// (#664 containment: a staged write drops the value type, so a staged
-// SecureString would silently downgrade to plaintext). No value is seeded, so no
-// secret is rendered.
+// its default (staged) mode: name, the Type select, value textarea, Description,
+// and the mode toggle. The Type select is drawn in both modes — the value type
+// flows through the staged path as well as the immediate path (the #664/#680
+// fix). No value is seeded, so no secret is rendered.
 func TestDialog_EntryFormAWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
@@ -285,6 +323,34 @@ func TestDialog_TagAWSParamGolden(t *testing.T) { //nolint:paralleltest // golde
 	dialogGolden(t, newDialogHost(m, cmd), "Action")
 }
 
+// TestDialog_EntryFormStagedOnlyGolden renders the edit form as launched from the
+// staging review page (StagedOnly): the Stage/Apply-immediately mode toggle is
+// gone, since a staged surface offers no immediate-write escape hatch (#679).
+func TestDialog_EntryFormStagedOnlyGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m, cmd := dialogs.NewEntryForm(dialogs.EntryFormInput{
+		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "param")},
+		Service: "param", Styles: styles.New(),
+		Edit: true, Name: "/app/api/DATABASE_URL", Value: "postgres://new", StagedOnly: true,
+	})
+
+	dialogGolden(t, newDialogHost(m, cmd), "Value")
+}
+
+// TestDialog_TagStagedOnlyGolden renders the tag form as launched from the staging
+// review page (StagedOnly): the mode toggle is gone (#679).
+func TestDialog_TagStagedOnlyGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m, cmd := dialogs.NewTagForm(dialogs.TagInput{
+		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "param")},
+		Service: "param", Styles: styles.New(), Name: "/app/api/DATABASE_URL", StagedOnly: true,
+	})
+
+	dialogGolden(t, newDialogHost(m, cmd), "Action")
+}
+
 // TestDialog_ErrorGolden renders the plain error dialog (a blocked operation the
 // app surfaces modally). It never mutates and carries no secret.
 func TestDialog_ErrorGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
@@ -294,6 +360,50 @@ func TestDialog_ErrorGolden(t *testing.T) { //nolint:paralleltest // goldenEnv s
 		"Creating is blocked while viewing all namespaces. Pick one namespace first.")
 
 	dialogGolden(t, newDialogHost(m, nil), "Cannot create here")
+}
+
+// minGoldenWidth / minGoldenHeight are the minimum supported terminal size the
+// #686 clip/wrap goldens render at.
+const (
+	minGoldenWidth  = 60
+	minGoldenHeight = 16
+)
+
+// TestDialog_EntryFormMinSizeGolden pins the #686 fix at the golden layer: at the
+// minimum supported 60×16 terminal the AWS secret create form — the tallest
+// dialog — caps its body into a scrollable region so the whole box, including
+// the submit/cancel hint, stays on-screen instead of clipping off the bottom.
+// The rendered screen is the full 60×16 grid, so a clipped hint would be absent.
+func TestDialog_EntryFormMinSizeGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m, cmd := dialogs.NewEntryForm(dialogs.EntryFormInput{
+		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "secret")},
+		Service: "secret", Styles: styles.New(),
+	})
+
+	dialogGoldenSize(t, newDialogHost(m, cmd), "esc: cancel", minGoldenWidth, minGoldenHeight)
+}
+
+// TestDialog_ErrorLongMessageMinSizeGolden pins the #686 fix for a long error at
+// 60×16: the provider/key-loss message wraps to the dialog width and scrolls
+// inside a viewport, so the message body is bounded and the close hint (with the
+// scroll affordance) stays pinned on-screen rather than clipping off the bottom.
+func TestDialog_ErrorLongMessageMinSizeGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	const msg = "The staging data key could not be recovered from the keychain, so every " +
+		"staged change for this scope is unreadable and must be re-created from scratch " +
+		"after clearing the store. Check that the login keychain is unlocked, that no other " +
+		"process holds it, and that SUVE_STAGING_KEY is either unset or matches the key the " +
+		"store was written with. If the keychain entry was deleted, the staged changes " +
+		"cannot be recovered and the store must be reset before staging again from this scope. " +
+		"Re-run the command after unlocking the keychain to confirm access has been restored, " +
+		"then stage the changes again and apply them once the store is readable."
+
+	m := dialogs.NewError(styles.New(), "Staging key lost", msg)
+
+	dialogGoldenSize(t, newDialogHost(m, nil), "enter/esc: close", minGoldenWidth, minGoldenHeight)
 }
 
 // TestDialog_RestoreGolden renders the restore form (name input, no mode toggle).

@@ -2,9 +2,11 @@ package data
 
 import (
 	"context"
+	"errors"
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/cli/commands/aws/param/paramtype"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
@@ -18,10 +20,14 @@ import (
 // WriteOutcome carries the semantic result of a mutation the UI must voice.
 // Skipped is set when a staged edit equalled the live value (nothing staged);
 // Unstaged when an edit-back-to-base or a delete-of-staged-create auto-unstaged
-// the entry (EditOutput.Skipped/Unstaged, DeleteOutput.Unstaged).
+// the entry (EditOutput.Skipped/Unstaged, DeleteOutput.Unstaged); Updated when
+// an immediate create fell back to update because the entry already existed
+// (the create-or-update/upsert branch), so the status voices an update rather
+// than a create — matching the GUI (ParamSet) and CLI (`param set`).
 type WriteOutcome struct {
 	Skipped  bool
 	Unstaged bool
+	Updated  bool
 }
 
 // Mutator is the write-path seam the mutation dialogs depend on. Every method is
@@ -129,7 +135,9 @@ func (m *paramMutator) Create(
 	}
 
 	if staged {
-		return m.stageEntry(ctx, StagedKey{Name: key.Name, Namespace: ns}, value, description, stageOpCreate)
+		return m.stageEntry(
+			ctx, StagedKey{Name: key.Name, Namespace: ns}, value, description, stagedValueType(typeLabel), stageOpCreate,
+		)
 	}
 
 	store, err := m.resolveStore(ctx, ns)
@@ -137,13 +145,35 @@ func (m *paramMutator) Create(
 		return WriteOutcome{}, err
 	}
 
-	uc := &param.CreateUseCase{Writer: store}
+	valueType := paramtype.Parse(typeLabel)
 
-	_, err = uc.Execute(ctx, param.CreateInput{
-		Name: key.Name, Value: value, Type: paramtype.Parse(typeLabel), Description: description,
+	// Immediate create is a create-or-update (upsert), matching the GUI (ParamSet)
+	// and the CLI (`param set`): try create first, and if the parameter already
+	// exists fall back to update instead of surfacing the raw ErrAlreadyExists.
+	// The staged branch above is untouched — stage-time add validation is unchanged.
+	createUC := &param.CreateUseCase{Writer: store}
+
+	_, err = createUC.Execute(ctx, param.CreateInput{
+		Name: key.Name, Value: value, Type: valueType, Description: description,
 	})
+	if err == nil {
+		return WriteOutcome{}, nil
+	}
 
-	return WriteOutcome{}, err
+	if !errors.Is(err, provider.ErrAlreadyExists) {
+		return WriteOutcome{}, err
+	}
+
+	updateUC := &param.UpdateUseCase{Store: store}
+
+	_, err = updateUC.Execute(ctx, param.UpdateInput{
+		Name: key.Name, Value: value, Type: valueType, Description: description,
+	})
+	if err != nil {
+		return WriteOutcome{}, err
+	}
+
+	return WriteOutcome{Updated: true}, nil
 }
 
 func (m *paramMutator) Update(
@@ -155,7 +185,9 @@ func (m *paramMutator) Update(
 	}
 
 	if staged {
-		return m.stageEntry(ctx, StagedKey{Name: key.Name, Namespace: ns}, value, description, stageOpEdit)
+		return m.stageEntry(
+			ctx, StagedKey{Name: key.Name, Namespace: ns}, value, description, stagedValueType(typeLabel), stageOpEdit,
+		)
 	}
 
 	store, err := m.resolveStore(ctx, ns)
@@ -261,14 +293,14 @@ func (m *paramMutator) stageStrategy(
 }
 
 func (m *paramMutator) stageEntry(
-	ctx context.Context, key StagedKey, value, description string, op stageOp,
+	ctx context.Context, key StagedKey, value, description string, valueType domain.ValueType, op stageOp,
 ) (WriteOutcome, error) {
 	strategy, st, err := m.stageStrategy(ctx, key.Namespace)
 	if err != nil {
 		return WriteOutcome{}, err
 	}
 
-	return stageEntry(ctx, strategy, st, key, value, description, op)
+	return stageEntry(ctx, strategy, st, key, value, description, valueType, op)
 }
 
 func (m *paramMutator) stageDelete(
@@ -330,7 +362,8 @@ func (m *secretMutator) Create(
 ) (WriteOutcome, error) {
 	if staged {
 		return m.stage(func(strategy staging.FullStrategy, st store.ReadWriteOperator) (WriteOutcome, error) {
-			return stageEntry(ctx, strategy, st, key, value, description, stageOpCreate)
+			// Secrets have no value-type axis, so no value type is staged.
+			return stageEntry(ctx, strategy, st, key, value, description, "", stageOpCreate)
 		})
 	}
 
@@ -345,7 +378,8 @@ func (m *secretMutator) Update(
 ) (WriteOutcome, error) {
 	if staged {
 		return m.stage(func(strategy staging.FullStrategy, st store.ReadWriteOperator) (WriteOutcome, error) {
-			return stageEntry(ctx, strategy, st, key, value, description, stageOpEdit)
+			// Secrets have no value-type axis, so no value type is staged.
+			return stageEntry(ctx, strategy, st, key, value, description, "", stageOpEdit)
 		})
 	}
 
@@ -441,24 +475,48 @@ const (
 	stageOpEdit
 )
 
+// stagedValueType maps a Type display label to the value type to stage. The
+// dialog passes an empty label when it presents no Type control (a secret, an App
+// Configuration setting, or the staging-review edit that cannot seed the current
+// type); an empty value means "no explicit type", which the staging apply treats
+// as plaintext for a create and as "preserve the existing type" for an edit — so
+// an edit from a surface with no Type control never downgrades a staged
+// SecureString. A non-empty label (an offered Type select) is mapped through
+// paramtype.Parse so the chosen type is stored and applied.
+func stagedValueType(typeLabel string) domain.ValueType {
+	if typeLabel == "" {
+		return ""
+	}
+
+	return paramtype.Parse(typeLabel)
+}
+
 // stageEntry stages a create or edit and maps the use-case outcome (Skipped/
-// Unstaged for edit) onto the neutral WriteOutcome.
+// Unstaged for edit) onto the neutral WriteOutcome. valueType carries the AWS SSM
+// param value type (String / SecureString / StringList) into the staging store so
+// a staged SecureString create/edit applies as SecureString; an empty value
+// preserves the existing type on edit (and applies plaintext on create). It is
+// empty for providers with no value-type axis (secret, App Configuration).
 func stageEntry(
 	ctx context.Context, strategy staging.FullStrategy, st store.ReadWriteOperator,
-	key StagedKey, value, description string, op stageOp,
+	key StagedKey, value, description string, valueType domain.ValueType, op stageOp,
 ) (WriteOutcome, error) {
 	entryKey := staging.EntryKey{Name: key.Name, Namespace: key.Namespace}
 
 	if op == stageOpCreate {
 		uc := &stagingusecase.AddUseCase{Strategy: strategy, Store: st}
-		_, err := uc.Execute(ctx, stagingusecase.AddInput{Key: entryKey, Value: value, Description: description})
+		_, err := uc.Execute(ctx, stagingusecase.AddInput{
+			Key: entryKey, Value: value, Description: description, ValueType: valueType,
+		})
 
 		return WriteOutcome{}, err
 	}
 
 	uc := &stagingusecase.EditUseCase{Strategy: strategy, Store: st}
 
-	out, err := uc.Execute(ctx, stagingusecase.EditInput{Key: entryKey, Value: value, Description: description})
+	out, err := uc.Execute(ctx, stagingusecase.EditInput{
+		Key: entryKey, Value: value, Description: description, ValueType: valueType,
+	})
 	if err != nil {
 		return WriteOutcome{}, err
 	}

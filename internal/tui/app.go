@@ -332,6 +332,7 @@ func (m *App) openEntryForm(req nav.OpenEntryForm) tea.Cmd {
 		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
 		Edit: req.Edit, Name: req.Name, Namespace: req.Namespace,
 		Value: req.Value, TypeLabel: req.TypeLabel, Description: req.Description,
+		StagedOnly: req.StagedOnly, DeleteStagedKeys: req.DeleteStagedKeys,
 	})
 
 	return m.pushDialog(d, cmd)
@@ -361,7 +362,7 @@ func (m *App) openTag(req nav.OpenTag) tea.Cmd {
 
 	d, cmd := dialogs.NewTagForm(dialogs.TagInput{
 		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
-		Name: req.Name, Namespace: req.Namespace,
+		Name: req.Name, Namespace: req.Namespace, StagedOnly: req.StagedOnly,
 	})
 
 	return m.pushDialog(d, cmd)
@@ -394,7 +395,21 @@ func (m *App) mutatorForService(service string) data.Mutator {
 // pushDialog appends a dialog to the modal stack, seeds it with the current size
 // (so its embedded form lays out before the first render), clears any transient
 // status, and returns the dialog's Init command.
+//
+// Dialog-open requests arrive as async commands (a page emits
+// func() tea.Msg { return nav.Open*{...} }), so a rapid double-press of a
+// dialog-open key (e/n/d/t/a) can emit two Open* commands before the first
+// dialog lands, and both would otherwise push an identical dialog — Esc then
+// reveals the duplicate underneath. Guard against that here, the single choke
+// point every dialog push flows through: a dialog is modal (once one is on the
+// stack it captures all input, so the page can no longer emit Open*), so any
+// Open* arriving while a dialog is already open is a stale in-flight duplicate.
+// Drop it rather than stack a second dialog.
 func (m *App) pushDialog(d dialogs.Model, initCmd tea.Cmd) tea.Cmd {
+	if len(m.dialogs) > 0 {
+		return nil
+	}
+
 	m.status = ""
 	m.dialogs = append(m.dialogs, dialogAdapter{m: d})
 
@@ -882,9 +897,9 @@ func (m *App) copyFocusedValue() tea.Cmd {
 }
 
 // copyText is the value the `y` key copies. A page that supplies a focused value
-// (the browser reveals its masked value pane and returns the revealed value)
-// wins; otherwise the app's own copyValue is used (empty in the skeleton, so the
-// copy is a guarded no-op).
+// (the browser returns its value pane's raw value WITHOUT changing the mask —
+// copying never reveals, #689) wins; otherwise the app's own copyValue is used
+// (empty in the skeleton, so the copy is a guarded no-op).
 func (m *App) copyText() string {
 	if c, ok := m.activePage().(copyable); ok {
 		if text, has := c.CopyText(); has {

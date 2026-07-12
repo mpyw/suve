@@ -4,10 +4,12 @@ package tui
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/golden"
 	teatest "github.com/charmbracelet/x/exp/teatest/v2"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +30,16 @@ import (
 // secretStagedValue is the secret staged value the value/diff-view goldens must
 // NEVER render revealed.
 const secretStagedValue = "super-secret-token-value"
+
+// secureStringParamValue is a SecureString PARAM staged value. It lives in the
+// param (non-secret) section, so it proves masking keys off the row's value
+// type, not the section's service axis (#677); it must never render revealed.
+const secureStringParamValue = "securestring-db-password-value"
+
+// secureStringCreateValue is a SecureString PARAM staged CREATE value. A create
+// has no remote to fetch, so its Secret flag is derived from the staged value
+// type (#719); it must never render revealed.
+const secureStringCreateValue = "securestring-created-api-key-value"
 
 // goldenStaging is a golden-only data.StagingService returning a fixed review
 // and (for the results golden) a fixed apply result. It never touches a store.
@@ -116,6 +128,147 @@ func stagingApp() *App {
 	})
 }
 
+// secureStringStagingFixture wires a param section holding a single SecureString
+// param staged update (Secret=true) alongside a plaintext param, so a golden can
+// prove the SecureString value is masked in the PARAM (non-secret) section while
+// the plaintext one is not — masking keys off the row's value type (#677).
+func secureStringStagingFixture() func(string) data.StagingService {
+	param := &goldenStaging{
+		service: "param", label: "Param", svcCap: goldenCap("aws", "param"),
+		review: data.StagingReview{
+			Entries: []data.StagedDiffRow{
+				{
+					Name: "/app/api/SECURE_TOKEN", Type: data.StagedDiffNormal, Operation: "update", Secret: true,
+					RemoteValue: "old-" + secureStringParamValue, StagedValue: secureStringParamValue,
+				},
+				{
+					Name: "/app/web/CDN_URL", Type: data.StagedDiffNormal, Operation: "update",
+					RemoteValue: "https://cdn-old.example.com", StagedValue: "https://cdn-new.example.com",
+				},
+			},
+		},
+	}
+
+	return func(service string) data.StagingService {
+		if service == "param" {
+			return param
+		}
+
+		return nil
+	}
+}
+
+// secureStringStagingApp lands on the Staging tab with only the SecureString
+// param fixture wired.
+func secureStringStagingApp() *App {
+	return newApp(config{
+		scope:      provider.Scope{Provider: provider.ProviderAWS},
+		service:    "staging",
+		identity:   awsIdentityFixture(),
+		stagingFor: secureStringStagingFixture(),
+	})
+}
+
+// secureStringCreateStagingFixture wires a param section holding a single
+// SecureString param staged CREATE (Secret=true) alongside a plaintext param
+// create, so a golden can prove the SecureString create value is masked in the
+// PARAM (non-secret) section while the plaintext one is not — a create has no
+// remote, so its Secret flag comes from the staged value type (#719).
+func secureStringCreateStagingFixture() func(string) data.StagingService {
+	param := &goldenStaging{
+		service: "param", label: "Param", svcCap: goldenCap("aws", "param"),
+		review: data.StagingReview{
+			Entries: []data.StagedDiffRow{
+				{
+					Name: "/app/api/SECURE_CREATE", Type: data.StagedDiffCreate, Operation: "create", Secret: true,
+					StagedValue: secureStringCreateValue,
+				},
+				{
+					Name: "/app/web/NEW_CDN_URL", Type: data.StagedDiffCreate, Operation: "create",
+					StagedValue: "https://cdn-new.example.com",
+				},
+			},
+		},
+	}
+
+	return func(service string) data.StagingService {
+		if service == "param" {
+			return param
+		}
+
+		return nil
+	}
+}
+
+// secureStringCreateStagingApp lands on the Staging tab with only the
+// SecureString param create fixture wired.
+func secureStringCreateStagingApp() *App {
+	return newApp(config{
+		scope:      provider.Scope{Provider: provider.ProviderAWS},
+		service:    "staging",
+		identity:   awsIdentityFixture(),
+		stagingFor: secureStringCreateStagingFixture(),
+	})
+}
+
+// TestStaging_SecureStringParamCreateDiffViewGolden pins that a SecureString
+// param staged CREATE is masked in the PARAM section, while a plaintext param
+// create is shown verbatim — a create derives its Secret flag from the staged
+// value type (#719).
+func TestStaging_SecureStringParamCreateDiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStaging(t, secureStringCreateStagingApp(), "SECURE_CREATE", false)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secureStringCreateValue, "no revealed SecureString param create value in the diff-view golden")
+	assert.Contains(t, screen, "•", "the SecureString param create row is masked with bullets, proving it renders (not just absent)")
+	assert.Contains(t, screen, "https://cdn-new.example.com", "a plaintext param create row is NOT masked")
+	golden.RequireEqual(t, screen)
+}
+
+// TestStaging_SecureStringParamCreateValueViewGolden pins the same masking after
+// toggling to value view.
+func TestStaging_SecureStringParamCreateValueViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStaging(t, secureStringCreateStagingApp(), "SECURE_CREATE", true)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secureStringCreateValue, "no revealed SecureString param create value in the value-view golden")
+	assert.Contains(t, screen, "•", "the SecureString param create row is masked with bullets, proving it renders (not just absent)")
+	golden.RequireEqual(t, screen)
+}
+
+// TestStaging_SecureStringParamDiffViewGolden pins that a SecureString param
+// staged row is masked on both diff sides in the PARAM section, while a
+// plaintext param row is shown verbatim — masking keys off the row's value type,
+// not the section's service axis (#677).
+func TestStaging_SecureStringParamDiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", false)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secureStringParamValue, "no revealed SecureString param value in the diff-view golden")
+	assert.Contains(t, screen, "•", "the SecureString param row is masked with bullets, proving it renders (not just absent)")
+	assert.Contains(t, screen, "https://cdn-new.example.com", "a plaintext param row is NOT masked")
+	golden.RequireEqual(t, screen)
+}
+
+// TestStaging_SecureStringParamValueViewGolden pins the same masking after
+// toggling to value view.
+func TestStaging_SecureStringParamValueViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", true)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secureStringParamValue, "no revealed SecureString param value in the value-view golden")
+	assert.Contains(t, screen, "•", "the SecureString param row is masked with bullets, proving it renders (not just absent)")
+	golden.RequireEqual(t, screen)
+}
+
 // TestStaging_DiffViewGolden renders the staging page in the default diff view.
 // Secret values are masked on both diff sides, so the secret value never appears.
 func TestStaging_DiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
@@ -138,6 +291,49 @@ func TestStaging_ValueViewGolden(t *testing.T) { //nolint:paralleltest // golden
 
 	assert.NotContains(t, screen, secretStagedValue, "no revealed secret value in the value-view golden")
 	golden.RequireEqual(t, screen)
+}
+
+// TestStaging_TagGateStatusGolden pins #684: pressing `t` on a delete-staged
+// entry does not open the tag form (a statically impossible transition) but
+// shows a one-line status message in the footer instead.
+func TestStaging_TagGateStatusGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStagingKeys(t, stagingApp(), "prod/api/old-key",
+		// Move to the delete-staged secret row (prod/api/old-key), then press `t`.
+		keyPress('j'), keyPress('j'), keyPress('j'), keyPress('j'), keyPress('t'))
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.Contains(t, screen, "cannot tag: staged for deletion", "the gate surfaces a status message")
+	golden.RequireEqual(t, screen)
+}
+
+// captureStagingKeys drives a staging app to its loaded state, sends the given
+// keys, and returns the captured byte stream (for asserting a post-key frame).
+func captureStagingKeys(t *testing.T, m *App, marker string, presses ...tea.KeyPressMsg) []byte {
+	t.Helper()
+
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
+
+	var buf bytes.Buffer
+
+	waitFor(t, tm, &buf, marker)
+
+	for _, k := range presses {
+		tm.Send(k)
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	_, _ = io.Copy(&buf, tm.Output())
+
+	tm.Send(keyPress('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	_, _ = io.Copy(&buf, tm.Output())
+
+	return buf.Bytes()
 }
 
 // captureStaging drives a staging app to its loaded state (optionally toggling to
@@ -222,6 +418,37 @@ func TestStaging_ApplyResultsGolden(t *testing.T) { //nolint:paralleltest // gol
 
 	// Focus Apply (row 1) and confirm to reach the results view.
 	raw := captureDialogWithKeys(t, newDialogHost(d, nil), "Apply results",
+		keyDownMsg(), keyEnterMsg())
+	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+}
+
+// TestStaging_ApplyResultsScrollableGolden pins the #687 fix: an apply result set
+// taller than the terminal is capped into a scrollable viewport with the title and
+// close hint pinned — so the tail and the hint are never clipped off-screen. The
+// 40-entry body cannot fit the 30-row golden terminal, so the frame shows the
+// viewport-capped head plus the pinned "scroll · enter/esc: close" hint.
+func TestStaging_ApplyResultsScrollableGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	entries := make([]data.ApplyEntryResult, 40)
+	for i := range entries {
+		entries[i] = data.ApplyEntryResult{Name: fmt.Sprintf("/app/web/PARAM_%02d", i), Status: "updated"}
+	}
+
+	svc := &goldenStaging{
+		service: "param", label: "Param",
+		applyResult: data.StagingApplyResult{ServiceLabel: "Param", Entries: entries},
+	}
+
+	// TargetLine is omitted: it appears only on the confirm view, and this golden
+	// captures the results view.
+	d := dialogs.NewApply(dialogs.ApplyInput{
+		Ctx: context.Background(), Targets: []data.StagingService{svc},
+		Title: "Apply staged changes — Param", EntryCount: len(entries), Styles: styles.New(),
+	})
+
+	// Focus Apply (row 1) and confirm to reach the results view.
+	raw := captureDialogWithKeys(t, newDialogHost(d, nil), "enter/esc: close",
 		keyDownMsg(), keyEnterMsg())
 	golden.RequireEqual(t, renderVisibleScreen(t, raw))
 }

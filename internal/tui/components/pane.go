@@ -15,6 +15,19 @@ import (
 // that split a right-aligned badge onto its own row. Centralizing the framing
 // keeps every pane identical, which also keeps goldens stable.
 func Pane(st styles.Styles, title, body string, width, height int) string {
+	return renderPane(st.Pane, st, title, body, width, height)
+}
+
+// PaneFocused frames a pane exactly like Pane but with the focused border, so the
+// pane that currently holds keyboard focus is visually distinct from the idle one.
+func PaneFocused(st styles.Styles, title, body string, width, height int) string {
+	return renderPane(st.PaneFocused, st, title, body, width, height)
+}
+
+// renderPane is the shared framing body: frame is the border style to draw with
+// (Pane or PaneFocused), so the inner content sizing/normalization stays identical
+// and goldens stay stable regardless of the focus border.
+func renderPane(frame lipgloss.Style, st styles.Styles, title, body string, width, height int) string {
 	innerW, innerH := PaneInner(width, height)
 	if innerW <= 0 || innerH < 0 {
 		return ""
@@ -31,7 +44,7 @@ func Pane(st styles.Styles, title, body string, width, height int) string {
 		rows = append(rows, strings.Repeat(" ", innerW))
 	}
 
-	return st.Pane.Render(strings.Join(rows, "\n"))
+	return frame.Render(strings.Join(rows, "\n"))
 }
 
 // Pane chrome sizes: two border columns, and two border rows plus one title row.

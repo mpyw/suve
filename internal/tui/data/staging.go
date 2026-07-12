@@ -16,13 +16,34 @@ type StagedKey struct {
 	Namespace string
 }
 
+// StagingSnapshot is the browser's read-only view of a service's staged state.
+// Keys drives the [staged] badge and the detail banner; DeleteKeys is the subset
+// staged for deletion, so the browser can gate the edit/delete/tag affordances
+// that the reducer would reject as dead-end transitions (#692). EntryKeys and
+// TagKeys split Keys by change kind — a value/entry change and a tag change —
+// so the detail banner can distinguish value-only / tag-only / both, mirroring
+// the GUI's StagingStatus {hasEntry, hasTags} pair
+// (internal/gui/frontend/src/lib/StagingBanner.svelte) (#701). EntryCount and
+// TagCount are the staged entry-row and tag-change totals whose sum feeds the
+// Staging tab badge — the same entries+tags definition the staging page uses, so
+// the badge no longer oscillates between two counts (#693).
+type StagingSnapshot struct {
+	Keys       map[StagedKey]struct{}
+	DeleteKeys map[StagedKey]struct{}
+	EntryKeys  map[StagedKey]struct{}
+	TagKeys    map[StagedKey]struct{}
+	EntryCount int
+	TagCount   int
+}
+
 // StagingProbe reports which items in the current service have staged changes
 // (an entry or a tag change), so the browser can show a [staged] badge and the
 // detail pane a staged-changes banner. It is read-only — the parity of the
 // GUI's StagingCheckStatus/StagingStatus reads (the staging page owns the mutations).
 type StagingProbe interface {
-	// StagedKeys returns the set of staged (name, namespace) keys for the service.
-	StagedKeys(ctx context.Context) (map[StagedKey]struct{}, error)
+	// Staged returns the staged snapshot (badge keys, delete-staged subset, and
+	// entry/tag counts) for the service.
+	Staged(ctx context.Context) (StagingSnapshot, error)
 }
 
 // StoreUnavailableError marks a StagingProbe failure that comes from CONSTRUCTING
@@ -51,23 +72,38 @@ func NewStagingProbe(strategy staging.ServiceStrategy, store store.ReadOperator)
 	return &stagingProbe{strategy: strategy, store: store}
 }
 
-func (p *stagingProbe) StagedKeys(ctx context.Context) (map[StagedKey]struct{}, error) {
+func (p *stagingProbe) Staged(ctx context.Context) (StagingSnapshot, error) {
 	uc := &stagingusecase.StatusUseCase{Strategy: p.strategy, Store: p.store}
 
 	out, err := uc.Execute(ctx, stagingusecase.StatusInput{})
 	if err != nil {
-		return nil, err
+		return StagingSnapshot{}, err
 	}
 
-	keys := make(map[StagedKey]struct{}, len(out.Entries)+len(out.TagEntries))
+	snap := StagingSnapshot{
+		Keys:       make(map[StagedKey]struct{}, len(out.Entries)+len(out.TagEntries)),
+		DeleteKeys: map[StagedKey]struct{}{},
+		EntryKeys:  make(map[StagedKey]struct{}, len(out.Entries)),
+		TagKeys:    make(map[StagedKey]struct{}, len(out.TagEntries)),
+		EntryCount: len(out.Entries),
+		TagCount:   len(out.TagEntries),
+	}
 
 	for _, e := range out.Entries {
-		keys[StagedKey{Name: e.Name, Namespace: e.Namespace}] = struct{}{}
+		key := StagedKey{Name: e.Name, Namespace: e.Namespace}
+		snap.Keys[key] = struct{}{}
+		snap.EntryKeys[key] = struct{}{}
+
+		if e.Operation == staging.OperationDelete {
+			snap.DeleteKeys[key] = struct{}{}
+		}
 	}
 
 	for _, t := range out.TagEntries {
-		keys[StagedKey{Name: t.Name, Namespace: t.Namespace}] = struct{}{}
+		key := StagedKey{Name: t.Name, Namespace: t.Namespace}
+		snap.Keys[key] = struct{}{}
+		snap.TagKeys[key] = struct{}{}
 	}
 
-	return keys, nil
+	return snap, nil
 }

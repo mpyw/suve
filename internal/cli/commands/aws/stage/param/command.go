@@ -2,20 +2,69 @@
 package param
 
 import (
+	"errors"
+
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/commands/aws/param/paramtype"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
 //nolint:gochecknoglobals // package-level config for command factory
 var config = stgcli.CommandConfig{
-	CommandName:    "param",
-	ItemName:       "parameter",
-	Factory:        cliinternal.AWSParamStrategyFactory,
-	ParserFactory:  staging.AWSParamParserFactory,
-	HasDescription: true,
+	CommandName:      "param",
+	ItemName:         "parameter",
+	Factory:          cliinternal.AWSParamStrategyFactory,
+	ParserFactory:    staging.AWSParamParserFactory,
+	HasDescription:   true,
+	ValueTypeFlags:   valueTypeFlags(),
+	ValueTypeFromCmd: resolveValueType,
+}
+
+// valueTypeFlags returns the SSM Parameter Store type flags for stage add/edit,
+// matching the immediate `param create`/`param update` commands. --type carries
+// no default so an unset flag stays "not specified" (create then applies String,
+// edit preserves the existing type).
+func valueTypeFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:  "type",
+			Usage: "Parameter type (String, StringList, SecureString)",
+		},
+		&cli.BoolFlag{
+			Name:  "secure",
+			Usage: "Shorthand for --type SecureString",
+		},
+	}
+}
+
+// resolveValueType maps the --type/--secure flags to a domain.ValueType, using
+// the same mutual-exclusion and validation as immediate `param create`. It
+// returns an empty value type when neither flag is set, meaning "not specified".
+func resolveValueType(cmd *cli.Command) (domain.ValueType, error) {
+	secure := cmd.Bool("secure")
+	typeSet := cmd.IsSet("type")
+
+	if secure && typeSet {
+		return "", errors.New("cannot use --secure with --type; use one or the other")
+	}
+
+	switch {
+	case secure:
+		return domain.ValueTypeSecret, nil
+	case typeSet:
+		paramType := cmd.String("type")
+		if err := paramtype.Validate(paramType); err != nil {
+			return "", err
+		}
+
+		return paramtype.Parse(paramType), nil
+	default:
+		return "", nil
+	}
 }
 
 // Config returns the AWS SSM Parameter Store staging command config. It is used

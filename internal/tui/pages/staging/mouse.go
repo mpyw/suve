@@ -7,10 +7,13 @@ import (
 // handleMouseClick maps a left click onto the last-rendered geometry, reducing
 // each click to the SAME internal action its keyboard equivalent performs: a
 // section's apply/reset button to apply/reset that section, an entry row to the
-// full-diff detail (like enter), a tag row to its cancel (like enter/x), and the
-// auto-unstaged notice to dismiss. It follows the browser's hand-rolled geom
-// hit-testing so #663 can migrate both pages to the compositor uniformly.
+// full-diff detail (like enter), a tag row to just selecting it (enter is a
+// no-op there — removal is `u`-only, never a click, #682), and the auto-unstaged
+// notice to dismiss. It follows the browser's hand-rolled geom hit-testing so
+// #663 can migrate both pages to the compositor uniformly.
 func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
+	m.status = "" // a mouse interaction dismisses the transient invalid-action status
+
 	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}
@@ -58,20 +61,26 @@ func (m *Model) clickSection(desc lineDesc, x int) (*Model, tea.Cmd) {
 	}
 }
 
-// clickRow selects a row and performs its enter action (detail for an entry,
-// cancel for a tag change), so a click reduces to the key path.
+// clickRow selects a row and performs its enter action (detail for an entry;
+// a no-op for a tag change, which is only selected), so a click reduces to the
+// key path.
 func (m *Model) clickRow(row int) (*Model, tea.Cmd) {
 	if row >= len(m.rows) {
 		return m, nil
 	}
 
 	m.selected = row
+	// A selection move resets the reveal so a peek never persists onto another row
+	// (mirrors moveSelection; the reveal is scoped to the selected row — #694).
+	m.reveal = false
 
 	return m, m.onEnter()
 }
 
 // handleMouseWheel scrolls the section body.
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) (*Model, tea.Cmd) {
+	m.status = "" // a mouse interaction dismisses the transient invalid-action status
+
 	delta := wheelDelta(msg.Button)
 	if delta == 0 {
 		return m, nil
