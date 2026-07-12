@@ -1,9 +1,11 @@
 package maputil
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 )
 
 // Set is a generic set type that serializes to/from JSON arrays.
@@ -43,23 +45,24 @@ func (s Set[T]) Len() int {
 
 // Values returns all values as a slice.
 func (s Set[T]) Values() []T {
-	values := make([]T, 0, len(s))
-	for v := range s {
-		values = append(values, v)
-	}
-
-	return values
+	return slices.Collect(maps.Keys(s))
 }
 
 // MarshalJSON implements json.Marshaler.
 func (s Set[T]) MarshalJSON() ([]byte, error) {
 	values := s.Values()
 
+	// Emit an empty array (not null) for an empty/nil set so staged-state files
+	// round-trip stably.
+	if len(values) == 0 {
+		return []byte("[]"), nil
+	}
+
 	// Deterministic order so staged-state files (which embed a Set in
 	// TagEntry.Remove) don't churn byte-for-byte across otherwise-identical
 	// writes. T is only comparable, not ordered, so sort by string form.
-	sort.Slice(values, func(i, j int) bool {
-		return fmt.Sprint(values[i]) < fmt.Sprint(values[j])
+	slices.SortFunc(values, func(a, b T) int {
+		return cmp.Compare(fmt.Sprint(a), fmt.Sprint(b))
 	})
 
 	return json.Marshal(values)

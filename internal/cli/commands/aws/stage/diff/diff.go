@@ -442,7 +442,7 @@ func (r *Runner) outputTagDiff(ctx context.Context, svc ServiceStrategy, key sta
 
 	if len(tagEntry.Add) > 0 {
 		tagPairs := make([]string, 0, len(tagEntry.Add))
-		for _, k := range maputil.SortedKeys(tagEntry.Add) {
+		for k := range maputil.SortedKeys(tagEntry.Add) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
 
@@ -463,7 +463,7 @@ func (r *Runner) outputTagDiff(ctx context.Context, svc ServiceStrategy, key sta
 
 func (r *Runner) outputRemovedTags(remove maputil.Set[string], currentTags map[string]string) {
 	tagPairs := make([]string, 0, remove.Len())
-	for _, k := range maputil.SortedKeys(remove) {
+	for k := range maputil.SortedKeys(remove) {
 		if currentTags != nil {
 			if v := currentTags[k]; v != "" {
 				tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, v))

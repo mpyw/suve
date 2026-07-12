@@ -44,6 +44,7 @@ import (
 
 	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
@@ -412,12 +413,12 @@ func mapTags(tags map[string]*string) []domain.Tag {
 		return nil
 	}
 
-	keys := lo.Keys(tags)
-	sort.Strings(keys)
+	out := make([]domain.Tag, 0, len(tags))
+	for k := range maputil.SortedKeys(tags) {
+		out = append(out, domain.Tag{Key: k, Value: lo.FromPtr(tags[k])})
+	}
 
-	return lo.Map(keys, func(k string, _ int) domain.Tag {
-		return domain.Tag{Key: k, Value: lo.FromPtr(tags[k])}
-	})
+	return out
 }
 
 // isNotFound reports whether err is an Azure 404 response error.

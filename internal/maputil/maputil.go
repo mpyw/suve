@@ -3,26 +3,25 @@ package maputil
 
 import (
 	"cmp"
+	"iter"
+	"maps"
 	"slices"
 
 	"github.com/samber/lo"
 )
 
-// SortedKeys returns the keys of a map sorted in ascending order.
-func SortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
-	keys := lo.Keys(m)
-	slices.Sort(keys)
-
-	return keys
+// SortedKeys returns an iterator over the keys of m in ascending order. The
+// ~map[K]V constraint also accepts defined map types such as Set.
+func SortedKeys[M ~map[K]V, K cmp.Ordered, V any](m M) iter.Seq[K] {
+	return slices.Values(slices.Sorted(maps.Keys(m)))
 }
 
-// SortedNames extracts unique names from a slice using the provided getter function
-// and returns them sorted in ascending order.
-func SortedNames[T any](items []T, getName func(T) string) []string {
-	names := make(map[string]struct{})
-	for _, item := range items {
-		names[getName(item)] = struct{}{}
-	}
+// SortedNames returns an iterator over the unique names extracted from items
+// via getName, in ascending order.
+func SortedNames[T any](items []T, getName func(T) string) iter.Seq[string] {
+	names := lo.Map(items, func(item T, _ int) string {
+		return getName(item)
+	})
 
-	return SortedKeys(names)
+	return SortedKeys(NewSet(names...))
 }
