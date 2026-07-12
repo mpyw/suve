@@ -281,35 +281,29 @@ func statusTagEntries(o *stagingusecase.StatusOutput) []stagingusecase.StatusTag
 // toStagingEntries converts use-case status entries into the frontend DTO,
 // formatting timestamps as RFC3339.
 func toStagingEntries(entries []stagingusecase.StatusEntry) []StagingEntry {
-	out := make([]StagingEntry, len(entries))
-	for i, e := range entries {
-		out[i] = StagingEntry{
+	return lo.Map(entries, func(e stagingusecase.StatusEntry, _ int) StagingEntry {
+		return StagingEntry{
 			Name:      e.Name,
 			Namespace: e.Namespace,
 			Operation: string(e.Operation),
 			Value:     e.Value,
 			StagedAt:  timeutil.FormatRFC3339(e.StagedAt),
 		}
-	}
-
-	return out
+	})
 }
 
 // toStagingTagEntries converts use-case status tag entries into the frontend
 // DTO, formatting timestamps as RFC3339.
 func toStagingTagEntries(tags []stagingusecase.StatusTagEntry) []StagingTagEntry {
-	out := make([]StagingTagEntry, len(tags))
-	for i, t := range tags {
-		out[i] = StagingTagEntry{
+	return lo.Map(tags, func(t stagingusecase.StatusTagEntry, _ int) StagingTagEntry {
+		return StagingTagEntry{
 			Name:       t.Name,
 			Namespace:  t.Namespace,
 			AddTags:    t.Add,
 			RemoveTags: t.Remove.Values(),
 			StagedAt:   timeutil.FormatRFC3339(t.StagedAt),
 		}
-	}
-
-	return out
+	})
 }
 
 // StagingApply applies staged changes for a service.
@@ -374,7 +368,7 @@ func newStagingApplyResult(result *stagingusecase.ApplyOutput) *StagingApplyResu
 		TagFailed:      result.TagFailed,
 	}
 
-	for _, r := range result.EntryResults {
+	output.EntryResults = lo.Map(result.EntryResults, func(r stagingusecase.ApplyEntryResult, _ int) StagingApplyEntryResult {
 		entry := StagingApplyEntryResult{
 			Name:      r.Name,
 			Namespace: r.Namespace,
@@ -388,10 +382,10 @@ func newStagingApplyResult(result *stagingusecase.ApplyOutput) *StagingApplyResu
 			entry.UnstageError = r.UnstageError.Error()
 		}
 
-		output.EntryResults = append(output.EntryResults, entry)
-	}
+		return entry
+	})
 
-	for _, r := range result.TagResults {
+	output.TagResults = lo.Map(result.TagResults, func(r stagingusecase.ApplyTagResult, _ int) StagingApplyTagResult {
 		tagResult := StagingApplyTagResult{
 			Name:       r.Name,
 			Namespace:  r.Namespace,
@@ -406,8 +400,8 @@ func newStagingApplyResult(result *stagingusecase.ApplyOutput) *StagingApplyResu
 			tagResult.UnstageError = r.UnstageError.Error()
 		}
 
-		output.TagResults = append(output.TagResults, tagResult)
-	}
+		return tagResult
+	})
 
 	return output
 }
@@ -824,9 +818,8 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		return nil, err
 	}
 
-	entries := make([]StagingDiffEntry, len(result.Entries))
-	for i, e := range result.Entries {
-		entries[i] = StagingDiffEntry{
+	entries := lo.Map(result.Entries, func(e stagingusecase.DiffEntry, _ int) StagingDiffEntry {
+		return StagingDiffEntry{
 			Name:             e.Name,
 			Namespace:        e.Namespace,
 			Type:             diffEntryTypeNames[e.Type],
@@ -837,17 +830,16 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 			Description:      e.Description,
 			Warning:          e.Warning,
 		}
-	}
+	})
 
-	tagEntries := make([]StagingDiffTagEntry, len(result.TagEntries))
-	for i, t := range result.TagEntries {
-		tagEntries[i] = StagingDiffTagEntry{
+	tagEntries := lo.Map(result.TagEntries, func(t stagingusecase.DiffTagEntry, _ int) StagingDiffTagEntry {
+		return StagingDiffTagEntry{
 			Name:       t.Name,
 			Namespace:  t.Namespace,
 			AddTags:    t.Add,
 			RemoveTags: t.Remove,
 		}
-	}
+	})
 
 	return &StagingDiffResult{
 		ItemName:   result.ItemName,

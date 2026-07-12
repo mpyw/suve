@@ -141,15 +141,14 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 		return nil, err
 	}
 
-	entries := make([]ParamListEntry, len(result.Entries))
-	for i, e := range result.Entries {
-		entries[i] = ParamListEntry{
+	entries := lo.Map(result.Entries, func(e param.ListEntry, _ int) ParamListEntry {
+		return ParamListEntry{
 			Name:   e.Name,
 			Type:   paramtype.Display(e.Type),
 			Secret: e.Type == domain.ValueTypeSecret,
 			Value:  e.Value,
 		}
-	}
+	})
 
 	return &ParamListResult{Entries: entries}, nil
 }
@@ -177,15 +176,13 @@ func (a *App) paramListWithNamespaces(
 		return nil, err
 	}
 
-	entries := make([]ParamListEntry, 0, len(items))
-
-	for _, item := range items {
+	entries := lo.FilterMap(items, func(item appconfig.KeyNamespace, _ int) (ParamListEntry, bool) {
 		if !param.MatchPrefix(item.Key, prefix, recursive) {
-			continue
+			return ParamListEntry{}, false
 		}
 
 		if filterRegex != nil && !filterRegex.MatchString(item.Key) {
-			continue
+			return ParamListEntry{}, false
 		}
 
 		// App Configuration values are always plaintext (never a secret), so the
@@ -200,8 +197,8 @@ func (a *App) paramListWithNamespaces(
 			entry.Value = lo.ToPtr(item.Value)
 		}
 
-		entries = append(entries, entry)
-	}
+		return entry, true
+	})
 
 	return &ParamListResult{Entries: entries}, nil
 }
@@ -236,17 +233,12 @@ func (a *App) ParamShow(specStr, namespace string) (*ParamShowResult, error) {
 		Type:        paramtype.Display(result.Type),
 		Secret:      result.Type == domain.ValueTypeSecret,
 		Description: result.Description,
-		Tags:        make([]ParamShowTag, 0, len(result.Tags)),
+		Tags: lo.Map(result.Tags, func(tag param.ShowTag, _ int) ParamShowTag {
+			return ParamShowTag{Key: tag.Key, Value: tag.Value}
+		}),
 	}
 	if result.LastModified != nil {
 		r.LastModified = timeutil.FormatRFC3339(*result.LastModified)
-	}
-
-	for _, tag := range result.Tags {
-		r.Tags = append(r.Tags, ParamShowTag{
-			Key:   tag.Key,
-			Value: tag.Value,
-		})
 	}
 
 	return r, nil
@@ -271,8 +263,7 @@ func (a *App) ParamLog(name string, maxResults int32, namespace string) (*ParamL
 		return nil, err
 	}
 
-	entries := make([]ParamLogEntry, len(result.Entries))
-	for i, e := range result.Entries {
+	entries := lo.Map(result.Entries, func(e param.LogEntry, _ int) ParamLogEntry {
 		entry := ParamLogEntry{
 			Version:   e.Version,
 			Value:     e.Value,
@@ -284,8 +275,8 @@ func (a *App) ParamLog(name string, maxResults int32, namespace string) (*ParamL
 			entry.LastModified = timeutil.FormatRFC3339(*e.LastModified)
 		}
 
-		entries[i] = entry
-	}
+		return entry
+	})
 
 	return &ParamLogResult{Name: result.Name, Entries: entries}, nil
 }
