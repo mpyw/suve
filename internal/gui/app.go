@@ -9,9 +9,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
+	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/provider/azure"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/provider/gcloud"

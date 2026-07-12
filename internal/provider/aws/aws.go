@@ -14,8 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
-	"github.com/mpyw/suve/internal/infra"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/provider/aws/param"
 	"github.com/mpyw/suve/internal/provider/aws/secret"
 )
