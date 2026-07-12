@@ -53,6 +53,7 @@ func Run(ctx context.Context, scope provider.Scope, service string) error {
 		fetchIdentity: awsIdentityFetcher(ctx),
 		sourceFor:     factory.sourceFor,
 		mutatorFor:    factory.mutatorFor,
+		stagingFor:    factory.stagingService,
 		runCtx:        ctx,
 	})
 

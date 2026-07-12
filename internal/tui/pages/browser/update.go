@@ -33,7 +33,7 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		return m, nil
 	case stagedLoadedMsg:
 		return m, m.onStagedLoaded(msg)
-	case ReloadMsg:
+	case nav.Reload:
 		return m, m.reload()
 	case namespacesLoadedMsg:
 		m.onNamespacesLoaded(msg)
@@ -156,7 +156,7 @@ func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 }
 
 // reload re-fetches the list and staged flags after a mutation (the app forwards
-// ReloadMsg). The list load re-issues the selection's detail/history on landing,
+// nav.Reload). The list load re-issues the selection's detail/history on landing,
 // so the value and badges reflect the write.
 func (m *Model) reload() tea.Cmd {
 	cmds := []tea.Cmd{m.loadListCmd(false)}
