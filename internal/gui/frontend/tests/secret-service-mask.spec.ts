@@ -134,3 +134,42 @@ test.describe('SecureString-param staging review masking (per-entry flag, #715)'
     expect(body).toMatch(/\*/);
   });
 });
+
+test.describe('SecureString-param staging review CREATE masking (#719)', () => {
+  // A create has no remote to fetch, so the diff usecase used to leave its
+  // Secret flag false — the create-staged value rendered in cleartext. The flag
+  // now derives from the staged value type (SecureString ⇒ secret), so a
+  // create-staged SecureString param is masked like every other secret value.
+  const SECURE_CREATE_VALUE = 'securestring-created-plaintext';
+
+  async function gotoParamCreateStaging(page: import('@playwright/test').Page) {
+    await setupWailsMocks(page, {
+      ...createParamStagedState([
+        { name: '/app/secure/new-token', operation: 'create', value: SECURE_CREATE_VALUE, secret: true },
+      ]),
+    });
+    await page.goto('/');
+    await navigateTo(page, 'Staging');
+    await expect(page.locator('.entry-item').first()).toBeVisible();
+  }
+
+  test('masks a create-staged SecureString param value in diff view', async ({ page }) => {
+    await gotoParamCreateStaging(page);
+    // Default view mode is Diff; a create renders its staged value directly.
+    await expect(page.getByRole('button', { name: 'Diff' })).toHaveClass(/active/);
+
+    const body = (await page.locator('.staging-content').textContent()) ?? '';
+    expect(body).not.toContain(SECURE_CREATE_VALUE);
+    expect(body).toMatch(/\*/);
+  });
+
+  test('masks a create-staged SecureString param value in value view', async ({ page }) => {
+    await gotoParamCreateStaging(page);
+    await page.getByRole('button', { name: 'Value' }).click();
+    await expect(page.getByRole('button', { name: 'Value' })).toHaveClass(/active/);
+
+    const body = (await page.locator('.staging-content').textContent()) ?? '';
+    expect(body).not.toContain(SECURE_CREATE_VALUE);
+    expect(body).toMatch(/\*/);
+  });
+});

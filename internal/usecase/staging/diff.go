@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
@@ -293,6 +294,10 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 			Operation:   entry.Operation,
 			StagedValue: lo.FromPtr(entry.Value),
 			Description: entry.Description,
+			// A create has no remote to fetch, so derive Secret from the staged
+			// value type: a SecureString param (or any secret-typed staged value)
+			// is masked in the review like every other secret value (#719).
+			Secret: entry.ValueType == domain.ValueTypeSecret,
 		}, nil
 
 	case staging.OperationUpdate:

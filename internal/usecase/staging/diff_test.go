@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
@@ -158,6 +159,37 @@ func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 	assert.Equal(t, usecasestaging.DiffEntryCreate, entry.Type)
 	assert.Equal(t, "new-value", entry.StagedValue)
 	assert.Equal(t, "new param", *entry.Description)
+	assert.False(t, entry.Secret, "a plaintext param create staged diff is not secret")
+}
+
+// TestDiffUseCase_Execute_CreateDiff_SecretFromValueType pins that a staged
+// SecureString-param CREATE flags the diff entry secret from its staged value
+// type — a create has no remote to fetch, so the Secret flag must come from the
+// staged ValueType rather than a fetch result (#719).
+func TestDiffUseCase_Execute_CreateDiff_SecretFromValueType(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secret"}, staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("new-secret"),
+		ValueType: domain.ValueTypeSecret,
+		StagedAt:  time.Now(),
+	}))
+
+	strategy := newMockDiffStrategy()
+	strategy.fetchErrors["/app/secret"] = provider.ErrNotFound
+
+	uc := &usecasestaging.DiffUseCase{Strategy: strategy, Store: store}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 1)
+
+	entry := output.Entries[0]
+	assert.Equal(t, usecasestaging.DiffEntryCreate, entry.Type)
+	assert.Equal(t, "new-secret", entry.StagedValue)
+	assert.True(t, entry.Secret, "a SecureString param create flags the diff entry secret from its staged value type")
 }
 
 func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
