@@ -22,6 +22,11 @@ type DiffOutput struct {
 	NewName    string
 	NewVersion int64
 	NewValue   string
+	// Secret reports whether either version is a SecureString (secret) value, so
+	// a consumer masks both sides before rendering the diff. A SecureString param
+	// is a secret on the value-type axis even though it lives on the param service
+	// axis, so masking must key off this flag, not the service (#677/#702).
+	Secret bool
 }
 
 // DiffUseCase executes diff operations.
@@ -48,6 +53,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 		NewName:    entry2.Name,
 		NewVersion: parseVersion(entry2.Version.ID),
 		NewValue:   entry2.Value,
+		Secret:     entry1.Type == domain.ValueTypeSecret || entry2.Type == domain.ValueTypeSecret,
 	}, nil
 }
 

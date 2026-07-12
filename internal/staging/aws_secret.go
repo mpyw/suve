@@ -173,6 +173,7 @@ func (s *AWSSecretStrategy) FetchCurrent(ctx context.Context, name string) (*Fet
 	return &FetchResult{
 		Value:      entry.Value,
 		Identifier: "#" + awssecretversion.TruncateVersionID(entry.Version.ID),
+		Secret:     true, // Secrets Manager values are always secret material.
 	}, nil
 }
 

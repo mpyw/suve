@@ -243,6 +243,22 @@ func TestParamStrategy_FetchCurrent(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "current-value", result.Value)
 		assert.Equal(t, "#5", result.Identifier)
+		assert.False(t, result.Secret, "a String param is not secret")
+	})
+
+	t.Run("securestring is secret", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Value: "current-secret", Type: domain.ValueTypeSecret, Version: domain.Version{ID: "5"}}, nil
+			},
+		}
+
+		s := staging.NewAWSParamStrategy(mock)
+		result, err := s.FetchCurrent(t.Context(), "/app/param")
+		require.NoError(t, err)
+		assert.True(t, result.Secret, "a SecureString param must be flagged secret (#677)")
 	})
 
 	t.Run("error", func(t *testing.T) {

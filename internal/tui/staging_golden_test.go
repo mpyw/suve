@@ -29,6 +29,11 @@ import (
 // NEVER render revealed.
 const secretStagedValue = "super-secret-token-value"
 
+// secureStringParamValue is a SecureString PARAM staged value. It lives in the
+// param (non-secret) section, so it proves masking keys off the row's value
+// type, not the section's service axis (#677); it must never render revealed.
+const secureStringParamValue = "securestring-db-password-value"
+
 // goldenStaging is a golden-only data.StagingService returning a fixed review
 // and (for the results golden) a fixed apply result. It never touches a store.
 type goldenStaging struct {
@@ -67,6 +72,10 @@ func stagingFixture() func(string) data.StagingService {
 		service: "param", label: "Param", svcCap: goldenCap("aws", "param"),
 		review: data.StagingReview{
 			Entries: []data.StagedDiffRow{
+				{
+					Name: "/app/api/SECURE_TOKEN", Type: data.StagedDiffNormal, Operation: "update", Secret: true,
+					RemoteValue: "old-" + secureStringParamValue, StagedValue: secureStringParamValue,
+				},
 				{
 					Name: "/app/web/CDN_URL", Type: data.StagedDiffNormal, Operation: "update",
 					RemoteValue: "https://cdn-old.example.com", StagedValue: "https://cdn-new.example.com",
@@ -125,6 +134,8 @@ func TestStaging_DiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenE
 	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
 
 	assert.NotContains(t, screen, secretStagedValue, "no revealed secret value in the diff-view golden")
+	assert.NotContains(t, screen, secureStringParamValue, "no revealed SecureString param value in the diff-view golden")
+	assert.Contains(t, screen, "•", "secret rows are masked with bullets, proving they render (not just absent)")
 	golden.RequireEqual(t, screen)
 }
 
@@ -137,6 +148,8 @@ func TestStaging_ValueViewGolden(t *testing.T) { //nolint:paralleltest // golden
 	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
 
 	assert.NotContains(t, screen, secretStagedValue, "no revealed secret value in the value-view golden")
+	assert.NotContains(t, screen, secureStringParamValue, "no revealed SecureString param value in the value-view golden")
+	assert.Contains(t, screen, "•", "secret rows are masked with bullets, proving they render (not just absent)")
 	golden.RequireEqual(t, screen)
 }
 

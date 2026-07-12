@@ -160,6 +160,9 @@ func (s *AWSParamStrategy) FetchCurrent(ctx context.Context, name string) (*Fetc
 	return &FetchResult{
 		Value:      entry.Value,
 		Identifier: "#" + entry.Version.ID,
+		// A SecureString param is secret material even on the param service, so the
+		// staged diff must mask it (#677).
+		Secret: entry.Type == domain.ValueTypeSecret,
 	}, nil
 }
 

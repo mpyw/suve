@@ -1013,11 +1013,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const versions = state.paramVersions[s1.name] || [];
         const v1 = versions.find((v: any) => v.version === s1.version);
         const v2 = versions.find((v: any) => v.version === s2.version);
+        // A SecureString param diff carries secret=true so the diff view masks
+        // both sides (mirrors the Go binding's value-type flag — #702).
+        const param = state.params.find((p: any) => p.name === s1.name);
         return {
           oldName: s1.name,
           newName: s2.name,
           oldValue: v1?.value || '',
           newValue: v2?.value || '',
+          secret: (param?.type || 'String') === 'SecureString',
         };
       },
       ParamAddTag: async (name: string, key: string, value: string) => {

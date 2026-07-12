@@ -362,13 +362,11 @@ func (s *paramSource) VersionContents(
 		NewLabel: out.NewName + "#" + strconv.FormatInt(out.NewVersion, 10),
 		OldValue: out.OldValue,
 		NewValue: out.NewValue,
+		// A SecureString param is a secret on the value-type axis, so the diff page
+		// masks both sides — even though this is the param service (#677).
+		Secret: out.Secret,
 	}, nil
 }
-
-// TODO(#677): a param value can be a SecureString (secret) but is currently
-// treated as non-secret here, so its diff renders in plaintext. Fix by
-// surfacing the value type from param.DiffUseCase and setting DiffContent.Secret
-// from it (the diff page already masks on that flag).
 
 func (s *paramSource) Namespaces(ctx context.Context) ([]string, error) {
 	if !s.svcCap.HasNamespaces {

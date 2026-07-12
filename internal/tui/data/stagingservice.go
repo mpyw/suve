@@ -42,6 +42,10 @@ type StagedDiffRow struct {
 	RemoteValue string
 	StagedValue string
 	Warning     string
+	// Secret reports whether this row's values are secret material (a secret
+	// service, or a SecureString param), so the page masks them per-row rather
+	// than keying off the section's service axis alone (#677).
+	Secret bool
 }
 
 // StagedTagRow is one item's staged tag changes: independent +add and −remove
@@ -248,6 +252,7 @@ func (s *stagingService) Review(ctx context.Context) (StagingReview, error) {
 				RemoteValue: e.AWSValue,
 				StagedValue: e.StagedValue,
 				Warning:     e.Warning,
+				Secret:      e.Secret,
 			}
 		}),
 		Tags: lo.Map(out.TagEntries, func(t stagingusecase.DiffTagEntry, _ int) StagedTagRow {

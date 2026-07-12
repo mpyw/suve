@@ -112,6 +112,44 @@ func awsParamDiffSource() data.Source {
 	})
 }
 
+// secureStringDiffValue is a SecureString param's value the diff golden must
+// NEVER render revealed — masking keys off the value type, not the service.
+// Its length differs from the old value so the masked bullet runs differ,
+// proving a change WITHOUT revealing content (below the 24-bullet mask cap).
+const secureStringDiffValue = "db-secret-password-v2"
+
+// secureStringDiffOldValue is the older SecureString value, also never revealed.
+const secureStringDiffOldValue = "db-pass-old"
+
+// awsParamSecureStringDiffSource is a param source whose value is a
+// SecureString (secret) value type. Its two versions differ, so a naive diff
+// would leak both cleartext values; the diff page must mask both sides because
+// DiffContent.Secret is set from the value type (#677).
+func awsParamSecureStringDiffSource() data.Source {
+	values := map[string]string{
+		"13": secureStringDiffOldValue,
+		"14": secureStringDiffValue,
+	}
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(specID(spec)), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:    name,
+				Value:   values[ref.ID()],
+				Type:    domain.ValueTypeSecret,
+				Version: domain.Version{ID: ref.ID()},
+			}, nil
+		},
+	}
+
+	return data.NewParamSource(capFor("aws", "param"), func(context.Context, string) (provider.Store, error) {
+		return store, nil
+	})
+}
+
 // ---------------------------------------------------------------------------
 // AWS secret (staging labels + ARN)
 // ---------------------------------------------------------------------------

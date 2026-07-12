@@ -222,7 +222,7 @@ func (m *Model) entryLines(sec *section, e data.StagedDiffRow, rowIdx int) []str
 		// value must stay one physical row, else the body overflows its box and
 		// the mouse hit-map (logical rows) desyncs from the screen rows. Full
 		// values are viewable via enter → the diff detail page.
-		value := firstLine(m.maskValue(e.StagedValue, sec.secret))
+		value := firstLine(m.maskValue(e.StagedValue, sec.secret || e.Secret))
 		if e.Operation == operationDelete {
 			value = m.styles.PageHint.Render("(delete)")
 		}
@@ -237,8 +237,11 @@ func (m *Model) entryLines(sec *section, e data.StagedDiffRow, rowIdx int) []str
 func (m *Model) diffLines(sec *section, e data.StagedDiffRow) []string {
 	var lines []string
 
-	remote := m.maskValue(e.RemoteValue, sec.secret)
-	staged := m.maskValue(e.StagedValue, sec.secret)
+	// A SecureString param row is secret even in a non-secret (param) section, so
+	// OR the row's own flag into the section's (#677).
+	secret := sec.secret || e.Secret
+	remote := m.maskValue(e.RemoteValue, secret)
+	staged := m.maskValue(e.StagedValue, secret)
 
 	if e.Operation != operationCreate {
 		lines = append(lines, "    "+m.styles.DiffRemoved.Render("- "+firstLine(remote)))
