@@ -30,6 +30,11 @@ type stubStaging struct {
 	conflict data.StagingApplyResult
 
 	applied []bool
+
+	// resetResult is returned by Reset; resets counts how many times Reset ran
+	// (so a fan-out test can assert every target was reset).
+	resetResult data.StagingResetResult
+	resets      int
 }
 
 func (s *stubStaging) Service() string { return s.service }
@@ -52,7 +57,9 @@ func (s *stubStaging) Review(context.Context) (data.StagingReview, error) {
 	return data.StagingReview{}, nil
 }
 func (s *stubStaging) Reset(context.Context) (data.StagingResetResult, error) {
-	return data.StagingResetResult{}, nil
+	s.resets++
+
+	return s.resetResult, nil
 }
 func (s *stubStaging) Unstage(context.Context, data.StagedKey) error              { return nil }
 func (s *stubStaging) CancelAddTag(context.Context, data.StagedKey, string) error { return nil }
@@ -163,27 +170,99 @@ func TestApply_ConflictThenIgnoreReapply(t *testing.T) {
 	assert.NotContains(t, d2.View(), "conflict", "no conflict on the ignore-conflicts re-apply")
 }
 
+// TestApply_DismissReloadsOnResults pins that closing the apply dialog with Back
+// (Esc) reloads only once it has applied: in the results phase DismissCmd emits
+// a MutationDoneMsg (so the shell pops+reloads+voices, matching enter), while in
+// the confirm phase it returns nil (a bare cancel, nothing applied yet).
+func TestApply_DismissReloadsOnResults(t *testing.T) {
+	t.Parallel()
+
+	svc := &stubStaging{
+		service: "param", label: "Param",
+		result: data.StagingApplyResult{
+			ServiceLabel: "Param",
+			Entries:      []data.ApplyEntryResult{{Name: "a", Status: "updated"}},
+		},
+	}
+
+	d := NewApply(ApplyInput{
+		Ctx: context.Background(), Targets: []data.StagingService{svc},
+		Title: "Apply staged changes — Param", EntryCount: 1, Styles: styles.New(),
+	})
+
+	dr, ok := d.(DismissReloader)
+	require.True(t, ok, "the apply dialog is a DismissReloader")
+	assert.Nil(t, dr.DismissCmd(), "confirm phase: Back is a bare cancel")
+
+	d, _ = d.Update(pressDown()) // focus Apply
+	d, cmd := d.Update(pressEnter())
+	require.NotNil(t, cmd)
+	d, _ = d.Update(cmd()) // deliver applyResultsMsg → results phase
+
+	dr, ok = d.(DismissReloader)
+	require.True(t, ok)
+
+	reload := dr.DismissCmd()
+	require.NotNil(t, reload, "results phase: Back reloads")
+
+	done, ok := reload().(MutationDoneMsg)
+	require.True(t, ok, "results-phase Back emits MutationDoneMsg (pop+reload+voice)")
+	assert.Contains(t, done.Status, "Applied", "the outcome is voiced, matching enter")
+}
+
 // TestReset_FanOutAggregation pins that reset-all fans out one reset per service
 // and voices the combined unstaged count.
 func TestReset_FanOutAggregation(t *testing.T) {
 	t.Parallel()
 
-	param := &stubStaging{service: "param", label: "Param"}
-	secret := &stubStaging{service: "secret", label: "Secret"}
+	param := &stubStaging{
+		service: "param", label: "Param",
+		resetResult: data.StagingResetResult{Type: data.StagingResetUnstagedAll, Count: 2},
+	}
+	secret := &stubStaging{
+		service: "secret", label: "Secret",
+		resetResult: data.StagingResetResult{Type: data.StagingResetUnstagedAll, Count: 3},
+	}
 
 	d := NewReset(ResetInput{
 		Ctx: context.Background(), Targets: []data.StagingService{param, secret},
 		Title: "Reset staged changes — all", Styles: styles.New(),
 	})
 
-	d, cmd := d.Update(pressEnter()) // focus is on Reset by default
+	d, _ = d.Update(pressDown()) // focus defaults to Cancel; move to Reset
+	d, cmd := d.Update(pressEnter())
 	require.True(t, d.Busy())
+	require.NotNil(t, cmd)
 
 	next, doneCmd := d.Update(cmd())
-	require.NotNil(t, doneCmd)
 
+	assert.Equal(t, 1, param.resets, "param was reset exactly once")
+	assert.Equal(t, 1, secret.resets, "secret was reset exactly once")
+
+	require.NotNil(t, doneCmd)
 	done, ok := doneCmd().(MutationDoneMsg)
 	require.True(t, ok, "reset emits a done message")
-	assert.NotEmpty(t, done.Status, "the reset outcome is voiced")
+	assert.Contains(t, done.Status, "5", "the aggregate voices the summed unstaged count (2+3)")
 	assert.False(t, next.Busy(), "the dialog clears busy once the reset finishes")
+}
+
+// TestReset_DefaultFocusCancels pins that the reset confirm opens focused on
+// Cancel, so an accidental enter (e.g. an "R enter" double-tap) cancels instead
+// of wiping staged changes — parity with the delete/apply confirms.
+func TestReset_DefaultFocusCancels(t *testing.T) {
+	t.Parallel()
+
+	param := &stubStaging{service: "param", label: "Param"}
+
+	d := NewReset(ResetInput{
+		Ctx: context.Background(), Targets: []data.StagingService{param},
+		Title: "Reset staged changes — Param", Styles: styles.New(),
+	})
+
+	_, cmd := d.Update(pressEnter()) // enter on the default focus
+
+	require.NotNil(t, cmd)
+	_, ok := cmd().(CanceledMsg)
+	assert.True(t, ok, "enter on the default focus cancels")
+	assert.Equal(t, 0, param.resets, "no reset ran")
 }

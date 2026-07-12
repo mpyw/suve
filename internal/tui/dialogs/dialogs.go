@@ -37,6 +37,16 @@ type Model interface {
 	Busy() bool
 }
 
+// DismissReloader is an optional dialog capability. A dialog that has already
+// mutated by the time it can be dismissed — the apply results view — returns a
+// non-nil command from DismissCmd so that closing it with Back (Esc) runs the
+// same pop+reload+voice as its confirm key, instead of the shell's bare pop
+// (which would leave the staging page rendering just-applied items as still
+// staged). Returning nil means "fall back to a bare dismiss".
+type DismissReloader interface {
+	DismissCmd() tea.Cmd
+}
+
 // MutationDoneMsg is emitted when a mutation succeeds. The app pops the dialog,
 // reloads the affected service's browser (list/detail/staged badges), refreshes
 // the staging tab count, and voices Status.

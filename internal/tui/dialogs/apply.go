@@ -104,6 +104,18 @@ func NewApply(in ApplyInput) Model {
 
 func (d *applyDialog) Busy() bool { return d.phase == phaseBusy }
 
+// DismissCmd makes Back (Esc) on the results view close with the same
+// reload+voice as enter: the results view has already applied, so a bare pop
+// would leave the staging page and its badge stale. Any other phase returns nil
+// so the shell bare-dismisses (confirm → cancel; busy is already suppressed).
+func (d *applyDialog) DismissCmd() tea.Cmd {
+	if d.phase == phaseResults {
+		return doneCmd("", d.summary(), true)
+	}
+
+	return nil
+}
+
 func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:

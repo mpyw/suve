@@ -218,7 +218,11 @@ func (m *Model) entryLines(sec *section, e data.StagedDiffRow, rowIdx int) []str
 	}
 
 	if !m.diffView {
-		value := m.maskValue(e.StagedValue, sec.secret)
+		// Collapse to the first line (as diff view does): a multi-line staged
+		// value must stay one physical row, else the body overflows its box and
+		// the mouse hit-map (logical rows) desyncs from the screen rows. Full
+		// values are viewable via enter → the diff detail page.
+		value := firstLine(m.maskValue(e.StagedValue, sec.secret))
 		if e.Operation == operationDelete {
 			value = m.styles.PageHint.Render("(delete)")
 		}

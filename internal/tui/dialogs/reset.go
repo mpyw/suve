@@ -48,13 +48,17 @@ type ResetInput struct {
 	Styles styles.Styles
 }
 
-// NewReset builds a reset dialog.
+// NewReset builds a reset dialog. Focus starts on Cancel so an accidental
+// enter (e.g. an "R enter" double-tap) does not wipe staged changes — parity
+// with the delete/apply confirms, which also default to a non-destructive
+// control.
 func NewReset(in ResetInput) Model {
 	return &resetDialog{
 		ctx:     in.Ctx,
 		targets: in.Targets,
 		title:   in.Title,
 		styles:  in.Styles,
+		focus:   int(ctrlResetCancel),
 	}
 }
 
