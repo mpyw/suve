@@ -13,7 +13,7 @@
 > [!NOTE]
 > This project was written by AI (Claude Code).
 
-A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud Secret Manager, and Azure Key Vault / App Configuration. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
+A **Git-like CLI/TUI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud Secret Manager, and Azure Key Vault / App Configuration. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
 
 <p align="center">
   <img src="demo/cli-demo.gif" alt="CLI Demo" width="800">
@@ -31,6 +31,7 @@ A **Git-like CLI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud S
 - **Colored diff output**: Easy-to-read unified diff format
 - **Multi-cloud**: [AWS SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) / [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html), [Google Cloud Secret Manager](https://cloud.google.com/secret-manager/docs), and [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/) / [App Configuration](https://learn.microsoft.com/en-us/azure/azure-app-configuration/)
 - **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`). When no key is available (no keychain backend and no `SUVE_STAGING_KEY`), an interactive session falls back to plaintext with a warning, while a non-interactive one refuses to write unencrypted unless `SUVE_STAGING_ALLOW_PLAINTEXT` is set. Exported snapshot files carry a separately passphrase-encrypted payload ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode); an empty passphrase writes plaintext).
+- **TUI mode**: Keyboard-driven terminal UI via `--tui` flag (built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)); ships in every build, including the dependency-free CLI-only one
 - **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
 
 ### Metadata terminology
@@ -50,7 +51,7 @@ All key=value metadata is unified as **tags**; suve adds no per-provider command
 ## Installation
 
 > [!NOTE]
-> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI-only version if you only need CLI functionality.
+> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI-only version if you only need CLI functionality. The keyboard-driven **TUI (`--tui`) is pure Go and ships in every build**, including the CLI-only one — only the desktop **GUI (`--gui`)** needs the GTK3/WebKit2GTK dependencies.
 
 ### Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
 
@@ -681,15 +682,69 @@ Examples (`—` = alias not exposed):
 
 `suve --help` lists which aliases are active in the current environment.
 
+### TUI mode
+
+`--tui` launches a keyboard-driven terminal UI over the same use cases as the CLI and GUI. It is pure Go (no GTK/WebKit) and ships in every build. The provider and scope are fixed for the session at launch — switch provider by relaunching.
+
+Launch forms:
+
+```bash
+suve --tui                 # only when exactly one provider is active (see Provider selection)
+suve aws --tui             # explicit provider group (always available)
+suve gcloud --tui
+suve azure --tui
+suve aws param --tui       # a service subgroup preselects that tab (Param / Secret)
+suve azure secret --tui    # opens on the Key Vault tab
+```
+
+- **Unique-provider rule:** bare `suve --tui` follows the same detection as the bare aliases — it launches only when exactly one provider is active across the union of the param/secret/stage axes (AWS is accepted via `~/.aws/credentials` when nothing else is set). With two or more active, it lists the explicit `suve <group> --tui` forms instead; there is no silent priority.
+- **Scope / env:** the TUI consumes the same scope inputs as the CLI — `GOOGLE_CLOUD_PROJECT` for Google Cloud, `--vault-name` / `AZURE_KEYVAULT_NAME` and `--store-name` / `AZURE_APPCONFIG_NAME` (plus `--namespace` / `AZURE_APPCONFIG_NAMESPACE`) for Azure. AWS uses the ambient shared config.
+- **Azure tab gating:** the Param (App Configuration) and Secret (Key Vault) tabs appear only for the services the launch scope resolves — set `--vault-name` for the Key Vault tab, `--store-name` for the App Configuration tab, either or both as needed. The Staging tab is always present.
+- **Shared staging area:** staged edits made in the TUI use the same per-scope staging store as the CLI/GUI, so `suve stage status` sees them and `stage apply` from either side applies the same working set.
+- The TUI adds **no new commands** and does not cover export/import (use the CLI/GUI for those). It requires an interactive terminal (a TTY on stdin and stdout).
+
+Keymap (the in-app `?` toggles full help, which is the source of truth):
+
+| Scope | Key | Action |
+|-------|-----|--------|
+| Global | `?` | toggle help |
+| Global | `q` / `ctrl+c` | quit |
+| Global | `tab` / `shift+tab` | next / previous tab |
+| Global | `1` `2` `3` | jump to tab |
+| Global | `↑`/`k`, `↓`/`j` | move selection |
+| Global | `enter` | select / open detail |
+| Global | `esc` | back / close |
+| Global | `y` | copy value (revealed first; masked never auto-copied) |
+| Browser | `p` / `/` | edit prefix / filter |
+| Browser | `v` | toggle value display |
+| Browser | `r` | recursive toggle / refresh |
+| Browser | `L` | load more (paged secrets) |
+| Browser | `x` | reveal a masked value |
+| Browser | `c`, `space`, `enter` | compare mode: toggle, pick a version, open diff |
+| Browser | `space` | pick namespace (App Configuration) |
+| Browser | `S` | jump to the Staging tab |
+| Browser | `n` / `e` / `d` / `t` / `R` | new / edit / delete / tag / restore |
+| Diff | `J` | re-diff with JSON normalization (parity with `--parse-json`) |
+| Staging | `v` | toggle diff / value view |
+| Staging | `e` / `u` / `t` | edit staged / unstage (entry + tags) / add staged tag |
+| Staging | `x` | cancel a staged tag change |
+| Staging | `enter` | open the full-diff detail |
+| Staging | `a` / `A` | apply this section / apply all |
+| Staging | `r` / `R` | reset this section / reset all |
+| Staging | `ctrl+r` | refresh |
+| Dialogs | `ctrl+e` | open the value in `$EDITOR` (create/edit) |
+
+Mutations are **staged by default** (an "Apply immediately" toggle is offered where the backend supports staging); operation markers and unsupported controls follow each backend's capabilities. Rendering honors `NO_COLOR` and degrades gracefully on narrow terminals.
+
 ### Feature support
 
-| Backend | Command | Versioning | Labels / Tags | Staging | GUI | Auth |
-|---------|---------|------------|---------------|---------|------|------|
-| [AWS Parameter Store](docs/aws.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | shared config/env/role |
-| [AWS Secrets Manager](docs/aws.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | shared config/env/role |
-| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | ✅ | ✅ | Application Default Credentials |
-| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | ✅ | ✅ | DefaultAzureCredential |
-| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ✅ tags¹ | ✅² | ✅ | DefaultAzureCredential |
+| Backend | Command | Versioning | Labels / Tags | Staging | TUI | GUI | Auth |
+|---------|---------|------------|---------------|---------|------|------|------|
+| [AWS Parameter Store](docs/aws.md) | `aws param` | ✅ numeric | ✅ tags | ✅ | ✅ | ✅ | shared config/env/role |
+| [AWS Secrets Manager](docs/aws.md) | `aws secret` | ✅ UUID + staging labels | ✅ tags | ✅ | ✅ | ✅ | shared config/env/role |
+| [Google Cloud Secret Manager](docs/gcloud.md) | `gcloud secret` | ✅ integer (`latest`) | ✅ labels | ✅ | ✅ | ✅ | Application Default Credentials |
+| [Azure Key Vault](docs/azure.md) | `azure secret` | ✅ opaque id | ✅ tags | ✅ | ✅ | ✅ | DefaultAzureCredential |
+| [Azure App Configuration](docs/azure.md) | `azure param` | ❌ unversioned | ✅ tags¹ | ✅² | ✅ | ✅ | DefaultAzureCredential |
 
 Read/write operations (`show`, `log`, `diff`, `list`, `create`, `update`, `delete`, `tag`, `untag`) are available on every backend, with these caveats: `restore` is available on AWS Secrets Manager and Azure Key Vault (soft-delete recovery); on Azure App Configuration `log` reports history unsupported and `#`/`~`/`:` are treated as literal key characters (not version specifiers). Only AWS Secrets Manager has staging labels (`:AWSCURRENT` etc.).
 

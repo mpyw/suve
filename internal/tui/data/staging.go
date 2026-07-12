@@ -19,7 +19,7 @@ type StagedKey struct {
 // StagingProbe reports which items in the current service have staged changes
 // (an entry or a tag change), so the browser can show a [staged] badge and the
 // detail pane a staged-changes banner. It is read-only — the parity of the
-// GUI's StagingCheckStatus/StagingStatus reads (#Step-5 owns the mutations).
+// GUI's StagingCheckStatus/StagingStatus reads (the staging page owns the mutations).
 type StagingProbe interface {
 	// StagedKeys returns the set of staged (name, namespace) keys for the service.
 	StagedKeys(ctx context.Context) (map[StagedKey]struct{}, error)

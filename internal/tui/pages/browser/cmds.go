@@ -145,7 +145,7 @@ func (m *Model) selectionCmd() tea.Cmd {
 // rebuildRows builds the rows one-to-one from m.items in order, so the selected
 // index maps back to its item even when App Configuration lists the same key
 // under several namespaces (a name lookup would resolve every duplicate to the
-// first, loading the wrong namespace, #Step-3 review).
+// first, loading the wrong namespace).
 func (m *Model) selectedItem() (data.Item, bool) {
 	idx := m.list.Selected()
 	if idx < 0 || idx >= len(m.items) {
