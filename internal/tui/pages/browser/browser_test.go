@@ -3,6 +3,7 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/capability"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/nav"
@@ -44,13 +46,18 @@ func (s *stubSource) VersionContents(context.Context, string, string, string, st
 func (s *stubSource) Namespaces(context.Context) ([]string, error) { return s.nsList, nil }
 
 // awsParamCap is a representative capability (versioned param).
-func awsParamCap() capability.ServiceCapability {
-	sc, _ := lookup("aws", "param")
+func awsParamCap() capability.ServiceCapability { return lookup("aws", "param") }
 
-	return sc
-}
+// appConfigCap is the namespaced Azure App Configuration param capability.
+func appConfigCap() capability.ServiceCapability { return lookup("azure", "param") }
 
-func lookup(prov, service string) (capability.ServiceCapability, bool) {
+// awsSecretCap is the AWS secret capability (has restore + tags).
+func awsSecretCap() capability.ServiceCapability { return lookup("aws", "secret") }
+
+// lookup returns the neutral capability for a provider/service, or the zero
+// capability when the matrix has no such pair (a test typo surfaces as a clearly
+// empty capability).
+func lookup(prov, service string) capability.ServiceCapability {
 	for _, pc := range capability.All() {
 		if pc.Provider != prov {
 			continue
@@ -58,12 +65,12 @@ func lookup(prov, service string) (capability.ServiceCapability, bool) {
 
 		for _, sc := range pc.Services {
 			if sc.Service == service {
-				return sc, true
+				return sc
 			}
 		}
 	}
 
-	return capability.ServiceCapability{}, false
+	return capability.ServiceCapability{}
 }
 
 // newModel builds a browser model over a stub source.
@@ -300,4 +307,118 @@ func TestStagingJump(t *testing.T) {
 	require.NotNil(t, cmd)
 	_, ok := cmd().(nav.OpenStaging)
 	assert.True(t, ok, "S emits nav.OpenStaging")
+}
+
+// TestOnStagedLoadedSurfacesStoreHardFail pins the read-path key-loss surfacing:
+// a staging store-construction hard-fail (a key-loss while encrypted state exists)
+// is shown on the browser error line, while an ordinary transient probe read error
+// stays quiet (badges just do not show — no error-line spam).
+func TestOnStagedLoadedSurfacesStoreHardFail(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	_ = m.loadStagedCmd() // advance stagedSeq so the messages are current
+
+	// A transient probe read error is swallowed.
+	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, err: errors.New("probe timeout")})
+	assert.Empty(t, m.err, "a transient probe error does not spam the error line")
+
+	// A store-construction hard-fail (key-loss) is surfaced.
+	hard := &data.StoreUnavailableError{Err: errors.New("cannot access the staging encryption key")}
+	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, err: hard})
+	assert.Contains(t, m.err, "staging encryption key", "a key-loss hard-fail is surfaced on the read path")
+}
+
+// TestOpenNewBlocksAllNamespaces pins the App Configuration create-block: a write
+// targets one concrete namespace, so requesting the create dialog while the
+// header filter is on `*` (all namespaces) emits an OpenError rather than the
+// entry form; on a single concrete namespace it emits OpenEntryForm seeded with
+// that namespace.
+func TestOpenNewBlocksAllNamespaces(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: appConfigCap()})
+
+	// New() seeds namespaces = ["", "*"]; select the all-namespaces filter.
+	m.nsIndex = 1
+	require.Equal(t, aznamespace.AllNamespacesFilter, m.currentNamespace())
+
+	cmd := m.openNew()
+	require.NotNil(t, cmd)
+	_, blocked := cmd().(nav.OpenError)
+	assert.True(t, blocked, "creating on * is blocked with an OpenError")
+
+	// A single concrete namespace is allowed and seeds the form.
+	m.nsIndex = 0
+	require.Empty(t, m.currentNamespace(), "the null namespace is a concrete single namespace")
+
+	cmd = m.openNew()
+	require.NotNil(t, cmd)
+	form, ok := cmd().(nav.OpenEntryForm)
+	require.True(t, ok, "a concrete namespace opens the entry form")
+	assert.False(t, form.Edit, "openNew requests a create, not an edit")
+}
+
+// TestOpenEditNoDetailGuard pins that Edit is a no-op until a detail has loaded
+// (nothing to seed), and once loaded it emits an OpenEntryForm carrying the
+// loaded name/namespace/value with Edit set.
+func TestOpenEditNoDetailGuard(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+
+	assert.Nil(t, m.openEdit(), "no detail loaded — edit is a no-op")
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/x"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/x", Value: "v1"}})
+
+	cmd := m.openEdit()
+	require.NotNil(t, cmd, "a loaded detail enables edit")
+	form, ok := cmd().(nav.OpenEntryForm)
+	require.True(t, ok, "edit emits nav.OpenEntryForm")
+	assert.True(t, form.Edit, "the request is an edit")
+	assert.Equal(t, "/app/x", form.Name)
+	assert.Equal(t, "v1", form.Value, "the edit form is seeded from the loaded detail")
+}
+
+// TestOpenTagHasTagsGate pins the tag dialog is offered only for a service with
+// tags: a no-tags capability makes Tag a no-op, while a tagging service with a
+// selected entry emits OpenTag for it.
+func TestOpenTagHasTagsGate(t *testing.T) {
+	t.Parallel()
+
+	noTagsCap := awsParamCap()
+	noTagsCap.HasTags = false
+	noTags := newModel(t, &stubSource{svcCap: noTagsCap})
+	noTags, _ = update(t, noTags, listLoadedMsg{seq: noTags.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/x"}}}})
+	assert.Nil(t, noTags.openTag(), "a no-tags service does not open the tag dialog")
+
+	tagging := newModel(t, &stubSource{svcCap: awsParamCap()})
+	tagging, _ = update(t, tagging, listLoadedMsg{seq: tagging.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/x"}}}})
+	cmd := tagging.openTag()
+	require.NotNil(t, cmd, "a tagging service with a selection opens the tag dialog")
+	open, ok := cmd().(nav.OpenTag)
+	require.True(t, ok, "tag emits nav.OpenTag")
+	assert.Equal(t, "/x", open.Name)
+}
+
+// TestOpenRestoreHasRestoreGate pins the restore dialog is offered only for a
+// service that supports restoring soft-deleted entries: a param service (no
+// restore) makes Restore a no-op, while AWS secret emits OpenRestore seeded with
+// the selection.
+func TestOpenRestoreHasRestoreGate(t *testing.T) {
+	t.Parallel()
+
+	noRestore := newModel(t, &stubSource{svcCap: awsParamCap()})
+	require.False(t, noRestore.svcCap.HasRestore)
+	assert.Nil(t, noRestore.openRestore(), "a service without restore does not open the restore dialog")
+
+	restorable := newModel(t, &stubSource{svcCap: awsSecretCap()})
+	require.True(t, restorable.svcCap.HasRestore)
+	restorable, _ = update(t, restorable, listLoadedMsg{seq: restorable.listSeq, res: data.ListResult{Items: []data.Item{{Name: "prod/x"}}}})
+	cmd := restorable.openRestore()
+	require.NotNil(t, cmd, "a restorable service opens the restore dialog")
+	open, ok := cmd().(nav.OpenRestore)
+	require.True(t, ok, "restore emits nav.OpenRestore")
+	assert.Equal(t, "prod/x", open.Name, "the restore form is seeded with the selection")
 }

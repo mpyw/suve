@@ -127,6 +127,47 @@ func dialogGolden(t *testing.T, host *dialogHost, marker string) {
 	golden.RequireEqual(t, renderVisibleScreen(t, raw))
 }
 
+// captureDialogWithKeys drives a hosted dialog, first replaying the given key
+// presses (so a golden can capture a post-interaction state — e.g. an immediate
+// delete after the mode toggle), then captures once the marker appears. The final
+// rendered screen reflects the last frame, so the pre-toggle frame in the stream
+// is harmless.
+func captureDialogWithKeys(t *testing.T, host *dialogHost, marker string, keys ...tea.KeyPressMsg) []byte {
+	t.Helper()
+
+	tm := teatest.NewTestModel(t, host, teatest.WithInitialTermSize(goldenTermWidth, goldenTermHeight))
+
+	for _, k := range keys {
+		tm.Send(k)
+	}
+
+	var buf bytes.Buffer
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		_, _ = io.Copy(&buf, tm.Output())
+		if bytes.Contains(buf.Bytes(), []byte(marker)) {
+			break
+		}
+
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	require.Contains(t, buf.String(), marker, "dialog content never rendered")
+
+	tm.Send(hostQuitMsg{})
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	_, _ = io.Copy(&buf, tm.Output())
+
+	return buf.Bytes()
+}
+
+// keyDownMsg / keyEnterMsg are the golden-driver key presses for navigating a
+// custom (non-huh) dialog's control rows.
+func keyDownMsg() tea.KeyPressMsg  { return tea.KeyPressMsg{Code: tea.KeyDown} }
+func keyEnterMsg() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyEnter} }
+
 func goldenCap(prov, service string) capability.ServiceCapability {
 	sc, _ := capabilityFor(provider.Provider(prov), service)
 
@@ -190,6 +231,30 @@ func TestDialog_DeleteAWSSecretGolden(t *testing.T) { //nolint:paralleltest // g
 	})
 
 	dialogGolden(t, newDialogHost(m, nil), "Force delete")
+}
+
+// TestDialog_DeleteAWSSecretImmediateGolden renders the delete confirm for AWS
+// secret AFTER toggling the mode to immediate: the recovery-window row and its
+// "recoverable until" line are gone, since an immediate delete cannot carry a
+// custom window (GUI parity — SecretDelete(name, force) exposes only force).
+func TestDialog_DeleteAWSSecretImmediateGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ + pins the clock
+	goldenEnv(t)
+
+	orig := dialogs.NowFunc
+	dialogs.NowFunc = func() time.Time { return time.Date(2026, 7, 12, 0, 0, 0, 0, time.UTC) }
+
+	t.Cleanup(func() { dialogs.NowFunc = orig })
+
+	m := dialogs.NewDeleteConfirm(dialogs.DeleteInput{
+		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "secret")},
+		Service: "secret", Styles: styles.New(), Name: "prod/api/old-key",
+	})
+
+	// From the default (staged) focus on Force, move down to the Mode row and
+	// toggle to immediate.
+	raw := captureDialogWithKeys(t, newDialogHost(m, nil), "(•) Apply immediately",
+		keyDownMsg(), keyDownMsg(), keyEnterMsg())
+	golden.RequireEqual(t, renderVisibleScreen(t, raw))
 }
 
 // TestDialog_DeleteGCloudSecretGolden renders the delete confirm for Google

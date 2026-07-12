@@ -74,9 +74,7 @@ func (d *tagForm) rebuildForm() tea.Cmd {
 	}
 
 	if d.svcCap.HasStaging {
-		fields = append(fields, huh.NewSelect[bool]().Key("mode").Title("Mode").Inline(true).
-			Options(huh.NewOption("Stage", true), huh.NewOption("Apply immediately", false)).
-			Value(&d.staged))
+		fields = append(fields, newModeField(&d.staged))
 	}
 
 	d.form = huh.NewForm(huh.NewGroup(fields...)).

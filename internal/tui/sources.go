@@ -230,7 +230,10 @@ type lazyStagingProbe struct {
 func (p *lazyStagingProbe) StagedKeys(ctx context.Context) (map[data.StagedKey]struct{}, error) {
 	probe, err := p.build()
 	if err != nil {
-		return nil, err
+		// A build failure is a store-construction hard-fail (e.g. a keychain
+		// key-loss while encrypted state exists). Mark it so the browser surfaces it
+		// on the error line instead of silently dropping the staging badges.
+		return nil, &data.StoreUnavailableError{Err: err}
 	}
 
 	return probe.StagedKeys(ctx)

@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"errors"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -126,10 +127,22 @@ func (m *Model) onHistoryLoaded(msg historyLoadedMsg) {
 }
 
 // onStagedLoaded records the staged-key set, rebuilds the rows so badges appear,
-// and reports the staged count to the app for the Staging tab badge. A probe
-// error is non-fatal (badges simply do not show).
+// and reports the staged count to the app for the Staging tab badge. An ordinary
+// probe read error is non-fatal (badges simply do not show), but a
+// store-construction hard-fail (a staging key-loss while encrypted state exists)
+// is surfaced on the error line so a launch-time key-loss is visible on the read
+// path, not only when the user attempts a write.
 func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
-	if msg.seq != m.stagedSeq || msg.err != nil {
+	if msg.seq != m.stagedSeq {
+		return nil
+	}
+
+	if msg.err != nil {
+		var storeErr *data.StoreUnavailableError
+		if errors.As(msg.err, &storeErr) {
+			m.err = storeErr.Error()
+		}
+
 		return nil
 	}
 

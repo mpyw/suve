@@ -2,6 +2,7 @@ package data_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -37,6 +38,63 @@ func awsParamCap(t *testing.T) capability.ServiceCapability {
 	t.Fatal("aws param capability not found")
 
 	return capability.ServiceCapability{}
+}
+
+// azureParamCap returns the Azure App Configuration param capability (the
+// namespaced param service) from the neutral matrix.
+func azureParamCap(t *testing.T) capability.ServiceCapability {
+	t.Helper()
+
+	for _, pc := range capability.All() {
+		if pc.Provider != string(provider.ProviderAzure) {
+			continue
+		}
+
+		for _, sc := range pc.Services {
+			if sc.Service == "param" {
+				return sc
+			}
+		}
+	}
+
+	t.Fatal("azure param capability not found")
+
+	return capability.ServiceCapability{}
+}
+
+// TestParamMutator_RejectsFilterNamespace pins the server-side namespace guard on
+// the write path: a write whose App Configuration namespace names all/multiple
+// namespaces (`*` or a `,` OR-list) is rejected by literalNamespace ->
+// aznamespace.Literal BEFORE any provider or staging store is resolved, so a
+// filter value can never be written as if it were one literal namespace.
+//
+//nolint:paralleltest // symmetrical with the other mutator tests; no shared state anyway
+func TestParamMutator_RejectsFilterNamespace(t *testing.T) {
+	ctx := context.Background()
+
+	resolveCalled := false
+	mut := data.NewParamMutator(
+		azureParamCap(t),
+		func(context.Context, string) (provider.Store, error) {
+			resolveCalled = true
+
+			return nil, errors.New("store must not be resolved for an invalid namespace")
+		},
+		func(provider.Store) staging.FullStrategy { return nil },
+		func() (store.ReadWriteOperator, error) {
+			return nil, errors.New("staging store must not be resolved for an invalid namespace")
+		},
+	)
+
+	_, err := mut.Create(ctx, data.StagedKey{Name: "k", Namespace: "*"}, "v", "", "", true)
+	require.Error(t, err, "a staged create into * is rejected")
+	assert.Contains(t, err.Error(), "all/multiple namespaces")
+
+	_, err = mut.Delete(ctx, data.StagedKey{Name: "k", Namespace: "dev,prod"}, false, 0, false)
+	require.Error(t, err, "an immediate delete across an OR-list is rejected")
+	assert.Contains(t, err.Error(), "all/multiple namespaces")
+
+	assert.False(t, resolveCalled, "the namespace guard rejects before any store is resolved")
 }
 
 // tempStagingStore configures a temp-home, env-keyed working store (the CI

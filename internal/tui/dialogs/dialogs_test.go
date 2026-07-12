@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	huh "charm.land/huh/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -140,6 +141,45 @@ func TestEntryForm_StagedByDefault(t *testing.T) {
 	assert.False(t, immediate.staged, "without staging the write is always immediate")
 }
 
+// newAppConfigEntry builds an App Configuration (namespaced) create/edit form
+// seeded with a namespace, for the namespace read-only assertions.
+func newAppConfigEntry(t *testing.T, edit bool, namespace string) *entryForm {
+	t.Helper()
+
+	mut := &fakeMutator{svcCap: appConfigCap()}
+
+	m, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Edit: edit,
+		Name: "app/Feature", Namespace: namespace, Value: "old",
+	})
+
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+
+	return d
+}
+
+// TestEntryForm_NamespaceReadOnlyOnEdit pins that the App Configuration namespace
+// field is an editable input on CREATE but a read-only note on EDIT: a write
+// targets one concrete namespace, so editing the namespace of an existing entry
+// would silently retarget a different partition (the name field is likewise
+// omitted on edit).
+func TestEntryForm_NamespaceReadOnlyOnEdit(t *testing.T) {
+	t.Parallel()
+
+	create := newAppConfigEntry(t, false, "prod")
+	_, isInput := create.namespaceField().(*huh.Input)
+	assert.True(t, isInput, "create offers an editable namespace input")
+
+	edit := newAppConfigEntry(t, true, "prod")
+	_, isNote := edit.namespaceField().(*huh.Note)
+	assert.True(t, isNote, "edit renders the namespace read-only (a note, not an input)")
+
+	// The null (default) namespace is shown as "(default)" rather than a blank.
+	assert.Equal(t, "prod", namespaceDisplay("prod"))
+	assert.Equal(t, "(default)", namespaceDisplay(""))
+}
+
 // TestEntryForm_TypeSelectGating pins the Type select is offered only for the
 // typed AWS SSM param service (App Configuration is untyped; secret has none).
 func TestEntryForm_TypeSelectGating(t *testing.T) {
@@ -269,6 +309,47 @@ func TestDeleteConfirm_ForceRecoveryGating(t *testing.T) {
 	gcloud := newDelete(t, gcloudSecretCap())
 	assert.NotContains(t, gcloud.controls(), ctrlForce)
 	assert.NotContains(t, gcloud.controls(), ctrlRecovery)
+}
+
+// TestDeleteConfirm_RecoveryStagedOnly pins that the recovery-window row (and its
+// "recoverable until" line) shows only for a STAGED delete. An immediate delete
+// cannot carry a custom window — the SDK-neutral seam has no recovery-window
+// DeleteOption, so AWS applies its 30-day default — so the dialog must not offer
+// an adjustable window it would silently drop (GUI parity: SecretDelete(name,
+// force) exposes only force for immediate).
+func TestDeleteConfirm_RecoveryStagedOnly(t *testing.T) {
+	t.Parallel()
+
+	d := newDelete(t, awsSecretCap())
+	require.True(t, d.staged, "AWS secret delete defaults to staged")
+	assert.Contains(t, d.controls(), ctrlRecovery, "staged mode offers the recovery window")
+	assert.Contains(t, d.View(), "Recovery window", "staged mode draws the adjustable window")
+
+	d.staged = false
+	assert.NotContains(t, d.controls(), ctrlRecovery, "immediate mode hides the recovery window")
+	assert.NotContains(t, d.View(), "Recovery window", "immediate mode shows no adjustable window")
+	assert.NotContains(t, d.View(), "Recoverable until", "immediate mode makes no recoverable-until claim")
+	assert.Equal(t, 0, d.effectiveRecoveryWindow(), "immediate mode records no custom window")
+}
+
+// TestDeleteConfirm_ModeToggleKeepsFocusAndDropsRecovery drives the mode toggle
+// through activate() and pins that toggling to immediate keeps focus on the Mode
+// row (rather than drifting onto a neighbour as the recovery row disappears) and
+// removes the recovery control.
+func TestDeleteConfirm_ModeToggleKeepsFocusAndDropsRecovery(t *testing.T) {
+	t.Parallel()
+
+	d := newDelete(t, awsSecretCap())
+
+	// Focus the Mode row: [force, recovery, mode, delete, cancel] -> index 2.
+	d.focus = 2
+	require.Equal(t, ctrlMode, d.focused())
+
+	_, _ = d.activate() // toggle staged -> immediate
+
+	assert.False(t, d.staged, "activate toggles the mode to immediate")
+	assert.Equal(t, ctrlMode, d.focused(), "focus stays on the Mode row after the control set shrinks")
+	assert.NotContains(t, d.controls(), ctrlRecovery, "immediate mode drops the recovery row")
 }
 
 // TestDeleteConfirm_SubmitRouting pins the delete routing (force/window/staged).

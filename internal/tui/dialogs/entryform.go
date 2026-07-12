@@ -150,8 +150,7 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 	}
 
 	if d.svcCap.HasNamespaces {
-		fields = append(fields, huh.NewInput().Key("namespace").Title("Namespace").
-			Placeholder("(default)").Value(&d.namespace))
+		fields = append(fields, d.namespaceField())
 	}
 
 	if d.showType() {
@@ -167,11 +166,7 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 		Placeholder("(optional)").Value(&d.description))
 
 	if d.svcCap.HasStaging {
-		fields = append(fields, huh.NewSelect[bool]().Key("mode").Title("Mode").Inline(true).
-			Options(
-				huh.NewOption("Stage", true),
-				huh.NewOption("Apply immediately", false),
-			).Value(&d.staged))
+		fields = append(fields, newModeField(&d.staged))
 	}
 
 	d.form = huh.NewForm(huh.NewGroup(fields...)).
@@ -180,6 +175,20 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 		WithShowErrors(true)
 
 	return d.form.Init()
+}
+
+// namespaceField builds the App Configuration namespace field. On CREATE it is an
+// editable input (seeded with the viewing namespace). On EDIT it is a read-only
+// note: a write targets one concrete namespace, so editing the namespace of an
+// existing entry would silently retarget a DIFFERENT namespace — the field is
+// disabled just as the name field is omitted on edit.
+func (d *entryForm) namespaceField() huh.Field {
+	if d.edit {
+		return huh.NewNote().Title("Namespace").Description(namespaceDisplay(d.namespace))
+	}
+
+	return huh.NewInput().Key("namespace").Title("Namespace").
+		Placeholder("(default)").Value(&d.namespace)
 }
 
 func (d *entryForm) Busy() bool { return d.busy }
@@ -389,6 +398,16 @@ func entryHint(onValue bool) string {
 	}
 
 	return "tab/↑↓: fields · enter: submit · esc: cancel"
+}
+
+// namespaceDisplay renders a namespace for the read-only edit note, showing the
+// null (default) namespace as "(default)" so a blank line never hides it.
+func namespaceDisplay(namespace string) string {
+	if namespace == "" {
+		return "(default)"
+	}
+
+	return namespace
 }
 
 // entryNoun names the created item per service (App Configuration setting vs SSM

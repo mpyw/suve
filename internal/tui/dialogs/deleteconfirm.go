@@ -39,10 +39,13 @@ const (
 	ctrlCancel
 )
 
-// deleteConfirm is the delete dialog. Force and recovery-window rows appear only
-// per HasForceDelete/HasRecoveryWindow (AWS secret) and are mutually exclusive
-// (forcing hides the recovery row — CLI parity); the mode toggle appears only
-// when the service supports staging.
+// deleteConfirm is the delete dialog. The force row appears per HasForceDelete
+// (AWS secret); the recovery-window row appears per HasRecoveryWindow but ONLY in
+// staged mode — an immediate delete cannot pass a custom window (there is no
+// SDK-neutral recovery-window DeleteOption, so immediate always applies AWS's
+// 30-day default, matching the GUI's SecretDelete(name, force)). Force and
+// recovery are also mutually exclusive (forcing hides the recovery row — CLI
+// parity). The mode toggle appears only when the service supports staging.
 type deleteConfirm struct {
 	ctx     context.Context //nolint:containedctx // the mutation command needs the Run context; mirrors the browser
 	mutator data.Mutator
@@ -92,8 +95,9 @@ func NewDeleteConfirm(in DeleteInput) Model {
 func (d *deleteConfirm) Busy() bool { return d.busy }
 
 // controls returns the focusable rows in order, gated by capability. The
-// recovery row is hidden while forcing (mutual exclusion), so navigation and
-// hit-testing follow what is drawn.
+// recovery row shows only for a staged delete (an immediate delete cannot carry a
+// custom window — GUI parity) and is hidden while forcing (mutual exclusion), so
+// navigation and hit-testing follow what is drawn.
 func (d *deleteConfirm) controls() []deleteControl {
 	var out []deleteControl
 
@@ -101,7 +105,7 @@ func (d *deleteConfirm) controls() []deleteControl {
 		out = append(out, ctrlForce)
 	}
 
-	if d.svcCap.HasRecoveryWindow && !d.force {
+	if d.svcCap.HasRecoveryWindow && !d.force && d.staged {
 		out = append(out, ctrlRecovery)
 	}
 
@@ -159,6 +163,21 @@ func (d *deleteConfirm) move(delta int) {
 	d.focus = ((d.focus+delta)%n + n) % n
 }
 
+// focusControl points focus at c when it is drawn, so a toggle that reshapes the
+// control set (force/mode showing or hiding the recovery row) keeps the same row
+// focused instead of letting the index drift onto a neighbour.
+func (d *deleteConfirm) focusControl(c deleteControl) {
+	for i, cc := range d.controls() {
+		if cc == c {
+			d.focus = i
+
+			return
+		}
+	}
+
+	d.move(0)
+}
+
 // adjust changes the recovery window (when focused) within bounds.
 func (d *deleteConfirm) adjust(delta int) {
 	if d.focused() != ctrlRecovery {
@@ -173,10 +192,13 @@ func (d *deleteConfirm) activate() (Model, tea.Cmd) {
 	switch d.focused() {
 	case ctrlForce:
 		d.force = !d.force
-		// Toggling force changes the control set (hides/shows recovery); clamp focus.
-		d.move(0)
+		// Toggling force changes the control set (hides/shows recovery); keep focus.
+		d.focusControl(ctrlForce)
 	case ctrlMode:
 		d.staged = !d.staged
+		// Toggling mode changes the control set (staged shows the recovery row);
+		// keep focus on the mode row rather than letting the index drift.
+		d.focusControl(ctrlMode)
 	case ctrlDelete:
 		d.busy = true
 
@@ -204,9 +226,11 @@ func (d *deleteConfirm) submit() tea.Cmd {
 }
 
 // effectiveRecoveryWindow is the recovery window a staged delete records: 0 when
-// forcing or when the service has no recovery window, else the chosen value.
+// forcing, when the service has no recovery window, or for an immediate delete
+// (which cannot carry a custom window and always applies AWS's default), else the
+// chosen value.
 func (d *deleteConfirm) effectiveRecoveryWindow() int {
-	if d.force || !d.svcCap.HasRecoveryWindow {
+	if d.force || !d.svcCap.HasRecoveryWindow || !d.staged {
 		return 0
 	}
 
