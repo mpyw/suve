@@ -101,9 +101,7 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 		filtered = filtered[:input.MaxResults]
 	}
 
-	entries := make([]LogEntry, 0, len(filtered))
-
-	for _, v := range filtered {
+	entries := lo.Map(filtered, func(v domain.Version, _ int) LogEntry {
 		entry, fetchErr := u.getVersion(ctx, input.Name, v)
 
 		logEntry := LogEntry{
@@ -119,8 +117,8 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 			logEntry.Value = entry.Value
 		}
 
-		entries = append(entries, logEntry)
-	}
+		return logEntry
+	})
 
 	// History yields newest first (default). Reverse to oldest first on request.
 	if input.Reverse {
