@@ -56,6 +56,11 @@ type ServiceCapability struct {
 	// delete immediately or govern retention by policy, so no "recoverable until"
 	// date is shown.
 	HasRecoveryWindow bool `json:"hasRecoveryWindow"`
+	// HasDescription is true when a write carries a free-text description (AWS
+	// Parameter Store + Secrets Manager only). The gcloud, Azure Key Vault, and
+	// Azure App Configuration writers ignore a description, so the frontend hides
+	// the description field for them (GUI parity: only AWS forms offer it).
+	HasDescription bool `json:"hasDescription"`
 }
 
 // ProviderCapability describes a provider and the services it offers.
@@ -88,12 +93,12 @@ func All() []ProviderCapability {
 				{
 					Service: serviceParam, DisplayName: "Param",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
-					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
 				},
 				{
 					Service: serviceSecret, DisplayName: displayNameSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: true,
-					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: true,
+					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: true, HasDescription: true,
 				},
 			},
 		},

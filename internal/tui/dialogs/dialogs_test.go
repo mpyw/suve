@@ -3,6 +3,8 @@ package dialogs
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -83,7 +85,7 @@ func (m *fakeMutator) Restore(context.Context, string) (data.WriteOutcome, error
 
 // Capability fixtures.
 func awsParamCap() capability.ServiceCapability {
-	return capability.ServiceCapability{Service: "param", HasTags: true, HasStaging: true}
+	return capability.ServiceCapability{Service: "param", HasTags: true, HasStaging: true, HasDescription: true}
 }
 
 func appConfigCap() capability.ServiceCapability {
@@ -93,7 +95,7 @@ func appConfigCap() capability.ServiceCapability {
 func awsSecretCap() capability.ServiceCapability {
 	return capability.ServiceCapability{
 		Service: "secret", HasTags: true, HasStaging: true, HasRestore: true,
-		HasForceDelete: true, HasRecoveryWindow: true,
+		HasForceDelete: true, HasRecoveryWindow: true, HasDescription: true,
 	}
 }
 
@@ -181,18 +183,52 @@ func TestEntryForm_NamespaceReadOnlyOnEdit(t *testing.T) {
 }
 
 // TestEntryForm_TypeSelectGating pins the Type select is offered only for the
-// typed AWS SSM param service (App Configuration is untyped; secret has none).
+// typed AWS SSM param service (App Configuration is untyped; secret has none)
+// AND only in immediate mode: containment for #664, since the staged path drops
+// the value type (staging apply hardcodes a plaintext String), so a staged
+// SecureString would silently downgrade to plaintext. Staged mode must not
+// present a Type control that can't take effect.
 func TestEntryForm_TypeSelectGating(t *testing.T) {
 	t.Parallel()
 
 	awsParam, _ := newEntry(t, awsParamCap(), false)
-	assert.True(t, awsParam.showType())
+	require.True(t, awsParam.staged, "AWS param defaults to staged")
+	assert.False(t, awsParam.showType(), "staged mode hides the Type select (#664 containment)")
+	assert.NotContains(t, awsParam.View(), "Type", "staged form draws no Type row")
+
+	awsParam.staged = false
+	require.NotNil(t, awsParam.rebuildForm())
+	assert.True(t, awsParam.showType(), "immediate mode offers the Type select")
+	assert.Contains(t, awsParam.View(), "Type", "immediate form draws the Type row")
 
 	appConfig, _ := newEntry(t, appConfigCap(), false)
-	assert.False(t, appConfig.showType())
+	appConfig.staged = false
+	require.NotNil(t, appConfig.rebuildForm())
+	assert.False(t, appConfig.showType(), "App Configuration is untyped even in immediate mode")
 
 	secret, _ := newEntry(t, awsSecretCap(), false)
-	assert.False(t, secret.showType())
+	secret.staged = false
+	require.NotNil(t, secret.rebuildForm())
+	assert.False(t, secret.showType(), "secret has no value type even in immediate mode")
+}
+
+// TestEntryForm_DescriptionGating pins that the Description field is drawn only
+// for a service that honors it (AWS param/secret). The gcloud, Azure Key Vault,
+// and App Configuration writers ignore a description, so their forms omit it.
+func TestEntryForm_DescriptionGating(t *testing.T) {
+	t.Parallel()
+
+	awsParam, _ := newEntry(t, awsParamCap(), false)
+	assert.Contains(t, awsParam.View(), "Description", "AWS param offers a description")
+
+	awsSecret, _ := newEntry(t, awsSecretCap(), false)
+	assert.Contains(t, awsSecret.View(), "Description", "AWS secret offers a description")
+
+	appConfig := newAppConfigEntry(t, false, "prod")
+	assert.NotContains(t, appConfig.View(), "Description", "App Configuration ignores a description")
+
+	gcloudSecret, _ := newEntry(t, gcloudSecretCap(), false)
+	assert.NotContains(t, gcloudSecret.View(), "Description", "gcloud secret ignores a description")
 }
 
 // TestEntryForm_SubmitRoutesStaged pins that a staged submit routes through the
@@ -232,20 +268,37 @@ func TestEntryForm_EditSubmitImmediate(t *testing.T) {
 	assert.Equal(t, "SecureString", mut.typeLabel, "edit preserves the current type")
 }
 
-// TestEntryForm_EditorNoOp pins the $EDITOR no-op: an unchanged buffer keeps the
-// value and shows "No changes made."; a changed buffer replaces it.
+// TestEntryForm_EditorNoOp pins the editor no-op as a REAL round-trip: the value
+// is written to a temp file, a simulated editor appends a trailing newline (as
+// most editors do), and the file is read back through the actual read path
+// (onEditorFinished). The newline-normalization must treat this as untouched
+// ("No changes made.", value unchanged) rather than silently mutating the value
+// with a stray newline; a genuine edit still replaces it.
 func TestEntryForm_EditorNoOp(t *testing.T) {
 	t.Parallel()
 
 	d, _ := newEntry(t, awsParamCap(), true)
 	d.value = "same"
 
-	_, _ = d.onEditorFinished(editorFinishedMsg{content: "same"})
-	assert.Equal(t, "same", d.value)
+	tmp := filepath.Join(t.TempDir(), "edit.txt")
+
+	// Simulate an editor that saved the buffer untouched but appended a newline.
+	require.NoError(t, os.WriteFile(tmp, []byte(d.value+"\n"), 0o600))
+	raw, err := os.ReadFile(tmp) //nolint:gosec // tmp is this test's own temp file
+	require.NoError(t, err)
+
+	_, _ = d.onEditorFinished(editorFinishedMsg{content: string(raw)})
+	assert.Equal(t, "same", d.value, "an editor-appended newline is a no-op round-trip")
 	assert.Equal(t, "No changes made.", d.notice)
 
-	_, _ = d.onEditorFinished(editorFinishedMsg{content: "edited"})
-	assert.Equal(t, "edited", d.value, "a changed buffer replaces the value")
+	// A genuine edit still replaces the value (with the editor newline normalized).
+	require.NoError(t, os.WriteFile(tmp, []byte("edited\n"), 0o600))
+	raw, err = os.ReadFile(tmp) //nolint:gosec // tmp is this test's own temp file
+	require.NoError(t, err)
+
+	_, _ = d.onEditorFinished(editorFinishedMsg{content: string(raw)})
+	assert.Equal(t, "edited", d.value, "a changed buffer replaces the value (newline normalized)")
+	assert.Equal(t, "Loaded from editor.", d.notice)
 }
 
 // TestEntryForm_EditorNoTTY pins the TTY gate: without a TTY the editor is not
@@ -418,6 +471,53 @@ func TestTagForm_Routing(t *testing.T) {
 	d.remove = true
 	execCmd(t, d.submit())
 	assert.Equal(t, "owner", mut.tagKey, "remove action routes to RemoveTag with the key")
+}
+
+// TestDeleteConfirm_ResultVoicing pins the delete status voicing, including the
+// auto-unstage case: deleting a staged create removes it (nothing left to
+// delete). The pure voicing is asserted, then routed through onResult to confirm
+// it reaches the MutationDoneMsg status line.
+func TestDeleteConfirm_ResultVoicing(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, deleteStatus(true, data.WriteOutcome{Unstaged: true}), "nothing left to delete")
+	assert.Equal(t, "Staged delete.", deleteStatus(true, data.WriteOutcome{}))
+	assert.Equal(t, "Deleted.", deleteStatus(false, data.WriteOutcome{}))
+
+	d := newDelete(t, awsSecretCap())
+	d.staged = true
+
+	_, cmd := d.onResult(mutationResultMsg{outcome: data.WriteOutcome{Unstaged: true}})
+	done, ok := cmd().(MutationDoneMsg)
+	require.True(t, ok, "a successful delete emits MutationDoneMsg")
+	assert.Contains(t, done.Status, "nothing left to delete", "auto-unstage surfaces in the status line")
+}
+
+// TestTagForm_ResultVoicing pins the tag status voicing (staged/applied,
+// add/removal) and that it reaches the MutationDoneMsg status line. Tags carry no
+// auto-unstage/skip outcome today (TagOutput/UntagOutput hold only the name), so
+// the tag equivalent that surfaces is the staged/applied voicing.
+func TestTagForm_ResultVoicing(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "Staged tag add.", tagStatus(false, true))
+	assert.Equal(t, "Staged tag removal.", tagStatus(true, true))
+	assert.Equal(t, "Applied tag add.", tagStatus(false, false))
+	assert.Equal(t, "Applied tag removal.", tagStatus(true, false))
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+	m, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+	})
+	d, ok := m.(*tagForm)
+	require.True(t, ok)
+
+	d.remove, d.staged = true, true
+
+	_, cmd := d.onResult(mutationResultMsg{outcome: data.WriteOutcome{}})
+	done, ok := cmd().(MutationDoneMsg)
+	require.True(t, ok, "a successful tag write emits MutationDoneMsg")
+	assert.Equal(t, "Staged tag removal.", done.Status, "tag voicing surfaces in the status line")
 }
 
 // TestRestoreForm_Routing pins that the restore form routes to Restore.

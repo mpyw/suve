@@ -4,11 +4,6 @@
 │┃ Name                                                │
 │┃ >                                                   │
 │                                                      │
-│  Type                                                │
-│  > String                                            │
-│    SecureString                                      │
-│    StringList                                        │
-│                                                      │
 │  Value                                               │
 │                                                      │
 │                                                      │

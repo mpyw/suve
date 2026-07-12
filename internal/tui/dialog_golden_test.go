@@ -174,9 +174,12 @@ func goldenCap(prov, service string) capability.ServiceCapability {
 	return sc
 }
 
-// TestDialog_EntryFormAWSParamGolden renders the create form for AWS SSM param
-// (name, Type select, empty value textarea, mode toggle). No value is seeded, so
-// no secret is rendered.
+// TestDialog_EntryFormAWSParamGolden renders the create form for AWS SSM param in
+// its default (staged) mode: name, value textarea, Description, and the mode
+// toggle. The Type select is NOT drawn — it is offered only in immediate mode
+// (#664 containment: a staged write drops the value type, so a staged
+// SecureString would silently downgrade to plaintext). No value is seeded, so no
+// secret is rendered.
 func TestDialog_EntryFormAWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
@@ -185,7 +188,7 @@ func TestDialog_EntryFormAWSParamGolden(t *testing.T) { //nolint:paralleltest //
 		Service: "param", Styles: styles.New(),
 	})
 
-	dialogGolden(t, newDialogHost(m, cmd), "Type")
+	dialogGolden(t, newDialogHost(m, cmd), "Value")
 }
 
 // TestDialog_EntryFormAppConfigGolden renders the create form for Azure App
@@ -280,6 +283,17 @@ func TestDialog_TagAWSParamGolden(t *testing.T) { //nolint:paralleltest // golde
 	})
 
 	dialogGolden(t, newDialogHost(m, cmd), "Action")
+}
+
+// TestDialog_ErrorGolden renders the plain error dialog (a blocked operation the
+// app surfaces modally). It never mutates and carries no secret.
+func TestDialog_ErrorGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m := dialogs.NewError(styles.New(), "Cannot create here",
+		"Creating is blocked while viewing all namespaces. Pick one namespace first.")
+
+	dialogGolden(t, newDialogHost(m, nil), "Cannot create here")
 }
 
 // TestDialog_RestoreGolden renders the restore form (name input, no mode toggle).

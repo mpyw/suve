@@ -3,7 +3,6 @@ package dialogs
 import (
 	"context"
 	"os"
-	"os/exec"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/cli/commands/aws/param/paramtype"
+	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
@@ -21,10 +21,6 @@ import (
 // to, so the modal size (and its goldens) stay deterministic regardless of
 // terminal width.
 const dialogContentWidth = 54
-
-// editorFallback is the editor used when $EDITOR is unset (the CLI $EDITOR gate
-// parity).
-const editorFallback = "vi"
 
 // isTTY reports whether the process is attached to a terminal, gating the
 // $EDITOR handoff (which suspends the program to run an editor). It is a package
@@ -66,8 +62,7 @@ type entryForm struct {
 	description string
 	staged      bool
 
-	form       *huh.Form
-	valueField *huh.Text
+	form *huh.Form
 
 	busy   bool
 	err    string
@@ -120,9 +115,15 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 
 // showType reports whether the typed-param Type select is offered: only the AWS
 // SSM param service has a value type (App Configuration is untyped; secret has
-// none) — parity with the GUI's ParamTypeOptions.
+// none) — parity with the GUI's ParamTypeOptions — AND only in immediate mode.
+//
+// Containment for #664: the staged write path drops the value type (staging
+// apply hardcodes a plaintext String), so a staged SecureString create would
+// silently apply as plaintext String. Until the systemic staged-type fix lands
+// (#664), the Type select is offered only in immediate mode, where it takes
+// effect; staged mode never presents a Type control that can't be honored.
 func (d *entryForm) showType() bool {
-	return d.svcCap.Service == serviceParam && !d.svcCap.HasNamespaces
+	return d.svcCap.Service == serviceParam && !d.svcCap.HasNamespaces && !d.staged
 }
 
 // defaultTypeLabel picks the Type select's initial value: the seeded label when
@@ -158,12 +159,16 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 			Options(huh.NewOptions(paramtype.Options()...)...).Value(&d.valueType))
 	}
 
-	d.valueField = huh.NewText().Key("value").Title("Value").Lines(4). //nolint:mnd // value textarea height
-										ExternalEditor(false).Value(&d.value)
-	fields = append(fields, d.valueField)
+	fields = append(fields, huh.NewText().Key("value").Title("Value").Lines(4). //nolint:mnd // value textarea height
+											ExternalEditor(false).Value(&d.value))
 
-	fields = append(fields, huh.NewInput().Key("description").Title("Description").
-		Placeholder("(optional)").Value(&d.description))
+	// Description is AWS-only: the gcloud, Azure Key Vault, and App Configuration
+	// writers ignore it (and the GUI never offers it), so it is shown only for a
+	// service that honors it.
+	if d.svcCap.HasDescription {
+		fields = append(fields, huh.NewInput().Key("description").Title("Description").
+			Placeholder("(optional)").Value(&d.description))
+	}
 
 	if d.svcCap.HasStaging {
 		fields = append(fields, newModeField(&d.staged))
@@ -279,17 +284,16 @@ func (d *entryForm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 	return d, doneCmd(d.service, status, d.staged)
 }
 
-// openEditor writes the current value to a temp file and hands off to $EDITOR.
+// openEditor writes the current value to a temp file and hands off to the user's
+// editor. The editor command is built by the shared internal/cli/editor helper,
+// so the TUI and the CLI resolve VISUAL→EDITOR, honor a flag-bearing or
+// space-containing editor path, and pick the same OS fallback — they cannot
+// diverge.
 func (d *entryForm) openEditor() tea.Cmd {
 	if !isTTY() {
 		d.notice = "editor needs a TTY."
 
 		return nil
-	}
-
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = editorFallback
 	}
 
 	buffer := d.value
@@ -313,8 +317,7 @@ func (d *entryForm) openEditor() tea.Cmd {
 
 	_ = tmp.Close()
 
-	//nolint:gosec // editor comes from $EDITOR (fallback vi); the CLI uses the same handoff
-	cmd := exec.CommandContext(d.ctx, editor, name)
+	cmd := editor.Command(d.ctx, name)
 
 	return tea.ExecProcess(cmd, func(runErr error) tea.Msg {
 		//nolint:gosec // name is the temp file this handler just created, not user input
@@ -329,9 +332,10 @@ func (d *entryForm) openEditor() tea.Cmd {
 	})
 }
 
-// onEditorFinished folds the $EDITOR buffer back into the value field: an
+// onEditorFinished folds the editor buffer back into the value field: an
 // unchanged buffer is a no-op ("No changes made."), otherwise the new content
-// replaces the textarea's value.
+// replaces the textarea's value and the form is rebuilt so the huh textarea
+// buffer re-syncs (mirroring every other path).
 func (d *entryForm) onEditorFinished(msg editorFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		d.notice = "editor error: " + msg.err.Error()
@@ -339,20 +343,25 @@ func (d *entryForm) onEditorFinished(msg editorFinishedMsg) (Model, tea.Cmd) {
 		return d, nil
 	}
 
-	if msg.content == d.value {
+	// Most editors auto-append a trailing newline; normalize it away with the same
+	// round-trip-lossless rule the CLI uses, so an untouched round-trip is
+	// byte-identical to the seed value and correctly reported as a no-op (instead
+	// of silently mutating the value with a stray newline). d.value still holds the
+	// pre-edit buffer that was written to the tmpfile.
+	content := editor.Normalize(d.value, msg.content)
+
+	if content == d.value {
 		d.notice = "No changes made."
 
 		return d, nil
 	}
 
-	d.value = msg.content
-	if d.valueField != nil {
-		d.valueField.Value(&d.value) // re-sync the textarea to the edited buffer
-	}
-
+	d.value = content
 	d.notice = "Loaded from editor."
 
-	return d, nil
+	// Rebuild so the huh textarea re-binds to the edited value (consistent with
+	// every other value-changing path; avoids a stale textarea buffer).
+	return d, d.rebuildForm()
 }
 
 func (d *entryForm) View() string {
