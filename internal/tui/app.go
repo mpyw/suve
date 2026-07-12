@@ -497,6 +497,17 @@ func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, m.keys.Back) && !m.topDialogBusy() {
+			// A dialog that has already mutated (the apply results view) closes on
+			// Back with the same reload+voice as enter, so the staging page and its
+			// badge refresh; the returned command emits MutationDoneMsg, which
+			// onMutationDone turns into the single pop+reload+voice. Every other
+			// dialog is bare-dismissed.
+			if d, ok := m.dialogs[len(m.dialogs)-1].(dialogs.DismissReloader); ok {
+				if cmd := d.DismissCmd(); cmd != nil {
+					return m, cmd
+				}
+			}
+
 			m.popDialog()
 
 			return m, nil

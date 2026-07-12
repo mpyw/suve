@@ -148,6 +148,30 @@ func TestUpdate_ViewToggle(t *testing.T) {
 	assert.True(t, m.diffView, "v switches back to diff view")
 }
 
+// TestUpdate_ValueViewCollapsesMultiline pins that value view collapses a
+// multi-line staged value to a single physical row (first line + " …"), so the
+// body cannot overflow its box and desync the mouse hit-map. The full value
+// stays reachable via the diff-detail page (enter).
+func TestUpdate_ValueViewCollapsesMultiline(t *testing.T) {
+	t.Parallel()
+
+	sec := &stubService{
+		service: "param", label: "Param", svcCap: capFor("aws", "param"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{{
+			Name: "/app/web/BLOB", Type: data.StagedDiffNormal, Operation: "create",
+			StagedValue: "first-line\nSECOND_LINE_MARKER\nthird-line",
+		}}},
+	}
+	m := newModel(t, sec)
+
+	m, _ = m.Update(keyPress('v'))
+	require.False(t, m.diffView, "switched to value view")
+
+	screen := m.View(100, 30)
+	assert.Contains(t, screen, "first-line …", "value collapses to its first line")
+	assert.NotContains(t, screen, "SECOND_LINE_MARKER", "later lines never render as extra rows")
+}
+
 // TestUpdate_CancelTagOps pins that `x` cancels a staged tag add and enter
 // cancels a staged tag removal, each addressing the correct (item, tagKey).
 func TestUpdate_CancelTagOps(t *testing.T) {
