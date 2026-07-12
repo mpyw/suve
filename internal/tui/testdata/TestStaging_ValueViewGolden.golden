@@ -1,0 +1,34 @@
+suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
+ Param Secret Staging(5)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+view: diff [value]   A apply-all · R reset-all · ctrl+r refresh
+⚠ auto-unstaged: /app/web/OLD_FLAG (staged value now equals remote)  esc: dismiss
+Param (3)                                                                                             a apply · r reset
+▸ update  /app/web/CDN_URL   https://cdn-new.example.com
+  create  /app/web/NEW_FLAG   true
+  tags  /app/api/DATABASE_URL  +owner=platform   x cancel
+  tags  /app/api/DATABASE_URL  −env (was prod)   ↩ cancel
+
+Secret (2)                                                                                            a apply · r reset
+  delete  prod/api/old-key   (delete)
+  update  prod/api/session   ••••••••••••••••••••••••
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ tab next tab • 1/2/3 jump to tab • ? help • q quit

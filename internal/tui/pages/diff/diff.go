@@ -74,8 +74,28 @@ func New(ctx context.Context, req nav.OpenDiff, st styles.Styles, km keys.Map) *
 	}
 }
 
-// Init dispatches the one-shot version-contents fetch.
+// NewStatic builds a diff page over already-known content (no fetch). It backs
+// the staging page's remote-vs-staged detail, where the two sides are the staged
+// review's values rather than two provider versions. Secret masking is honored
+// exactly as in the fetched path.
+func NewStatic(content data.DiffContent, st styles.Styles, km keys.Map) *Model {
+	return &Model{
+		name:    content.NewLabel,
+		content: content,
+		loaded:  true,
+		styles:  st,
+		keys:    km,
+		vp:      viewport.New(),
+	}
+}
+
+// Init dispatches the one-shot version-contents fetch, or nothing for a static
+// page whose content is already known.
 func (m *Model) Init() tea.Cmd {
+	if m.source == nil {
+		return nil
+	}
+
 	return m.loadCmd()
 }
 

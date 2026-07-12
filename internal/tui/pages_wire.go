@@ -10,6 +10,7 @@ import (
 	"github.com/mpyw/suve/internal/tui/nav"
 	"github.com/mpyw/suve/internal/tui/pages/browser"
 	"github.com/mpyw/suve/internal/tui/pages/diff"
+	"github.com/mpyw/suve/internal/tui/pages/staging"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
@@ -51,6 +52,33 @@ func (p diffPage) Init() tea.Cmd                 { return p.m.Init() }
 // capturesInput is always false: the diff page has no text input (its keys are
 // scroll/parse-json/back, all safe to route through the global map).
 func (p diffPage) capturesInput() bool { return false }
+
+// stagingPage adapts *staging.Model to the app's page interface.
+type stagingPage struct{ m *staging.Model }
+
+func (p stagingPage) Update(msg tea.Msg) (page, tea.Cmd) {
+	m, cmd := p.m.Update(msg)
+
+	return stagingPage{m: m}, cmd
+}
+
+func (p stagingPage) View(width, height int) string { return p.m.View(width, height) }
+func (p stagingPage) Init() tea.Cmd                 { return p.m.Init() }
+
+// capturesInput is always false: the staging page has no text input.
+func (p stagingPage) capturesInput() bool { return false }
+
+// newStagingPage builds the staging page adapter over the offered services'
+// staging seams.
+func newStagingPage(ctx context.Context, services []data.StagingService, st styles.Styles, km keys.Map) stagingPage {
+	return stagingPage{m: staging.New(ctx, services, st, km)}
+}
+
+// newStaticDiffPage builds a diff page over already-known content (the staging
+// page's remote-vs-staged detail).
+func newStaticDiffPage(content data.DiffContent, st styles.Styles, km keys.Map) diffPage {
+	return diffPage{m: diff.NewStatic(content, st, km)}
+}
 
 // newBrowserPage builds the browser page adapter for a service source.
 func newBrowserPage(

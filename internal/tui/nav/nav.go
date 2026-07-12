@@ -13,9 +13,44 @@ import (
 // diff page returns to the browser).
 type PopPage struct{}
 
-// OpenStaging asks the app to switch to the Staging tab (the `S` jump; the
-// staging page itself is a placeholder until Step 5).
+// OpenStaging asks the app to switch to the Staging tab (the browser's `S` jump).
 type OpenStaging struct{}
+
+// Reload asks the app to reload the active page after a mutation or staging
+// action applied through a dialog (both the browser and the staging page react
+// to it, refreshing their data and staged-count badges).
+type Reload struct{}
+
+// OpenApply asks the app to open the apply confirmation dialog for a set of
+// services. Global marks the fan-out (apply-all) variant; EntryCount/TagCount are
+// the staged totals across the targets, shown on the confirmation.
+type OpenApply struct {
+	Services   []string
+	Global     bool
+	EntryCount int
+	TagCount   int
+}
+
+// OpenReset asks the app to open the reset confirmation dialog for a set of
+// services. Global marks the reset-all variant.
+type OpenReset struct {
+	Services []string
+	Global   bool
+}
+
+// OpenStagingDetail asks the app to push a full-diff page comparing an entry's
+// remote value against its staged value (the staging page's `enter` detail),
+// reusing the diff viewer for long values.
+type OpenStagingDetail struct {
+	Title    string
+	OldLabel string
+	NewLabel string
+	OldValue string
+	NewValue string
+	// Secret masks both sides before diffing, so a secret detail never renders a
+	// revealed value.
+	Secret bool
+}
 
 // OpenEntryForm asks the app to open the create/edit dialog. Edit fixes the name
 // and seeds the value/type/description from the selected entry; create seeds only

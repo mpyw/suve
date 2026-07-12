@@ -82,6 +82,83 @@ func (f *sourceFactory) mutatorFor(service string) data.Mutator {
 	}
 }
 
+// stagingService returns the review/apply/reset seam for a service tab, or nil
+// when the service is unavailable or has no staging workflow. Resolution of the
+// store and strategy is deferred into a StagingResolver so building the page
+// never touches the keychain/registry on the update loop; a key-loss surfaces as
+// the review's error.
+func (f *sourceFactory) stagingService(service string) data.StagingService {
+	svcCap, ok := capabilityFor(f.scope.Provider, service)
+	if !ok || !svcCap.HasStaging {
+		return nil
+	}
+
+	switch service {
+	case string(staging.ServiceParam):
+		return data.NewStagingService(svcCap, svcCap.DisplayName, f.paramStagingResolver())
+	case string(staging.ServiceSecret):
+		return data.NewStagingService(svcCap, svcCap.DisplayName, f.secretStagingResolver())
+	default:
+		return nil
+	}
+}
+
+// paramStagingResolver builds the param service's staging resources: the cached
+// staging store paired with the provider-specific strategy, plus a per-namespace
+// strategy resolver for Azure App Configuration (whose settings share one store
+// across namespaces).
+func (f *sourceFactory) paramStagingResolver() data.StagingResolver {
+	build := f.paramStrategyBuilder()
+	resolveStore := f.paramResolver()
+
+	return func(ctx context.Context) (data.StagingResources, error) {
+		st, err := f.stagingStore(provider.KindParam)
+		if err != nil {
+			return data.StagingResources{}, err
+		}
+
+		base, err := resolveStore(ctx, "")
+		if err != nil {
+			return data.StagingResources{}, err
+		}
+
+		res := data.StagingResources{Store: st, Strategy: build(base)}
+
+		if f.scope.Provider == provider.ProviderAzure && f.scope.StoreName != "" {
+			res.StrategyFor = func(namespace string) (staging.FullStrategy, error) {
+				s, err := resolveStore(ctx, namespace)
+				if err != nil {
+					return nil, err
+				}
+
+				return build(s), nil
+			}
+		}
+
+		return res, nil
+	}
+}
+
+// secretStagingResolver builds the secret service's staging resources (no
+// namespace axis, so a single strategy handles every entry).
+func (f *sourceFactory) secretStagingResolver() data.StagingResolver {
+	build := f.secretStrategyBuilder()
+
+	return func(ctx context.Context) (data.StagingResources, error) {
+		st, err := f.stagingStore(provider.KindSecret)
+		if err != nil {
+			return data.StagingResources{}, err
+		}
+
+		base, err := registry.Store(ctx, f.scope, provider.KindSecret)
+		if err != nil {
+			return data.StagingResources{}, err
+		}
+
+		return data.StagingResources{Store: st, Strategy: build(base)}, nil
+	}
+}
+
 // stagingStoreResolver returns a lazy resolver for the service's cached staging
 // store, or nil when the service has no staging workflow (so a staged write is
 // never offered). Deferring the build keeps dialog open off the keychain.

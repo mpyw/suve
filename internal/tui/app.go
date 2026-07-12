@@ -25,7 +25,6 @@ import (
 	"github.com/mpyw/suve/internal/tui/dialogs"
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/nav"
-	"github.com/mpyw/suve/internal/tui/pages/browser"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
@@ -73,6 +72,11 @@ type config struct {
 	// dialogs' seam). Production wires it to the registry-backed sourceFactory,
 	// tests to a providermock-backed one; nil disables the write dialogs.
 	mutatorFor func(service string) data.Mutator
+	// stagingFor builds the review/apply/reset seam for a service, backing the
+	// staging page's sections and the apply/reset dialogs. Production wires it to
+	// the registry-backed sourceFactory, tests to a providermock-backed one; nil
+	// leaves the Staging tab a placeholder.
+	stagingFor func(service string) data.StagingService
 	// runCtx is the Run context threaded into pages so their fetch commands are
 	// cancelled when the program exits. Tests may leave it nil (newApp defaults it
 	// to context.Background()).
@@ -135,6 +139,7 @@ type App struct {
 	// threaded into pages.
 	sourceFor  func(service string) (data.Source, data.StagingProbe)
 	mutatorFor func(service string) data.Mutator
+	stagingFor func(service string) data.StagingService
 	runCtx     context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
 
 	// status is a transient one-line outcome (staged/applied/skipped/unstaged)
@@ -165,6 +170,7 @@ func newApp(cfg config) *App {
 		identity:      cfg.identity,
 		sourceFor:     cfg.sourceFor,
 		mutatorFor:    cfg.mutatorFor,
+		stagingFor:    cfg.stagingFor,
 		runCtx:        cmp.Or(cfg.runCtx, context.Background()),
 		stagedCounts:  map[string]int{},
 	}
@@ -262,6 +268,12 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.openTag(msg)
 	case nav.OpenRestore:
 		return m, m.openRestore(msg)
+	case nav.OpenApply:
+		return m, m.openApply(msg)
+	case nav.OpenReset:
+		return m, m.openReset(msg)
+	case nav.OpenStagingDetail:
+		return m, m.pushStagingDetail(msg)
 	case nav.OpenError:
 		m.pushDialog(dialogs.NewError(m.styles, msg.Title, msg.Message), nil)
 
@@ -303,7 +315,7 @@ func (m *App) reloadActivePage() tea.Cmd {
 	}
 
 	top := len(m.pages) - 1
-	p, cmd := m.pages[top].Update(browser.ReloadMsg{})
+	p, cmd := m.pages[top].Update(nav.Reload{})
 	m.pages[top] = p
 
 	return cmd
@@ -426,8 +438,8 @@ func (m *App) refreshStagingTab() {
 	}
 }
 
-// openStaging switches to the Staging tab (the browser's `S` jump). The staging
-// page is a placeholder until Step 5; landing on the tab is enough.
+// openStaging switches to the Staging tab (the browser's `S` jump); setTab
+// builds and loads the real staging page.
 func (m *App) openStaging() {
 	for i, t := range m.tabs {
 		if t.Service == stagingService {
@@ -688,12 +700,23 @@ func (m *App) setTab(i int) tea.Cmd {
 	return cmd
 }
 
-// pageForTab builds the page for a tab index: a real browser page for a
-// param/secret service when a data source is wired, else the placeholder.
+// pageForTab builds the page for a tab index: the staging page for the Staging
+// tab (when its seam is wired), a browser page for a param/secret service (when
+// a data source is wired), else the placeholder.
 func (m *App) pageForTab(i int) (page, tea.Cmd) {
 	tab := m.tabs[i]
 
-	if tab.Service != stagingService && m.sourceFor != nil {
+	if tab.Service == stagingService {
+		if services := m.stagingServicesFor(m.offeredServices()); len(services) > 0 {
+			p := newStagingPage(m.runCtx, services, m.styles, m.keys)
+
+			return p, p.Init()
+		}
+
+		return newPlaceholderPage(m.styles, tab.Title, placeholderNotice(tab)), nil
+	}
+
+	if m.sourceFor != nil {
 		if source, staging := m.sourceFor(tab.Service); source != nil {
 			p := newBrowserPage(m.runCtx, source, staging, m.styles, m.keys)
 
@@ -702,6 +725,136 @@ func (m *App) pageForTab(i int) (page, tea.Cmd) {
 	}
 
 	return newPlaceholderPage(m.styles, tab.Title, placeholderNotice(tab)), nil
+}
+
+// offeredServices returns the service-axis keys the scope offers (the non-staging
+// tabs, in tab order), so the staging page and the apply/reset fan-out iterate
+// exactly the services that have a browser tab.
+func (m *App) offeredServices() []string {
+	var services []string
+
+	for _, t := range m.tabs {
+		if t.Service != stagingService {
+			services = append(services, t.Service)
+		}
+	}
+
+	return services
+}
+
+// stagingServicesFor resolves the staging seams for a set of service keys,
+// dropping any the factory does not offer (nil seam), preserving order.
+func (m *App) stagingServicesFor(services []string) []data.StagingService {
+	if m.stagingFor == nil {
+		return nil
+	}
+
+	out := make([]data.StagingService, 0, len(services))
+
+	for _, s := range services {
+		if svc := m.stagingFor(s); svc != nil {
+			out = append(out, svc)
+		}
+	}
+
+	return out
+}
+
+// openApply builds and pushes the apply confirmation for the requested services.
+func (m *App) openApply(req nav.OpenApply) tea.Cmd {
+	targets := m.stagingServicesFor(req.Services)
+	if len(targets) == 0 {
+		return nil
+	}
+
+	d := dialogs.NewApply(dialogs.ApplyInput{
+		Ctx: m.runCtx, Targets: targets, TargetLine: m.applyTargetLine(),
+		Title: applyTitle(req.Global, targets), EntryCount: req.EntryCount, TagCount: req.TagCount,
+		Styles: m.styles,
+	})
+
+	return m.pushDialog(d, nil)
+}
+
+// openReset builds and pushes the reset confirmation for the requested services.
+func (m *App) openReset(req nav.OpenReset) tea.Cmd {
+	targets := m.stagingServicesFor(req.Services)
+	if len(targets) == 0 {
+		return nil
+	}
+
+	d := dialogs.NewReset(dialogs.ResetInput{
+		Ctx: m.runCtx, Targets: targets, Title: resetTitle(req.Global, targets), Styles: m.styles,
+	})
+
+	return m.pushDialog(d, nil)
+}
+
+// pushStagingDetail pushes a full remote-vs-staged diff page for the staging
+// page's `enter` detail, reusing the diff viewer over static content.
+func (m *App) pushStagingDetail(req nav.OpenStagingDetail) tea.Cmd {
+	p := newStaticDiffPage(data.DiffContent{
+		OldLabel: req.OldLabel, NewLabel: req.NewLabel,
+		OldValue: req.OldValue, NewValue: req.NewValue, Secret: req.Secret,
+	}, m.styles, m.keys)
+	m.pages = append(m.pages, p)
+	m.forwardResizeToTop()
+
+	return p.Init()
+}
+
+// applyTargetLine renders the apply target identity (account/region, project, or
+// vault/store) shown on the apply confirmation — parity with the CLI's prompt.
+func (m *App) applyTargetLine() string {
+	switch m.scope.Provider {
+	case provider.ProviderAWS:
+		parts := []string{"aws"}
+		if m.identity != nil {
+			parts = appendKV(parts, "account", m.identity.Account)
+			parts = appendKV(parts, "region", m.identity.Region)
+		}
+
+		return strings.Join(parts, " · ")
+	case provider.ProviderGoogleCloud:
+		return strings.Join(appendKV([]string{"googlecloud"}, "project", m.scope.ProjectID), " · ")
+	case provider.ProviderAzure:
+		parts := []string{"azure"}
+		parts = appendKV(parts, "vault", m.scope.VaultName)
+		parts = appendKV(parts, "store", m.scope.StoreName)
+
+		return strings.Join(parts, " · ")
+	default:
+		return string(m.scope.Provider)
+	}
+}
+
+// appendKV appends a "key value" segment when value is non-empty.
+func appendKV(parts []string, key, value string) []string {
+	if value == "" {
+		return parts
+	}
+
+	return append(parts, key+" "+value)
+}
+
+// applyTitle names the apply confirmation: "— all" for the fan-out, else the
+// single service's label.
+func applyTitle(global bool, targets []data.StagingService) string {
+	return "Apply staged changes — " + targetTitle(global, targets)
+}
+
+// resetTitle names the reset confirmation.
+func resetTitle(global bool, targets []data.StagingService) string {
+	return "Reset staged changes — " + targetTitle(global, targets)
+}
+
+// targetTitle is "all" for a global fan-out, else the single target's label.
+func targetTitle(global bool, targets []data.StagingService) string {
+	if global || len(targets) != 1 {
+		return "all"
+	}
+
+	return targets[0].Label()
 }
 
 // copyFocusedValue copies the focused value through the OSC52 clipboard seam, or
@@ -889,8 +1042,8 @@ func (m *App) overlayDialogs(base string) string {
 // the step its real page arrives in.
 func placeholderNotice(t components.Tab) string {
 	if t.Service == stagingService {
-		return "(staging page lands in Step 5)"
+		return "(no staging services available for this scope)"
 	}
 
-	return "(browser page lands in Step 3)"
+	return "(no data source available for this service)"
 }
