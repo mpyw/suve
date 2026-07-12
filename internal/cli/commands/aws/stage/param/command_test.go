@@ -92,6 +92,26 @@ func TestCommand_EditSubcommand(t *testing.T) {
 	assert.NotNil(t, editCmd.Action)
 }
 
+func TestCommand_AddEditHaveTypeFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := param.Command()
+	require.NotNil(t, cmd)
+
+	for _, name := range []string{"add", "edit"} {
+		leaf, found := lo.Find(cmd.Commands, func(c *cli.Command) bool {
+			return c.Name == name
+		})
+		require.True(t, found, "should have %s subcommand", name)
+
+		flagNames := lo.FlatMap(leaf.Flags, func(f cli.Flag, _ int) []string {
+			return f.Names()
+		})
+		assert.Contains(t, flagNames, "type", "%s should accept --type", name)
+		assert.Contains(t, flagNames, "secure", "%s should accept --secure", name)
+	}
+}
+
 func TestCommand_DeleteSubcommand(t *testing.T) {
 	t.Parallel()
 
