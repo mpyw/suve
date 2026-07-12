@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/samber/lo/it"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
@@ -441,10 +443,9 @@ func (r *Runner) outputTagDiff(ctx context.Context, svc ServiceStrategy, key sta
 	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.For(r.Stdout).Info("Tags:"), diffDisplayName(key))
 
 	if len(tagEntry.Add) > 0 {
-		tagPairs := make([]string, 0, len(tagEntry.Add))
-		for k := range maputil.SortedKeys(tagEntry.Add) {
-			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
-		}
+		tagPairs := slices.Collect(it.Map(maputil.SortedKeys(tagEntry.Add), func(k string) string {
+			return fmt.Sprintf("%s=%s", k, tagEntry.Add[k])
+		}))
 
 		output.Printf(r.Stdout, "  %s %s\n", colors.For(r.Stdout).OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
@@ -462,18 +463,15 @@ func (r *Runner) outputTagDiff(ctx context.Context, svc ServiceStrategy, key sta
 }
 
 func (r *Runner) outputRemovedTags(remove maputil.Set[string], currentTags map[string]string) {
-	tagPairs := make([]string, 0, remove.Len())
-	for k := range maputil.SortedKeys(remove) {
+	tagPairs := slices.Collect(it.Map(maputil.SortedKeys(remove), func(k string) string {
 		if currentTags != nil {
 			if v := currentTags[k]; v != "" {
-				tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, v))
-			} else {
-				tagPairs = append(tagPairs, k)
+				return fmt.Sprintf("%s=%s", k, v)
 			}
-		} else {
-			tagPairs = append(tagPairs, k)
 		}
-	}
+
+		return k
+	}))
 
 	output.Printf(r.Stdout, "  %s %s\n", colors.For(r.Stdout).OpDelete("-"), strings.Join(tagPairs, ", "))
 }
