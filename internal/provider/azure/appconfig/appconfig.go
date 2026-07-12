@@ -36,11 +36,13 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"slices"
 	"sort"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig/v2"
 	"github.com/samber/lo"
+	"github.com/samber/lo/it"
 
 	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
@@ -413,12 +415,9 @@ func mapTags(tags map[string]*string) []domain.Tag {
 		return nil
 	}
 
-	out := make([]domain.Tag, 0, len(tags))
-	for k := range maputil.SortedKeys(tags) {
-		out = append(out, domain.Tag{Key: k, Value: lo.FromPtr(tags[k])})
-	}
-
-	return out
+	return slices.Collect(it.Map(maputil.SortedKeys(tags), func(k string) domain.Tag {
+		return domain.Tag{Key: k, Value: lo.FromPtr(tags[k])}
+	}))
 }
 
 // isNotFound reports whether err is an Azure 404 response error.
