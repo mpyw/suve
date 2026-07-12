@@ -92,6 +92,96 @@ func TestUpdateUseCase_Execute(t *testing.T) {
 	assert.Equal(t, int64(5), output.Version)
 }
 
+// TestUpdateUseCase_Execute_PreserveType verifies that a value-only update
+// (PreserveType) reuses the existing parameter's type, so a SecureString is not
+// silently downgraded to String even when Type is left at its zero value.
+func TestUpdateUseCase_Execute_PreserveType(t *testing.T) {
+	t.Parallel()
+
+	var gotType domain.ValueType
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Type: domain.ValueTypeSecret}, nil
+		},
+		PutFunc: func(_ context.Context, _, _ string, vt domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+			gotType = vt
+
+			return domain.Version{ID: "2"}, nil
+		},
+	}
+
+	uc := &param.UpdateUseCase{Store: store}
+
+	_, err := uc.Execute(t.Context(), param.UpdateInput{
+		Name:         "/app/secret",
+		Value:        "new-value",
+		PreserveType: true,
+		// Type deliberately left unset to prove PreserveType wins over it.
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ValueTypeSecret, gotType)
+}
+
+// TestUpdateUseCase_Execute_PreserveType_StringList verifies preservation also
+// covers StringList (the issue names it alongside SecureString).
+func TestUpdateUseCase_Execute_PreserveType_StringList(t *testing.T) {
+	t.Parallel()
+
+	var gotType domain.ValueType
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Type: domain.ValueTypeList}, nil
+		},
+		PutFunc: func(_ context.Context, _, _ string, vt domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+			gotType = vt
+
+			return domain.Version{ID: "2"}, nil
+		},
+	}
+
+	uc := &param.UpdateUseCase{Store: store}
+
+	_, err := uc.Execute(t.Context(), param.UpdateInput{
+		Name:         "/app/list",
+		Value:        "a,b,c",
+		PreserveType: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ValueTypeList, gotType)
+}
+
+// TestUpdateUseCase_Execute_ExplicitTypeOverridesPreserve verifies an explicit
+// Type is applied verbatim (PreserveType false) even when it differs from the
+// existing entry's type — an intentional type change must go through.
+func TestUpdateUseCase_Execute_ExplicitTypeOverridesPreserve(t *testing.T) {
+	t.Parallel()
+
+	var gotType domain.ValueType
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Type: domain.ValueTypeSecret}, nil
+		},
+		PutFunc: func(_ context.Context, _, _ string, vt domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+			gotType = vt
+
+			return domain.Version{ID: "3"}, nil
+		},
+	}
+
+	uc := &param.UpdateUseCase{Store: store}
+
+	_, err := uc.Execute(t.Context(), param.UpdateInput{
+		Name:  "/app/secret",
+		Value: "new-value",
+		Type:  domain.ValueTypePlaintext,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ValueTypePlaintext, gotType)
+}
+
 // TestUpdateUseCase_Execute_NotFound verifies a missing parameter is reported
 // as not-found (only provider.ErrNotFound triggers this path).
 func TestUpdateUseCase_Execute_NotFound(t *testing.T) {

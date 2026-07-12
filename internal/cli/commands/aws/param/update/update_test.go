@@ -136,6 +136,33 @@ func TestRun_WriteOptions(t *testing.T) {
 	})
 }
 
+// TestRun_PreserveType verifies that a value-only update (PreserveType, no
+// --type/--secure) reuses the existing parameter's type, so an existing
+// SecureString is not silently rewritten as String.
+func TestRun_PreserveType(t *testing.T) {
+	t.Parallel()
+
+	var gotType domain.ValueType
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Value: "old-value", Type: domain.ValueTypeSecret}, nil
+		},
+		PutFunc: func(_ context.Context, _, _ string, vt domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+			gotType = vt
+
+			return domain.Version{ID: "2"}, nil
+		},
+	}
+
+	var buf, errBuf bytes.Buffer
+
+	r := &update.Runner{UseCase: &param.UpdateUseCase{Store: store}, Stdout: &buf, Stderr: &errBuf}
+	err := r.Run(t.Context(), update.Options{Name: "/app/secret", Value: "v", PreserveType: true})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ValueTypeSecret, gotType)
+}
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 
