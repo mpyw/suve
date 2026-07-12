@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/samber/lo/it"
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	"github.com/mpyw/suve/internal/cli/output"
@@ -190,23 +191,21 @@ func (r *DiffRunner) OutputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 	output.Printf(r.Stdout, "%s %s (staged tag changes)\n", colors.For(r.Stdout).Info("Tags:"), tagEntry.Name)
 
 	if len(tagEntry.Add) > 0 {
-		tagPairs := make([]string, 0, len(tagEntry.Add))
-		for k := range maputil.SortedKeys(tagEntry.Add) {
-			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
-		}
+		tagPairs := slices.Collect(it.Map(maputil.SortedKeys(tagEntry.Add), func(k string) string {
+			return fmt.Sprintf("%s=%s", k, tagEntry.Add[k])
+		}))
 
 		output.Printf(r.Stdout, "  %s %s\n", colors.For(r.Stdout).OpAdd("+"), strings.Join(tagPairs, ", "))
 	}
 
 	if len(tagEntry.Remove) > 0 {
-		tagPairs := make([]string, 0, len(tagEntry.Remove))
-		for k := range maputil.SortedKeys(tagEntry.Remove) {
+		tagPairs := slices.Collect(it.Map(maputil.SortedKeys(tagEntry.Remove), func(k string) string {
 			if v := tagEntry.Remove[k]; v != "" {
-				tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, v))
-			} else {
-				tagPairs = append(tagPairs, k)
+				return fmt.Sprintf("%s=%s", k, v)
 			}
-		}
+
+			return k
+		}))
 
 		output.Printf(r.Stdout, "  %s %s\n", colors.For(r.Stdout).OpDelete("-"), strings.Join(tagPairs, ", "))
 	}

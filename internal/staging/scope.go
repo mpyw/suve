@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/provider"
 )
 
@@ -50,10 +52,9 @@ func KindToService(k provider.Kind) Service {
 func SupportedServices(scope provider.Scope) []Service {
 	kinds := scope.SupportedKinds()
 
-	services := make([]Service, 0, len(kinds))
-	for _, k := range kinds {
-		services = append(services, KindToService(k))
-	}
+	services := lo.Map(kinds, func(k provider.Kind, _ int) Service {
+		return KindToService(k)
+	})
 
 	return services
 }

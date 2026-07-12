@@ -57,6 +57,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/version"
 )
 
@@ -309,10 +311,9 @@ func requireSpecifier(label, arg, prefixes string) error {
 // formatPrefixes renders the specifier prefix characters as a human-readable
 // comma-separated list, e.g. "#~" → "#, ~".
 func formatPrefixes(prefixes string) string {
-	parts := make([]string, 0, len(prefixes))
-	for _, r := range prefixes {
-		parts = append(parts, string(r))
-	}
+	parts := lo.Map([]rune(prefixes), func(r rune, _ int) string {
+		return string(r)
+	})
 
 	return strings.Join(parts, ", ")
 }

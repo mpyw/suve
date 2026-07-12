@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/confirm"
@@ -217,10 +218,9 @@ func exportAction(service staging.Service, resolver staging.ScopeResolver) func(
 			return filepath.Join(dest, string(svc)+".json")
 		}
 
-		targetPaths := make([]string, 0, len(services))
-		for _, svc := range services {
-			targetPaths = append(targetPaths, pathFor(svc))
-		}
+		targetPaths := lo.Map(services, func(svc staging.Service, _ int) string {
+			return pathFor(svc)
+		})
 
 		// Share one buffered stdin reader across the overwrite confirmation and the
 		// passphrase prompt so consecutive reads over piped stdin don't

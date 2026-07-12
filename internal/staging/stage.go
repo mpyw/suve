@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/maputil"
 )
 
@@ -167,10 +169,9 @@ func (s *State) MarshalJSON() ([]byte, error) {
 			out.Entries = make(map[Service][]entryRecord)
 		}
 
-		recs := make([]entryRecord, 0, len(m))
-		for _, k := range SortedEntryKeys(m) {
-			recs = append(recs, entryRecord{Name: k.Name, Namespace: k.Namespace, Entry: m[k]})
-		}
+		recs := lo.Map(SortedEntryKeys(m), func(k EntryKey, _ int) entryRecord {
+			return entryRecord{Name: k.Name, Namespace: k.Namespace, Entry: m[k]}
+		})
 
 		out.Entries[svc] = recs
 	}
@@ -184,10 +185,9 @@ func (s *State) MarshalJSON() ([]byte, error) {
 			out.Tags = make(map[Service][]tagRecord)
 		}
 
-		recs := make([]tagRecord, 0, len(m))
-		for _, k := range SortedEntryKeys(m) {
-			recs = append(recs, tagRecord{Name: k.Name, Namespace: k.Namespace, TagEntry: m[k]})
-		}
+		recs := lo.Map(SortedEntryKeys(m), func(k EntryKey, _ int) tagRecord {
+			return tagRecord{Name: k.Name, Namespace: k.Namespace, TagEntry: m[k]}
+		})
 
 		out.Tags[svc] = recs
 	}

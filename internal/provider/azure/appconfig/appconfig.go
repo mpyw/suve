@@ -221,14 +221,13 @@ func (s *Store) listWithNamespaces(ctx context.Context, filter, what string) ([]
 		return nil, fmt.Errorf("failed to list settings %s: %w", what, err)
 	}
 
-	out := make([]KeyNamespace, 0, len(settings))
-	for _, setting := range settings {
-		out = append(out, KeyNamespace{
+	out := lo.Map(settings, func(setting azappconfig.Setting, _ int) KeyNamespace {
+		return KeyNamespace{
 			Key:       lo.FromPtr(setting.Key),
 			Namespace: lo.FromPtr(setting.Label),
 			Value:     lo.FromPtr(setting.Value),
-		})
-	}
+		}
+	})
 
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Key != out[j].Key {
