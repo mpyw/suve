@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/timeutil"
@@ -47,6 +48,8 @@ const (
 // recovery are also mutually exclusive (forcing hides the recovery row — CLI
 // parity). The mode toggle appears only when the service supports staging.
 type deleteConfirm struct {
+	dialogLayout
+
 	ctx     context.Context //nolint:containedctx // the mutation command needs the Run context; mirrors the browser
 	mutator data.Mutator
 	svcCap  capability.ServiceCapability
@@ -127,6 +130,10 @@ func (d *deleteConfirm) focused() deleteControl {
 
 func (d *deleteConfirm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		d.setSize(msg)
+
+		return d, nil
 	case mutationResultMsg:
 		return d.onResult(msg)
 	case tea.KeyPressMsg:
@@ -252,9 +259,16 @@ func (d *deleteConfirm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 func (d *deleteConfirm) View() string {
 	var b strings.Builder
 
-	b.WriteString(d.styles.PaneTitle.Render("Delete " + entryNoun(d.svcCap)))
+	// Header + wrapped target name. Wrapping the name to the dialog width keeps an
+	// unwrapped long name (or sibling paths differing only in suffix) from clipping
+	// at the screen edge, which would leave an ambiguous delete target — a safety
+	// concern.
+	header := d.fit(d.styles.PaneTitle.Render("Delete " + entryNoun(d.svcCap)))
+	name := d.fit(clipName(d.name, d.namespace))
+
+	b.WriteString(header)
 	b.WriteString("\n\n")
-	b.WriteString(clipName(d.name, d.namespace))
+	b.WriteString(name)
 	b.WriteString("\n\n")
 
 	if d.busy {
@@ -263,20 +277,37 @@ func (d *deleteConfirm) View() string {
 		return b.String()
 	}
 
+	var controls strings.Builder
 	for _, c := range d.controls() {
-		b.WriteString(d.renderControl(c))
-		b.WriteString("\n")
+		controls.WriteString(d.renderControl(c))
+		controls.WriteString("\n")
 	}
+
+	// Wrap the hint too: it is the widest fixed line and would otherwise push the
+	// box past a 60-column terminal, clipping "esc: cancel" off the edge.
+	hint := d.fit(d.styles.PageHint.Render("↑↓: move · space/enter: toggle/submit · ←→: window · esc: cancel"))
+
+	b.WriteString(controls.String())
 
 	if d.err != "" {
-		b.WriteString(d.styles.ErrorText.Render(d.err))
+		// The delete confirm cannot scroll (its controls need focus), so a long
+		// provider error is wrapped and capped to whatever rows remain after the
+		// name, controls, and hint — the controls and close hint always stay
+		// on-screen rather than being pushed off the bottom by a tall error.
+		fixed := lipgloss.Height(header) + nameSpacerRows + lipgloss.Height(name) +
+			lipgloss.Height(strings.TrimRight(controls.String(), "\n")) + lipgloss.Height(hint)
+		b.WriteString(d.wrapCapped(d.styles.ErrorText.Render(d.err), d.errBudget(fixed)))
 		b.WriteString("\n")
 	}
 
-	b.WriteString(d.styles.PageHint.Render("↑↓: move · space/enter: toggle/submit · ←→: window · esc: cancel"))
+	b.WriteString(hint)
 
 	return b.String()
 }
+
+// nameSpacerRows is the two blank lines the delete confirm pins around its
+// header and target name (one after each), reserved when budgeting the error.
+const nameSpacerRows = 2
 
 // renderControl draws one focusable row, marking the focused one.
 func (d *deleteConfirm) renderControl(c deleteControl) string {

@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	huh "charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/tui/data"
@@ -15,6 +16,8 @@ import (
 // tagForm is the tag add/remove dialog: an action select (Add/Remove), a key
 // input, a value input (used by Add), and a mode toggle. It embeds a huh form.
 type tagForm struct {
+	dialogLayout
+
 	ctx     context.Context //nolint:containedctx // the mutation command needs the Run context; mirrors the browser
 	mutator data.Mutator
 	svcCap  capability.ServiceCapability
@@ -94,13 +97,45 @@ func (d *tagForm) rebuildForm() tea.Cmd {
 		WithShowHelp(false).
 		WithShowErrors(true)
 
-	return d.form.Init()
+	// Init the (re)built form, then cap its body to the known terminal size so a
+	// retry after an error never renders at full natural height off-screen.
+	return tea.Batch(d.form.Init(), d.syncFormSize())
+}
+
+// syncFormSize re-caps the embedded form's scrollable body to the current
+// terminal size and footer (see the entry form for the full rationale): huh caps
+// the group at min(naturalHeight, budget) so the form scrolls with the focused
+// field kept in view rather than clipping the submit control off the bottom.
+func (d *tagForm) syncFormSize() tea.Cmd {
+	if d.form == nil || !d.sized() {
+		return nil
+	}
+
+	form, cmd := d.form.Update(tea.WindowSizeMsg{Width: dialogContentWidth, Height: d.formBodyHeight()})
+	if f, ok := form.(*huh.Form); ok {
+		d.form = f
+	}
+
+	return cmd
+}
+
+// formBodyHeight is the height budget for the form body: the frame's inner
+// height less the title, its blank spacer, and the footer (any active error plus
+// the hint).
+func (d *tagForm) formBodyHeight() int {
+	around := lipgloss.Height(d.header()) + titleSpacerRows + lipgloss.Height(d.footer())
+
+	return max(d.availHeight()-around, minFormBody)
 }
 
 func (d *tagForm) Busy() bool { return d.busy }
 
 func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		d.setSize(msg)
+
+		return d, d.syncFormSize()
 	case mutationResultMsg:
 		return d.onResult(msg)
 	case tea.KeyPressMsg:
@@ -162,7 +197,7 @@ func (d *tagForm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 func (d *tagForm) View() string {
 	var b strings.Builder
 
-	b.WriteString(d.styles.PaneTitle.Render("Tag — " + clipName(d.name, d.namespace)))
+	b.WriteString(d.header())
 	b.WriteString("\n\n")
 
 	if d.busy {
@@ -173,15 +208,33 @@ func (d *tagForm) View() string {
 
 	b.WriteString(d.form.View())
 	b.WriteString("\n")
-
-	if d.err != "" {
-		b.WriteString(d.styles.ErrorText.Render(d.err))
-		b.WriteString("\n")
-	}
-
-	b.WriteString(d.styles.PageHint.Render("tab/↑↓: fields · enter: submit · esc: cancel"))
+	b.WriteString(d.footer())
 
 	return b.String()
+}
+
+// header renders the dialog title, wrapping the entry name to the dialog width so
+// a long name does not overflow the box.
+func (d *tagForm) header() string {
+	return d.fit(d.styles.PaneTitle.Render("Tag — " + clipName(d.name, d.namespace)))
+}
+
+// footer renders the pinned rows below the form: any active error (wrapped to the
+// dialog width and capped so the form keeps at least minFormBody rows) then the
+// key hint.
+func (d *tagForm) footer() string {
+	parts := make([]string, 0, 2) //nolint:mnd // at most error + hint
+
+	hint := d.styles.PageHint.Render("tab/↑↓: fields · enter: submit · esc: cancel")
+
+	if d.err != "" {
+		budget := d.errBudget(lipgloss.Height(d.header()) + titleSpacerRows + minFormBody + lipgloss.Height(hint))
+		parts = append(parts, d.wrapCapped(d.styles.ErrorText.Render(d.err), budget))
+	}
+
+	parts = append(parts, hint)
+
+	return strings.Join(parts, "\n")
 }
 
 // tagStatus voices the tag outcome.
