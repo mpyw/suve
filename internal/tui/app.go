@@ -897,9 +897,9 @@ func (m *App) copyFocusedValue() tea.Cmd {
 }
 
 // copyText is the value the `y` key copies. A page that supplies a focused value
-// (the browser reveals its masked value pane and returns the revealed value)
-// wins; otherwise the app's own copyValue is used (empty in the skeleton, so the
-// copy is a guarded no-op).
+// (the browser returns its value pane's raw value WITHOUT changing the mask —
+// copying never reveals, #689) wins; otherwise the app's own copyValue is used
+// (empty in the skeleton, so the copy is a guarded no-op).
 func (m *App) copyText() string {
 	if c, ok := m.activePage().(copyable); ok {
 		if text, has := c.CopyText(); has {

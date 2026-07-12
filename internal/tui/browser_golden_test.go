@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/golden"
 	teatest "github.com/charmbracelet/x/exp/teatest/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/provider"
@@ -202,6 +203,45 @@ func TestBrowser_StagedValueAndTagBannerGolden(t *testing.T) { //nolint:parallel
 	golden.RequireEqual(t, screen)
 }
 
+// TestBrowser_CopyKeepsMaskGolden pins #689: after `y` copies the masked
+// SecureString value, the detail value pane stays MASKED (bullets, no plaintext)
+// and a transient "copied (value stays masked)" status shows — a copy is never a
+// standing on-screen disclosure.
+func TestBrowser_CopyKeepsMaskGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
+	goldenEnv(t)
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+
+	raw := captureBrowserKeys(t, m, "SecureString", 'y')
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.Contains(t, screen, "copied (value stays masked)", "the copy status shows")
+	assert.NotContains(t, screen, "postgres://db.internal:5432/app", "the copied secret is NOT revealed on screen")
+	golden.RequireEqual(t, screen)
+}
+
+// TestBrowser_ParseJSONGolden pins #690: `J` pretty-prints a JSON value in the
+// browser detail value pane (parity with the diff page and the GUI).
+func TestBrowser_ParseJSONGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
+	goldenEnv(t)
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamJSONSource(), nil),
+	})
+
+	raw := captureBrowserKeys(t, m, "db.internal", 'J')
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.Contains(t, screen, `"host": "db.internal"`, "J pretty-prints the JSON value onto indented lines")
+	golden.RequireEqual(t, screen)
+}
+
 // TestBrowser_AWSSecretGolden renders the AWS secret browser (staging labels +
 // ARN, masked value).
 func TestBrowser_AWSSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
@@ -377,6 +417,43 @@ func browserGolden(t *testing.T, m *App, marker string) {
 
 	raw := captureUntil(t, m, marker, browserTermWidth, browserTermHeight)
 	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight))
+}
+
+// captureBrowserKeys drives a browser app to its loaded state (marker), then
+// sends keys (each followed by a short settle) before quitting — so a golden can
+// capture the screen after a key toggle (copy, parse-json).
+func captureBrowserKeys(t *testing.T, m *App, marker string, keys ...rune) []byte {
+	t.Helper()
+
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
+
+	var buf bytes.Buffer
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		_, _ = io.Copy(&buf, tm.Output())
+		if bytes.Contains(buf.Bytes(), []byte(marker)) {
+			break
+		}
+
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	require.Contains(t, buf.String(), marker, "loaded content never rendered")
+
+	for _, k := range keys {
+		tm.Send(keyPress(k))
+		time.Sleep(100 * time.Millisecond)
+
+		_, _ = io.Copy(&buf, tm.Output())
+	}
+
+	tm.Send(keyPress('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	_, _ = io.Copy(&buf, tm.Output())
+
+	return buf.Bytes()
 }
 
 // captureBrowserAfterKeys drives a browser app to its loaded state (waiting for

@@ -172,6 +172,60 @@ func TestUpdate_ValueViewCollapsesMultiline(t *testing.T) {
 	assert.NotContains(t, screen, "SECOND_LINE_MARKER", "later lines never render as extra rows")
 }
 
+// TestUpdate_RevealIsPerSelectedRow pins #694: in value view, `x` reveals only
+// the SELECTED secret row's value — every other staged secret stays masked — and
+// moving the selection resets the reveal (it never persists across a move, nor
+// auto-reveals the newly-selected row). Before the fix `x` was a single
+// page-global flag that unmasked every staged secret at once and stayed on across
+// navigation.
+func TestUpdate_RevealIsPerSelectedRow(t *testing.T) {
+	t.Parallel()
+
+	const (
+		valueRow0 = "VALUE-ROW-ZERO"
+		valueRow1 = "VALUE-ROW-ONE"
+	)
+
+	sec := &stubService{
+		service: "secret", label: "Secret", svcCap: capFor("aws", "secret"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{
+			{Name: "prod/api/one", Type: data.StagedDiffNormal, Operation: "update", StagedValue: valueRow0},
+			{Name: "prod/api/two", Type: data.StagedDiffNormal, Operation: "update", StagedValue: valueRow1},
+		}},
+	}
+	m := newModel(t, sec)
+	require.Len(t, m.rows, 2, "two secret entry rows")
+
+	// Value view: both values are masked to start.
+	m, _ = m.Update(keyPress('v'))
+	require.False(t, m.diffView)
+
+	screen := m.View(100, 30)
+	require.NotContains(t, screen, valueRow0, "row 0 masked by default")
+	require.NotContains(t, screen, valueRow1, "row 1 masked by default")
+
+	// Select row 0 and reveal: ONLY row 0 unmasks.
+	m.selected = 0
+	m, _ = m.Update(keyPress('x'))
+	screen = m.View(100, 30)
+	assert.Contains(t, screen, valueRow0, "x reveals the selected row's value")
+	assert.NotContains(t, screen, valueRow1, "x must not reveal any other row (not page-global)")
+
+	// Moving the selection (down to row 1) resets the reveal: the old reveal does
+	// not persist and the new row is NOT auto-revealed.
+	m, _ = m.Update(keyPress('j'))
+	require.Equal(t, 1, m.selected, "j moved the selection to row 1")
+	screen = m.View(100, 30)
+	assert.NotContains(t, screen, valueRow0, "moving selection resets the previous reveal")
+	assert.NotContains(t, screen, valueRow1, "moving selection does not auto-reveal the new row")
+
+	// Reveal again on row 1: only row 1 unmasks.
+	m, _ = m.Update(keyPress('x'))
+	screen = m.View(100, 30)
+	assert.Contains(t, screen, valueRow1, "x reveals the now-selected row")
+	assert.NotContains(t, screen, valueRow0, "the earlier row stays masked")
+}
+
 // tagOpsReview is a param section with one staged tag add and one staged tag
 // removal (no entry rows), used to exercise the tag-row key handling.
 func tagOpsReview() data.StagingReview {

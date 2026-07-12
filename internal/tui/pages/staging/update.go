@@ -153,6 +153,9 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 }
 
 // moveSelection shifts the selection by delta (clamped) and keeps it visible.
+// It resets the reveal so a peek never persists across a selection move — the
+// reveal is scoped to the row that was selected when `x` was pressed, mirroring
+// the browser's per-entry reveal (#694).
 func (m *Model) moveSelection(delta int) {
 	if len(m.rows) == 0 {
 		return
@@ -160,12 +163,14 @@ func (m *Model) moveSelection(delta int) {
 
 	m.selected = max(0, min(m.selected+delta, len(m.rows)-1))
 	m.scrollToSelection = true
+	m.reveal = false
 }
 
-// onReveal toggles value-view masking. It is reveal-only on every row kind
-// (including tag rows): removing a staged change — entry or tag — is `u`'s job,
-// never `x`, so a user who learned `x` = reveal never destroys a staged change
-// by peeking (#682).
+// onReveal toggles the reveal for the SELECTED row's value only (never
+// page-global): pressing `x` unmasks just the selected secret, and moving the
+// selection resets it (#694). It is reveal-only on every row kind (including tag
+// rows): removing a staged change — entry or tag — is `u`'s job, never `x`, so a
+// user who learned `x` = reveal never destroys a staged change by peeking (#682).
 func (m *Model) onReveal() {
 	m.reveal = !m.reveal
 }
@@ -349,9 +354,13 @@ func (m *Model) noticeVisible() bool {
 	return !m.noticeDismissed && len(m.autoUnstaged()) > 0
 }
 
-// maskValue masks a secret value for value-view rendering unless revealed.
-func (m *Model) maskValue(value string, secret bool) string {
-	if secret && !m.reveal {
+// maskValue masks a secret value for rendering unless the reveal is on AND the
+// row is the selected one. The reveal is scoped to the selected row (and reset
+// on a selection move), so pressing `x` unmasks only that row's value rather
+// than every staged secret across all sections (#694).
+func (m *Model) maskValue(value string, secret bool, rowIdx int) string {
+	revealed := m.reveal && rowIdx == m.selected
+	if secret && !revealed {
 		return components.MaskValue(value)
 	}
 

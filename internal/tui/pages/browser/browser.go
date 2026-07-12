@@ -71,6 +71,7 @@ var (
 	recursiveKey = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "recursive/refresh"))
 	loadMoreKey  = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "load more"))
 	revealKey    = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal"))
+	parseJSONKey = key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "parse-json"))
 	compareKey   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "compare"))
 	stagingKey   = key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "staging"))
 	spaceKey     = key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "pick/namespace"))

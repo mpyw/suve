@@ -82,8 +82,8 @@ type Model struct {
 
 	// diffView selects diff (Remote vs Staged) vs value (raw staged) rendering.
 	diffView bool
-	// reveal unmasks secret staged values in value view (never persisted, reset
-	// on load).
+	// reveal unmasks the SELECTED row's secret staged value (never page-global);
+	// reset on a selection move, a view toggle, and reload (#694).
 	reveal bool
 	// noticeDismissed hides the auto-unstaged notice until the next load.
 	noticeDismissed bool
