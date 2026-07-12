@@ -9,8 +9,8 @@ Param (3)                                                                       
     + https://cdn-new.example.com
   create  /app/web/NEW_FLAG
     + true
-  tags  /app/api/DATABASE_URL  +owner=platform   x cancel
-  tags  /app/api/DATABASE_URL  −env (was prod)   ↩ cancel
+  tags  /app/api/DATABASE_URL  +owner=platform   u unstage
+  tags  /app/api/DATABASE_URL  −env (was prod)   u unstage
 
 Secret (2)                                                                                            a apply · r reset
   delete  prod/api/old-key
@@ -30,5 +30,5 @@ Secret (2)                                                                      
 
 
 
-e edit · u unstage · t tags · x cancel-tag · enter detail · v view · a apply · r reset
+e edit · u unstage · t tags · x reveal · enter detail · v view · a apply · r reset
  tab next tab • 1/2/3 jump to tab • ? help • q quit

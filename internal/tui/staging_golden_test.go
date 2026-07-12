@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/golden"
 	teatest "github.com/charmbracelet/x/exp/teatest/v2"
 	"github.com/stretchr/testify/assert"
@@ -138,6 +139,49 @@ func TestStaging_ValueViewGolden(t *testing.T) { //nolint:paralleltest // golden
 
 	assert.NotContains(t, screen, secretStagedValue, "no revealed secret value in the value-view golden")
 	golden.RequireEqual(t, screen)
+}
+
+// TestStaging_TagGateStatusGolden pins #684: pressing `t` on a delete-staged
+// entry does not open the tag form (a statically impossible transition) but
+// shows a one-line status message in the footer instead.
+func TestStaging_TagGateStatusGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStagingKeys(t, stagingApp(), "prod/api/old-key",
+		// Move to the delete-staged secret row (prod/api/old-key), then press `t`.
+		keyPress('j'), keyPress('j'), keyPress('j'), keyPress('j'), keyPress('t'))
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.Contains(t, screen, "cannot tag: staged for deletion", "the gate surfaces a status message")
+	golden.RequireEqual(t, screen)
+}
+
+// captureStagingKeys drives a staging app to its loaded state, sends the given
+// keys, and returns the captured byte stream (for asserting a post-key frame).
+func captureStagingKeys(t *testing.T, m *App, marker string, presses ...tea.KeyPressMsg) []byte {
+	t.Helper()
+
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
+
+	var buf bytes.Buffer
+
+	waitFor(t, tm, &buf, marker)
+
+	for _, k := range presses {
+		tm.Send(k)
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	_, _ = io.Copy(&buf, tm.Output())
+
+	tm.Send(keyPress('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	_, _ = io.Copy(&buf, tm.Output())
+
+	return buf.Bytes()
 }
 
 // captureStaging drives a staging app to its loaded state (optionally toggling to
