@@ -18,7 +18,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.44.0
 	github.com/aws/smithy-go v1.27.3
 	github.com/aymanbagabas/go-udiff v0.4.1
+	github.com/charmbracelet/x/exp/golden v0.0.0-20260712004152-b16d026a9d2e
 	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20260712004152-b16d026a9d2e
+	github.com/charmbracelet/x/vt v0.0.0-20260712004152-b16d026a9d2e
 	github.com/fatih/color v1.19.0
 	github.com/gofrs/flock v0.13.0
 	github.com/mattn/go-isatty v0.0.22
@@ -65,7 +67,7 @@ require (
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260703014108-f5a850f9c2b7 // indirect
 	github.com/charmbracelet/x/ansi v0.11.7 // indirect
-	github.com/charmbracelet/x/exp/golden v0.0.0-20260712004152-b16d026a9d2e // indirect
+	github.com/charmbracelet/x/exp/ordered v0.1.0 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect

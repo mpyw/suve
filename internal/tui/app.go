@@ -82,6 +82,11 @@ type App struct {
 	tabs      []components.Tab
 	activeTab int
 
+	// copyValue is the focused value the `y` key copies. The skeleton has none
+	// (real pages supply one from Step 3), so it stays empty and the copy is a
+	// no-op; it is a field so a page can set it and so the empty guard is testable.
+	copyValue string
+
 	// pages is the page stack; the top is the active page. dialogs is the modal
 	// overlay stack; the top dialog captures input while any dialog is open.
 	pages   []page
@@ -187,6 +192,7 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Modal: a dialog on top consumes input first; Esc closes it.
 	if len(m.dialogs) > 0 {
+		// TODO(step-4): match Quit before forwarding to a modal dialog so ctrl+c can force-quit
 		if key.Matches(msg, m.keys.Back) {
 			m.popDialog()
 
@@ -219,7 +225,7 @@ func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 	case key.Matches(msg, m.keys.Copy):
-		return m, copyToClipboard(m.copyText())
+		return m, m.copyFocusedValue()
 	}
 
 	return m.updateActivePage(msg)
@@ -245,7 +251,11 @@ func (m *App) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 		return m.updateTopDialog(msg)
 	}
 
-	if msg.Button == tea.MouseLeft && msg.Y == m.tabBarRow() {
+	// Below the minimum size the shell draws only the too-small notice — no tab
+	// bar — so a click at the tab-bar row must not hit-test (and switch) an
+	// invisible tab. Gate mouse tab selection on the same size the shell renders.
+	if m.width >= minWidth && m.height >= minHeight &&
+		msg.Button == tea.MouseLeft && msg.Y == m.tabBarRow() {
 		if i, ok := m.tabBar().TabAtX(msg.X); ok {
 			m.jumpTab(i)
 
@@ -377,11 +387,24 @@ func (m *App) setActivePage(p page) {
 	m.pages[len(m.pages)-1] = p
 }
 
+// copyFocusedValue copies the focused value through the OSC52 clipboard seam, or
+// does nothing when there is no value. Copying an empty string would emit an
+// OSC52 that CLEARS the user's system clipboard, so an empty copy must be a
+// no-op rather than a destructive write.
+func (m *App) copyFocusedValue() tea.Cmd {
+	text := m.copyText()
+	if text == "" {
+		return nil
+	}
+
+	return copyToClipboard(text)
+}
+
 // copyText is the value the `y` key copies. The skeleton has no focused value
-// yet (real pages supply one from Step 3), so it copies an empty string; the
-// wiring — key → OSC52 command — is what this step lands.
+// yet (real pages supply one from Step 3), so it is empty and the copy is a
+// no-op; the wiring — key → guard → OSC52 command — is what this step lands.
 func (m *App) copyText() string {
-	return ""
+	return m.copyValue
 }
 
 // tabBarRow is the terminal row the tab bar renders on (0-based), used to

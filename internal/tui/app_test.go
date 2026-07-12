@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/exp/golden"
 	teatest "github.com/charmbracelet/x/exp/teatest/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,6 +127,10 @@ func TestUpdate_MouseClickReducesToTabSelect(t *testing.T) {
 
 	base := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
 
+	// Size the shell above the minimum so the tab bar is actually rendered and
+	// mouse tab selection is live (below the minimum a click is inert).
+	base = updateApp(t, base, tea.WindowSizeMsg{Width: 100, Height: 30})
+
 	// Derive an x column that the layout maps to tab index 1 — no magic number.
 	x, ok := columnForTab(base.tabBar(), 1)
 	require.True(t, ok, "layout must expose a column for tab 1")
@@ -137,6 +142,24 @@ func TestUpdate_MouseClickReducesToTabSelect(t *testing.T) {
 
 	assert.Equal(t, keyed.activeTab, clicked.activeTab, "click and key select the same tab")
 	assert.Equal(t, 1, clicked.activeTab)
+}
+
+// TestUpdate_MouseClickInertBelowMinSize pins the guard: below the minimum
+// terminal size the tab bar is not rendered, so a left click at the tab-bar row
+// must not hit-test (and switch) an invisible tab.
+func TestUpdate_MouseClickInertBelowMinSize(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+
+	// A column that WOULD map to tab 1 at full size, then shrink below the minimum.
+	x, ok := columnForTab(m.tabBar(), 1)
+	require.True(t, ok, "layout must expose a column for tab 1")
+
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: minWidth - 1, Height: minHeight - 1})
+	m = updateApp(t, m, tea.MouseClickMsg{X: x, Y: m.tabBarRow(), Button: tea.MouseLeft})
+
+	assert.Equal(t, 0, m.activeTab, "a click is inert while the tab bar is hidden")
 }
 
 // columnForTab walks the tab bar's own hit-test to find a column inside tab i,
@@ -151,25 +174,39 @@ func columnForTab(tb components.TabBar, target int) (int, bool) {
 	return 0, false
 }
 
-// TestUpdate_CopyToClipboard pins that the `y` key routes through the OSC52
-// clipboard seam (asserted via a stub, never real escape bytes).
+// TestUpdate_CopyToClipboard pins that the `y` key routes a non-empty focused
+// value through the OSC52 clipboard seam (asserted via a stub, never real escape
+// bytes), and — the guard — that with no value it does NOT touch the clipboard:
+// copying "" would emit an OSC52 that clears the user's system clipboard.
 //
 //nolint:paralleltest // swaps the package-level setClipboard seam; must not race other tests
 func TestUpdate_CopyToClipboard(t *testing.T) {
 	called := false
+	copied := ""
 	orig := setClipboard
-	setClipboard = func(string) tea.Cmd {
+	setClipboard = func(s string) tea.Cmd {
 		called = true
+		copied = s
 
 		return nil
 	}
 
 	t.Cleanup(func() { setClipboard = orig })
 
+	// A focused value is present: y copies it through the seam.
 	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m.copyValue = "s3cr3t"
 	_ = updateApp(t, m, keyPress('y'))
 
 	assert.True(t, called, "y copies via the clipboard seam")
+	assert.Equal(t, "s3cr3t", copied, "y copies the focused value verbatim")
+
+	// No focused value: y must be a no-op so it never clears the clipboard.
+	called = false
+	empty := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	_ = updateApp(t, empty, keyPress('y'))
+
+	assert.False(t, called, "y with no value does not clear the clipboard")
 }
 
 // keyForBinding returns a key press whose String() matches keystroke, resolving
@@ -222,21 +259,27 @@ func TestShell_AzureStoreOnlyGolden(t *testing.T) {
 	requireShellGolden(t, m)
 }
 
-// requireShellGolden drives the model through teatest at a fixed 100x30 size and
-// golden-compares the full program output. The AWS/Azure golden models have no
-// async work (identity is preseeded; non-AWS scopes fetch nothing), so Bubble
-// Tea's FIFO message order — the initial resize renders the shell, then the
-// quit key exits — makes the captured stream deterministic without polling the
-// shared output reader (which would consume the frame before FinalOutput).
+// requireShellGolden drives the model through teatest at a fixed size and
+// golden-compares the VISIBLE SCREEN — the captured byte stream replayed through
+// a virtual terminal (see renderVisibleScreen) — rather than the raw stream. The
+// raw stream carries the terminal's capability handshake, which differs between
+// CI and a local run even when the drawn frame is byte-identical; goldening the
+// rendered cell grid absorbs that divergence and yields a human-readable golden.
+//
+// The AWS/Azure golden models have no async work (identity is preseeded; non-AWS
+// scopes fetch nothing), so Bubble Tea's FIFO message order — the initial resize
+// renders the shell, then the quit key exits — makes the captured stream
+// deterministic without polling the shared output reader (which would consume
+// the frame before FinalOutput).
 func requireShellGolden(t *testing.T, m *App) {
 	t.Helper()
 
-	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(100, 30))
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(goldenTermWidth, goldenTermHeight))
 
 	tm.Send(keyPress('q'))
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
 	out, err := io.ReadAll(tm.FinalOutput(t))
 	require.NoError(t, err)
-	teatest.RequireEqualOutput(t, out)
+	golden.RequireEqual(t, renderVisibleScreen(t, out))
 }
