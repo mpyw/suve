@@ -59,10 +59,11 @@ func (m *Model) View(width, height int) string {
 		head = append(head, m.noticeLine(width))
 	}
 
-	// Reserve the last page row for the footer: normally the row-action hint so
-	// the page-local bindings (e/u/t/x/enter/v, apply/reset) are discoverable —
-	// they are not in the global keys.Map the help bar renders (#655) — but a
-	// pending invalid-action status message takes that row while it is set (#684).
+	// The page's bindings (e/u/t/x/enter/v, apply/reset) are now rendered by the
+	// adaptive help bar (#681) via HelpKeyMap, so the body no longer carries a
+	// hint line. The last row is still reserved unconditionally — it renders a
+	// pending invalid-action status message (#684) or a blank line — so the body
+	// height stays fixed and an appearing/clearing status never reflows the list.
 	footer := m.footerLine(width)
 
 	bodyTop := len(head)
@@ -75,7 +76,7 @@ func (m *Model) View(width, height int) string {
 
 	m.hits = m.buildHits(width, bodyTop, noticeRow, hRanges, visDescs)
 
-	out := append(head, visible...) //nolint:gocritic // head is a fresh slice; appending body then footer is intentional
+	out := append(head, visible...) //nolint:gocritic // head is a fresh slice; the status/blank footer row is always appended
 	out = append(out, footer)
 
 	return strings.Join(out, "\n")
@@ -131,29 +132,14 @@ func rangeRegion(id string, r [2]int, y int) *lipgloss.Layer {
 }
 
 // footerLine renders the reserved bottom row: a pending invalid-action status
-// message when one is set (#684), otherwise the row-action hint.
+// message when one is set (#684), otherwise nothing (the row-action bindings are
+// now shown by the adaptive help bar, #681).
 func (m *Model) footerLine(width int) string {
 	if m.status != "" {
 		return m.styles.ErrorText.Render(clip(m.status, width))
 	}
 
-	return m.hintLine(width)
-}
-
-// hintLine renders the bottom row-action hint: the per-row bindings plus
-// apply/reset. These are page-local (not in keys.Map), so the global help bar
-// never lists them; this line makes them discoverable (#655).
-func (m *Model) hintLine(width int) string {
-	// `x` is view-aware: it hides the revealed diff comparison in diff view, and
-	// reveals the selected masked value in value view (see onReveal).
-	xHint := "x reveal"
-	if m.diffView {
-		xHint = "x hide"
-	}
-
-	hint := "e edit · u unstage · t tags · " + xHint + " · enter detail · v view · a apply · r reset"
-
-	return m.styles.PageHint.Render(clip(hint, width))
+	return ""
 }
 
 // headerLine renders the fixed top line — the view toggle and the global

@@ -1,28 +1,23 @@
-suve  azure · store:myapp-config
- App Configuration Staging
+suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
+ Param Secret Staging
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-ns: (NULL)   prefix: —   filter: —   values:off  ⟳
+prefix: —   filter: —   values:off  ⟳
 ╭────────────────────────────────────────────╮╭────────────────────────────────────────────────────────────────────────╮
-│entries (2)                                 ││app/FeatureY                                                            │
-│▸ app/FeatureY                      [(NULL)]││Value                                                                   │
-│  app/Timeout                       [(NULL)]││enabled                                                                 │
+│entries (2)                                 ││prod/api/key                                                            │
+│▸ prod/api/key                              ││Value   (x to reveal)                                                   │
+│  prod/web/session                          ││••••••••••••                                                            │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
-│                                            ││Namespace   (NULL)                                                      │
-│                                            ││Modified    2026-07-01 09:30:00                                         │
-│                                            ││Tags        team=web                                                    │
+│                                            ││Version ID  a1b2c3d4-1111-2222-3333-444455556666                        │
+│                                            ││Created     2026-07-01 09:30:00                                         │
+│                                            ││ARN         arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:pr│
+│                                            ││Labels      AWSCURRENT                                                  │
+│                                            ││Tags        (none)                                                      │
 │                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
+│                                            ││History   enter: history · c: compare mode                              │
+│                                            ││▹ a1b2c3d4…  2026-07-01  current  [AWSCURRENT]                          │
+│                                            ││  e5f6a7b8…  2026-06-24  [AWSPREVIOUS]                                  │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
@@ -31,4 +26,9 @@ ns: (NULL)   prefix: —   filter: —   values:off  ⟳
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 ╰────────────────────────────────────────────╯╰────────────────────────────────────────────────────────────────────────╯
- ↑/↓ move • / filter • e edit • n new • tab next tab • 1/2/3 jump to tab • ? help • q quit
+ ↑/↓   move              p prefix               n new        c compare    tab       next tab
+enter history           / filter               e edit                    shift+tab prev tab
+esc   back              v values               d delete                  1/2/3     jump to tab
+space pick/namespace    r recursive/refresh    t tag                     ?         help
+                        x reveal               R restore                 q         quit
+                        J parse-json           y copy

@@ -9,6 +9,7 @@ import (
 	"context"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -22,6 +23,12 @@ import (
 	"github.com/mpyw/suve/internal/tui/nav"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
+
+// scrollKey is a help-only binding advertising viewport scrolling (the diff
+// page forwards unclaimed movement keys straight to the viewport).
+//
+//nolint:gochecknoglobals // immutable page-local binding
+var scrollKey = key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("↑/↓", "scroll"))
 
 // parseJSONKey toggles JSON normalization of both values before diffing.
 //
@@ -182,6 +189,22 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 	m.vp, cmd = m.vp.Update(msg)
 
 	return m, cmd
+}
+
+// HelpKeyMap reports the diff page's context-aware bindings for the help bar:
+// scroll and parse-json always, the mask toggle only on a loaded secret diff
+// (`x` is a no-op on a non-secret diff, so it is hidden there), then back. The
+// help bar makes `J`/`x`/esc discoverable — previously undocumented (#681).
+func (m *Model) HelpKeyMap() help.KeyMap {
+	bindings := []key.Binding{scrollKey, parseJSONKey}
+
+	if m.loaded && m.content.Secret {
+		bindings = append(bindings, maskKey)
+	}
+
+	bindings = append(bindings, m.keys.Back)
+
+	return keys.Bindings{Short: bindings, Full: [][]key.Binding{bindings}}
 }
 
 // resizeViewport sizes the inner viewport to the page area minus the pane border

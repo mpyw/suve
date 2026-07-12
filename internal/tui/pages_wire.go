@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 
+	"charm.land/bubbles/v2/help"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/mpyw/suve/internal/tui/data"
@@ -37,6 +38,7 @@ func (p browserPage) View(width, height int) string { return p.m.View(width, hei
 func (p browserPage) Init() tea.Cmd                 { return p.m.Init() }
 func (p browserPage) CopyText() (string, bool)      { return p.m.CopyText() }
 func (p browserPage) capturesInput() bool           { return p.m.CapturesInput() }
+func (p browserPage) HelpKeyMap() help.KeyMap       { return p.m.HelpKeyMap() }
 
 // diffPage adapts *diff.Model to the app's page interface.
 type diffPage struct{ m *diff.Model }
@@ -49,6 +51,7 @@ func (p diffPage) Update(msg tea.Msg) (page, tea.Cmd) {
 
 func (p diffPage) View(width, height int) string { return p.m.View(width, height) }
 func (p diffPage) Init() tea.Cmd                 { return p.m.Init() }
+func (p diffPage) HelpKeyMap() help.KeyMap       { return p.m.HelpKeyMap() }
 
 // capturesInput is always false: the diff page has no text input (its keys are
 // scroll/parse-json/back, all safe to route through the global map).
@@ -65,6 +68,7 @@ func (p stagingPage) Update(msg tea.Msg) (page, tea.Cmd) {
 
 func (p stagingPage) View(width, height int) string { return p.m.View(width, height) }
 func (p stagingPage) Init() tea.Cmd                 { return p.m.Init() }
+func (p stagingPage) HelpKeyMap() help.KeyMap       { return p.m.HelpKeyMap() }
 
 // capturesInput is always false: the staging page has no text input.
 func (p stagingPage) capturesInput() bool { return false }
