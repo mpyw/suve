@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -24,6 +25,14 @@ const dialogChrome = 4
 // minDialogContent floors the wrap width so a very narrow terminal still wraps
 // to something legible rather than one column.
 const minDialogContent = 24
+
+// resultsChrome is the vertical overhead the results view reserves around its
+// scrollable body so the box fits the screen: the shell's dialog border (top +
+// bottom = 2 rows), the pinned "Apply results" title plus its blank spacer
+// (2 rows), and the pinned blank spacer plus close hint (2 rows). The viewport
+// height is capped at screenHeight−resultsChrome so a long fan-out result list
+// scrolls inside the box while the title and close hint stay visible.
+const resultsChrome = 6
 
 // applyControl identifies a focusable row in the apply confirmation.
 type applyControl int
@@ -68,9 +77,18 @@ type applyDialog struct {
 	results         []data.StagingApplyResult
 	err             string
 	title           string
-	// width is the terminal width (from the last WindowSizeMsg); the results view
-	// wraps its lines to width−dialogChrome so the box never overflows the screen.
-	width int
+	// width / height are the terminal size (from the last WindowSizeMsg). The
+	// results view wraps its lines to width−dialogChrome so the box never overflows
+	// horizontally, and caps the scrollable body at height−resultsChrome so a long
+	// result list scrolls instead of clipping off-screen.
+	width  int
+	height int
+	// vp scrolls the results body when it is taller than the box can show; the
+	// title and close hint are rendered outside it so they stay pinned.
+	vp viewport.Model
+	// scrollable records whether the last synced body overflowed the viewport, so
+	// the close hint can advertise the scroll keys only when they do something.
+	scrollable bool
 }
 
 // ApplyInput configures an apply dialog.
@@ -99,6 +117,7 @@ func NewApply(in ApplyInput) Model {
 		tagCount:   in.TagCount,
 		styles:     in.Styles,
 		title:      in.Title,
+		vp:         viewport.New(),
 	}
 }
 
@@ -119,7 +138,8 @@ func (d *applyDialog) DismissCmd() tea.Cmd {
 func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		d.width = msg.Width
+		d.width, d.height = msg.Width, msg.Height
+		d.syncViewport()
 
 		return d, nil
 	case applyResultsMsg:
@@ -130,7 +150,16 @@ func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 			d.err = msg.err.Error()
 		}
 
+		d.syncViewport()
+
 		return d, nil
+	case tea.MouseWheelMsg:
+		// Wheel scrolls the results body (the confirm phase has nothing to scroll).
+		var cmd tea.Cmd
+
+		d.vp, cmd = d.vp.Update(msg)
+
+		return d, cmd
 	case tea.KeyPressMsg:
 		return d.handleKey(msg)
 	}
@@ -171,7 +200,13 @@ func (d *applyDialog) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return d, doneCmd("", d.summary(), true)
 		}
 
-		return d, nil
+		// Any other key scrolls the results body (↑↓/j/k, pgup/pgdn, etc.); Esc is
+		// intercepted by the shell before it reaches here, so it still closes.
+		var cmd tea.Cmd
+
+		d.vp, cmd = d.vp.Update(msg)
+
+		return d, cmd
 	}
 
 	return d.handleConfirmKey(msg)
@@ -279,11 +314,68 @@ func (d *applyDialog) changesLine() string {
 	return pluralize(d.entryCount, "entry", "entries") + " · " + pluralize(d.tagCount, "tag change", "tag changes")
 }
 
+// sized reports whether a WindowSizeMsg has arrived, so the results view knows
+// whether it may cap the body to the screen (a viewport with a zero width/height
+// renders nothing).
+func (d *applyDialog) sized() bool { return d.width > 0 && d.height > 0 }
+
+// syncViewport (re)builds the scrollable results body and sizes the viewport to
+// min(needed, screenHeight−resultsChrome), so a long fan-out result list scrolls
+// inside the box while the title and close hint stay pinned. It is a no-op until
+// a WindowSizeMsg arrives (before that the results view renders inline, uncapped).
+func (d *applyDialog) syncViewport() {
+	if !d.sized() {
+		return
+	}
+
+	body := d.resultsBody()
+	lines := max(lipgloss.Height(body), 1)
+	avail := max(d.height-resultsChrome, 1)
+	height := min(lines, avail)
+
+	d.scrollable = lines > height
+	d.vp.SetWidth(d.contentWidth())
+	d.vp.SetHeight(height)
+	d.vp.SetContent(body)
+}
+
 func (d *applyDialog) resultsView() string {
 	var b strings.Builder
 
 	b.WriteString(d.styles.PaneTitle.Render("Apply results"))
 	b.WriteString("\n\n")
+
+	// Once sized, the body scrolls inside the viewport; before the first
+	// WindowSizeMsg it renders inline (uncapped) so a size-less unit render still
+	// shows every line.
+	if d.sized() {
+		b.WriteString(d.vp.View())
+	} else {
+		b.WriteString(d.resultsBody())
+	}
+
+	b.WriteString("\n\n")
+	b.WriteString(d.styles.PageHint.Render(d.resultsHint()))
+
+	return b.String()
+}
+
+// resultsHint pins the close hint, advertising the scroll keys only when the body
+// actually overflows the viewport.
+func (d *applyDialog) resultsHint() string {
+	if d.scrollable {
+		return "↑↓/pgup/pgdn: scroll · enter/esc: close"
+	}
+
+	return "enter/esc: close"
+}
+
+// resultsBody renders the scrollable results content: the hard-failure banner (if
+// any) followed by every service's entry/tag statuses, conflicts, and unstage
+// warnings. The trailing blank each service block leaves is trimmed so the pinned
+// close hint sits one blank line below the body.
+func (d *applyDialog) resultsBody() string {
+	var b strings.Builder
 
 	if d.err != "" {
 		b.WriteString(d.fit(d.styles.ErrorText.Render(d.err)) + "\n\n")
@@ -293,9 +385,7 @@ func (d *applyDialog) resultsView() string {
 		d.writeServiceResults(&b, res)
 	}
 
-	b.WriteString(d.styles.PageHint.Render("enter/esc: close"))
-
-	return b.String()
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // writeServiceResults appends one service's entry/tag statuses, conflicts, and

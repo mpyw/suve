@@ -3,6 +3,7 @@ package dialogs
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -122,6 +123,156 @@ func TestApply_FanOutAggregation(t *testing.T) {
 	assert.Contains(t, view, "s1", "the secret result is shown")
 	assert.Contains(t, view, "Param", "results are grouped by service")
 	assert.Contains(t, view, "Secret")
+}
+
+// pressPgDown sends a page-down key press (viewport scrolling).
+func pressPgDown() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyPgDown} }
+
+// manyEntries builds n distinct applied-entry results, named entry-000…entry-NNN
+// so a test can locate the first vs last in the rendered viewport.
+func manyEntries(n int) []data.ApplyEntryResult {
+	entries := make([]data.ApplyEntryResult, n)
+	for i := range entries {
+		entries[i] = data.ApplyEntryResult{Name: fmt.Sprintf("entry-%03d", i), Status: "updated"}
+	}
+
+	return entries
+}
+
+// appliedResults builds an apply dialog, sizes it to a fixed 100×24 terminal, and
+// drives it through the confirm → apply → results transition with the given
+// single-service result, returning the concrete dialog in its results phase. The
+// 24-row height is short enough that a many-entry body must scroll.
+func appliedResults(t *testing.T, result data.StagingApplyResult) *applyDialog {
+	t.Helper()
+
+	const (
+		width  = 100
+		height = 24
+	)
+
+	svc := &stubStaging{service: "param", label: "Param", result: result}
+
+	m := NewApply(ApplyInput{
+		Ctx: context.Background(), Targets: []data.StagingService{svc},
+		TargetLine: "aws", Title: "Apply staged changes — Param", EntryCount: len(result.Entries), Styles: styles.New(),
+	})
+
+	m, _ = m.Update(tea.WindowSizeMsg{Width: width, Height: height})
+	m, _ = m.Update(pressDown()) // focus Apply
+	m, cmd := m.Update(pressEnter())
+	m = drive(t, m, cmd) // run the fan-out command and fold in the results
+
+	d, ok := m.(*applyDialog)
+	require.True(t, ok, "the apply dialog is an *applyDialog")
+	require.Equal(t, phaseResults, d.phase, "the dialog reached the results phase")
+
+	return d
+}
+
+// TestApply_ResultsScrollable pins the #687 fix: a result set taller than the box
+// is capped into a scrollable viewport, the close hint stays pinned (never clipped
+// off-screen), and paging down reaches the tail that was hidden at the top.
+func TestApply_ResultsScrollable(t *testing.T) {
+	t.Parallel()
+
+	const entries = 50
+
+	// A short terminal: the 50-line body cannot fit, so it must scroll.
+	d := appliedResults(t, data.StagingApplyResult{
+		ServiceLabel: "Param", Entries: manyEntries(entries),
+	})
+
+	assert.True(t, d.scrollable, "a body taller than the box scrolls")
+	assert.Equal(t, entries, d.vp.TotalLineCount(), "every result line is in the viewport")
+	assert.Less(t, d.vp.Height(), entries, "the viewport is capped below the full body height")
+	assert.True(t, d.vp.AtTop(), "the results open scrolled to the top")
+
+	top := d.View()
+	assert.Contains(t, top, "enter/esc: close", "the close hint is pinned even with a long body")
+	assert.Contains(t, top, "scroll", "the hint advertises the scroll keys when the body overflows")
+	assert.Contains(t, top, "entry-000", "the first result is visible at the top")
+	assert.NotContains(t, top, "entry-049", "the last result is below the fold at the top")
+
+	// Page down until the tail is reached (a bounded loop: each page advances by
+	// the viewport height, so the body is exhausted well within `entries` presses).
+	// Update mutates the pointer receiver in place, so d reflects each scroll.
+	for range entries {
+		if d.vp.AtBottom() {
+			break
+		}
+
+		_, _ = d.Update(pressPgDown())
+	}
+
+	assert.True(t, d.vp.AtBottom(), "paging down reaches the bottom of the results")
+
+	bottom := d.View()
+	assert.Contains(t, bottom, "entry-049", "the previously-hidden last result is reachable by scrolling")
+	assert.Contains(t, bottom, "enter/esc: close", "the close hint stays pinned after scrolling")
+}
+
+// TestApply_ResultsMouseWheelScrolls pins that the mouse wheel scrolls the results
+// body (the #687 report noted the wheel was dropped): a wheel-down event advances
+// the viewport off the top.
+func TestApply_ResultsMouseWheelScrolls(t *testing.T) {
+	t.Parallel()
+
+	d := appliedResults(t, data.StagingApplyResult{
+		ServiceLabel: "Param", Entries: manyEntries(50),
+	})
+	require.True(t, d.vp.AtTop(), "the results open at the top")
+
+	_, _ = d.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+
+	assert.False(t, d.vp.AtTop(), "a wheel-down event scrolls the results body")
+}
+
+// TestApply_ResultsShortNoScroll pins that a body that fits renders inline (no
+// scroll): the viewport is sized to the exact body height, nothing is clipped,
+// and the hint does not advertise scroll keys that would do nothing.
+func TestApply_ResultsShortNoScroll(t *testing.T) {
+	t.Parallel()
+
+	d := appliedResults(t, data.StagingApplyResult{
+		ServiceLabel: "Param",
+		Entries: []data.ApplyEntryResult{
+			{Name: "entry-000", Status: "updated"},
+			{Name: "entry-001", Status: "created"},
+		},
+	})
+
+	assert.False(t, d.scrollable, "a body that fits does not scroll")
+	assert.Equal(t, 2, d.vp.TotalLineCount(), "both result lines are present")
+
+	view := d.View()
+	assert.Contains(t, view, "entry-000", "the first result renders")
+	assert.Contains(t, view, "entry-001", "the second result renders")
+	assert.Contains(t, view, "enter/esc: close", "the close hint renders")
+	assert.NotContains(t, view, "scroll", "no scroll keys are advertised when the body fits")
+}
+
+// TestApply_ScrollThenDismissReloads pins that the #669 Esc-reload behavior
+// survives scrolling: after paging through a long results list, dismissing with
+// Back (DismissCmd) still emits the pop+reload+voice MutationDoneMsg.
+func TestApply_ScrollThenDismissReloads(t *testing.T) {
+	t.Parallel()
+
+	d := appliedResults(t, data.StagingApplyResult{
+		ServiceLabel: "Param", Entries: manyEntries(50),
+	})
+
+	// Scroll down; Esc (routed by the shell to DismissCmd) must still reload.
+	m, _ := d.Update(pressPgDown())
+	dr, ok := m.(DismissReloader)
+	require.True(t, ok, "the apply dialog is a DismissReloader after scrolling")
+
+	reload := dr.DismissCmd()
+	require.NotNil(t, reload, "results phase: Back still reloads after scrolling")
+
+	done, ok := reload().(MutationDoneMsg)
+	require.True(t, ok, "Back after scrolling emits MutationDoneMsg (pop+reload+voice)")
+	assert.Contains(t, done.Status, "Applied", "the outcome is still voiced")
 }
 
 // TestApply_ConflictThenIgnoreReapply pins the conflict → re-apply path: the
