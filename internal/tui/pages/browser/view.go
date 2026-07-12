@@ -240,15 +240,12 @@ func (m *Model) historyHeaderLine(width int) string {
 	return clip(m.styles.PaneTitle.Render("History")+"   "+m.styles.PageHint.Render(hint), width)
 }
 
-// isSelectedStaged reports whether the selected entry has staged changes.
+// isSelectedStaged reports whether the selected entry has staged changes. It
+// resolves the item by index (see selectedItem) so a namespaced duplicate keys
+// the banner off the correct (name, namespace) pair.
 func (m *Model) isSelectedStaged() bool {
-	row, ok := m.list.SelectedRow()
+	item, ok := m.selectedItem()
 	if !ok {
-		return false
-	}
-
-	item, found := m.itemByName(row.Name)
-	if !found {
 		return false
 	}
 

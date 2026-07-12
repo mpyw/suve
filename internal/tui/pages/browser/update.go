@@ -142,9 +142,19 @@ func (m *Model) onNamespacesLoaded(msg namespacesLoadedMsg) {
 		return
 	}
 
+	// Preserve the currently-selected namespace VALUE across the rebuild, so an
+	// inserted discovered namespace never silently changes what the current index
+	// points at (#Step-3 review).
+	current := m.currentNamespace()
 	m.namespaces = namespaceOptions(msg.names)
-	if m.nsIndex >= len(m.namespaces) {
-		m.nsIndex = 0
+
+	m.nsIndex = 0
+	for i, ns := range m.namespaces {
+		if ns == current {
+			m.nsIndex = i
+
+			break
+		}
 	}
 }
 
@@ -349,11 +359,14 @@ func (m *Model) debounce() tea.Cmd {
 	})
 }
 
-// blurInputs leaves any focused text input and returns focus to the list.
+// blurInputs leaves any focused text input and returns focus to the list. It
+// advances debounceSeq so a still-pending debounce tick from the last keystroke
+// is invalidated — the immediate commit reload supersedes it (no duplicate load).
 func (m *Model) blurInputs() {
 	m.prefix.Blur()
 	m.filter.Blur()
 	m.focus = focusList
+	m.debounceSeq++
 }
 
 // cycleNamespace advances the App Config namespace filter and reloads the list.

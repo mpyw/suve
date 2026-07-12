@@ -128,15 +128,10 @@ func (m *Model) loadNamespacesCmd() tea.Cmd {
 // selectionCmd loads the detail and history for the currently-selected item, as
 // two independent fetches.
 func (m *Model) selectionCmd() tea.Cmd {
-	row, ok := m.list.SelectedRow()
+	item, ok := m.selectedItem()
 	if !ok {
 		m.detailOK = false
 
-		return nil
-	}
-
-	item, found := m.itemByName(row.Name)
-	if !found {
 		return nil
 	}
 
@@ -146,14 +141,16 @@ func (m *Model) selectionCmd() tea.Cmd {
 	)
 }
 
-// itemByName returns the loaded item with the given name (the list preserves
-// order, so the selected row maps back to its item).
-func (m *Model) itemByName(name string) (data.Item, bool) {
-	for _, it := range m.items {
-		if it.Name == name {
-			return it, true
-		}
+// selectedItem returns the item under the list's selection by INDEX, not name:
+// rebuildRows builds the rows one-to-one from m.items in order, so the selected
+// index maps back to its item even when App Configuration lists the same key
+// under several namespaces (a name lookup would resolve every duplicate to the
+// first, loading the wrong namespace, #Step-3 review).
+func (m *Model) selectedItem() (data.Item, bool) {
+	idx := m.list.Selected()
+	if idx < 0 || idx >= len(m.items) {
+		return data.Item{}, false
 	}
 
-	return data.Item{}, false
+	return m.items[idx], true
 }

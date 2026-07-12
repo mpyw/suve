@@ -259,6 +259,32 @@ func TestValuesToggleReloads(t *testing.T) {
 	assert.Greater(t, m.listSeq, before)
 }
 
+// TestSelectedItemByIndexWithDuplicateNames pins that the selection resolves an
+// item by INDEX, not name, so App Configuration's same-key-across-namespaces
+// case loads the correct (name, namespace) pair rather than the first duplicate.
+func TestSelectedItemByIndexWithDuplicateNames(t *testing.T) {
+	t.Parallel()
+
+	items := []data.Item{
+		{Name: "app/Feature", Namespace: ""},
+		{Name: "app/Feature", Namespace: "staging"},
+		{Name: "app/Feature", Namespace: "prod"},
+	}
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: items}})
+
+	m.list.SelectIndex(1)
+	got, ok := m.selectedItem()
+	require.True(t, ok)
+	assert.Equal(t, "staging", got.Namespace, "index 1 resolves to the staging duplicate, not the first")
+
+	m.list.SelectIndex(2)
+	got, ok = m.selectedItem()
+	require.True(t, ok)
+	assert.Equal(t, "prod", got.Namespace, "index 2 resolves to the prod duplicate")
+}
+
 // TestStagingJump pins that S emits the OpenStaging navigation request.
 func TestStagingJump(t *testing.T) {
 	t.Parallel()

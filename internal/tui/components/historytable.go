@@ -161,7 +161,10 @@ func (t *HistoryTable) RowAtLine(line int) (int, bool) {
 
 		consumed++
 
-		if t.rows[row].TagsLine != "" {
+		// A tag line is drawn only when View still has room for it (len(lines) <
+		// visible); mirror that guard so a click on the last visible line never maps
+		// to a tag line View clipped away.
+		if t.rows[row].TagsLine != "" && consumed < visible {
 			if consumed == line {
 				return row, true
 			}
