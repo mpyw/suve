@@ -245,6 +245,38 @@ func TestUpdate_UnstageAndApplyKeys(t *testing.T) {
 	assert.ElementsMatch(t, []string{"param", "secret"}, msg.Services)
 }
 
+// TestUpdate_EditAndTagAreStagedOnly pins that the staging review page's `e`
+// (edit) and `t` (tag) launch their dialogs staged-only: the emitted
+// OpenEntryForm/OpenTag carry StagedOnly=true, so the shared mutation dialogs
+// hide the Stage/Apply-immediately mode toggle. An immediate write from this
+// staged surface would bypass the staging store and orphan the staged draft the
+// dialog was launched from (issue #679).
+func TestUpdate_EditAndTagAreStagedOnly(t *testing.T) {
+	t.Parallel()
+
+	sec := &stubService{service: "param", label: "Param", svcCap: capFor("aws", "param"), review: updateReview()}
+	m := newModel(t, sec)
+
+	m.selected = 0
+
+	// `e` edits the selected staged entry, staged-only.
+	_, cmd := m.Update(keyPress('e'))
+	require.NotNil(t, cmd, "e emits an open-form command")
+	form, ok := cmd().(nav.OpenEntryForm)
+	require.True(t, ok, "e emits nav.OpenEntryForm")
+	assert.True(t, form.Edit, "the request is an edit")
+	assert.Equal(t, "/app/web/CDN_URL", form.Name)
+	assert.True(t, form.StagedOnly, "a staging-review edit is staged-only (no immediate-mode escape hatch)")
+
+	// `t` opens the tag dialog for the selected item, staged-only.
+	_, cmd = m.Update(keyPress('t'))
+	require.NotNil(t, cmd, "t emits an open-tag command")
+	tag, ok := cmd().(nav.OpenTag)
+	require.True(t, ok, "t emits nav.OpenTag")
+	assert.Equal(t, "/app/web/CDN_URL", tag.Name)
+	assert.True(t, tag.StagedOnly, "a staging-review tag add is staged-only (no immediate-mode escape hatch)")
+}
+
 // TestUpdate_AutoUnstagedNotice pins the dismissible auto-unstaged notice: it
 // shows after a review that auto-unstaged an entry, and esc dismisses it.
 func TestUpdate_AutoUnstagedNotice(t *testing.T) {

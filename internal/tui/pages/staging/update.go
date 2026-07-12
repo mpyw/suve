@@ -215,7 +215,10 @@ func (m *Model) unstageSelected() tea.Cmd {
 }
 
 // editSelected reuses the mutation entry form to edit a staged create/update's
-// value; it is a no-op on a tag row or a staged delete (nothing to edit).
+// value; it is a no-op on a tag row or a staged delete (nothing to edit). The
+// form is opened staged-only (no immediate-mode escape hatch): this is a staged
+// surface, so an immediate write would bypass the staging store and orphan the
+// staged draft.
 func (m *Model) editSelected() tea.Cmd {
 	row, ok := m.selectedRow()
 	if !ok || row.kind != rowEntry || row.entry.Operation == operationDelete {
@@ -226,17 +229,19 @@ func (m *Model) editSelected() tea.Cmd {
 
 	return func() tea.Msg {
 		return nav.OpenEntryForm{
-			Service:   sec.service,
-			Edit:      true,
-			Name:      row.entry.Name,
-			Namespace: row.entry.Namespace,
-			Value:     row.entry.StagedValue,
+			Service:    sec.service,
+			Edit:       true,
+			Name:       row.entry.Name,
+			Namespace:  row.entry.Namespace,
+			Value:      row.entry.StagedValue,
+			StagedOnly: true,
 		}
 	}
 }
 
-// tagSelected reuses the tag form to stage a tag add on the selected
-// row's item.
+// tagSelected reuses the tag form to stage a tag add on the selected row's item,
+// opened staged-only (no immediate-mode escape hatch) for the same reason as
+// editSelected: this is a staged surface.
 func (m *Model) tagSelected() tea.Cmd {
 	row, ok := m.selectedRow()
 	if !ok {
@@ -246,7 +251,9 @@ func (m *Model) tagSelected() tea.Cmd {
 	sec := m.sections[row.section]
 
 	return func() tea.Msg {
-		return nav.OpenTag{Service: sec.service, Name: row.key.Name, Namespace: row.key.Namespace}
+		return nav.OpenTag{
+			Service: sec.service, Name: row.key.Name, Namespace: row.key.Namespace, StagedOnly: true,
+		}
 	}
 }
 

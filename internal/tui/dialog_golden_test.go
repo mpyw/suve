@@ -285,6 +285,34 @@ func TestDialog_TagAWSParamGolden(t *testing.T) { //nolint:paralleltest // golde
 	dialogGolden(t, newDialogHost(m, cmd), "Action")
 }
 
+// TestDialog_EntryFormStagedOnlyGolden renders the edit form as launched from the
+// staging review page (StagedOnly): the Stage/Apply-immediately mode toggle is
+// gone, since a staged surface offers no immediate-write escape hatch (#679).
+func TestDialog_EntryFormStagedOnlyGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m, cmd := dialogs.NewEntryForm(dialogs.EntryFormInput{
+		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "param")},
+		Service: "param", Styles: styles.New(),
+		Edit: true, Name: "/app/api/DATABASE_URL", Value: "postgres://new", StagedOnly: true,
+	})
+
+	dialogGolden(t, newDialogHost(m, cmd), "Value")
+}
+
+// TestDialog_TagStagedOnlyGolden renders the tag form as launched from the staging
+// review page (StagedOnly): the mode toggle is gone (#679).
+func TestDialog_TagStagedOnlyGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m, cmd := dialogs.NewTagForm(dialogs.TagInput{
+		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "param")},
+		Service: "param", Styles: styles.New(), Name: "/app/api/DATABASE_URL", StagedOnly: true,
+	})
+
+	dialogGolden(t, newDialogHost(m, cmd), "Action")
+}
+
 // TestDialog_ErrorGolden renders the plain error dialog (a blocked operation the
 // app surfaces modally). It never mutates and carries no secret.
 func TestDialog_ErrorGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
