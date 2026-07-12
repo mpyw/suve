@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ import (
 
 	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/samber/lo"
+	"github.com/samber/lo/it"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -505,10 +507,7 @@ func mapLabels(labels map[string]string) []domain.Tag {
 		return nil
 	}
 
-	tags := make([]domain.Tag, 0, len(labels))
-	for k := range maputil.SortedKeys(labels) {
-		tags = append(tags, domain.Tag{Key: k, Value: labels[k]})
-	}
-
-	return tags
+	return slices.Collect(it.Map(maputil.SortedKeys(labels), func(k string) domain.Tag {
+		return domain.Tag{Key: k, Value: labels[k]}
+	}))
 }

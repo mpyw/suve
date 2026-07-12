@@ -19,9 +19,7 @@ func SortedKeys[M ~map[K]V, K cmp.Ordered, V any](m M) iter.Seq[K] {
 // SortedNames returns an iterator over the unique names extracted from items
 // via getName, in ascending order.
 func SortedNames[T any](items []T, getName func(T) string) iter.Seq[string] {
-	names := lo.Map(items, func(item T, _ int) string {
+	return SortedKeys(NewSet(lo.Map(items, func(item T, _ int) string {
 		return getName(item)
-	})
-
-	return SortedKeys(NewSet(names...))
+	})...))
 }
