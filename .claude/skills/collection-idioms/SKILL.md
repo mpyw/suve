@@ -18,6 +18,27 @@ Default to declarative transforms. A `out := make([]T, 0, len(xs)); for _, x := 
 
 Use `it.Map`/`it.Filter` **only when the source is genuinely an `iter.Seq`** (e.g. `maputil.SortedKeys(m)`). If the source is a plain slice, use `lo.Map` — don't wrap a slice in an iterator just to transform it.
 
+## Point-free transforms and the `_ int` boilerplate
+
+`lo.Map`'s iteratee is `func(item T, index int) R`, so handing it an existing `func(T) R` needs a throwaway wrapper — `lo.Map(xs, func(x T, _ int) R { return f(x) })`. `it.Map`'s transform is `func(item T) R`, so it accepts such a function **directly**.
+
+So when the result is **consumed by `range`**, prefer starting from an iterator and using `it.Map`: you pass the function point-free and drop the `_ int`.
+
+```go
+// avoid — the wrapper exists only to satisfy lo.Map's (T, int) shape
+for _, tag := range lo.Map(keys, func(k string, _ int) domain.Tag { return toTag(k) }) {
+	...
+}
+// prefer — it.Map takes func(T) U; pass toTag directly and range the iterator
+for tag := range it.Map(slices.Values(keys), toTag) {
+	...
+}
+```
+
+When the source is already an `iter.Seq` (e.g. `maputil.SortedKeys(m)`) it's cleaner still — no `slices.Values` wrap.
+
+**When it's not worth it:** if you need a materialized `[]U` rather than a `range`, the point-free form becomes `slices.Collect(it.Map(slices.Values(xs), f))` — the extra `slices.Values`/`slices.Collect` wrapping generally isn't worth it over a plain `lo.Map(xs, func(x T, _ int) U { ... })`. Reserve the iterator + `it.Map` point-free style for range-terminal consumption; for slice-producing transforms, `lo.Map` (with its `_ int`) is the simpler choice.
+
 ## Keep an explicit loop when the body…
 
 This is the "complex side effects" carve-out — readability wins, don't force a helper:
