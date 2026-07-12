@@ -57,6 +57,72 @@ func (f *sourceFactory) sourceFor(service string) (data.Source, data.StagingProb
 	}
 }
 
+// mutatorFor returns the write-path Mutator for a service tab, or nil when the
+// service is unavailable for the scope. It pairs the immediate param/secret use
+// cases with the staged-write strategy and the per-scope-cached staging store,
+// mirroring the GUI's serviceStrategyScoped discipline.
+func (f *sourceFactory) mutatorFor(service string) data.Mutator {
+	svcCap, ok := capabilityFor(f.scope.Provider, service)
+	if !ok {
+		return nil
+	}
+
+	switch service {
+	case string(staging.ServiceParam):
+		return data.NewParamMutator(svcCap, f.paramResolver(), f.paramStrategyBuilder(), f.stagingStoreResolver(svcCap, provider.KindParam))
+	case string(staging.ServiceSecret):
+		store, err := registry.Store(f.ctx, f.scope, provider.KindSecret)
+		if err != nil {
+			return nil
+		}
+
+		return data.NewSecretMutator(svcCap, store, f.secretStrategyBuilder(), f.stagingStoreResolver(svcCap, provider.KindSecret))
+	default:
+		return nil
+	}
+}
+
+// stagingStoreResolver returns a lazy resolver for the service's cached staging
+// store, or nil when the service has no staging workflow (so a staged write is
+// never offered). Deferring the build keeps dialog open off the keychain.
+func (f *sourceFactory) stagingStoreResolver(svcCap capability.ServiceCapability, kind provider.Kind) data.StagingStoreResolver {
+	if !svcCap.HasStaging {
+		return nil
+	}
+
+	return func() (store.ReadWriteOperator, error) {
+		return f.stagingStore(kind)
+	}
+}
+
+// paramStrategyBuilder builds the provider-specific param staging strategy over a
+// resolved store (Azure App Configuration vs AWS SSM), mirroring the GUI's
+// serviceStrategyScoped.
+func (f *sourceFactory) paramStrategyBuilder() data.StrategyBuilder {
+	return func(s provider.Store) staging.FullStrategy {
+		if f.scope.Provider == provider.ProviderAzure {
+			return staging.NewAzureAppConfigParamStrategy(s)
+		}
+
+		return staging.NewAWSParamStrategy(s)
+	}
+}
+
+// secretStrategyBuilder builds the provider-specific secret staging strategy over
+// a resolved store (Google Cloud / Azure Key Vault / AWS Secrets Manager).
+func (f *sourceFactory) secretStrategyBuilder() data.StrategyBuilder {
+	return func(s provider.Store) staging.FullStrategy {
+		switch f.scope.Provider {
+		case provider.ProviderGoogleCloud:
+			return staging.NewGoogleCloudSecretStrategy(s)
+		case provider.ProviderAzure:
+			return staging.NewAzureKeyVaultSecretStrategy(s)
+		default:
+			return staging.NewAWSSecretStrategy(s)
+		}
+	}
+}
+
 // paramResolver resolves the param store for an App Configuration namespace,
 // mirroring the GUI's paramStoreForNamespace (the namespace is harmless for
 // other providers).

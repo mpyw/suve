@@ -1,0 +1,24 @@
+╭──────────────────────────────────────────────────────╮
+│New parameter                                         │
+│                                                      │
+│┃ Name                                                │
+│┃ >                                                   │
+│                                                      │
+│  Type                                                │
+│  > String                                            │
+│    SecureString                                      │
+│    StringList                                        │
+│                                                      │
+│  Value                                               │
+│                                                      │
+│                                                      │
+│                                                      │
+│                                                      │
+│                                                      │
+│  Description                                         │
+│  > (optional)                                        │
+│                                                      │
+│  Mode                                                │
+│  Stage                                               │
+│tab/↑↓: fields · enter: submit · esc: cancel          │
+╰──────────────────────────────────────────────────────╯

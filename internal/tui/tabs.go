@@ -6,9 +6,14 @@ import (
 	"github.com/mpyw/suve/internal/tui/components"
 )
 
-// stagingService is the synthetic tab service key for the staging page (which
-// is not a capability service of its own but a workflow over the offered ones).
-const stagingService = "staging"
+// Service tab keys: the two capability services plus the synthetic staging tab
+// (which is not a capability service of its own but a workflow over the offered
+// ones).
+const (
+	serviceParam   = "param"
+	serviceSecret  = "secret"
+	stagingService = "staging"
+)
 
 // buildTabs derives the tab bar for a launched scope from the neutral
 // capability matrix. It filters capability.All() to the scope's provider, gates
@@ -52,9 +57,9 @@ func buildTabs(scope provider.Scope) []components.Tab {
 // this is a no-op for them.
 func serviceAvailable(scope provider.Scope, service string) bool {
 	switch service {
-	case "param":
+	case serviceParam:
 		return scope.SupportsService(provider.KindParam)
-	case "secret":
+	case serviceSecret:
 		return scope.SupportsService(provider.KindSecret)
 	default:
 		return true

@@ -1,0 +1,22 @@
+╭──────────────────────────────────────────────────────╮
+│New setting                                           │
+│                                                      │
+│┃ Name                                                │
+│┃ >                                                   │
+│                                                      │
+│  Namespace                                           │
+│  > (default)                                         │
+│                                                      │
+│  Value                                               │
+│                                                      │
+│                                                      │
+│                                                      │
+│                                                      │
+│                                                      │
+│  Description                                         │
+│  > (optional)                                        │
+│                                                      │
+│  Mode                                                │
+│  Stage                                               │
+│tab/↑↓: fields · enter: submit · esc: cancel          │
+╰──────────────────────────────────────────────────────╯

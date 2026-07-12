@@ -11,6 +11,7 @@ package tui
 import (
 	"cmp"
 	"context"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -21,8 +22,10 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/tui/components"
 	"github.com/mpyw/suve/internal/tui/data"
+	"github.com/mpyw/suve/internal/tui/dialogs"
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/nav"
+	"github.com/mpyw/suve/internal/tui/pages/browser"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
@@ -66,6 +69,10 @@ type config struct {
 	// tests to a providermock-backed one. When nil (the Step 2 skeleton and the
 	// staging tab), a tab shows its placeholder.
 	sourceFor func(service string) (data.Source, data.StagingProbe)
+	// mutatorFor builds the write-path Mutator for a service tab (the mutation
+	// dialogs' seam). Production wires it to the registry-backed sourceFactory,
+	// tests to a providermock-backed one; nil disables the write dialogs.
+	mutatorFor func(service string) data.Mutator
 	// runCtx is the Run context threaded into pages so their fetch commands are
 	// cancelled when the program exits. Tests may leave it nil (newApp defaults it
 	// to context.Background()).
@@ -73,14 +80,19 @@ type config struct {
 }
 
 // dialog is a modal overlay in the app shell's dialog stack. While any dialog
-// is open it consumes input first (modality); Esc closes the top one. Concrete
-// dialogs (entry form, confirm, results, error) land in later steps.
+// is open it consumes input first (modality); Esc closes the top one unless it
+// is busy (a mutation is in flight — GUI "Modal busy" parity). Concrete dialogs
+// live in internal/tui/dialogs and are adapted to this interface by
+// dialogs_wire.go.
 type dialog interface {
 	// Update handles a forwarded message and returns the (possibly replaced)
 	// dialog plus any command.
 	Update(tea.Msg) (dialog, tea.Cmd)
 	// View renders the dialog box content (the app frames and centers it).
 	View() string
+	// busy reports whether the dialog is mid-operation, so the shell suppresses
+	// dismissal.
+	busy() bool
 }
 
 // awsIdentityMsg carries a resolved AWS identity back to the model.
@@ -121,8 +133,16 @@ type App struct {
 
 	// sourceFor is the injected data seam (see config); runCtx is the Run context
 	// threaded into pages.
-	sourceFor func(service string) (data.Source, data.StagingProbe)
-	runCtx    context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
+	sourceFor  func(service string) (data.Source, data.StagingProbe)
+	mutatorFor func(service string) data.Mutator
+	runCtx     context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
+
+	// status is a transient one-line outcome (staged/applied/skipped/unstaged)
+	// shown just above the help bar; empty renders no row.
+	status string
+	// stagedCounts holds the last staged-item count each service's browser
+	// reported, totalled into the Staging tab's count badge.
+	stagedCounts map[string]int
 }
 
 // newApp builds the root model from a launch config: it derives the tab set
@@ -144,7 +164,9 @@ func newApp(cfg config) *App {
 		fetchIdentity: cfg.fetchIdentity,
 		identity:      cfg.identity,
 		sourceFor:     cfg.sourceFor,
+		mutatorFor:    cfg.mutatorFor,
 		runCtx:        cmp.Or(cfg.runCtx, context.Background()),
+		stagedCounts:  map[string]int{},
 	}
 
 	m.identityLoading = cfg.scope.Provider == provider.ProviderAWS &&
@@ -232,12 +254,175 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case nav.OpenDiff:
 		return m, m.pushDiff(msg)
+	case nav.OpenEntryForm:
+		return m, m.openEntryForm(msg)
+	case nav.OpenDelete:
+		return m, m.openDelete(msg)
+	case nav.OpenTag:
+		return m, m.openTag(msg)
+	case nav.OpenRestore:
+		return m, m.openRestore(msg)
+	case nav.OpenError:
+		m.pushDialog(dialogs.NewError(m.styles, msg.Title, msg.Message), nil)
+
+		return m, nil
+	case nav.StagedCount:
+		m.stagedCounts[msg.Service] = msg.Count
+		m.refreshStagingTab()
+
+		return m, nil
+	case dialogs.MutationDoneMsg:
+		return m, m.onMutationDone(msg)
+	case dialogs.CanceledMsg:
+		m.popDialog()
+
+		return m, nil
 	case nav.PopPage:
 		m.popPage()
 
 		return m, nil
 	default:
 		return m.routeToFocused(msg)
+	}
+}
+
+// onMutationDone closes the dialog, voices the outcome, and reloads the active
+// browser page (list/detail/staged badges) so the mutation is reflected.
+func (m *App) onMutationDone(msg dialogs.MutationDoneMsg) tea.Cmd {
+	m.popDialog()
+	m.status = msg.Status
+
+	return m.reloadActivePage()
+}
+
+// reloadActivePage asks the active page to reload after a mutation. A browser
+// page reloads its list, detail, and staged badges; other pages ignore it.
+func (m *App) reloadActivePage() tea.Cmd {
+	if len(m.pages) == 0 {
+		return nil
+	}
+
+	top := len(m.pages) - 1
+	p, cmd := m.pages[top].Update(browser.ReloadMsg{})
+	m.pages[top] = p
+
+	return cmd
+}
+
+// openEntryForm builds and pushes the create/edit dialog for a service.
+func (m *App) openEntryForm(req nav.OpenEntryForm) tea.Cmd {
+	mut := m.mutatorForService(req.Service)
+	if mut == nil {
+		return nil
+	}
+
+	d, cmd := dialogs.NewEntryForm(dialogs.EntryFormInput{
+		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
+		Edit: req.Edit, Name: req.Name, Namespace: req.Namespace,
+		Value: req.Value, TypeLabel: req.TypeLabel, Description: req.Description,
+	})
+
+	return m.pushDialog(d, cmd)
+}
+
+// openDelete builds and pushes the delete-confirm dialog for a service.
+func (m *App) openDelete(req nav.OpenDelete) tea.Cmd {
+	mut := m.mutatorForService(req.Service)
+	if mut == nil {
+		return nil
+	}
+
+	d := dialogs.NewDeleteConfirm(dialogs.DeleteInput{
+		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
+		Name: req.Name, Namespace: req.Namespace,
+	})
+
+	return m.pushDialog(d, nil)
+}
+
+// openTag builds and pushes the tag add/remove dialog for a service.
+func (m *App) openTag(req nav.OpenTag) tea.Cmd {
+	mut := m.mutatorForService(req.Service)
+	if mut == nil {
+		return nil
+	}
+
+	d, cmd := dialogs.NewTagForm(dialogs.TagInput{
+		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
+		Name: req.Name, Namespace: req.Namespace,
+	})
+
+	return m.pushDialog(d, cmd)
+}
+
+// openRestore builds and pushes the restore dialog for a service.
+func (m *App) openRestore(req nav.OpenRestore) tea.Cmd {
+	mut := m.mutatorForService(req.Service)
+	if mut == nil {
+		return nil
+	}
+
+	d, cmd := dialogs.NewRestore(dialogs.RestoreInput{
+		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles, Name: req.Name,
+	})
+
+	return m.pushDialog(d, cmd)
+}
+
+// mutatorForService resolves the write seam for a service, or nil when none is
+// wired (the Step 2 skeleton, or a service with no mutator).
+func (m *App) mutatorForService(service string) data.Mutator {
+	if m.mutatorFor == nil {
+		return nil
+	}
+
+	return m.mutatorFor(service)
+}
+
+// pushDialog appends a dialog to the modal stack, seeds it with the current size
+// (so its embedded form lays out before the first render), clears any transient
+// status, and returns the dialog's Init command.
+func (m *App) pushDialog(d dialogs.Model, initCmd tea.Cmd) tea.Cmd {
+	m.status = ""
+	m.dialogs = append(m.dialogs, dialogAdapter{m: d})
+
+	if m.width > 0 && m.height > 0 {
+		top := len(m.dialogs) - 1
+		next, _ := m.dialogs[top].Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		m.dialogs[top] = next
+	}
+
+	return initCmd
+}
+
+// topDialogBusy reports whether the top dialog is mid-operation.
+func (m *App) topDialogBusy() bool {
+	if len(m.dialogs) == 0 {
+		return false
+	}
+
+	return m.dialogs[len(m.dialogs)-1].busy()
+}
+
+// refreshStagingTab updates the Staging tab's title with the current staged
+// total ("Staging" at zero, "Staging(n)" otherwise).
+func (m *App) refreshStagingTab() {
+	total := 0
+	for _, c := range m.stagedCounts {
+		total += c
+	}
+
+	for i, t := range m.tabs {
+		if t.Service == stagingService {
+			title := "Staging"
+			if total > 0 {
+				title += "(" + strconv.Itoa(total) + ")"
+			}
+
+			m.tabs[i].Title = title
+
+			return
+		}
 	}
 }
 
@@ -277,7 +462,7 @@ func (m *App) forwardResizeToTop() {
 		return
 	}
 
-	chrome := statusBarHeight + tabBarHeight + separatorHeight + lipgloss.Height(m.helpView())
+	chrome := statusBarHeight + tabBarHeight + separatorHeight + lipgloss.Height(m.helpView()) + m.statusLineHeight()
 	pageHeight := max(m.height-chrome, 0)
 
 	top := len(m.pages) - 1
@@ -288,10 +473,18 @@ func (m *App) forwardResizeToTop() {
 // handleKey applies the dialogs → global keys → active page order for a key
 // press.
 func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	// Modal: a dialog on top consumes input first; Esc closes it.
+	// Modal: a dialog on top consumes input first. Only ctrl+c stays global as a
+	// force-quit escape hatch — every other key (q, digits, y, ?, tab, letters)
+	// is forwarded into the dialog so a focused huh text field types normally,
+	// the same principle as the page capturesInput seam. Esc closes the top
+	// dialog, but only when it is not busy (a mutation in flight suppresses
+	// dismissal — GUI "Modal busy" parity).
 	if len(m.dialogs) > 0 {
-		// TODO(step-4): match Quit before forwarding to a modal dialog so ctrl+c can force-quit
-		if key.Matches(msg, m.keys.Back) {
+		if key.Matches(msg, forceQuitKey) {
+			return m, tea.Quit
+		}
+
+		if key.Matches(msg, m.keys.Back) && !m.topDialogBusy() {
 			m.popDialog()
 
 			return m, nil
@@ -610,15 +803,16 @@ func (m *App) renderTooSmall() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, notice)
 }
 
-// render composes status bar / tab bar / separator / page body / help bar, and
-// overlays any dialogs as lipgloss layers.
+// render composes status bar / tab bar / separator / page body / status line /
+// help bar, and overlays any dialogs as lipgloss layers.
 func (m *App) render() string {
 	status := m.statusBar().View(m.width)
 	tabbar := m.tabBar().View(m.width)
 	separator := m.styles.Separator.Render(strings.Repeat("─", m.width))
 	helpBar := m.helpView()
+	statusLine := m.statusLine()
 
-	chrome := statusBarHeight + tabBarHeight + separatorHeight + lipgloss.Height(helpBar)
+	chrome := statusBarHeight + tabBarHeight + separatorHeight + lipgloss.Height(helpBar) + m.statusLineHeight()
 	pageHeight := max(m.height-chrome, 0)
 
 	var body string
@@ -628,13 +822,46 @@ func (m *App) render() string {
 
 	body = lipgloss.NewStyle().Width(m.width).Height(pageHeight).Render(body)
 
-	base := strings.Join([]string{status, tabbar, separator, body, helpBar}, "\n")
+	rows := []string{status, tabbar, separator, body}
+	if statusLine != "" {
+		rows = append(rows, statusLine)
+	}
+
+	rows = append(rows, helpBar)
+	base := strings.Join(rows, "\n")
 
 	if len(m.dialogs) == 0 {
 		return base
 	}
 
 	return m.overlayDialogs(base)
+}
+
+// statusLine renders the transient outcome line (empty when there is no status).
+func (m *App) statusLine() string {
+	if m.status == "" {
+		return ""
+	}
+
+	return m.styles.Banner.Render(" " + clipStatus(m.status, m.width))
+}
+
+// statusLineHeight is the row count the status line occupies (0 or 1).
+func (m *App) statusLineHeight() int {
+	if m.status == "" {
+		return 0
+	}
+
+	return 1
+}
+
+// clipStatus clamps the status text to the terminal width.
+func clipStatus(s string, width int) string {
+	if width <= 1 || lipgloss.Width(s) <= width-1 {
+		return s
+	}
+
+	return lipgloss.NewStyle().MaxWidth(width - 1).Render(s)
 }
 
 // helpView renders the bottom help bar (short by default, full when toggled).

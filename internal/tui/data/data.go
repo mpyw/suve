@@ -97,6 +97,10 @@ type Detail struct {
 	Description   string
 	Tags          []Tag
 	Namespace     string
+	// TypeLabel is the entry's display value type (e.g. "SecureString"), so the
+	// edit dialog can preserve the type on an update. Empty for services with no
+	// value type (secret, App Configuration).
+	TypeLabel string
 	// ARN is the Secrets Manager ARN surfaced from the entry's Extra metadata,
 	// empty for providers that expose none.
 	ARN string
@@ -279,6 +283,7 @@ func (s *paramSource) Show(ctx context.Context, name, namespace string) (Detail,
 		Secret:      out.Type == domain.ValueTypeSecret,
 		Description: out.Description,
 		Namespace:   namespace,
+		TypeLabel:   typeLabel(out.Type, true),
 		Tags: lo.Map(out.Tags, func(t param.ShowTag, _ int) Tag {
 			return Tag{Key: t.Key, Value: t.Value}
 		}),

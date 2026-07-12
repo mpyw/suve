@@ -40,6 +40,10 @@ type (
 	debounceMsg struct{ seq int }
 )
 
+// ReloadMsg asks the browser to re-fetch its list and staged flags after a
+// mutation applied through a dialog. The app forwards it to the active page.
+type ReloadMsg struct{}
+
 // listParams snapshots the header state into a data.ListParams.
 func (m *Model) listParams() data.ListParams {
 	return data.ListParams{

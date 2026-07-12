@@ -1,0 +1,16 @@
+╭──────────────────────────────────────────────────────╮
+│Tag — /app/api/DATABASE_URL                           │
+│                                                      │
+│┃ Action                                              │
+│┃ ← Add tag →                                         │
+│                                                      │
+│  Key                                                 │
+│  >                                                   │
+│                                                      │
+│  Value                                               │
+│  > (add only)                                        │
+│                                                      │
+│  Mode                                                │
+│  Stage                                               │
+│tab/↑↓: fields · enter: submit · esc: cancel          │
+╰──────────────────────────────────────────────────────╯
