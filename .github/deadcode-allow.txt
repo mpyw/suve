@@ -77,11 +77,3 @@ internal/timeutil/timeutil.go: unreachable func: ResetLocationCache
 # step, so they are waived here rather than deleted.
 internal/usecase/param/tag.go: unreachable func: TagUseCase.Execute
 internal/usecase/secret/tag.go: unreachable func: TagUseCase.Execute
-
-# capability.All: the provider×service capability matrix. In this first TUI-epic
-# step its only non-test caller is internal/gui (providers.go, production-gated),
-# so under the default build tags it looks dead — the same GUI-only situation as
-# the two entries above. TEMPORARY: Step 2 adds internal/tui (untagged), which
-# consumes capability.All() in the default build and makes this reachable; this
-# waiver must be removed then (and must be gone by Step 6 per the epic guardrail).
-internal/capability/capability.go: unreachable func: All
