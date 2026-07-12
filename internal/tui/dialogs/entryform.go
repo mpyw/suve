@@ -54,6 +54,10 @@ type entryForm struct {
 
 	edit bool
 
+	// stagedOnly hides the mode toggle and forces a staged write (the staging
+	// review page's edit path); the browser leaves it false and keeps the toggle.
+	stagedOnly bool
+
 	// Bound form values.
 	name        string
 	namespace   string
@@ -79,10 +83,14 @@ type EntryFormInput struct {
 	Edit bool
 	// Name/Namespace/Value/TypeLabel/Description seed the fields. For create,
 	// Namespace seeds the App Configuration namespace default (the viewing one).
-	Name        string
-	Namespace   string
-	Value       string
-	TypeLabel   string
+	Name      string
+	Namespace string
+	Value     string
+	TypeLabel string
+	// StagedOnly opens the dialog from a staged-only surface (the staging review
+	// page): the mode toggle is hidden and the write is forced staged, so a staged
+	// review can never launch an immediate write that bypasses the staging store.
+	StagedOnly  bool
 	Description string
 }
 
@@ -103,9 +111,11 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 		valueType:   defaultTypeLabel(svcCap, in.TypeLabel),
 		value:       in.Value,
 		description: in.Description,
+		stagedOnly:  in.StagedOnly,
 		// Staged by default when the service supports staging; otherwise always
-		// immediate (the mode toggle is hidden).
-		staged: svcCap.HasStaging,
+		// immediate (the mode toggle is hidden). A staged-only surface forces
+		// staged regardless (its toggle is hidden too).
+		staged: svcCap.HasStaging || in.StagedOnly,
 	}
 
 	cmd := d.rebuildForm()
@@ -170,7 +180,10 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 			Placeholder("(optional)").Value(&d.description))
 	}
 
-	if d.svcCap.HasStaging {
+	// The mode toggle is offered only when staging is supported AND the dialog was
+	// not launched from a staged-only surface (the staging review page), which has
+	// no legitimate immediate-write escape hatch.
+	if d.svcCap.HasStaging && !d.stagedOnly {
 		fields = append(fields, newModeField(&d.staged))
 	}
 

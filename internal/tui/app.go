@@ -332,6 +332,7 @@ func (m *App) openEntryForm(req nav.OpenEntryForm) tea.Cmd {
 		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
 		Edit: req.Edit, Name: req.Name, Namespace: req.Namespace,
 		Value: req.Value, TypeLabel: req.TypeLabel, Description: req.Description,
+		StagedOnly: req.StagedOnly,
 	})
 
 	return m.pushDialog(d, cmd)
@@ -361,7 +362,7 @@ func (m *App) openTag(req nav.OpenTag) tea.Cmd {
 
 	d, cmd := dialogs.NewTagForm(dialogs.TagInput{
 		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
-		Name: req.Name, Namespace: req.Namespace,
+		Name: req.Name, Namespace: req.Namespace, StagedOnly: req.StagedOnly,
 	})
 
 	return m.pushDialog(d, cmd)

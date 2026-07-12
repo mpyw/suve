@@ -28,6 +28,9 @@ type tagForm struct {
 	tagKey   string
 	tagValue string
 	staged   bool
+	// stagedOnly hides the mode toggle and forces a staged tag write (the staging
+	// review page's tag path); the browser leaves it false and keeps the toggle.
+	stagedOnly bool
 
 	form *huh.Form
 	busy bool
@@ -42,6 +45,9 @@ type TagInput struct {
 	Styles    styles.Styles
 	Name      string
 	Namespace string
+	// StagedOnly opens the dialog from a staged-only surface (the staging review
+	// page): the mode toggle is hidden and the tag write is forced staged.
+	StagedOnly bool
 }
 
 // NewTagForm builds a tag add/remove dialog.
@@ -49,14 +55,17 @@ func NewTagForm(in TagInput) (Model, tea.Cmd) {
 	svcCap := in.Mutator.Capability()
 
 	d := &tagForm{
-		ctx:       in.Ctx,
-		mutator:   in.Mutator,
-		svcCap:    svcCap,
-		service:   in.Service,
-		styles:    in.Styles,
-		name:      in.Name,
-		namespace: in.Namespace,
-		staged:    svcCap.HasStaging,
+		ctx:        in.Ctx,
+		mutator:    in.Mutator,
+		svcCap:     svcCap,
+		service:    in.Service,
+		styles:     in.Styles,
+		name:       in.Name,
+		namespace:  in.Namespace,
+		stagedOnly: in.StagedOnly,
+		// Staged by default when the service supports staging; a staged-only surface
+		// forces staged regardless (its toggle is hidden too).
+		staged: svcCap.HasStaging || in.StagedOnly,
 	}
 
 	cmd := d.rebuildForm()
@@ -73,7 +82,10 @@ func (d *tagForm) rebuildForm() tea.Cmd {
 		huh.NewInput().Key("tagvalue").Title("Value").Placeholder("(add only)").Value(&d.tagValue),
 	}
 
-	if d.svcCap.HasStaging {
+	// The mode toggle is offered only when staging is supported AND the dialog was
+	// not launched from a staged-only surface (the staging review page), which has
+	// no legitimate immediate-write escape hatch.
+	if d.svcCap.HasStaging && !d.stagedOnly {
 		fields = append(fields, newModeField(&d.staged))
 	}
 

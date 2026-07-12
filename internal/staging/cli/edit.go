@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -27,6 +28,9 @@ type EditOptions struct {
 	// Namespace is the App Configuration namespace of the setting (empty for the
 	// null/default namespace and every other provider).
 	Namespace string
+	// ValueType is the provider-neutral value type to record on the staged entry
+	// (AWS SSM Parameter Store axis). Empty preserves the existing type.
+	ValueType domain.ValueType
 }
 
 // Run executes the edit command.
@@ -66,6 +70,7 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 		Key:         staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
 		Value:       newValue,
 		Description: opts.Description,
+		ValueType:   opts.ValueType,
 	})
 	if err != nil {
 		return err

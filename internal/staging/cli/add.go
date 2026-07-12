@@ -7,6 +7,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -27,6 +28,9 @@ type AddOptions struct {
 	// Namespace is the App Configuration namespace to stage under (empty for the
 	// null/default namespace and every other provider).
 	Namespace string
+	// ValueType is the provider-neutral value type to record on the staged entry
+	// (AWS SSM Parameter Store axis). Empty for providers without a type axis.
+	ValueType domain.ValueType
 }
 
 // Run executes the add command.
@@ -73,6 +77,7 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 		Key:         staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
 		Value:       newValue,
 		Description: opts.Description,
+		ValueType:   opts.ValueType,
 	})
 	if err != nil {
 		return err

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 	"github.com/mpyw/suve/internal/staging/transition"
@@ -67,6 +68,57 @@ func TestAddUseCase_Execute(t *testing.T) {
 	assert.Equal(t, staging.OperationCreate, entry.Operation)
 	assert.Equal(t, "new-value", lo.FromPtr(entry.Value))
 	assert.Equal(t, "test description", lo.FromPtr(entry.Description))
+}
+
+func TestAddUseCase_Execute_RecordsValueType(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
+		Key:       staging.EntryKey{Name: "/app/secure"},
+		Value:     "secret",
+		ValueType: domain.ValueTypeSecret,
+	})
+	require.NoError(t, err)
+
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secure"})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ValueTypeSecret, entry.ValueType)
+}
+
+func TestAddUseCase_Execute_PreservesStagedTypeOnReAddWithoutType(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// A create was previously staged as SecureString.
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secure"}, staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("v1"),
+		ValueType: domain.ValueTypeSecret,
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.AddUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	// Re-staging without a type must NOT downgrade the prior SecureString (#664).
+	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{
+		Key:   staging.EntryKey{Name: "/app/secure"},
+		Value: "v2",
+	})
+	require.NoError(t, err)
+
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secure"})
+	require.NoError(t, err)
+	assert.Equal(t, "v2", lo.FromPtr(entry.Value))
+	assert.Equal(t, domain.ValueTypeSecret, entry.ValueType)
 }
 
 func TestAddUseCase_Execute_RejectsWhenResourceExists(t *testing.T) {
