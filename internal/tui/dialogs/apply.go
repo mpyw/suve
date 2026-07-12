@@ -15,17 +15,6 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// dialogChrome is the column overhead the shell's dialog frame adds around the
-// content (a 1-cell rounded border plus 1 cell of horizontal padding on each
-// side); the results view caps its lines at width−dialogChrome so a long
-// conflict / unstage-error line wraps inside the box instead of clipping its
-// border.
-const dialogChrome = 4
-
-// minDialogContent floors the wrap width so a very narrow terminal still wraps
-// to something legible rather than one column.
-const minDialogContent = 24
-
 // resultsChrome is the vertical overhead the results view reserves around its
 // scrollable body so the box fits the screen: the shell's dialog border (top +
 // bottom = 2 rows), the pinned "Apply results" title plus its blank spacer
@@ -64,6 +53,12 @@ type applyResultsMsg struct {
 // coherent results view. While busy it swallows input (the #568 double-fire
 // guard) and reports Busy() so the shell suppresses dismissal.
 type applyDialog struct {
+	// dialogLayout carries the terminal size (from the last WindowSizeMsg). The
+	// results view wraps its lines to contentWidth so the box never overflows
+	// horizontally, and caps the scrollable body at height−resultsChrome so a long
+	// result list scrolls instead of clipping off-screen.
+	dialogLayout
+
 	ctx        context.Context //nolint:containedctx // the apply command needs the Run context; mirrors the browser
 	targets    []data.StagingService
 	targetLine string
@@ -77,12 +72,6 @@ type applyDialog struct {
 	results         []data.StagingApplyResult
 	err             string
 	title           string
-	// width / height are the terminal size (from the last WindowSizeMsg). The
-	// results view wraps its lines to width−dialogChrome so the box never overflows
-	// horizontally, and caps the scrollable body at height−resultsChrome so a long
-	// result list scrolls instead of clipping off-screen.
-	width  int
-	height int
 	// vp scrolls the results body when it is taller than the box can show; the
 	// title and close hint are rendered outside it so they stay pinned.
 	vp viewport.Model
@@ -138,7 +127,7 @@ func (d *applyDialog) DismissCmd() tea.Cmd {
 func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		d.width, d.height = msg.Width, msg.Height
+		d.setSize(msg)
 		d.syncViewport()
 
 		return d, nil
@@ -165,29 +154,6 @@ func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return d, nil
-}
-
-// contentWidth is the inner width the results box may fill: the terminal width
-// less the shell's dialog frame, floored so a narrow terminal still wraps. Zero
-// (before the first WindowSizeMsg) means "don't wrap".
-func (d *applyDialog) contentWidth() int {
-	if d.width <= 0 {
-		return 0
-	}
-
-	return max(d.width-dialogChrome, minDialogContent)
-}
-
-// fit wraps one already-styled result line to the content width when it would
-// overflow, so a long conflict / unstage-error / error line stays inside the box
-// instead of pushing the border off-screen. Short lines pass through untouched
-// so the box keeps its natural width when nothing wraps.
-func (d *applyDialog) fit(line string) string {
-	if w := d.contentWidth(); w > 0 && lipgloss.Width(line) > w {
-		return lipgloss.NewStyle().Width(w).Render(line)
-	}
-
-	return line
 }
 
 func (d *applyDialog) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -280,10 +246,10 @@ func (d *applyDialog) View() string {
 func (d *applyDialog) confirmView() string {
 	var b strings.Builder
 
-	b.WriteString(d.styles.PaneTitle.Render(d.title))
+	b.WriteString(d.fit(d.styles.PaneTitle.Render(d.title)))
 	b.WriteString("\n\n")
-	b.WriteString(d.styles.FieldLabel.Render("Target  ") + " " + d.targetLine + "\n")
-	b.WriteString(d.styles.FieldLabel.Render("Changes ") + " " + d.changesLine() + "\n\n")
+	b.WriteString(d.fit(d.styles.FieldLabel.Render("Target  ")+" "+d.targetLine) + "\n")
+	b.WriteString(d.fit(d.styles.FieldLabel.Render("Changes ")+" "+d.changesLine()) + "\n\n")
 
 	if d.phase == phaseBusy {
 		b.WriteString(d.styles.PageHint.Render("applying…"))
@@ -313,11 +279,6 @@ func (d *applyDialog) confirmRow(c applyControl, label string) string {
 func (d *applyDialog) changesLine() string {
 	return pluralize(d.entryCount, "entry", "entries") + " · " + pluralize(d.tagCount, "tag change", "tag changes")
 }
-
-// sized reports whether a WindowSizeMsg has arrived, so the results view knows
-// whether it may cap the body to the screen (a viewport with a zero width/height
-// renders nothing).
-func (d *applyDialog) sized() bool { return d.width > 0 && d.height > 0 }
 
 // syncViewport (re)builds the scrollable results body and sizes the viewport to
 // min(needed, screenHeight−resultsChrome), so a long fan-out result list scrolls

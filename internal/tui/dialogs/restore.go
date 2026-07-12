@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	huh "charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/styles"
@@ -15,6 +16,8 @@ import (
 // secret. Restore is immediate only (there is no staged restore), so it carries
 // no mode toggle; it is offered only when the service HasRestore.
 type restoreForm struct {
+	dialogLayout
+
 	ctx     context.Context //nolint:containedctx // the mutation command needs the Run context; mirrors the browser
 	mutator data.Mutator
 	service string
@@ -60,13 +63,43 @@ func (d *restoreForm) rebuildForm() tea.Cmd {
 		WithShowHelp(false).
 		WithShowErrors(true)
 
-	return d.form.Init()
+	// Init the (re)built form, then cap its body to the known terminal size so a
+	// retry after an error never renders at full natural height off-screen.
+	return tea.Batch(d.form.Init(), d.syncFormSize())
+}
+
+// syncFormSize re-caps the embedded form's scrollable body to the current
+// terminal size and footer (see the entry form for the full rationale).
+func (d *restoreForm) syncFormSize() tea.Cmd {
+	if d.form == nil || !d.sized() {
+		return nil
+	}
+
+	form, cmd := d.form.Update(tea.WindowSizeMsg{Width: dialogContentWidth, Height: d.formBodyHeight()})
+	if f, ok := form.(*huh.Form); ok {
+		d.form = f
+	}
+
+	return cmd
+}
+
+// formBodyHeight is the height budget for the form body: the frame's inner
+// height less the title, its blank spacer, and the footer (any active error plus
+// the hint).
+func (d *restoreForm) formBodyHeight() int {
+	around := lipgloss.Height(d.header()) + titleSpacerRows + lipgloss.Height(d.footer())
+
+	return max(d.availHeight()-around, minFormBody)
 }
 
 func (d *restoreForm) Busy() bool { return d.busy }
 
 func (d *restoreForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		d.setSize(msg)
+
+		return d, d.syncFormSize()
 	case mutationResultMsg:
 		return d.onResult(msg)
 	case tea.KeyPressMsg:
@@ -121,7 +154,7 @@ func (d *restoreForm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 func (d *restoreForm) View() string {
 	var b strings.Builder
 
-	b.WriteString(d.styles.PaneTitle.Render("Restore secret"))
+	b.WriteString(d.header())
 	b.WriteString("\n\n")
 
 	if d.busy {
@@ -132,13 +165,30 @@ func (d *restoreForm) View() string {
 
 	b.WriteString(d.form.View())
 	b.WriteString("\n")
-
-	if d.err != "" {
-		b.WriteString(d.styles.ErrorText.Render(d.err))
-		b.WriteString("\n")
-	}
-
-	b.WriteString(d.styles.PageHint.Render("enter: restore · esc: cancel"))
+	b.WriteString(d.footer())
 
 	return b.String()
+}
+
+// header renders the dialog title.
+func (d *restoreForm) header() string {
+	return d.fit(d.styles.PaneTitle.Render("Restore secret"))
+}
+
+// footer renders the pinned rows below the form: any active error (wrapped to the
+// dialog width and capped so the form keeps at least minFormBody rows) then the
+// key hint.
+func (d *restoreForm) footer() string {
+	parts := make([]string, 0, 2) //nolint:mnd // at most error + hint
+
+	hint := d.styles.PageHint.Render("enter: restore · esc: cancel")
+
+	if d.err != "" {
+		budget := d.errBudget(lipgloss.Height(d.header()) + titleSpacerRows + minFormBody + lipgloss.Height(hint))
+		parts = append(parts, d.wrapCapped(d.styles.ErrorText.Render(d.err), budget))
+	}
+
+	parts = append(parts, hint)
+
+	return strings.Join(parts, "\n")
 }

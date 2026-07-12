@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	huh "charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 	"golang.org/x/term"
 
 	"github.com/mpyw/suve/internal/capability"
@@ -19,8 +20,18 @@ import (
 
 // dialogContentWidth is the fixed inner width every dialog's huh form lays out
 // to, so the modal size (and its goldens) stay deterministic regardless of
-// terminal width.
+// terminal width. It fits the minimum supported 60-column terminal (60 −
+// dialogChrome = 56 ≥ 54).
 const dialogContentWidth = 54
+
+// minFormBody floors the embedded form's scrollable body height so a very short
+// terminal still shows at least a field or two (the rest scrolls into view)
+// rather than collapsing the form to nothing.
+const minFormBody = 3
+
+// titleSpacerRows is the blank line the form dialogs draw between the title and
+// the form body; it is reserved when budgeting the body's scrollable height.
+const titleSpacerRows = 1
 
 // isTTY reports whether the process is attached to a terminal, gating the
 // $EDITOR handoff (which suspends the program to run an editor). It is a package
@@ -46,6 +57,8 @@ var ctrlEKey = key.NewBinding(key.WithKeys("ctrl+e"))
 // namespace, value, description, mode) as a model and adds a $EDITOR handoff on
 // the value field.
 type entryForm struct {
+	dialogLayout
+
 	ctx     context.Context //nolint:containedctx // the mutation command needs the Run context; mirrors the browser
 	mutator data.Mutator
 	svcCap  capability.ServiceCapability
@@ -203,7 +216,40 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 		WithShowHelp(false).
 		WithShowErrors(true)
 
-	return d.form.Init()
+	// Init the (re)built form, then immediately cap its body to the known
+	// terminal size so a retry after an error — or the initial build once the
+	// size has been seeded — never renders at full natural height off-screen.
+	return tea.Batch(d.form.Init(), d.syncFormSize())
+}
+
+// syncFormSize re-caps the embedded form's scrollable body to the current
+// terminal size and footer. It forwards a height-reduced WindowSizeMsg so huh
+// caps the group at min(naturalHeight, budget): a form that fits renders whole,
+// a taller one scrolls with the focused field kept in view, so the submit
+// control and the pinned hint never clip off the bottom at the minimum size. It
+// returns any redraw command the resize produces, and is a no-op (nil) until the
+// form exists and a WindowSizeMsg has arrived.
+func (d *entryForm) syncFormSize() tea.Cmd {
+	if d.form == nil || !d.sized() {
+		return nil
+	}
+
+	form, cmd := d.form.Update(tea.WindowSizeMsg{Width: dialogContentWidth, Height: d.formBodyHeight()})
+	if f, ok := form.(*huh.Form); ok {
+		d.form = f
+	}
+
+	return cmd
+}
+
+// formBodyHeight is the height budget the embedded form's scrollable body gets:
+// the frame's inner height less the fixed rows this View pins around the form
+// (the title and its blank spacer above, the footer — any active error/notice
+// plus the hint — below).
+func (d *entryForm) formBodyHeight() int {
+	around := lipgloss.Height(d.header()) + titleSpacerRows + lipgloss.Height(d.footer())
+
+	return max(d.availHeight()-around, minFormBody)
 }
 
 // namespaceField builds the App Configuration namespace field. On CREATE it is an
@@ -224,6 +270,10 @@ func (d *entryForm) Busy() bool { return d.busy }
 
 func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		d.setSize(msg)
+
+		return d, d.syncFormSize()
 	case mutationResultMsg:
 		return d.onResult(msg)
 	case editorFinishedMsg:
@@ -327,7 +377,7 @@ func (d *entryForm) openEditor() tea.Cmd {
 	if !isTTY() {
 		d.notice = "editor needs a TTY."
 
-		return nil
+		return d.syncFormSize()
 	}
 
 	buffer := d.value
@@ -336,7 +386,7 @@ func (d *entryForm) openEditor() tea.Cmd {
 	if err != nil {
 		d.notice = "could not open editor: " + err.Error()
 
-		return nil
+		return d.syncFormSize()
 	}
 
 	name := tmp.Name()
@@ -346,7 +396,7 @@ func (d *entryForm) openEditor() tea.Cmd {
 		_ = os.Remove(name)
 		d.notice = "could not open editor: " + err.Error()
 
-		return nil
+		return d.syncFormSize()
 	}
 
 	_ = tmp.Close()
@@ -374,7 +424,7 @@ func (d *entryForm) onEditorFinished(msg editorFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		d.notice = "editor error: " + msg.err.Error()
 
-		return d, nil
+		return d, d.syncFormSize()
 	}
 
 	// Most editors auto-append a trailing newline; normalize it away with the same
@@ -387,7 +437,7 @@ func (d *entryForm) onEditorFinished(msg editorFinishedMsg) (Model, tea.Cmd) {
 	if content == d.value {
 		d.notice = "No changes made."
 
-		return d, nil
+		return d, d.syncFormSize()
 	}
 
 	d.value = content
@@ -399,14 +449,9 @@ func (d *entryForm) onEditorFinished(msg editorFinishedMsg) (Model, tea.Cmd) {
 }
 
 func (d *entryForm) View() string {
-	title := "Edit " + d.name
-	if !d.edit {
-		title = "New " + entryNoun(d.svcCap)
-	}
-
 	var b strings.Builder
 
-	b.WriteString(d.styles.PaneTitle.Render(title))
+	b.WriteString(d.header())
 	b.WriteString("\n\n")
 
 	if d.busy {
@@ -417,20 +462,51 @@ func (d *entryForm) View() string {
 
 	b.WriteString(d.form.View())
 	b.WriteString("\n")
+	b.WriteString(d.footer())
+
+	return b.String()
+}
+
+// header renders the dialog title, wrapped to the dialog width so a long edited
+// entry name does not overflow the box (its height is budgeted into the form
+// body so the whole dialog stays on-screen).
+func (d *entryForm) header() string {
+	title := "Edit " + d.name
+	if !d.edit {
+		title = "New " + entryNoun(d.svcCap)
+	}
+
+	return d.fit(d.styles.PaneTitle.Render(title))
+}
+
+// footer renders the pinned rows below the form: any active error and notice
+// (each wrapped to the dialog width so a long provider error/notice stays inside
+// the box), then the key hint. The error and notice are each capped to the rows
+// that remain after the form's minimum body, so even a pathological error or
+// notice scrolls the form rather than pushing the hint off the bottom.
+func (d *entryForm) footer() string {
+	parts := make([]string, 0, 3) //nolint:mnd // at most error + notice + hint
+
+	hint := d.styles.PageHint.Render(entryHint(d.valueFieldFocused()))
+	// Reserve the frame around the footer (title, spacer, the form's minimum body,
+	// the hint); the error then the notice each take what remains, so the form
+	// body never drops below minFormBody and the whole dialog fits.
+	reserved := lipgloss.Height(d.header()) + titleSpacerRows + minFormBody + lipgloss.Height(hint)
 
 	if d.err != "" {
-		b.WriteString(d.styles.ErrorText.Render(d.err))
-		b.WriteString("\n")
+		line := d.wrapCapped(d.styles.ErrorText.Render(d.err), d.errBudget(reserved))
+		parts = append(parts, line)
+		reserved += lipgloss.Height(line)
 	}
 
 	if d.notice != "" {
-		b.WriteString(d.styles.Banner.Render(d.notice))
-		b.WriteString("\n")
+		line := d.wrapCapped(d.styles.Banner.Render(d.notice), d.errBudget(reserved))
+		parts = append(parts, line)
 	}
 
-	b.WriteString(d.styles.PageHint.Render(entryHint(d.valueFieldFocused())))
+	parts = append(parts, hint)
 
-	return b.String()
+	return strings.Join(parts, "\n")
 }
 
 // entryHint is the bottom hint line, adding the ctrl+e affordance while the
