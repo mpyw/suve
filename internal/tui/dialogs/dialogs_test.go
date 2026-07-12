@@ -475,6 +475,40 @@ func TestEntryForm_ResultVoicing(t *testing.T) {
 	assert.Contains(t, entryStatus(true, true, data.WriteOutcome{Unstaged: true}), "auto-unstaged")
 	assert.Equal(t, "Staged update.", entryStatus(true, true, data.WriteOutcome{}))
 	assert.Equal(t, "Applied create.", entryStatus(false, false, data.WriteOutcome{}))
+	// #691: an immediate create that upserted onto an existing entry voices an
+	// update, matching the GUI/CLI create-or-update semantics.
+	assert.Equal(t, "Applied update.", entryStatus(false, false, data.WriteOutcome{Updated: true}))
+}
+
+// TestEntryForm_ImmediateCreateUpsertVoicesUpdate pins the #691 fix at the dialog
+// layer: when an immediate param create upserts onto an existing entry, the
+// mutator reports WriteOutcome{Updated: true}; the dialog must voice "Applied
+// update." (never surface the raw already-exists error) and emit MutationDoneMsg.
+func TestEntryForm_ImmediateCreateUpsertVoicesUpdate(t *testing.T) {
+	t.Parallel()
+
+	d, mut := newEntry(t, awsParamCap(), false)
+	d.name = "/app/EXISTS"
+	d.value = "new"
+	d.staged = false
+	// The data layer upserted onto an existing param: create fell back to update.
+	mut.outcome = data.WriteOutcome{Updated: true}
+
+	// Run the create submit and feed its result back through Update (the real loop).
+	cmd := d.submit()
+	require.NotNil(t, cmd)
+
+	m, done := d.Update(cmd())
+
+	dd, ok := m.(*entryForm)
+	require.True(t, ok)
+	assert.True(t, mut.createCalled, "an immediate create routes through Create")
+	assert.False(t, mut.staged, "the write is immediate")
+	assert.Empty(t, dd.err, "no raw already-exists error is surfaced")
+
+	msg, ok := done().(MutationDoneMsg)
+	require.True(t, ok, "a successful upsert emits MutationDoneMsg")
+	assert.Equal(t, "Applied update.", msg.Status, "an upsert voices an update, not a create")
 }
 
 // TestDeleteConfirm_ForceRecoveryGating pins that force/recovery rows appear only

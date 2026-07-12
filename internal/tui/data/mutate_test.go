@@ -359,3 +359,59 @@ func TestParamMutator_ImmediateRouting(t *testing.T) {
 	_, err = st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/NEW"})
 	require.ErrorIs(t, err, staging.ErrNotStaged)
 }
+
+// TestParamMutator_ImmediateCreateUpserts pins the #691 fix: an immediate param
+// create is a create-or-update (upsert), matching the GUI (ParamSet) and the CLI
+// (`param set`). Creating over an EXISTING param no longer surfaces the raw
+// provider.ErrAlreadyExists — it falls back to update and reports the outcome as
+// an update so the dialog voices it. A create error that is NOT already-exists is
+// still surfaced unchanged (never silently swallowed as an upsert).
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv (newParamMutator)
+func TestParamMutator_ImmediateCreateUpserts(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("create over an existing param falls back to update", func(t *testing.T) {
+		var createTried, put bool
+
+		provStore := &providermock.Store{
+			CreateFunc: func(context.Context, string, string, domain.ValueType, string, ...provider.WriteOption) (domain.Version, error) {
+				createTried = true
+
+				return domain.Version{}, provider.ErrAlreadyExists
+			},
+			// UpdateUseCase reads the entry before writing; report it as present.
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Name: existingParamName, Value: "old", Type: domain.ValueTypePlaintext}, nil
+			},
+			PutFunc: func(context.Context, string, string, domain.ValueType, string, ...provider.WriteOption) (domain.Version, error) {
+				put = true
+
+				return domain.Version{ID: "2"}, nil
+			},
+		}
+
+		mut, _ := newParamMutator(t, provStore)
+
+		out, err := mut.Create(ctx, data.StagedKey{Name: existingParamName}, "new", "String", "", false)
+		require.NoError(t, err, "immediate create over an existing param upserts instead of raising already-exists")
+		assert.True(t, createTried, "create is attempted first")
+		assert.True(t, put, "the already-exists create falls back to update (Put)")
+		assert.True(t, out.Updated, "the outcome reports an update so the dialog voices it")
+	})
+
+	t.Run("a non-already-exists create error is surfaced unchanged", func(t *testing.T) {
+		sentinel := errors.New("provider exploded")
+
+		provStore := &providermock.Store{
+			CreateFunc: func(context.Context, string, string, domain.ValueType, string, ...provider.WriteOption) (domain.Version, error) {
+				return domain.Version{}, sentinel
+			},
+		}
+
+		mut, _ := newParamMutator(t, provStore)
+
+		_, err := mut.Create(ctx, data.StagedKey{Name: "/app/NEW"}, "v", "String", "", false)
+		require.ErrorIs(t, err, sentinel, "a non-already-exists error is returned, not treated as an upsert")
+	})
+}
