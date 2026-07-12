@@ -37,6 +37,10 @@ export GOOGLE_CLOUD_PROJECT=my-project
 suve gcloud secret list
 ```
 
+## TUI
+
+Launch the terminal UI with `suve gcloud --tui` (or bare `suve --tui` when Google Cloud is the only active provider). It consumes the same project scope as the CLI — `--project` or `GOOGLE_CLOUD_PROJECT` — and offers the Secret tab (Google Cloud has no param service). See [TUI mode](../README.md#tui-mode) for the keymap.
+
 ## Version Specification
 
 Google Cloud secrets are integer-versioned. The version spec is:

@@ -45,6 +45,10 @@ export AZURE_KEYVAULT_NAME=my-vault
 suve azure secret list
 ```
 
+## TUI
+
+Launch the terminal UI with `suve azure --tui` (or bare `suve --tui` when Azure is the only active provider). It consumes the same scope as the CLI: `--vault-name` / `AZURE_KEYVAULT_NAME` for the Key Vault (Secret) tab and `--store-name` / `AZURE_APPCONFIG_NAME` (plus `--namespace` / `AZURE_APPCONFIG_NAMESPACE`) for the App Configuration (Param) tab. Each tab appears only when its store name is set — set either or both. `suve azure secret --tui` preselects Key Vault, `suve azure param --tui` preselects App Configuration. See [TUI mode](../README.md#tui-mode) for the keymap.
+
 ---
 
 # suve azure secret (Key Vault)
