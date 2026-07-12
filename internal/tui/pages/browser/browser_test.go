@@ -381,6 +381,7 @@ func TestOpenEditNoDetailGuard(t *testing.T) {
 	assert.True(t, form.Edit, "the request is an edit")
 	assert.Equal(t, "/app/x", form.Name)
 	assert.Equal(t, "v1", form.Value, "the edit form is seeded from the loaded detail")
+	assert.False(t, form.StagedOnly, "a browser edit keeps the immediate-mode toggle (not a staged-only surface)")
 }
 
 // TestOpenTagHasTagsGate pins the tag dialog is offered only for a service with
@@ -402,6 +403,7 @@ func TestOpenTagHasTagsGate(t *testing.T) {
 	open, ok := cmd().(nav.OpenTag)
 	require.True(t, ok, "tag emits nav.OpenTag")
 	assert.Equal(t, "/x", open.Name)
+	assert.False(t, open.StagedOnly, "a browser tag keeps the immediate-mode toggle (not a staged-only surface)")
 }
 
 // TestOpenRestoreHasRestoreGate pins the restore dialog is offered only for a
