@@ -119,8 +119,13 @@ type Model struct {
 	// edit/delete/tag affordances are dead-end transitions on such an entry (the
 	// reducer rejects them), so they are gated on this set (#692).
 	deleteStagedKeys map[data.StagedKey]struct{}
-	loading          bool
-	spinner          spinner.Model
+	// entryStagedKeys and tagStagedKeys split stagedKeys by change kind (value/entry
+	// vs tag), so the detail banner distinguishes value-only / tag-only / both,
+	// matching the GUI's StagingBanner (#701).
+	entryStagedKeys map[data.StagedKey]struct{}
+	tagStagedKeys   map[data.StagedKey]struct{}
+	loading         bool
+	spinner         spinner.Model
 
 	// Detail state.
 	valuePane       components.ValuePane
@@ -203,6 +208,8 @@ func New(ctx context.Context, source data.Source, staging data.StagingProbe, st 
 		valuePane:        components.NewValuePane(),
 		stagedKeys:       map[data.StagedKey]struct{}{},
 		deleteStagedKeys: map[data.StagedKey]struct{}{},
+		entryStagedKeys:  map[data.StagedKey]struct{}{},
+		tagStagedKeys:    map[data.StagedKey]struct{}{},
 		// Recursive listing defaults on (GUI parity): a param browser shows the whole
 		// subtree under a prefix by default. The toggle is only shown/effective for a
 		// non-namespaced param service; elsewhere the field is inert.

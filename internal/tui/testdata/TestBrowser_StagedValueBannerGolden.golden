@@ -1,26 +1,26 @@
 suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
  Param Secret Staging(1)
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-prefix: —   filter: —   values:off  ⟳
-cannot tag: staged for deletion — reset first
+prefix: —   filter: —   values:off  recursive:on  ⟳
 ╭────────────────────────────────────────────╮╭────────────────────────────────────────────────────────────────────────╮
-│entries (2)                                 ││prod/api/key                                                            │
-│▸ prod/api/key                      [staged]││⚠ staged value changes — S: staging                                     │
-│  prod/web/session                          ││                                                                        │
-│                                            ││Value   (x to reveal)                                                   │
-│                                            ││••••••••••••                                                            │
+│entries (3)                                 ││/app/api/DATABASE_URL                                                   │
+│▸ /app/api/DATABASE_URL             [staged]││⚠ staged value changes — S: staging                                     │
+│  /app/api/REDIS_URL                        ││                                                                        │
+│  /app/web/BASE_URL                         ││Value   (x to reveal)                                                   │
+│                                            ││••••••••••••••••••••••••                                                │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
-│                                            ││Version ID  a1b2c3d4-1111-2222-3333-444455556666                        │
-│                                            ││Created     2026-07-01 09:30:00                                         │
-│                                            ││ARN         arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:pr│
-│                                            ││Labels      AWSCURRENT                                                  │
-│                                            ││Tags        (none)                                                      │
+│                                            ││Version     14 (current)                                                │
+│                                            ││Type        SecureString                                                │
+│                                            ││Modified    2026-07-01 09:30:00                                         │
+│                                            ││Tags        env=prod · team=api                                         │
 │                                            ││                                                                        │
 │                                            ││History   enter: history · c: compare mode                              │
-│                                            ││▹ a1b2c3d4…  2026-07-01  current  [AWSCURRENT]                          │
-│                                            ││  e5f6a7b8…  2026-06-24  [AWSPREVIOUS]                                  │
+│                                            ││▹ #14  2026-07-01  current                                              │
+│                                            ││  #13  2026-06-24                                                       │
+│                                            ││  #12  2026-06-02                                                       │
+│                                            ││                                                                        │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
