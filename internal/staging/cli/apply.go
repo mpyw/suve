@@ -142,7 +142,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Output entry results in sorted order
-	for _, name := range maputil.SortedNames(result.EntryResults, func(e stagingusecase.ApplyEntryResult) string { return e.Name }) {
+	for name := range maputil.SortedNames(result.EntryResults, func(e stagingusecase.ApplyEntryResult) string { return e.Name }) {
 		for _, entry := range result.EntryResults {
 			if entry.Name != name {
 				continue
@@ -175,7 +175,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	}
 
 	// Output tag results in sorted order
-	for _, name := range maputil.SortedNames(result.TagResults, func(e stagingusecase.ApplyTagResult) string { return e.Name }) {
+	for name := range maputil.SortedNames(result.TagResults, func(e stagingusecase.ApplyTagResult) string { return e.Name }) {
 		for _, tag := range result.TagResults {
 			if tag.Name != name {
 				continue

@@ -211,7 +211,7 @@ func findProfileByAccountID(accountID string) string {
 	}
 
 	// Search all profiles for a match (sorted for deterministic results)
-	for _, profile := range maputil.SortedKeys(profileAccounts) {
+	for profile := range maputil.SortedKeys(profileAccounts) {
 		if profileAccounts[profile] == accountID {
 			return profile
 		}

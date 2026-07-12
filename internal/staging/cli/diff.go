@@ -98,7 +98,7 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 	}
 
 	// Output tag entries
-	for _, name := range maputil.SortedNames(result.TagEntries, func(e stagingusecase.DiffTagEntry) string { return e.Name }) {
+	for name := range maputil.SortedNames(result.TagEntries, func(e stagingusecase.DiffTagEntry) string { return e.Name }) {
 		for _, tagEntry := range result.TagEntries {
 			if tagEntry.Name != name {
 				continue
@@ -191,7 +191,7 @@ func (r *DiffRunner) OutputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 
 	if len(tagEntry.Add) > 0 {
 		tagPairs := make([]string, 0, len(tagEntry.Add))
-		for _, k := range maputil.SortedKeys(tagEntry.Add) {
+		for k := range maputil.SortedKeys(tagEntry.Add) {
 			tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, tagEntry.Add[k]))
 		}
 
@@ -200,7 +200,7 @@ func (r *DiffRunner) OutputTagEntry(tagEntry stagingusecase.DiffTagEntry) {
 
 	if len(tagEntry.Remove) > 0 {
 		tagPairs := make([]string, 0, len(tagEntry.Remove))
-		for _, k := range maputil.SortedKeys(tagEntry.Remove) {
+		for k := range maputil.SortedKeys(tagEntry.Remove) {
 			if v := tagEntry.Remove[k]; v != "" {
 				tagPairs = append(tagPairs, fmt.Sprintf("%s=%s", k, v))
 			} else {
