@@ -59,8 +59,13 @@ func (m *Model) View(width, height int) string {
 		head = append(head, m.noticeLine(width))
 	}
 
+	// Reserve the last page row for the row-action hint so the page-local
+	// bindings (e/u/t/x/enter/v, apply/reset) are discoverable — they are not in
+	// the global keys.Map the help bar renders (#655).
+	footer := m.hintLine(width)
+
 	bodyTop := len(head)
-	bodyH := max(height-bodyTop, 0)
+	bodyH := max(height-bodyTop-1, 0)
 	m.geom.bodyTop = bodyTop
 	m.geom.bodyRows = bodyH
 
@@ -70,7 +75,19 @@ func (m *Model) View(width, height int) string {
 	visible, visDescs := window(lines, descs, m.scroll, bodyH)
 	m.geom.lines = visDescs
 
-	return strings.Join(append(head, visible...), "\n")
+	out := append(head, visible...) //nolint:gocritic // head is a fresh slice; appending body then footer is intentional
+	out = append(out, footer)
+
+	return strings.Join(out, "\n")
+}
+
+// hintLine renders the bottom row-action hint: the per-row bindings plus
+// apply/reset. These are page-local (not in keys.Map), so the global help bar
+// never lists them; this line makes them discoverable (#655).
+func (m *Model) hintLine(width int) string {
+	const hint = "e edit · u unstage · t tags · x cancel-tag · enter detail · v view · a apply · r reset"
+
+	return m.styles.PageHint.Render(clip(hint, width))
 }
 
 // headerLine renders the fixed top line: the view toggle and the global

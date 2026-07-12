@@ -105,7 +105,15 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 		m.diffView = !m.diffView
 		m.reveal = false
 
-		return m, nil
+		// Toggling diff↔value rewrites every row's layout (diff spreads a value
+		// over ±lines; value packs it onto the header line). Bubble Tea's cell
+		// renderer would service that with a scroll-region optimization
+		// (ESC[…r + ESC[nS) whose result depends on the exact prior frame, so
+		// under a terminal that negotiates synchronized output differently (CI)
+		// the targeted cell writes land wrong and the staged values render
+		// empty. Force a full repaint so the toggle frame is
+		// environment-independent, exactly like the initial full paint.
+		return m, tea.ClearScreen
 	case key.Matches(msg, m.keys.Select):
 		return m, m.onEnter()
 	case key.Matches(msg, revealKey):

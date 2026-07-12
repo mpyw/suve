@@ -37,7 +37,6 @@ type resetDialog struct {
 
 	focus int
 	busy  bool
-	err   string
 }
 
 // ResetInput configures a reset dialog.
@@ -67,9 +66,11 @@ func (d *resetDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 		d.busy = false
 
 		if msg.err != nil {
-			d.err = msg.err.Error()
-
-			return d, nil
+			// A hard failure may still have reset earlier fan-out targets. Close and
+			// reload like a success (the app's onMutationDone), so those succeeded
+			// resets refresh their badges immediately, and voice the failure on the
+			// status line rather than leaving the dialog stuck open.
+			return d, doneCmd("", "Reset failed: "+msg.err.Error(), true)
 		}
 
 		return d, doneCmd("", resetSummary(msg.results), true)
@@ -142,11 +143,6 @@ func (d *resetDialog) View() string {
 	b.WriteString(d.resetRow(ctrlReset, d.styles.ErrorText.Render("[ Reset ]")) + "    " +
 		d.resetRow(ctrlResetCancel, "[ Cancel ]"))
 	b.WriteString("\n\n")
-
-	if d.err != "" {
-		b.WriteString(d.styles.ErrorText.Render(d.err) + "\n")
-	}
-
 	b.WriteString(d.styles.PageHint.Render("↑↓: move · enter: confirm · esc: cancel"))
 
 	return b.String()

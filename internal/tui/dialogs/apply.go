@@ -8,10 +8,22 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
+
+// dialogChrome is the column overhead the shell's dialog frame adds around the
+// content (a 1-cell rounded border plus 1 cell of horizontal padding on each
+// side); the results view caps its lines at width−dialogChrome so a long
+// conflict / unstage-error line wraps inside the box instead of clipping its
+// border.
+const dialogChrome = 4
+
+// minDialogContent floors the wrap width so a very narrow terminal still wraps
+// to something legible rather than one column.
+const minDialogContent = 24
 
 // applyControl identifies a focusable row in the apply confirmation.
 type applyControl int
@@ -56,6 +68,9 @@ type applyDialog struct {
 	results         []data.StagingApplyResult
 	err             string
 	title           string
+	// width is the terminal width (from the last WindowSizeMsg); the results view
+	// wraps its lines to width−dialogChrome so the box never overflows the screen.
+	width int
 }
 
 // ApplyInput configures an apply dialog.
@@ -91,6 +106,10 @@ func (d *applyDialog) Busy() bool { return d.phase == phaseBusy }
 
 func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		d.width = msg.Width
+
+		return d, nil
 	case applyResultsMsg:
 		d.phase = phaseResults
 		d.results = msg.results
@@ -105,6 +124,29 @@ func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return d, nil
+}
+
+// contentWidth is the inner width the results box may fill: the terminal width
+// less the shell's dialog frame, floored so a narrow terminal still wraps. Zero
+// (before the first WindowSizeMsg) means "don't wrap".
+func (d *applyDialog) contentWidth() int {
+	if d.width <= 0 {
+		return 0
+	}
+
+	return max(d.width-dialogChrome, minDialogContent)
+}
+
+// fit wraps one already-styled result line to the content width when it would
+// overflow, so a long conflict / unstage-error / error line stays inside the box
+// instead of pushing the border off-screen. Short lines pass through untouched
+// so the box keeps its natural width when nothing wraps.
+func (d *applyDialog) fit(line string) string {
+	if w := d.contentWidth(); w > 0 && lipgloss.Width(line) > w {
+		return lipgloss.NewStyle().Width(w).Render(line)
+	}
+
+	return line
 }
 
 func (d *applyDialog) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -232,7 +274,7 @@ func (d *applyDialog) resultsView() string {
 	b.WriteString("\n\n")
 
 	if d.err != "" {
-		b.WriteString(d.styles.ErrorText.Render(d.err) + "\n\n")
+		b.WriteString(d.fit(d.styles.ErrorText.Render(d.err)) + "\n\n")
 	}
 
 	for _, res := range d.results {
@@ -252,27 +294,27 @@ func (d *applyDialog) writeServiceResults(b *strings.Builder, res data.StagingAp
 	}
 
 	for _, e := range res.Entries {
-		b.WriteString(d.entryResultLine(e) + "\n")
+		b.WriteString(d.fit(d.entryResultLine(e)) + "\n")
 	}
 
 	for _, t := range res.Tags {
-		b.WriteString(d.tagResultLine(t) + "\n")
+		b.WriteString(d.fit(d.tagResultLine(t)) + "\n")
 	}
 
 	for _, c := range res.Conflicts {
-		b.WriteString(d.styles.Banner.Render("⚠ conflict: "+c+
-			" was modified remotely after staging — re-apply with \"Ignore conflicts\" to overwrite.") + "\n")
+		b.WriteString(d.fit(d.styles.Banner.Render("⚠ conflict: "+c+
+			" was modified remotely after staging — re-apply with \"Ignore conflicts\" to overwrite.")) + "\n")
 	}
 
 	for _, e := range res.Entries {
 		if e.UnstageError != "" {
-			b.WriteString(d.unstageWarn(entryLabel(e.Name, e.Namespace), e.UnstageError) + "\n")
+			b.WriteString(d.fit(d.unstageWarn(entryLabel(e.Name, e.Namespace), e.UnstageError)) + "\n")
 		}
 	}
 
 	for _, t := range res.Tags {
 		if t.UnstageError != "" {
-			b.WriteString(d.unstageWarn(entryLabel(t.Name, t.Namespace), t.UnstageError) + "\n")
+			b.WriteString(d.fit(d.unstageWarn(entryLabel(t.Name, t.Namespace), t.UnstageError)) + "\n")
 		}
 	}
 

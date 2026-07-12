@@ -26,11 +26,10 @@ type rowRef struct {
 	// entry is the staged entry (rowEntry only).
 	entry data.StagedDiffRow
 
-	// key identifies the item (all kinds); tagKey/tagValue name the tag change
-	// (rowTagAdd/rowTagRemove).
-	key      data.StagedKey
-	tagKey   string
-	tagValue string
+	// key identifies the item (all kinds); tagKey names the tag change the row's
+	// cancel action targets (rowTagAdd/rowTagRemove).
+	key    data.StagedKey
+	tagKey string
 }
 
 // rebuildRows flattens every section's entries and tag changes into the
@@ -53,13 +52,13 @@ func (m *Model) rebuildRows() {
 
 			for _, add := range t.Adds {
 				rows = append(rows, rowRef{
-					section: i, kind: rowTagAdd, key: key, tagKey: add.Key, tagValue: add.Value,
+					section: i, kind: rowTagAdd, key: key, tagKey: add.Key,
 				})
 			}
 
 			for _, rem := range t.Removes {
 				rows = append(rows, rowRef{
-					section: i, kind: rowTagRemove, key: key, tagKey: rem.Key, tagValue: rem.Value,
+					section: i, kind: rowTagRemove, key: key, tagKey: rem.Key,
 				})
 			}
 		}
