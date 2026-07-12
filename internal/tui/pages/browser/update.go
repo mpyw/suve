@@ -79,6 +79,14 @@ func (m *Model) onListLoaded(msg listLoadedMsg) tea.Cmd {
 
 	m.err = ""
 
+	// Preserve the selection by IDENTITY, not index. A replace can insert or
+	// remove rows above the selection, so capture the selected entry's key first
+	// and re-resolve it to its new index after the rows rebuild — otherwise the
+	// clamped index silently slides the detail onto a neighbor after a mutation
+	// reload (the GUI tracks selection by name; #699). On append the existing
+	// rows keep their indices, so the selection index is already correct.
+	prevKey, hadSelection := m.selectedKey()
+
 	if msg.append {
 		m.items = append(m.items, msg.res.Items...)
 	} else {
@@ -87,6 +95,10 @@ func (m *Model) onListLoaded(msg listLoadedMsg) tea.Cmd {
 
 	m.nextToken = msg.res.NextToken
 	m.rebuildRows()
+
+	if !msg.append && hadSelection {
+		m.reselect(prevKey)
+	}
 
 	return m.selectionCmd()
 }
@@ -479,9 +491,14 @@ func (m *Model) openDiff() tea.Cmd {
 	return func() tea.Msg { return req }
 }
 
-// loadMore appends the next secret page when a NextToken is present.
+// loadMore appends the next secret page when a NextToken is present. It is a
+// no-op while a list fetch is already in flight: m.loading is set by loadListCmd
+// for BOTH a full reload and a previous append, so a single guard mirrors the
+// GUI's `loading || loadingMore` check and stops a hammered `L` from splicing a
+// duplicate or stale page (#700). The stale-seq guard in onListLoaded is the
+// backstop; this keeps a superseded append from ever being issued.
 func (m *Model) loadMore() tea.Cmd {
-	if m.nextToken == "" {
+	if m.nextToken == "" || m.loading {
 		return nil
 	}
 

@@ -1,7 +1,8 @@
 // Package staging implements the TUI's staging review page: per-service sections
 // listing staged entries (as Remote-vs-Staged diffs or raw staged values) and
-// independent staged tag changes, with unstage / edit-staged / cancel-tag row
-// actions and the apply and reset flows. It completes the TUI's stage → review →
+// independent staged tag changes, with unstage (`u`, the single removal
+// affordance for both entries and tag changes) / edit-staged row actions and the
+// apply and reset flows. It completes the TUI's stage → review →
 // apply loop. Only the services the launched scope offers get a section; every
 // staged read is a tea.Cmd guarded by a monotonic sequence (the browser's
 // loadSeq pattern), and a staging read failure degrades to a per-section error
@@ -27,7 +28,7 @@ const serviceSecret = "secret"
 //nolint:gochecknoglobals // immutable page-local bindings
 var (
 	viewKey     = key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "view"))
-	revealKey   = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal/cancel-tag"))
+	revealKey   = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal"))
 	resetKey    = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reset"))
 	unstageKey  = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "unstage"))
 	editKey     = key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit"))
@@ -86,6 +87,11 @@ type Model struct {
 	reveal bool
 	// noticeDismissed hides the auto-unstaged notice until the next load.
 	noticeDismissed bool
+	// status is a transient one-line message shown in the footer for an invalid
+	// action on the selected row (e.g. tagging a delete-staged entry, #684). It is
+	// cleared on the next interaction (key or mouse) and on every reload, so it can
+	// never outlive the row it referred to.
+	status string
 
 	// rows is the flattened list of selectable rows (entries + tag changes across
 	// all sections), rebuilt on every load; selected indexes into it.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
@@ -26,6 +27,11 @@ type AddInput struct {
 	Key         staging.EntryKey
 	Value       string
 	Description string
+	// ValueType is the provider-neutral value type for the staged create. It is
+	// only meaningful on the AWS SSM Parameter Store axis (String / SecureString /
+	// StringList); other providers leave it empty. An empty value applies as
+	// plaintext, so callers that do not set it keep the prior behavior.
+	ValueType domain.ValueType
 }
 
 // AddOutput holds the result of the add use case.
@@ -71,6 +77,21 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 
 	key := staging.EntryKey{Name: name, Namespace: input.Key.Namespace}
 
+	// Resolve the staged value type. When the caller specifies none, preserve a
+	// previously staged type so re-staging the create (e.g. re-editing the draft
+	// without --secure) never silently downgrades a SecureString to plain String.
+	valueType := input.ValueType
+	if valueType == "" {
+		existing, gerr := u.Store.GetEntry(ctx, service, key)
+
+		switch {
+		case gerr == nil:
+			valueType = existing.ValueType
+		case !errors.Is(gerr, staging.ErrNotStaged):
+			return nil, gerr
+		}
+	}
+
 	// Load current state with AWS existence check
 	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
 	if err != nil {
@@ -80,7 +101,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
 
-	opts := &transition.EntryExecuteOptions{}
+	opts := &transition.EntryExecuteOptions{ValueType: valueType}
 	if input.Description != "" {
 		opts.Description = &input.Description
 	}

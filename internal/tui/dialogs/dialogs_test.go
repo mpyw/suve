@@ -143,6 +143,69 @@ func TestEntryForm_StagedByDefault(t *testing.T) {
 	assert.False(t, immediate.staged, "without staging the write is always immediate")
 }
 
+// TestEntryForm_StagedOnlyHidesModeToggle pins the #679 fix: a dialog launched
+// from a staged-only surface (the staging review page) hides the Stage/Apply-
+// immediately mode toggle and forces a staged write, so the review screen offers
+// no immediate-write escape hatch that would bypass the staging store. A default
+// (browser) launch still shows the toggle.
+func TestEntryForm_StagedOnlyHidesModeToggle(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+
+	browser, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		Edit: true, Name: "/app/X", Value: "old",
+	})
+	b, ok := browser.(*entryForm)
+	require.True(t, ok)
+	assert.True(t, b.staged, "browser launch defaults to staged")
+	assert.Contains(t, b.View(), "Apply immediately", "browser launch keeps the mode toggle")
+
+	staged, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		Edit: true, Name: "/app/X", Value: "old", StagedOnly: true,
+	})
+	s, ok := staged.(*entryForm)
+	require.True(t, ok)
+	assert.True(t, s.staged, "a staged-only launch forces staged")
+	assert.NotContains(t, s.View(), "Apply immediately", "a staged-only launch hides the mode toggle")
+
+	// The forced-staged write still routes through the staging path.
+	execCmd(t, s.submit())
+	assert.True(t, mut.staged, "a staged-only submit writes staged, never immediate")
+}
+
+// TestTagForm_StagedOnlyHidesModeToggle pins the #679 fix for the tag dialog: a
+// staged-only launch hides the mode toggle and forces a staged tag write; a
+// browser launch keeps the toggle.
+func TestTagForm_StagedOnlyHidesModeToggle(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+
+	browser, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+	})
+	b, ok := browser.(*tagForm)
+	require.True(t, ok)
+	assert.True(t, b.staged, "browser launch defaults to staged")
+	assert.Contains(t, b.View(), "Apply immediately", "browser launch keeps the mode toggle")
+
+	staged, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		Name: "/app/X", StagedOnly: true,
+	})
+	s, ok := staged.(*tagForm)
+	require.True(t, ok)
+	assert.True(t, s.staged, "a staged-only launch forces staged")
+	assert.NotContains(t, s.View(), "Apply immediately", "a staged-only launch hides the mode toggle")
+
+	s.tagKey = "owner"
+	execCmd(t, s.submit())
+	assert.True(t, mut.staged, "a staged-only submit writes staged, never immediate")
+}
+
 // newAppConfigEntry builds an App Configuration (namespaced) create/edit form
 // seeded with a namespace, for the namespace read-only assertions.
 func newAppConfigEntry(t *testing.T, edit bool, namespace string) *entryForm {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 )
@@ -23,8 +24,9 @@ func NewExecutor(store store.ReadWriteOperator) *Executor {
 
 // EntryExecuteOptions holds optional metadata for entry execution.
 type EntryExecuteOptions struct {
-	BaseModifiedAt *time.Time // Base modification time for conflict detection
-	Description    *string    // Optional description for the staged entry
+	BaseModifiedAt *time.Time       // Base modification time for conflict detection
+	Description    *string          // Optional description for the staged entry
+	ValueType      domain.ValueType // Provider-neutral value type (AWS param axis); empty means unset
 }
 
 // ExecuteEntry executes an entry action and persists the result.
@@ -106,8 +108,11 @@ func (e *Executor) persistEntryState(
 			Value:     lo.ToPtr(s.DraftValue),
 			StagedAt:  time.Now(),
 		}
-		if opts != nil && opts.Description != nil {
-			entry.Description = opts.Description
+		if opts != nil {
+			entry.ValueType = opts.ValueType
+			if opts.Description != nil {
+				entry.Description = opts.Description
+			}
 		}
 
 		err = e.Store.StageEntry(ctx, service, key, entry)
@@ -120,6 +125,8 @@ func (e *Executor) persistEntryState(
 		}
 		if opts != nil {
 			entry.BaseModifiedAt = opts.BaseModifiedAt
+			entry.ValueType = opts.ValueType
+
 			if opts.Description != nil {
 				entry.Description = opts.Description
 			}

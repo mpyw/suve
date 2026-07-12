@@ -56,12 +56,18 @@ type OpenStagingDetail struct {
 // and seeds the value/type/description from the selected entry; create seeds only
 // the App Configuration namespace default (the concrete namespace being viewed).
 type OpenEntryForm struct {
-	Service     string
-	Edit        bool
-	Name        string
-	Namespace   string
-	Value       string
-	TypeLabel   string
+	Service   string
+	Edit      bool
+	Name      string
+	Namespace string
+	Value     string
+	TypeLabel string
+	// StagedOnly launches the dialog in a staged-only context (the staging review
+	// page): the Stage/Apply-immediately mode toggle is hidden and the write is
+	// forced staged. An immediate write from a staged surface would bypass the
+	// staging store, orphaning the staged draft it was launched from — matching the
+	// GUI's dedicated StagingEdit/StagingAddTag calls, which offer no immediate mode.
+	StagedOnly  bool
 	Description string
 }
 
@@ -78,6 +84,13 @@ type OpenTag struct {
 	Service   string
 	Name      string
 	Namespace string
+	// StagedOnly launches the tag dialog in a staged-only context (the staging
+	// review page): the mode toggle is hidden and the tag write is forced staged.
+	// An immediate tag write from a staged surface can silently revert on a later
+	// apply (providers whose tag writes don't advance LastModified escape conflict
+	// detection), so a staged surface must never offer it — matching the GUI's
+	// StagingAddTag call.
+	StagedOnly bool
 }
 
 // OpenRestore asks the app to open the restore dialog (a name input) for a

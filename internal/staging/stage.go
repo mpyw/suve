@@ -12,6 +12,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
 )
 
@@ -83,6 +84,16 @@ type Entry struct {
 	Operation   Operation `json:"operation"`
 	Value       *string   `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
 	Description *string   `json:"description,omitempty"`
+	// ValueType classifies the staged value in the provider-neutral domain model.
+	// It only matters on the AWS SSM Parameter Store axis (String / SecureString /
+	// StringList); every other provider's staging path ignores it. An empty value
+	// means "unset": the apply path treats it as ValueTypePlaintext for create, and
+	// as "preserve the existing type" for update. Older on-disk entries written
+	// before this field existed decode as empty, preserving the prior plaintext
+	// behavior. Optional and additive so the working-store schema stays backward
+	// compatible (no version bump).
+	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
+	ValueType domain.ValueType `json:"value_type,omitempty"`
 	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	StagedAt time.Time `json:"staged_at"`
 	// BaseModifiedAt records the AWS LastModified time when the value was fetched.
