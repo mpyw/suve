@@ -14,9 +14,10 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// copyable is implemented by a page that supplies the `y`-copy value (and
-// reveals a masked value as a side effect, so a masked secret is never copied
-// silently). The app consults the active page for it.
+// copyable is implemented by a page that supplies the `y`-copy value. Copying
+// never changes the pane's mask state — a masked secret is copied to the
+// clipboard but stays masked on screen (#689). The app consults the active page
+// for it.
 type copyable interface {
 	CopyText() (string, bool)
 }

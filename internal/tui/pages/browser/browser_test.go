@@ -365,10 +365,12 @@ func TestMaskToggle(t *testing.T) {
 	assert.True(t, m.valuePane.Masked(), "x re-masks")
 }
 
-// TestCopyRevealsThenCopies pins that a copy reveals a masked secret first (so it
-// is never copied while masked) and returns the value, and that an empty/absent
-// value is not copyable (which would otherwise clear the clipboard).
-func TestCopyRevealsThenCopies(t *testing.T) {
+// TestCopyDoesNotUnmask pins #689: copying a masked secret returns the real
+// value for the clipboard WITHOUT unmasking the on-screen pane (the mask stays
+// put, so a copy never becomes a standing disclosure), and it leaves a transient
+// "value stays masked" status. An empty/absent value is not copyable (which
+// would otherwise clear the clipboard).
+func TestCopyDoesNotUnmask(t *testing.T) {
 	t.Parallel()
 
 	src := &stubSource{svcCap: awsParamCap()}
@@ -385,7 +387,83 @@ func TestCopyRevealsThenCopies(t *testing.T) {
 	text, ok := m.CopyText()
 	require.True(t, ok)
 	assert.Equal(t, "s3cr3t", text, "copy returns the real value")
-	assert.False(t, m.valuePane.Masked(), "copy reveals first — never copies while masked")
+	assert.True(t, m.valuePane.Masked(), "copy must NOT unmask — the on-screen value stays masked (#689)")
+	assert.Equal(t, "copied (value stays masked)", m.actionStatus, "a masked copy notes the value stays masked")
+
+	// A revealed value copies too, and reports a plain "copied" note.
+	m, _ = update(t, m, keyPress('x'))
+	require.False(t, m.valuePane.Masked(), "x reveals")
+
+	text, ok = m.CopyText()
+	require.True(t, ok)
+	assert.Equal(t, "s3cr3t", text)
+	assert.False(t, m.valuePane.Masked(), "a copy never changes the mask state either way")
+	assert.Equal(t, "copied", m.actionStatus)
+}
+
+// TestParseJSONToggleFormatsValue pins #690: the detail value pane's `J` toggle
+// pretty-prints a JSON value in the browser (parity with the diff page and the
+// GUI), and toggles back to the raw compact form. A masked secret gates the
+// toggle off (the pane requires reveal first).
+func TestParseJSONToggleFormatsValue(t *testing.T) {
+	t.Parallel()
+
+	const compact = `{"host":"db.internal","port":5432}`
+
+	// The pretty-printed form indents each member on its own line — the viewport
+	// pads lines to width, so assert on a single indented member line (present only
+	// when the value is formatted) rather than the whole multi-line block.
+	const indentedMember = `  "host": "db.internal"`
+
+	src := &stubSource{svcCap: awsParamCap()}
+	m := newModel(t, src)
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/cfg"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/cfg", Value: compact}})
+
+	m.valuePane.SetSize(80, 20)
+	require.Contains(t, m.valuePane.View(), compact, "a non-secret JSON value renders raw by default")
+	require.NotContains(t, m.valuePane.View(), indentedMember, "the raw form is not indented")
+
+	// `J` pretty-prints it.
+	m, _ = update(t, m, keyPress('J'))
+	m.valuePane.SetSize(80, 20)
+	assert.Contains(t, m.valuePane.View(), indentedMember, "J pretty-prints the JSON value onto indented lines")
+	assert.NotContains(t, m.valuePane.View(), compact, "the compact single-line form is gone once formatted")
+
+	// `J` again toggles back to the compact form.
+	m, _ = update(t, m, keyPress('J'))
+	m.valuePane.SetSize(80, 20)
+	assert.Contains(t, m.valuePane.View(), compact, "J toggles back to the raw value")
+	assert.NotContains(t, m.valuePane.View(), indentedMember, "the formatting is undone")
+}
+
+// TestParseJSONToggleGatedWhileMasked pins that `J` is a no-op while a secret is
+// masked (the pane requires reveal first, so a masked secret is never
+// normalized), and works once revealed.
+func TestParseJSONToggleGatedWhileMasked(t *testing.T) {
+	t.Parallel()
+
+	const compact = `{"token":"abc"}`
+
+	src := &stubSource{svcCap: awsParamCap()}
+	m := newModel(t, src)
+
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/s"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/s", Value: compact, Secret: true}})
+	require.True(t, m.valuePane.Masked(), "secret starts masked")
+
+	// J while masked does nothing — the pane stays masked (no format, no reveal).
+	m, _ = update(t, m, keyPress('J'))
+	m.valuePane.SetSize(80, 20)
+	assert.True(t, m.valuePane.Masked(), "J must not reveal a masked secret")
+	assert.NotContains(t, m.valuePane.View(), "token", "J must not format (or leak) a masked secret")
+
+	// Reveal, then J formats.
+	m, _ = update(t, m, keyPress('x'))
+	m, _ = update(t, m, keyPress('J'))
+	m.valuePane.SetSize(80, 20)
+	assert.Contains(t, m.valuePane.View(), `  "token": "abc"`, "once revealed, J formats the JSON onto indented lines")
 }
 
 // TestMouseClickSelectEqualsKeySelect pins the epic's mouse rule: a click on a

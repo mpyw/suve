@@ -70,6 +70,9 @@ func (m *Model) clickRow(row int) (*Model, tea.Cmd) {
 	}
 
 	m.selected = row
+	// A selection move resets the reveal so a peek never persists onto another row
+	// (mirrors moveSelection; the reveal is scoped to the selected row — #694).
+	m.reveal = false
 
 	return m, m.onEnter()
 }

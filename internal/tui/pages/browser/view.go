@@ -200,10 +200,14 @@ func (m *Model) renderDetail(innerW, innerH int) (string, int, int) {
 	return fitLines(lines, innerH), historyLocalTop, historyH
 }
 
-// valueLabelLine renders the "Value  (x to reveal)" label row.
+// valueLabelLine renders the "Value  (x to reveal)" / "(J to format)" label row.
 func (m *Model) valueLabelLine(width int) string {
 	label := m.styles.PaneTitle.Render("Value")
 	if hint := m.valuePane.HintSuffix(); hint != "" {
+		label += "   " + m.styles.PageHint.Render(hint)
+	}
+
+	if hint := m.valuePane.ParseJSONHint(); hint != "" {
 		label += "   " + m.styles.PageHint.Render(hint)
 	}
 

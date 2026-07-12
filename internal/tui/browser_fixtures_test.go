@@ -178,6 +178,42 @@ func awsParamSecureStringDiffSource() data.Source {
 	})
 }
 
+// awsParamJSONSource is a param source whose single entry holds a NON-SECRET
+// compact JSON value, so the browser detail value pane's parse-JSON toggle (`J`)
+// has something to pretty-print (#690). Plaintext (not a SecureString) so the
+// value is unmasked and `J` applies without a reveal first.
+func awsParamJSONSource() data.Source {
+	const value = `{"host":"db.internal","port":5432,"tls":true}`
+
+	store := &providermock.Store{
+		ListFunc: func(context.Context) ([]string, error) { return []string{"/app/web/CONFIG"}, nil },
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(specID(spec)), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			id := ref.ID()
+			if id == "" {
+				id = "3"
+			}
+
+			return &domain.Entry{
+				Name:     name,
+				Value:    value,
+				Type:     domain.ValueTypePlaintext,
+				Version:  domain.Version{ID: id, Created: &fxT1},
+				Modified: &fxT1,
+			}, nil
+		},
+		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
+			return []domain.Version{{ID: "3", Created: &fxT1}}, nil
+		},
+	}
+
+	return data.NewParamSource(capFor("aws", "param"), func(context.Context, string) (provider.Store, error) {
+		return store, nil
+	})
+}
+
 // ---------------------------------------------------------------------------
 // AWS secret (staging labels + ARN)
 // ---------------------------------------------------------------------------

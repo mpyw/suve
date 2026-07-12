@@ -311,6 +311,13 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		m.valuePane.ToggleMask()
 
 		return true, nil
+	case key.Matches(msg, parseJSONKey):
+		// Parse-JSON pretty-prints a JSON value in the detail pane (parity with the
+		// diff page's `J` and the GUI). It is a no-op while a secret is masked (the
+		// pane gates it behind reveal).
+		m.valuePane.ToggleParseJSON()
+
+		return true, nil
 	case key.Matches(msg, stagingKey):
 		return true, func() tea.Msg { return nav.OpenStaging{} }
 	case key.Matches(msg, compareKey):
@@ -626,19 +633,26 @@ func (m *Model) currentNamespace() string {
 // order, so a picked row index maps to its version.
 func (m *Model) currentHistoryVersions() []string { return m.historyVersions }
 
-// CopyText reveals the detail value pane (so a masked secret is not copied
-// silently) and returns the revealed value for the clipboard. The app calls this
-// for the global `y` copy; false means there is nothing to copy.
+// CopyText returns the detail value pane's raw value for the clipboard WITHOUT
+// changing its mask state: a `y` copy is a clipboard write, not a reveal, so the
+// on-screen mask stays put and a copied secret never becomes a standing on-screen
+// disclosure (#689). A transient status note reports the copy (and that a masked
+// value stayed masked). The app calls this for the global `y` copy; false means
+// there is nothing to copy.
 func (m *Model) CopyText() (string, bool) {
 	if !m.detailOK {
 		return "", false
 	}
 
-	m.valuePane.Reveal()
-
-	v := m.valuePane.RevealedValue()
+	v := m.valuePane.RawValue()
 	if v == "" {
 		return "", false
+	}
+
+	if m.valuePane.Masked() {
+		m.actionStatus = "copied (value stays masked)"
+	} else {
+		m.actionStatus = "copied"
 	}
 
 	return v, true
