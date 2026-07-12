@@ -4,243 +4,87 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI for multi-cloud secret and parameter management, covering AWS (Parameter Store + Secrets Manager), Google Cloud (Secret Manager), and Azure (Key Vault + App Configuration). It provides familiar Git-style commands (`show`, `log`, `diff`, `list`, `tag`) with version specification syntax (`#VERSION`, `~SHIFT`, `:LABEL`).
+**suve** (**S**ecret **U**nified **V**ersioning **E**xplorer) is a Git-like CLI (and Wails/Svelte GUI) for multi-cloud secret and parameter management across AWS (Parameter Store + Secrets Manager), Google Cloud (Secret Manager), and Azure (Key Vault + App Configuration). It offers Git-style commands (`show`, `log`, `diff`, `list`, `tag`, `untag`) with revision syntax (`#VERSION`, `~SHIFT`, `:LABEL`) and a staging workflow (`stage add|edit|delete|status|diff|apply|reset`, alias `stg`) for batched writes.
 
-### Core Concepts
+## Where things live
 
-1. **Git-like Commands**: Commands mirror Git behavior for familiarity
-   - `show` - Display value with metadata (like `git show`); use `--raw` for piping
-   - `log` - Version history (like `git log`)
-   - `diff` - Compare versions (like `git diff`)
-   - `list` - List parameters/secrets (aliased as `ls`)
-   - `tag` - Add or update tags on a resource
-   - `untag` - Remove tags from a resource
+- **Domain model** — `internal/domain`: the provider-neutral types (`Entry` with `Extra []Field`, `Version`, `Tag`, `ValueType`, `Field`) that every layer speaks.
+- **Provider seam** — `internal/provider`: the `Reader`/`Writer`/`Tagger`/`Store` interfaces, `Registry`, `Scope`, opaque `VersionRef`, and errors. Provider selection lives in `internal/provider/detect` (env-detected flat aliases) + `registry.go`.
+- **Provider adapters** — `internal/provider/{aws,gcloud,azure}`: each cloud's SDK-backed implementation. AWS client init sits at `internal/provider/aws/infra`.
+- **Use cases** — `internal/usecase/{param,secret,staging,gcloud,azure}`: business logic. `param`/`secret` are the neutral service-axis core (the GUI consumes them for every provider); `gcloud`/`azure` add provider-specific presentation.
+- **CLI commands** — `internal/cli/commands/{aws,gcloud,azure}` for provider groups plus the provider-neutral scaffold under `internal/cli/commands/generic` (show/diff/list/log/tag); wiring in `internal/cli/commands/app.go` and `internal/cli/commands/internal`.
+- **Staging** — `internal/staging`: the reducer-based transition state machine (`transition/`) over a keychain-encrypted file store (`store/file`, the only backend).
+- **Version parsers** — `internal/version/*` (`awsparamversion`, `awssecretversion`, `gcloudversion`, `azurekvversion`, `azureappconfigversion`) resolve version/shift/label per provider.
+- **GUI** — `internal/gui` (Wails app) + `internal/gui/frontend` (Svelte + Playwright).
 
-2. **Staging Commands**: Git-like staging workflow for batch operations
-   - `stage add` - Stage a new parameter/secret for creation
-   - `stage edit` - Stage modifications to existing resources
-   - `stage delete` - Stage resources for deletion
-   - `stage status` - Show staged changes
-   - `stage diff` - Show diff of staged changes vs AWS
-   - `stage apply` - Apply all staged changes to AWS
-   - `stage reset` - Unstage changes
+## Non-obvious invariants
 
-3. **Export / Import Commands**: Save/restore staging state to portable snapshot files
-   - `stage export <dir>` - Write every service with staged changes to `<dir>/param.json` + `<dir>/secret.json` (wholesale, never merges)
-   - `stage {param,secret} export <file>` - Write a single service to `<file>`
-   - `stage import <dir>` - Read `param.json` / `secret.json` from `<dir>` (missing skipped; nothing imported if both absent)
-   - `stage {param,secret} import <file>` - Read a single service from `<file>` (missing file or `service` mismatch = hard error)
-   - Each file is a plaintext JSON envelope `{version, provider, scope, service, payload}` whose `payload` is passphrase-encrypted (Argon2id) or plaintext when the passphrase is empty; the full scope is embedded and validated on import
-   - `export` flags: `--keep` (retain the working area; default clears it), `--yes`/`--force` (skip overwrite confirmation), `--passphrase-stdin`. NO `--merge`/`--overwrite`
-   - `import` flags: `--merge`/`--overwrite` (mutually exclusive; only used when the working area already has changes), `--yes`, `--passphrase-stdin`, `--allow-scope-mismatch` (override scope mismatch). NO `--keep`
+- **SDK confinement**: only `internal/provider/<cloud>/**` may import that cloud's SDK. Enforced by `internal/architecture_test.go` and the depguard linter (`.golangci.yaml`).
+- **Interface segregation**: `provider.Store = Reader + Writer + Tagger`. Versions are opaque `provider.VersionRef` values produced by an adapter and passed back to it — never parsed by callers.
+- **io.Writer everywhere**: commands write to an injected `io.Writer`, never directly to stdout, so output is testable.
+- **Staging store**: keychain-encrypted (zalando/go-keyring), scope-keyed under `~/.suve/staging/{scope.Key()}/` with per-service `param.json`/`secret.json`; `SUVE_STAGING_KEY` overrides the keychain data key (used in CI/tests).
+- **Export/import**: each snapshot is a plaintext JSON envelope `{version, provider, scope, service, payload}` whose `payload` is Argon2id-passphrase-encrypted (or plaintext when the passphrase is empty); the scope is embedded and validated on import. `export` flags: `--keep`, `--yes`/`--force`, `--passphrase-stdin` (no `--merge`/`--overwrite`). `import` flags: `--merge`/`--overwrite` (mutually exclusive), `--yes`, `--passphrase-stdin`, `--allow-scope-mismatch` (no `--keep`).
+- **Two naming axes**: provider axis (`aws`/`gcloud`/`azure`) × service axis (`param`/`secret`/`stage`). Service-axis names are shared by all providers and are never provider-marked; only the provider axis carries a marker. Flat `param`/`secret`/`stage` CLI commands are env-detected aliases that may resolve to any active provider.
 
-4. **Version Specification**: Git-like revision syntax
-   ```
-   # SSM Parameter Store
-   <name>[#VERSION][~SHIFT]*
-   where ~SHIFT = ~ | ~N  (repeatable, cumulative)
-
-   /my/param           # Latest
-   /my/param#3         # Version 3
-   /my/param~1         # 1 version ago (like HEAD~1)
-   /my/param#5~2       # Version 5, then 2 back = Version 3
-   /my/param~~         # 2 versions ago (same as ~1~1)
-
-   # Secrets Manager
-   <name>[#VERSION | :LABEL][~SHIFT]*
-   where ~SHIFT = ~ | ~N  (repeatable, cumulative)
-
-   my-secret              # Current version
-   my-secret#abc123       # Specific version ID
-   my-secret:AWSCURRENT   # Staging label
-   my-secret:AWSCURRENT~1 # 1 version before AWSCURRENT
-   user@example.com~1     # @ in name is allowed
-   ```
-
-5. **Command Groups**:
-   - `param` (aliases: `ssm`, `ps`) - AWS Systems Manager Parameter Store
-   - `secret` (aliases: `sm`) - AWS Secrets Manager
-   - `gcloud` - Google Cloud (`secret` = Secret Manager)
-   - `azure` - Azure (`secret` = Key Vault, `param` = App Configuration)
-   - `stage` (alias: `stg`) - Staging operations (AWS + Google Cloud + Azure)
-
-## Architecture
-
-```
-suve/
-├── cmd/suve/main.go              # Entry point
-│
-├── internal/
-│   ├── cli/
-│   │   ├── colors/               # ANSI color codes
-│   │   ├── confirm/              # User confirmation prompts
-│   │   ├── diffargs/             # Diff argument parsing
-│   │   ├── editor/               # External editor integration ($EDITOR)
-│   │   ├── output/               # Output formatting (diff, colors)
-│   │   ├── pager/                # Pager integration ($PAGER)
-│   │   ├── passphrase/           # Passphrase input (for export/import encryption)
-│   │   ├── terminal/             # Terminal utilities (TTY detection)
-│   │   └── commands/
-│   │       ├── app.go            # urfave/cli v3 app definition
-│   │       ├── generic/          # provider-neutral command scaffold (show/diff/list/log/tag) + per-provider presenters
-│   │       ├── internal/         # registry composition + provider/scope wiring for commands
-│   │       ├── param/            # AWS param subcommands
-│   │       ├── secret/           # AWS secret subcommands
-│   │       ├── gcloud/           # Google Cloud command group (secret)
-│   │       ├── azure/            # Azure command group (secret=Key Vault, param=App Config)
-│   │       └── stage/            # staging subcommands
-│   │           ├── command.go    # stage command group definition
-│   │           ├── apply/        # apply staged changes
-│   │           ├── diff/         # diff staged vs AWS
-│   │           ├── param/        # param-specific staging
-│   │           ├── reset/        # unstage changes
-│   │           ├── secret/       # secret-specific staging
-│   │           └── status/       # show staged changes
-│   │
-│   ├── domain/                   # Neutral model (Entry, Version, Tag, ValueType, Field) shared across providers
-│   │
-│   ├── provider/                 # Provider seam: Reader/Writer/Tagger/Store interfaces, Registry, Scope, errors
-│   │   ├── aws/                  # AWS adapter (SSM + Secrets Manager); AWS SDK confined here
-│   │   ├── gcloud/                  # Google Cloud Secret Manager adapter
-│   │   ├── azure/                # Azure Key Vault + App Configuration adapters
-│   │   └── providermock/         # In-memory provider mock for tests
-│   │
-│   ├── gui/                      # GUI application (Wails + Svelte)
-│   │   ├── app.go                # Wails app definition
-│   │   ├── param.go              # Param operations for GUI
-│   │   ├── secret.go             # Secret operations for GUI
-│   │   ├── staging.go            # Staging operations for GUI
-│   │   └── frontend/             # Svelte frontend
-│   │       ├── src/              # Svelte components
-│   │       └── tests/            # Playwright tests
-│   │
-│   ├── infra/                    # AWS client initialization (SDK confinement boundary w/ provider/aws)
-│   │
-│   ├── jsonutil/                 # JSON formatting utilities
-│   │
-│   ├── maputil/                  # Generic map utilities (Set type)
-│   │
-│   ├── parallel/                 # Parallel execution utilities
-│   │
-│   ├── timeutil/                 # Time utilities (timezone handling)
-│   │
-│   ├── updatecheck/              # Non-blocking update-check notification (#209)
-│   │
-│   ├── staging/                  # Staging core functionality (AWS + Google Cloud + Azure)
-│   │   ├── cli/                  # Staging CLI wrappers (service-specific)
-│   │   ├── transition/           # Reducer-based state machine (state/action/reducer/executor)
-│   │   └── store/                # Storage backend
-│   │       ├── store.go          # Storage interfaces
-│   │       ├── file/             # File-based storage (ONLY backend); scope-keyed split param.json/secret.json (working area) + per-service export envelopes
-│   │       │   └── internal/
-│   │       │       ├── crypt/        # Argon2 + AES-GCM (export/import passphrase payload) and raw-key (working) encryption
-│   │       │       └── keyprovider/  # OS-keychain data-key provider (zalando/go-keyring); SUVE_STAGING_KEY override
-│   │       └── testutil/         # Mock store for testing
-│   │
-│   ├── usecase/                  # Business logic layer
-│   │   ├── param/                # AWS SSM use cases
-│   │   ├── secret/               # AWS SM use cases
-│   │   ├── staging/              # Staging use cases
-│   │   ├── gcloud/                  # Google Cloud use cases
-│   │   └── azure/                # Azure use cases
-│   │
-│   ├── version/                  # Version specification parsing
-│   │   ├── parse.go              # Shared generic spec parsing
-│   │   ├── shift.go              # Shift (~N) handling
-│   │   ├── internal/             # Shared utilities (char checks)
-│   │   ├── paramversion/         # AWS SSM version spec parser
-│   │   ├── secretversion/        # AWS Secrets Manager version spec parser
-│   │   ├── gcloudversion/           # Google Cloud integer-version parser
-│   │   ├── azurekvversion/       # Azure Key Vault opaque-id parser
-│   │   └── azureappconfigversion/ # Azure App Config (rejects specifiers; unversioned)
-│   │
-│   └── architecture_test.go      # Arch-guard: forbids cloud SDKs outside their provider/{aws,gcloud,azure} + infra
-│
-├── e2e/                          # E2E tests (requires localstack)
-│
-├── .github/workflows/
-│   └── test.yml                  # CI: test + lint on push/PR
-│
-└── mise.toml                     # toolchain + tasks: build-cli/build-gui, test, lint, e2e-aws(+ -gcloud/-azure-appconfig/-azure-keyvault), generate-gui-bindings, coverage/coverage-all, clean, bash (run via `mise <task>` / `mise run <task>`)
-```
-
-### Key Design Patterns
-
-1. **Unified generic commands**: Commands (show, diff, list, log, tag) share a provider-neutral scaffold in `internal/cli/commands/generic/**` with per-provider presenters; AWS `param`/`secret` still register their own command groups.
-2. **Provider seam**: Core interfaces (`Reader`/`Writer`/`Tagger`/`Store`) live in `internal/provider` and are mocked via `internal/provider/providermock` for testing.
-3. **Version resolution**: `paramversion` and `secretversion` (plus `gcloudversion`, `azurekvversion`, `azureappconfigversion`) handle version/shift/label resolution per provider.
-4. **Output abstraction**: Commands write to `io.Writer` for testability
-5. **Staging state machine**: `staging/transition` implements a reducer-based state machine for staging operations
-6. **Keychain-encrypted file store**: Staging is a keychain-encrypted file store, scope-keyed under `~/.suve/staging/{scope.Key()}/`
-
-## Development Commands
+## Development commands
 
 ```bash
-# Run tests
-mise test
+mise test                  # unit tests
+mise lint                  # golangci-lint (+ deadcode gate)
+mise build-cli             # build bin/suve (CLI)
+mise build-gui             # build bin/suve with the GUI frontend embedded
+mise generate-gui-bindings # regenerate Wails bindings (rebuild GUI afterward)
+mise e2e-aws               # e2e against localstack (AWS param/secret/staging)
+mise e2e-gcloud            # e2e against the Google Cloud emulator
+mise e2e-azure-appconfig   # e2e against Azure App Configuration
+mise e2e-azure-keyvault    # e2e against Azure Key Vault
+mise coverage              # unit coverage
+mise coverage-e2e-aws      # AWS e2e coverage
+mise coverage-all          # combined coverage
+mise clean                 # sweep leftover test containers/volumes
 
-# Run linter
-mise lint
-
-# Build CLI
-mise build-cli
-
-# E2E tests (each task starts its emulator automatically via docker compose)
-mise e2e-aws              # AWS (localstack)
-mise e2e-gcloud           # Google Cloud
-mise e2e-azure-appconfig  # Azure App Configuration
-mise e2e-azure-keyvault   # Azure Key Vault
-
-# Dev verification shell: start emulators + inject their env for the chosen
-# cloud(s), then open a shell (any combination of flags; 0 = plain shell).
+# Dev shell: start emulators + inject env for the chosen cloud(s), then a shell.
 mise run bash --aws --gcloud --azure
-
-# Coverage
-mise coverage
-
-# GUI (requires Wails + Node.js)
-mise build-gui             # Build the CLI+GUI binary (bin/suve) with the frontend embedded
-mise generate-gui-bindings # Regenerate the GUI wailsjs bindings
-(cd gui && wails dev)      # GUI hot-reload dev server
 ```
 
-## Testing Strategy
+See `mise.toml` for the full task list, including local seeding (`seed-*`, `seed-build`) and demo-recording tasks.
 
-- **Unit tests**: Each command package has `*_test.go` with provider-neutral mocking via `internal/provider/providermock`
-- **E2E tests**: `e2e/aws_*_test.go` runs against localstack (SSM only, SM requires Pro)
-- **GUI tests**: `internal/gui/frontend/tests/` uses Playwright for component/integration testing
-- **Test dependencies**: Uses `github.com/samber/lo` for pointer helpers and `github.com/stretchr/testify` for assertions
+## Testing
 
-### Running E2E Tests
+- **Unit**: each package has `*_test.go`; provider behavior is mocked via `internal/provider/providermock`.
+- **E2E**: `e2e/` runs against emulators (localstack for AWS, plus Google Cloud and Azure), covering each provider's available services (param and/or secret) plus staging; select a suite with the `e2e-*` tasks above.
+- **GUI**: `internal/gui/frontend/tests` uses Playwright (`npm run test` / `npm run test:ui` from that directory).
+- User-visible behavior is expected at all three layers (Go unit + e2e + GUI Playwright) where applicable.
+- Test helpers use `github.com/samber/lo` (pointer helpers) and `github.com/stretchr/testify` (assertions).
 
-```bash
-# Run E2E tests fully inside Docker (starts the AWS emulator, localstack, on a
-# closed compose network with no host ports; the test suite runs in-container
-# and tears everything down on exit)
-mise e2e-aws
+## Skills & docs
 
-# Sweep any leftover test containers/volumes from a crashed run
-mise run clean
-```
+Load the matching skill under `.claude/skills/` before non-trivial work; each holds the *why* so this file stays lean.
 
-### Running GUI Tests
+- **provider-seam-invariants** — touching `internal/provider/**` or `internal/domain/**`: neutral model, opaque version refs, typed write/delete options, interface segregation, SDK confinement.
+- **provider-selection-and-registry** — wiring a top-level command group, adding a cloud, or touching `registry.go`/`detect/`/`internal/cli/commands/internal/client.go`: how a provider is selected and how the registry composes backends and scopes.
+- **staging-state-machine** — changing reducers/executor in `internal/staging/transition/` or reasoning about add/edit/delete/tag transitions, auto-skip/unstage, tag cascade, or conflict detection.
+- **suve-cli-map** — the per-provider capability, versioning, and alias matrix without reading the full option tables.
+- **add-provider-adapter** — adding a cloud adapter (or a new service under one): the `Store` interface, SDK confinement, error mapping, version parsing, CLI/registry wiring, staging.
+- **add-e2e-emulator** — wiring an emulator-backed e2e seam: env gate, `compose.test.yaml` service, `mise e2e-<provider>` task, closed-network CI job, coverage upload.
+- **gui-change** — changing `internal/gui/**`: bindings-regenerate-then-rebuild rule, capability-driven UI, server-side guards, async-load checklist.
+- **refresh-demo-gifs** — re-recording CLI/GUI demo GIFs: record scripts, robust selectors, output-drift triggers, frame verification, Git LFS.
+- **bug-audit-epic** — running a codebase- or subsystem-wide bug audit: parallel investigators, adversarial verification, severity-grouped epic with linked sub-issues.
+- **bug-fix-pr** — turning one filed bug into a fix PR: reproduce, fix at the cited site, add regression tests at every layer, run gates.
+- **feature-epic-breakdown** — planning a multi-PR feature or cross-cutting refactor as a layer-ordered epic with standalone sub-issues.
+- **docs-audit** — keeping docs in sync: sweep command tables/env-vars/paths against the real CLI, current-state-only, consistent terminology, aqua-registry tracking.
 
-```bash
-cd internal/gui/frontend
-npm install
-npm run test        # Run Playwright tests
-npm run test:ui     # Run with UI mode
-```
+For user-facing reference see `README.md` and `docs/{aws,azure,gcloud}.md`. The staging state machine's authoritative reference is `docs/staging-state-transitions.md`.
 
-## Code Style
+## Code style
 
-- Follow standard Go conventions
-- Use `urfave/cli/v3` for CLI structure
-- Commands write to `io.Writer`, not directly to stdout
-- Error messages should be user-friendly
+- Follow standard Go conventions; use `urfave/cli/v3` for CLI structure.
+- Commands write to `io.Writer`, not directly to stdout.
+- Error messages should be user-friendly.
+- Reference docs are current-state-only: no historical/migration language (that belongs in release notes).
 
-## Refactoring Guidelines
+## Refactoring gates
 
-1. **Tests must pass**: Run `mise test` after changes
-2. **Lint must pass**: Run `mise lint` after changes
-3. **E2E tests**: Run `mise e2e-aws` for command behavior changes (optional, requires Docker)
+1. **Tests pass**: `mise test` after changes.
+2. **Lint passes**: `mise lint` after changes.
+3. **E2E** (optional, for command-behavior changes; needs Docker): `mise e2e-aws` (and provider-specific `e2e-*` as relevant).
