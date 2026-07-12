@@ -38,7 +38,7 @@ options and examples, read the full docs:
 | Group | Aliases |
 |-------|---------|
 | `aws` | (none) |
-| `gcloud` | `gcp`, `google` |
+| `gcloud` | `gcp`, `google` <!-- naming-allow-gcp --> |
 | `azure` | `az` |
 
 ## Notes
