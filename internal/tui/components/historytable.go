@@ -38,6 +38,10 @@ type HistoryTable struct {
 	height   int
 	styles   styles.Styles
 	compare  bool
+	// focused reports whether the history pane currently holds keyboard focus. The
+	// selected row is drawn with the active cursor when focused and a dimmed cursor
+	// when not, so the list and history never look equally selected at once.
+	focused bool
 	// picks holds the row indices selected for comparison (0, 1, or 2 entries).
 	picks []int
 }
@@ -55,6 +59,10 @@ func (t *HistoryTable) SetRows(rows []HistoryEntry) {
 	t.picks = nil
 	t.ensureVisible()
 }
+
+// SetFocused sets whether the history pane holds keyboard focus, which selects
+// the active vs dimmed selection style the next View draws with.
+func (t *HistoryTable) SetFocused(focused bool) { t.focused = focused }
 
 // SetSize sets the table's inner content size.
 func (t *HistoryTable) SetSize(width, height int) {
@@ -215,13 +223,21 @@ func (t *HistoryTable) renderRow(idx int) string {
 	switch {
 	case t.compare && indexOf(t.picks, idx) >= 0:
 		marker = t.styles.StatusValue.Render("◉ ")
+	case idx == t.selected && t.focused:
+		marker = t.styles.Selection.Render("▸ ")
 	case idx == t.selected:
-		marker = t.styles.StatusValue.Render("▸ ")
+		// Selected but the history pane is idle: a hollow, dimmed cursor.
+		marker = t.styles.SelectionInactive.Render("▹ ")
 	}
 
 	label := row.Label
+
 	if idx == t.selected {
-		label = t.styles.StatusValue.Render(label)
+		if t.focused {
+			label = t.styles.Selection.Render(label)
+		} else {
+			label = t.styles.SelectionInactive.Render(label)
+		}
 	}
 
 	parts := []string{marker + label}

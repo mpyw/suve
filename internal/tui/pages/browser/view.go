@@ -24,8 +24,8 @@ func (m *Model) View(width, height int) string {
 	parts := []string{header}
 	offset := headerH
 
-	if m.err != "" {
-		parts = append(parts, m.styles.ErrorText.Render(clip(m.err, width)))
+	for _, line := range m.errLines() {
+		parts = append(parts, m.styles.ErrorText.Render(clip(line, width)))
 		offset++
 	}
 
@@ -106,10 +106,15 @@ func (m *Model) renderStacked(width, height, yOffset int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, listPane, detailPane)
 }
 
-// renderListPane sizes the list widget, records its geometry, and frames it.
+// renderListPane sizes the list widget, records its geometry, and frames it. The
+// pane is drawn focused (accent border, active selection cursor) when the list
+// holds keyboard focus, so the user can see where the arrow keys will land.
 func (m *Model) renderListPane(width, height, paneTop, paneLeft int) string {
 	innerW, innerH := components.PaneInner(width, height)
 	m.list.SetSize(innerW, innerH)
+
+	focused := m.focus == focusList
+	m.list.SetFocused(focused)
 
 	m.geom.listTop = paneTop + paneContentTop
 	m.geom.listLeft = paneLeft + paneBorderLeft
@@ -118,11 +123,12 @@ func (m *Model) renderListPane(width, height, paneTop, paneLeft int) string {
 
 	title := "entries (" + strconv.Itoa(m.list.Len()) + ")"
 
-	return components.Pane(m.styles, title, m.list.View(), width, height)
+	return framePane(m.styles, focused, title, m.list.View(), width, height)
 }
 
 // renderDetailPane sizes the detail widgets, records the history geometry, and
-// frames the detail.
+// frames the detail. The pane is drawn focused when the history holds keyboard
+// focus (the detail pane's only navigable widget), so the active pane is obvious.
 func (m *Model) renderDetailPane(width, height, paneTop, paneLeft int) string {
 	innerW, innerH := components.PaneInner(width, height)
 
@@ -139,7 +145,16 @@ func (m *Model) renderDetailPane(width, height, paneTop, paneLeft int) string {
 	m.geom.historyRight = m.geom.historyLeft + innerW
 	m.geom.historyRows = historyRows
 
-	return components.Pane(m.styles, title, body, width, height)
+	return framePane(m.styles, m.focus == focusHistory, title, body, width, height)
+}
+
+// framePane frames a pane with the focused border when focused, else the idle one.
+func framePane(st styles.Styles, focused bool, title, body string, width, height int) string {
+	if focused {
+		return components.PaneFocused(st, title, body, width, height)
+	}
+
+	return components.Pane(st, title, body, width, height)
 }
 
 // renderDetail builds the detail body and returns the line offset (within the
@@ -179,6 +194,7 @@ func (m *Model) renderDetail(innerW, innerH int) (string, int, int) {
 	historyLocalTop := len(lines)
 	historyH := max(innerH-historyLocalTop, 0)
 	m.history.SetSize(innerW, historyH)
+	m.history.SetFocused(m.focus == focusHistory)
 	lines = append(lines, strings.Split(m.history.View(), "\n")...)
 
 	return fitLines(lines, innerH), historyLocalTop, historyH
@@ -232,14 +248,29 @@ func (m *Model) tagLine(width int) string {
 	return fieldLine(m.styles, "Tags", tagsInline(m.detail.Tags), width)
 }
 
-// historyHeaderLine renders the "History  c: compare mode" row.
+// historyHeaderLine renders the "History  <hint>" row. The hint adapts to focus so
+// the enter→history / esc→list transitions are discoverable: from the list it
+// advertises `enter: history`; in the history it advertises `esc: list`; in
+// compare mode it advertises the pick/diff/exit keys.
 func (m *Model) historyHeaderLine(width int) string {
-	hint := "c: compare mode"
-	if m.history.Compare() {
+	title := m.styles.PaneTitle.Render("History")
+
+	var hint string
+
+	switch {
+	case m.history.Compare():
 		hint = "space: pick · enter: diff · esc: exit"
+	case m.history.Len() == 0:
+		// No versions: neither entering the history nor compare mode does anything,
+		// so advertise no (false) transition.
+		return clip(title, width)
+	case m.focus == focusHistory:
+		hint = "esc: list · c: compare mode"
+	default:
+		hint = "enter: history · c: compare mode"
 	}
 
-	return clip(m.styles.PaneTitle.Render("History")+"   "+m.styles.PageHint.Render(hint), width)
+	return clip(title+"   "+m.styles.PageHint.Render(hint), width)
 }
 
 // isSelectedStaged reports whether the selected entry has staged changes. It

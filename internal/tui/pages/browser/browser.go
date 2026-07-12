@@ -125,7 +125,16 @@ type Model struct {
 	detail          data.Detail
 	detailOK        bool
 
-	err string
+	// Error state is split per source (mirroring the staging page's per-section
+	// err and the GUI's per-source error fields) so a transient detail/history
+	// failure clears the moment that source next succeeds and never lingers over
+	// another source's correct data. listErr/detailErr/historyErr track the three
+	// content loads; stagedErr holds the launch-time staging-store hard-fail, which
+	// is a persistent condition and is not cleared by a selection change.
+	listErr    string
+	detailErr  string
+	historyErr string
+	stagedErr  string
 
 	// Monotonic sequence guards (GUI loadSeq pattern): a response is applied only
 	// when its seq still matches the latest issued one.

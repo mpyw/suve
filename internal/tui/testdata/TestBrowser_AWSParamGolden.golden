@@ -14,8 +14,8 @@ prefix: —   filter: —   values:off  recursive:on  ⟳
 │                                            ││Modified    2026-07-01 09:30:00                                         │
 │                                            ││Tags        env=prod · team=api                                         │
 │                                            ││                                                                        │
-│                                            ││History   c: compare mode                                               │
-│                                            ││▸ #14  2026-07-01  current                                              │
+│                                            ││History   enter: history · c: compare mode                              │
+│                                            ││▹ #14  2026-07-01  current                                              │
 │                                            ││  #13  2026-06-24                                                       │
 │                                            ││  #12  2026-06-02                                                       │
 │                                            ││                                                                        │

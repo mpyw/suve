@@ -72,12 +72,12 @@ func (m *Model) onListLoaded(msg listLoadedMsg) tea.Cmd {
 	m.loading = false
 
 	if msg.err != nil {
-		m.err = msg.err.Error()
+		m.listErr = msg.err.Error()
 
 		return nil
 	}
 
-	m.err = ""
+	m.listErr = ""
 
 	// Preserve the selection by IDENTITY, not index. A replace can insert or
 	// remove rows above the selection, so capture the selected entry's key first
@@ -103,37 +103,42 @@ func (m *Model) onListLoaded(msg listLoadedMsg) tea.Cmd {
 	return m.selectionCmd()
 }
 
-// onDetailLoaded applies a detail response and loads it into the value pane.
+// onDetailLoaded applies a detail response and loads it into the value pane. A
+// successful load clears the detail error so a prior transient failure never
+// lingers over the freshly-loaded value.
 func (m *Model) onDetailLoaded(msg detailLoadedMsg) {
 	if msg.seq != m.detailSeq {
 		return
 	}
 
 	if msg.err != nil {
-		m.err = msg.err.Error()
+		m.detailErr = msg.err.Error()
 		m.detailOK = false
 
 		return
 	}
 
+	m.detailErr = ""
 	m.detail = msg.d
 	m.detailOK = true
 	m.valuePane.SetValue(msg.d.Value, msg.d.Secret)
 }
 
-// onHistoryLoaded applies a history response. A history error is surfaced on the
-// error line but never clears the already-loaded value.
+// onHistoryLoaded applies a history response. A history error is surfaced on its
+// own error line (never clearing the already-loaded value); a successful load
+// clears it so a prior transient failure never lingers over good history.
 func (m *Model) onHistoryLoaded(msg historyLoadedMsg) {
 	if msg.seq != m.historySeq {
 		return
 	}
 
 	if msg.err != nil {
-		m.err = msg.err.Error()
+		m.historyErr = msg.err.Error()
 
 		return
 	}
 
+	m.historyErr = ""
 	m.history.SetRows(historyEntries(m.styles, msg.rows, m.svcCap.TagsPerVersion))
 	m.historyVersions = versionIDs(msg.rows)
 }
@@ -152,12 +157,13 @@ func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 	if msg.err != nil {
 		var storeErr *data.StoreUnavailableError
 		if errors.As(msg.err, &storeErr) {
-			m.err = storeErr.Error()
+			m.stagedErr = storeErr.Error()
 		}
 
 		return nil
 	}
 
+	m.stagedErr = ""
 	m.stagedKeys = msg.keys
 	m.rebuildRows()
 
@@ -165,6 +171,22 @@ func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 	count := len(msg.keys)
 
 	return func() tea.Msg { return nav.StagedCount{Service: service, Count: count} }
+}
+
+// errLines returns the active error lines in a stable order — list, detail,
+// history, then the staging-store hard-fail — each owned by its own source so a
+// transient failure clears when that source next succeeds without masking or
+// lingering over another source's state.
+func (m *Model) errLines() []string {
+	lines := make([]string, 0, 4) //nolint:mnd // the four error sources
+
+	for _, e := range []string{m.listErr, m.detailErr, m.historyErr, m.stagedErr} {
+		if e != "" {
+			lines = append(lines, e)
+		}
+	}
+
+	return lines
 }
 
 // reload re-fetches the list and staged flags after a mutation (the app forwards
