@@ -29,11 +29,12 @@ func newDiff(t *testing.T) *Model {
 // keyPress builds a printable key press.
 func keyPress(r rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Text: string(r)} }
 
-// TestSecretDiffMasksBothSides pins the leak guard: a SECRET diff whose two
-// versions differ renders +/- lines, but every line is a run of mask bullets —
-// no revealed secret value reaches the viewport. The two values differ in length
-// so the masked runs differ, proving a change is still visible without content.
-func TestSecretDiffMasksBothSides(t *testing.T) {
+// TestSecretDiffRevealedByDefaultAndHideToggle pins the relaxed policy: the
+// Compare/diff view is a surface the user explicitly opened to inspect the
+// change, so a secret's values are SHOWN by default (#702/#735) — and `x` hides
+// them again, masking both sides into differing bullet runs that still show a
+// change without disclosing content.
+func TestSecretDiffRevealedByDefaultAndHideToggle(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 
 	const (
@@ -50,24 +51,37 @@ func TestSecretDiffMasksBothSides(t *testing.T) {
 		Secret:   true,
 	}})
 
-	out := m.View(100, 40)
+	// Revealed by default: both cleartext values are shown so the diff is useful.
+	shown := m.View(100, 40)
+	assert.Contains(t, shown, oldSecret, "the old secret value is shown by default")
+	assert.Contains(t, shown, newSecret, "the new secret value is shown by default")
+	assert.NotContains(t, shown, "•", "a revealed secret diff has no mask bullets")
 
-	// No revealed secret anywhere in the output.
-	assert.NotContains(t, out, oldSecret, "the old secret value must never be rendered")
-	assert.NotContains(t, out, newSecret, "the new secret value must never be rendered")
-	assert.NotContains(t, out, "secret", "no fragment of a secret value leaks")
+	// `x` hides it: neither cleartext value reaches the viewport, and a masked
+	// difference still renders (differing bullet runs).
+	m, _ = m.Update(keyPress('x'))
+	require.True(t, m.masked, "x masks the secret diff")
 
-	// A real, masked difference: both a removed and an added bullet line.
-	assert.Contains(t, out, "•", "the masked diff renders bullet runs")
-	assert.Contains(t, out, "-•", "a removed masked line is shown")
-	assert.Contains(t, out, "+•", "an added masked line is shown")
-	assert.NotContains(t, out, "(no differences)", "the differing versions produce a diff")
+	hidden := m.View(100, 40)
+	assert.NotContains(t, hidden, oldSecret, "the old secret value must never be rendered while masked")
+	assert.NotContains(t, hidden, newSecret, "the new secret value must never be rendered while masked")
+	assert.NotContains(t, hidden, "secret", "no fragment of a secret value leaks while masked")
+	assert.Contains(t, hidden, "•", "the masked diff renders bullet runs")
+	assert.Contains(t, hidden, "-•", "a removed masked line is shown")
+	assert.Contains(t, hidden, "+•", "an added masked line is shown")
+	assert.NotContains(t, hidden, "(no differences)", "the differing versions produce a masked diff")
+
+	// `x` again reveals: back to cleartext.
+	m, _ = m.Update(keyPress('x'))
+	require.False(t, m.masked, "x toggles back to revealed")
+	assert.Contains(t, m.View(100, 40), newSecret, "toggling back shows the value again")
 }
 
-// TestSecretDiffEqualLengthsMaskToNoDifference pins that when two secret values
-// mask to the same run (equal length), the diff collapses to "(no differences)"
-// rather than leaking that they in fact differ — masking is length-only.
-func TestSecretDiffEqualLengthsMaskToNoDifference(t *testing.T) {
+// TestSecretDiffHiddenEqualLengthsMaskToNoDifference pins that once hidden, two
+// secret values that mask to the same run (equal length) collapse to
+// "(no differences)" rather than leaking that they in fact differ — masking is
+// length-only.
+func TestSecretDiffHiddenEqualLengthsMaskToNoDifference(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 
 	m := newDiff(t)
@@ -75,9 +89,12 @@ func TestSecretDiffEqualLengthsMaskToNoDifference(t *testing.T) {
 		OldLabel: "s#1",
 		NewLabel: "s#2",
 		OldValue: "aaaaaaaa", // 8 runes
-		NewValue: "bbbbbbbb", // 8 runes → same 8 bullets
+		NewValue: "bbbbbbbb", // 8 runes → same 8 bullets when masked
 		Secret:   true,
 	}})
+
+	// Hide first, then the equal-length masked runs are indistinguishable.
+	m, _ = m.Update(keyPress('x'))
 
 	out := m.View(100, 40)
 

@@ -1,11 +1,11 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│diff: /app/api/DATABASE_URL#13 → /app/api/DATABASE_URL#14                                         │
+│diff: /app/api/DATABASE_URL#13 → /app/api/DATABASE_URL#14  ·  x: hide                             │
 │--- /app/api/DATABASE_URL#13                                                                      │
 │+++ /app/api/DATABASE_URL#14                                                                      │
 │@@ -1 +1 @@                                                                                       │
-│-•••••••••••                                                                                      │
+│-db-pass-old                                                                                      │
 │\ No newline at end of file                                                                       │
-│+•••••••••••••••••••••                                                                            │
+│+db-secret-password-v2                                                                            │
 │\ No newline at end of file                                                                       │
 │                                                                                                  │
 │                                                                                                  │

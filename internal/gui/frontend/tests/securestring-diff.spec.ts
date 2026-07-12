@@ -8,12 +8,12 @@ import {
 } from './fixtures/wails-mock';
 
 // ============================================================================
-// SecureString param diff masking (GUI counterpart of #677 — see #702)
+// SecureString param diff reveal + hide toggle (GUI counterpart of #677 — #702)
 //
-// A SecureString param is masked in the detail pane, but its version diff used
-// to render both plaintext values. The diff DTO now carries a value-type secret
-// flag (SecureString ⇒ true) that DiffDisplay masks on, so neither cleartext
-// value reaches the diff modal.
+// A SecureString param's Version Comparison is a surface the user explicitly
+// opened to inspect the change, so its values are REVEALED by default (#702/
+// #735). The DiffDisplay Hide/Show toggle can still mask both sides, matching
+// the detail pane's masked-by-default behavior on demand.
 // ============================================================================
 
 // Distinctive cleartext values that must NEVER appear in the diff modal.
@@ -39,7 +39,7 @@ test.describe('SecureString param diff masking', () => {
     await waitForItemList(page);
   });
 
-  test('masks both sides of a SecureString version diff', async ({ page }) => {
+  test('reveals both sides of a SecureString version diff by default, and hides on toggle', async ({ page }) => {
     await clickItemByName(page, '/app/secure/token');
 
     await page.getByRole('button', { name: /Compare/i }).click();
@@ -49,17 +49,26 @@ test.describe('SecureString param diff masking', () => {
 
     await expect(page.getByText('Version Comparison')).toBeVisible();
 
-    // Neither cleartext value may appear anywhere in the diff modal.
-    const oldSide = (await page.locator('.diff-value.diff-old').textContent()) ?? '';
-    const newSide = (await page.locator('.diff-value.diff-new').textContent()) ?? '';
+    // Revealed by default: both cleartext values are shown so the diff is useful.
+    let oldSide = (await page.locator('.diff-value.diff-old').textContent()) ?? '';
+    let newSide = (await page.locator('.diff-value.diff-new').textContent()) ?? '';
+    expect(oldSide).toContain(OLD_SECRET);
+    expect(newSide).toContain(NEW_SECRET);
 
+    // The Hide toggle masks both sides (bullets/asterisks), so a change still
+    // shows without disclosing content.
+    await page.locator('.btn-mask-toggle').click();
+    oldSide = (await page.locator('.diff-value.diff-old').textContent()) ?? '';
+    newSide = (await page.locator('.diff-value.diff-new').textContent()) ?? '';
     expect(oldSide).not.toContain(OLD_SECRET);
     expect(oldSide).not.toContain('plaintext-old');
     expect(newSide).not.toContain(NEW_SECRET);
     expect(newSide).not.toContain('plaintext-new');
-
-    // Both sides are masked with bullets/asterisks, so a change still shows.
     expect(oldSide).toMatch(/\*/);
     expect(newSide).toMatch(/\*/);
+
+    // Show again brings the values back.
+    await page.locator('.btn-mask-toggle').click();
+    expect((await page.locator('.diff-value.diff-new').textContent()) ?? '').toContain(NEW_SECRET);
   });
 });

@@ -28,6 +28,14 @@ import (
 //nolint:gochecknoglobals // immutable page-local binding
 var parseJSONKey = key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "parse-json"))
 
+// maskKey toggles masking of a secret diff. The Compare/diff view is a surface
+// the user explicitly opened to inspect the change, so its values are REVEALED
+// by default (#702/#735); `x` hides them again. It is a no-op on a non-secret
+// diff (whose values are never masked).
+//
+//nolint:gochecknoglobals // immutable page-local binding
+var maskKey = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "hide/show"))
+
 // loadedMsg carries the fetched two-version contents back to the model.
 type loadedMsg struct {
 	content data.DiffContent
@@ -55,7 +63,11 @@ type Model struct {
 	content   data.DiffContent
 	loaded    bool
 	parseJSON bool
-	err       string
+	// masked hides a secret diff's values. It defaults to false: an explicitly
+	// opened Compare/diff view reveals values so the diff is meaningful
+	// (#702/#735); `x` toggles it to mask both sides.
+	masked bool
+	err    string
 }
 
 // New builds a diff page from a navigation request. ctx is the Run context
@@ -158,6 +170,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 		m.render()
 
 		return m, nil
+	case key.Matches(msg, maskKey):
+		m.masked = !m.masked
+		m.render()
+
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -185,13 +202,14 @@ func (m *Model) render() {
 
 	oldVal, newVal := m.content.OldValue, m.content.NewValue
 
-	// A secret diff is masked on BOTH sides before diffing, so a revealed value
-	// never reaches the viewport (or a golden). Masking is per-line and length-
-	// capped, so a change still shows as differing bullet runs without disclosing
-	// content. Parse-json is skipped for a secret: the masked bullets are not JSON,
-	// and normalizing the raw secret first could leak its structure.
+	// A Compare/diff view is a surface the user explicitly opened to inspect the
+	// change, so a secret's values are shown by default (#702/#735). Pressing `x`
+	// masks BOTH sides before diffing (per-line, length-capped bullets), so a
+	// change still shows as differing runs without disclosing content — and while
+	// masked, parse-json is skipped: the bullets are not JSON, and normalizing the
+	// raw secret first could leak its structure.
 	switch {
-	case m.content.Secret:
+	case m.content.Secret && m.masked:
 		oldVal = components.MaskValue(oldVal)
 		newVal = components.MaskValue(newVal)
 	case m.parseJSON:
@@ -250,6 +268,15 @@ func (m *Model) View(width, height int) string {
 	title := "diff: " + m.name
 	if m.loaded {
 		title = "diff: " + m.content.OldLabel + " → " + m.content.NewLabel
+	}
+
+	// Surface the mask toggle so hiding a revealed secret diff is discoverable.
+	if m.loaded && m.content.Secret {
+		if m.masked {
+			title += "  ·  x: show"
+		} else {
+			title += "  ·  x: hide"
+		}
 	}
 
 	body := m.vp.View()

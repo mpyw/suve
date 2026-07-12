@@ -14,10 +14,10 @@ Param (3)                                                                       
 
 Secret (2)                                                                                            a apply · r reset
   delete  prod/api/old-key
-    - ••••••••••••••••••••••••
+    - super-secret-token-value
   update  prod/api/session
-    - ••••••••••••••••••••••••
-    + ••••••••••••••••••••••••
+    - old-super-secret-token-value
+    + super-secret-token-value
 
 
 
@@ -30,5 +30,5 @@ Secret (2)                                                                      
 
 
 
-e edit · u unstage · t tags · x reveal · enter detail · v view · a apply · r reset
+e edit · u unstage · t tags · x hide · enter detail · v view · a apply · r reset
  tab next tab • 1/2/3 jump to tab • ? help • q quit
