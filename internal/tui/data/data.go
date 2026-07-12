@@ -125,6 +125,10 @@ type DiffContent struct {
 	NewLabel string
 	OldValue string
 	NewValue string
+	// Secret reports whether the two values are secrets and must be masked before
+	// diffing, so a secret diff never renders a revealed value. The source is the
+	// authority on secret-ness (the browser's OpenDiff carries no such flag).
+	Secret bool
 }
 
 // Source is the read-path seam the browser and diff pages depend on. Every
@@ -356,6 +360,10 @@ func (s *paramSource) VersionContents(
 	}, nil
 }
 
+// TODO(step-6/followup): a param value can be a SecureString (secret); mask its
+// diff too once a real value-type capability flag replaces the !HasNamespaces
+// proxy. Until then a param diff is treated as non-secret (plaintext content).
+
 func (s *paramSource) Namespaces(ctx context.Context) ([]string, error) {
 	if !s.svcCap.HasNamespaces {
 		return nil, nil
@@ -508,6 +516,7 @@ func (s *secretSource) VersionContents(
 		NewLabel: out.NewName + "#" + shortID(out.NewVersionID),
 		OldValue: out.OldValue,
 		NewValue: out.NewValue,
+		Secret:   true,
 	}, nil
 }
 

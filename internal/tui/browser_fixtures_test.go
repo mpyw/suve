@@ -171,9 +171,18 @@ func gcloudSecretStore() *providermock.Store {
 				id = "3"
 			}
 
+			// Values vary per version (and differ in length) so a secret diff shows
+			// real +/- lines — which the diff page masks. Distinct lengths make the
+			// masked bullet runs differ, proving a change WITHOUT revealing content.
+			values := map[string]string{
+				"3": "googlecloud-secret-value-three",
+				"2": "googlecloud-secret-2",
+				"1": "googlecloud-old-1",
+			}
+
 			return &domain.Entry{
 				Name:    name,
-				Value:   "gcp-secret-value",
+				Value:   values[id],
 				Type:    domain.ValueTypeSecret,
 				Version: domain.Version{ID: id, State: "enabled", Created: &fxT1},
 			}, nil

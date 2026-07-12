@@ -20,6 +20,7 @@ type fakeCopyPage struct {
 
 func (p *fakeCopyPage) Update(tea.Msg) (page, tea.Cmd) { return p, nil }
 func (p *fakeCopyPage) View(int, int) string           { return "" }
+func (p *fakeCopyPage) capturesInput() bool            { return false }
 
 func (p *fakeCopyPage) CopyText() (string, bool) {
 	p.revealed = true

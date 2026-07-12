@@ -34,6 +34,7 @@ func (p browserPage) Update(msg tea.Msg) (page, tea.Cmd) {
 func (p browserPage) View(width, height int) string { return p.m.View(width, height) }
 func (p browserPage) Init() tea.Cmd                 { return p.m.Init() }
 func (p browserPage) CopyText() (string, bool)      { return p.m.CopyText() }
+func (p browserPage) capturesInput() bool           { return p.m.CapturesInput() }
 
 // diffPage adapts *diff.Model to the app's page interface.
 type diffPage struct{ m *diff.Model }
@@ -46,6 +47,10 @@ func (p diffPage) Update(msg tea.Msg) (page, tea.Cmd) {
 
 func (p diffPage) View(width, height int) string { return p.m.View(width, height) }
 func (p diffPage) Init() tea.Cmd                 { return p.m.Init() }
+
+// capturesInput is always false: the diff page has no text input (its keys are
+// scroll/parse-json/back, all safe to route through the global map).
+func (p diffPage) capturesInput() bool { return false }
 
 // newBrowserPage builds the browser page adapter for a service source.
 func newBrowserPage(

@@ -164,7 +164,17 @@ func (m *Model) render() {
 	}
 
 	oldVal, newVal := m.content.OldValue, m.content.NewValue
-	if m.parseJSON {
+
+	// A secret diff is masked on BOTH sides before diffing, so a revealed value
+	// never reaches the viewport (or a golden). Masking is per-line and length-
+	// capped, so a change still shows as differing bullet runs without disclosing
+	// content. Parse-json is skipped for a secret: the masked bullets are not JSON,
+	// and normalizing the raw secret first could leak its structure.
+	switch {
+	case m.content.Secret:
+		oldVal = components.MaskValue(oldVal)
+		newVal = components.MaskValue(newVal)
+	case m.parseJSON:
 		if f, ok := jsonutil.TryFormat(oldVal); ok {
 			oldVal = f
 		}

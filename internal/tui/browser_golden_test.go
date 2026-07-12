@@ -193,15 +193,16 @@ func (h *diffHost) View() tea.View {
 	return v
 }
 
-// diffReq builds an OpenDiff request for a shape.
-func diffReq(src data.Source, name, oldV, newV string, secret bool) nav.OpenDiff {
-	return nav.OpenDiff{Source: src, Name: name, OldVersion: oldV, NewVersion: newV, Secret: secret}
+// diffReq builds an OpenDiff request for a shape. Secret-ness is not carried
+// here — the diff page learns it from the source's DiffContent.
+func diffReq(src data.Source, name, oldV, newV string) nav.OpenDiff {
+	return nav.OpenDiff{Source: src, Name: name, OldVersion: oldV, NewVersion: newV}
 }
 
 func TestDiff_AWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
 	goldenEnv(t)
 
-	host := newDiffHost(diffReq(awsParamDiffSource(), "/app/api/DATABASE_URL", "13", "14", false))
+	host := newDiffHost(diffReq(awsParamDiffSource(), "/app/api/DATABASE_URL", "13", "14"))
 
 	diffGolden(t, host, "@@")
 }
@@ -209,15 +210,19 @@ func TestDiff_AWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv 
 func TestDiff_AWSSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
 	goldenEnv(t)
 
-	host := newDiffHost(diffReq(awsSecretSource(), "prod/api/key", "e5f6a7b8-9999-8888-7777-666655554444", "a1b2c3d4-1111-2222-3333-444455556666", true))
+	host := newDiffHost(diffReq(awsSecretSource(), "prod/api/key", "e5f6a7b8-9999-8888-7777-666655554444", "a1b2c3d4-1111-2222-3333-444455556666"))
 
 	diffGolden(t, host, "diff:")
 }
 
+// TestDiff_GCloudSecretGolden pins a SECRET diff: the two versions differ, so the
+// diff renders +/- lines — and every one is a run of mask bullets, never a
+// revealed secret value (the fixture values, e.g. "googlecloud-secret-value-…",
+// must not appear in the golden).
 func TestDiff_GCloudSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
 	goldenEnv(t)
 
-	host := newDiffHost(diffReq(gcloudSecretSource(), "api-key", "2", "3", true))
+	host := newDiffHost(diffReq(gcloudSecretSource(), "api-key", "2", "3"))
 
 	diffGolden(t, host, "diff:")
 }
@@ -225,7 +230,7 @@ func TestDiff_GCloudSecretGolden(t *testing.T) { //nolint:paralleltest // golden
 func TestDiff_AzureKVGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
 	goldenEnv(t)
 
-	host := newDiffHost(diffReq(azureKVSource(), "vault-secret", "4c3b2a1908f7", "9f8e7d6c5b4a", true))
+	host := newDiffHost(diffReq(azureKVSource(), "vault-secret", "4c3b2a1908f7", "9f8e7d6c5b4a"))
 
 	diffGolden(t, host, "diff:")
 }

@@ -26,6 +26,12 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
+// forceQuitKey is the one global escape that survives even while a page captures
+// text input: ctrl+c always quits, so a focused filter can never trap the user.
+//
+//nolint:gochecknoglobals // immutable global escape binding
+var forceQuitKey = key.NewBinding(key.WithKeys("ctrl+c"))
+
 // Layout row heights for the fixed chrome around the page body.
 const (
 	statusBarHeight = 1
@@ -294,6 +300,17 @@ func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateTopDialog(msg)
 	}
 
+	// A page with a focused text input (e.g. the browser's prefix/filter field)
+	// owns every keystroke: the global map must not steal q/1/2/3/y/?/tab from an
+	// edit. Only ctrl+c stays global, as a force-quit escape hatch.
+	if m.activePageCapturesInput() {
+		if key.Matches(msg, forceQuitKey) {
+			return m, tea.Quit
+		}
+
+		return m.updateActivePage(msg)
+	}
+
 	// Numbered tab jumps (1/2/3) map to a tab index directly.
 	if i, ok := numberedTabJump(m.keys, msg); ok {
 		return m, m.jumpTab(i)
@@ -519,6 +536,14 @@ func (m *App) copyText() string {
 	}
 
 	return m.copyValue
+}
+
+// activePageCapturesInput reports whether the active page has a focused text
+// input claiming raw keystrokes, so the router bypasses the global key map.
+func (m *App) activePageCapturesInput() bool {
+	p := m.activePage()
+
+	return p != nil && p.capturesInput()
 }
 
 // activePage returns the top page, or nil when the stack is empty.

@@ -132,7 +132,9 @@ func TestPrefixDebounceSequenceGuard(t *testing.T) {
 }
 
 // TestCompareSelectionOpensDiff pins compare mode: two picked history rows and
-// enter emit an OpenDiff request carrying the two versions in pick order.
+// enter emit an OpenDiff request carrying the two versions ordered
+// CHRONOLOGICALLY (older → newer), regardless of the order they were picked in —
+// so picking newest first still diffs #13 → #14, not the reverse.
 func TestCompareSelectionOpensDiff(t *testing.T) {
 	t.Parallel()
 
@@ -156,11 +158,11 @@ func TestCompareSelectionOpensDiff(t *testing.T) {
 	require.True(t, m.history.Compare())
 	require.Equal(t, focusHistory, m.focus)
 
-	m, _ = update(t, m, keyForSpace()) // pick #14 (selection at index 0)
+	m, _ = update(t, m, keyForSpace()) // pick #14 (index 0, newest) FIRST
 	m, _ = update(t, m, keyPress('j')) // move to #13
-	m, _ = update(t, m, keyForSpace()) // pick #13
+	m, _ = update(t, m, keyForSpace()) // pick #13 (index 1, older) second
 
-	i, j, ok := m.history.PickedVersions()
+	_, _, ok := m.history.PickedVersions()
 	require.True(t, ok, "two rows picked")
 
 	_, cmd := update(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -169,8 +171,11 @@ func TestCompareSelectionOpensDiff(t *testing.T) {
 	msg := cmd()
 	open, ok := msg.(nav.OpenDiff)
 	require.True(t, ok, "enter emits nav.OpenDiff")
-	assert.Equal(t, src.history[i].Version, open.OldVersion)
-	assert.Equal(t, src.history[j].Version, open.NewVersion)
+	// Picked newest-first, but the diff must read old → new: the older #13 is
+	// OldVersion and the newer #14 is NewVersion (history index order: higher
+	// index = older).
+	assert.Equal(t, "13", open.OldVersion, "older version is OldVersion regardless of pick order")
+	assert.Equal(t, "14", open.NewVersion, "newer version is NewVersion")
 }
 
 // keyForSpace builds the space key press (Bubble Tea v2 spells it "space").

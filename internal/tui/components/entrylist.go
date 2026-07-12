@@ -1,7 +1,6 @@
 package components
 
 import (
-	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -33,9 +32,11 @@ type EntryList struct {
 	width    int
 	height   int
 	styles   styles.Styles
-	// truncated, when >0, appends a "… N more — L: load more" footer that occupies
-	// the last visible row (for secret NextToken paging).
-	truncated int
+	// hasMore, when true, appends a "… load more (L)" footer occupying the last
+	// visible row. It is set only when the source reports a real next page (a
+	// non-empty NextToken); the un-loaded count is unknown, so no phantom number
+	// is shown.
+	hasMore bool
 }
 
 // NewEntryList builds an empty list with the given styles.
@@ -43,11 +44,11 @@ func NewEntryList(st styles.Styles) EntryList {
 	return EntryList{styles: st}
 }
 
-// SetRows replaces the rows, clamping the selection into range. A load-more
-// footer count (remaining, un-loaded entries) may be supplied; 0 hides it.
-func (l *EntryList) SetRows(rows []ListRow, moreCount int) {
+// SetRows replaces the rows, clamping the selection into range. hasMore appends
+// the load-more footer; pass true only when the source reports a real next page.
+func (l *EntryList) SetRows(rows []ListRow, hasMore bool) {
 	l.rows = rows
-	l.truncated = max(moreCount, 0)
+	l.hasMore = hasMore
 	l.clampSelection()
 	l.ensureVisible()
 }
@@ -145,8 +146,8 @@ func (l *EntryList) View() string {
 		lines = append(lines, l.renderRow(idx))
 	}
 
-	if l.truncated > 0 {
-		lines = append(lines, l.styles.PageHint.Render(truncate("  … "+strconv.Itoa(l.truncated)+" more — L: load more", l.width)))
+	if l.hasMore {
+		lines = append(lines, l.styles.PageHint.Render(truncate("  … load more (L)", l.width)))
 	}
 
 	// Pad to the full height so the pane border stays rectangular.
@@ -192,9 +193,9 @@ func (l *EntryList) renderRow(idx int) string {
 }
 
 // visibleRows is how many entry rows fit, reserving one line for the load-more
-// footer when rows are truncated.
+// footer when there is a next page.
 func (l *EntryList) visibleRows() int {
-	if l.truncated > 0 {
+	if l.hasMore {
 		return max(l.height-1, 0)
 	}
 

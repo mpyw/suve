@@ -111,7 +111,15 @@ func (p *ValuePane) display() string {
 		return p.raw
 	}
 
-	lines := strings.Split(p.raw, "\n")
+	return MaskValue(p.raw)
+}
+
+// MaskValue masks a (possibly multi-line) value: each line becomes a run of
+// bullets capped at maxMaskWidth, so neither the content nor (beyond the cap)
+// the length reaches the screen. Shared by the value pane and the diff page so a
+// secret diff is masked identically on both sides.
+func MaskValue(raw string) string {
+	lines := strings.Split(raw, "\n")
 	for i, line := range lines {
 		lines[i] = strings.Repeat(maskBullet, maskWidth(line))
 	}

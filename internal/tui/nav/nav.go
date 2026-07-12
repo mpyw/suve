@@ -28,9 +28,8 @@ type OpenDiff struct {
 	Name      string
 	Namespace string
 	// OldVersion / NewVersion are the raw provider version identifiers to diff.
+	// The diff page learns secret-ness from the source's DiffContent, not from
+	// here, so this request carries no secret flag.
 	OldVersion string
 	NewVersion string
-	// Secret reports whether the diffed value is a secret (the diff page still
-	// renders the diff, but the flag lets the app label the page consistently).
-	Secret bool
 }

@@ -158,6 +158,14 @@ func (m *Model) onNamespacesLoaded(msg namespacesLoadedMsg) {
 	}
 }
 
+// CapturesInput reports whether a header text input (prefix or filter) is
+// focused. While it is, the app forwards raw keystrokes here instead of applying
+// its global key map, so a `q`/`1`/`y` typed into the filter is text, not a quit
+// or tab jump.
+func (m *Model) CapturesInput() bool {
+	return m.focus == focusPrefix || m.focus == focusFilter
+}
+
 // handleKey routes a key: to a focused text input when editing, else to the
 // page-local bindings, else to the focused list/history widget.
 func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
@@ -316,7 +324,11 @@ func (m *Model) handleSpace() tea.Cmd {
 	return nil
 }
 
-// openDiff opens the diff page for the two picked history versions.
+// openDiff opens the diff page for the two picked history versions, ordered
+// chronologically (older → newer) regardless of pick order. History rows are in
+// display order (newest first, index 0), so the HIGHER index is the older
+// version and becomes OldVersion; the lower index is the newer NewVersion. This
+// keeps the diff reading old → new even when the user picks newest first.
 func (m *Model) openDiff() tea.Cmd {
 	i, j, ok := m.history.PickedVersions()
 	if !ok {
@@ -328,13 +340,14 @@ func (m *Model) openDiff() tea.Cmd {
 		return nil
 	}
 
+	oldIdx, newIdx := max(i, j), min(i, j)
+
 	req := nav.OpenDiff{
 		Source:     m.source,
 		Name:       m.detail.Name,
 		Namespace:  m.currentNamespace(),
-		OldVersion: rows[i],
-		NewVersion: rows[j],
-		Secret:     m.detail.Secret,
+		OldVersion: rows[oldIdx],
+		NewVersion: rows[newIdx],
 	}
 
 	return func() tea.Msg { return req }

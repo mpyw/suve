@@ -1,7 +1,7 @@
 suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
  Param Secret Staging
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-prefix: —   filter: —   values:off  recursive:off  ⟳
+prefix: —   filter: —   values:off  recursive:on  ⟳
 ╭────────────────────────────────────────────╮╭────────────────────────────────────────────────────────────────────────╮
 │entries (3)                                 ││/app/api/DATABASE_URL                                                   │
 │▸ /app/api/DATABASE_URL                     ││Value   (x to reveal)                                                   │

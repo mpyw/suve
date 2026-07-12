@@ -171,6 +171,10 @@ func New(ctx context.Context, source data.Source, staging data.StagingProbe, st 
 		history:    components.NewHistoryTable(st),
 		valuePane:  components.NewValuePane(),
 		stagedKeys: map[data.StagedKey]struct{}{},
+		// Recursive listing defaults on (GUI parity): a param browser shows the whole
+		// subtree under a prefix by default. The toggle is only shown/effective for a
+		// non-namespaced param service; elsewhere the field is inert.
+		recursive: true,
 	}
 	if m.svcCap.HasNamespaces {
 		// Seed the namespace filter with the null and all-namespaces options; the
