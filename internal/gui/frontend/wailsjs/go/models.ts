@@ -77,17 +77,19 @@ export namespace gui {
 	    newName: string;
 	    oldValue: string;
 	    newValue: string;
-	
+	    secret: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new ParamDiffResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.oldName = source["oldName"];
 	        this.newName = source["newName"];
 	        this.oldValue = source["oldValue"];
 	        this.newValue = source["newValue"];
+	        this.secret = source["secret"];
 	    }
 	}
 	export class ParamListEntry {

@@ -268,7 +268,8 @@ func (m *Model) openDetail(row rowRef) tea.Cmd {
 		NewLabel: "staged",
 		OldValue: row.entry.RemoteValue,
 		NewValue: row.entry.StagedValue,
-		Secret:   sec.secret,
+		// A SecureString param row is secret even in a non-secret section (#677).
+		Secret: sec.secret || row.entry.Secret,
 	}
 
 	return func() tea.Msg { return req }

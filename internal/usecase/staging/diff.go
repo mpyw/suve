@@ -42,6 +42,11 @@ type DiffEntry struct {
 	StagedValue   string
 	Description   *string
 	Warning       string // For warnings like "already deleted in AWS"
+	// Secret reports whether the entry's values are secret material (a secret
+	// service, or a SecureString param), so a consumer masks both the remote and
+	// staged values in the review. Keyed off the value type, not the service, so
+	// a SecureString param is masked too (#677).
+	Secret bool
 }
 
 // DiffTagEntry represents a single diff result for tag changes.
@@ -252,6 +257,7 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 		AWSIdentifier: fetchResult.Identifier,
 		StagedValue:   stagedValue,
 		Description:   entry.Description,
+		Secret:        fetchResult.Secret,
 	}, nil
 }
 

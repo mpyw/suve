@@ -95,6 +95,10 @@ type ParamDiffResult struct {
 	NewName  string `json:"newName"`
 	OldValue string `json:"oldValue"`
 	NewValue string `json:"newValue"`
+	// Secret reports whether either version is a SecureString (secret) value, so
+	// the diff view masks both sides. A SecureString param is a secret on the
+	// value-type axis even though it lives on the param service (#702).
+	Secret bool `json:"secret"`
 }
 
 // ParamSetResult represents the result of setting a parameter.
@@ -315,6 +319,7 @@ func (a *App) ParamDiff(spec1Str, spec2Str, namespace string) (*ParamDiffResult,
 		NewName:  result.NewName,
 		OldValue: result.OldValue,
 		NewValue: result.NewValue,
+		Secret:   result.Secret,
 	}, nil
 }
 

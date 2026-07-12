@@ -145,6 +145,7 @@ func (s *AzureKeyVaultSecretStrategy) FetchCurrent(ctx context.Context, name str
 	return &FetchResult{
 		Value:      entry.Value,
 		Identifier: "#" + entry.Version.ID,
+		Secret:     true, // Key Vault values are always secret material.
 	}, nil
 }
 

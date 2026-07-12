@@ -207,6 +207,26 @@ func TestDiff_AWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv 
 	diffGolden(t, host, "@@")
 }
 
+// TestDiff_AWSParamSecureStringGolden pins a SecureString PARAM diff: the two
+// versions differ, so the diff renders +/- lines — every one a run of mask
+// bullets, never a revealed value. A SecureString is a secret on the value-type
+// axis even though it lives on the param service, so its diff must mask exactly
+// like a secret-service diff (#677). The fixture's cleartext value must NOT
+// appear in the golden.
+func TestDiff_AWSParamSecureStringGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
+	goldenEnv(t)
+
+	host := newDiffHost(diffReq(awsParamSecureStringDiffSource(), "/app/api/DATABASE_URL", "13", "14"))
+
+	raw := captureUntil(t, host, "diff:", goldenTermWidth, goldenTermHeight)
+	screen := renderVisibleScreenSize(t, raw, goldenTermWidth, goldenTermHeight)
+
+	require.NotContains(t, screen, secureStringDiffValue, "no revealed SecureString value in the diff golden")
+	require.NotContains(t, screen, secureStringDiffOldValue, "no revealed SecureString value in the diff golden")
+	require.Contains(t, screen, "•", "the SecureString diff is masked with bullets, proving it renders (not just absent)")
+	golden.RequireEqual(t, screen)
+}
+
 func TestDiff_AWSSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
 	goldenEnv(t)
 

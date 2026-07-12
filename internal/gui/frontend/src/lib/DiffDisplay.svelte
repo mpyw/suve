@@ -1,5 +1,6 @@
 <script lang="ts">
   import { computeInlineDiff } from './diff-utils';
+  import { maskValue } from './viewUtils';
 
   interface Props {
     oldValue: string;
@@ -8,11 +9,16 @@
     newLabel?: string;
     oldSubLabel?: string;
     newSubLabel?: string;
+    // secret masks both sides before diffing, so a SecureString value never
+    // renders in cleartext (mask-only, matching the TUI's secret diff — #702).
+    secret?: boolean;
   }
 
-  let { oldValue, newValue, oldLabel = 'Old', newLabel = 'New', oldSubLabel = '', newSubLabel = '' }: Props = $props();
+  let { oldValue, newValue, oldLabel = 'Old', newLabel = 'New', oldSubLabel = '', newSubLabel = '', secret = false }: Props = $props();
 
-  let diff = $derived(computeInlineDiff(oldValue, newValue));
+  let displayOld = $derived(secret ? maskValue(oldValue) : oldValue);
+  let displayNew = $derived(secret ? maskValue(newValue) : newValue);
+  let diff = $derived(computeInlineDiff(displayOld, displayNew));
 </script>
 
 <div class="diff-container">

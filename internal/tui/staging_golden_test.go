@@ -30,6 +30,11 @@ import (
 // NEVER render revealed.
 const secretStagedValue = "super-secret-token-value"
 
+// secureStringParamValue is a SecureString PARAM staged value. It lives in the
+// param (non-secret) section, so it proves masking keys off the row's value
+// type, not the section's service axis (#677); it must never render revealed.
+const secureStringParamValue = "securestring-db-password-value"
+
 // goldenStaging is a golden-only data.StagingService returning a fixed review
 // and (for the results golden) a fixed apply result. It never touches a store.
 type goldenStaging struct {
@@ -115,6 +120,76 @@ func stagingApp() *App {
 		identity:   awsIdentityFixture(),
 		stagingFor: stagingFixture(),
 	})
+}
+
+// secureStringStagingFixture wires a param section holding a single SecureString
+// param staged update (Secret=true) alongside a plaintext param, so a golden can
+// prove the SecureString value is masked in the PARAM (non-secret) section while
+// the plaintext one is not — masking keys off the row's value type (#677).
+func secureStringStagingFixture() func(string) data.StagingService {
+	param := &goldenStaging{
+		service: "param", label: "Param", svcCap: goldenCap("aws", "param"),
+		review: data.StagingReview{
+			Entries: []data.StagedDiffRow{
+				{
+					Name: "/app/api/SECURE_TOKEN", Type: data.StagedDiffNormal, Operation: "update", Secret: true,
+					RemoteValue: "old-" + secureStringParamValue, StagedValue: secureStringParamValue,
+				},
+				{
+					Name: "/app/web/CDN_URL", Type: data.StagedDiffNormal, Operation: "update",
+					RemoteValue: "https://cdn-old.example.com", StagedValue: "https://cdn-new.example.com",
+				},
+			},
+		},
+	}
+
+	return func(service string) data.StagingService {
+		if service == "param" {
+			return param
+		}
+
+		return nil
+	}
+}
+
+// secureStringStagingApp lands on the Staging tab with only the SecureString
+// param fixture wired.
+func secureStringStagingApp() *App {
+	return newApp(config{
+		scope:      provider.Scope{Provider: provider.ProviderAWS},
+		service:    "staging",
+		identity:   awsIdentityFixture(),
+		stagingFor: secureStringStagingFixture(),
+	})
+}
+
+// TestStaging_SecureStringParamDiffViewGolden pins that a SecureString param
+// staged row is masked on both diff sides in the PARAM section, while a
+// plaintext param row is shown verbatim — masking keys off the row's value type,
+// not the section's service axis (#677).
+func TestStaging_SecureStringParamDiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", false)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secureStringParamValue, "no revealed SecureString param value in the diff-view golden")
+	assert.Contains(t, screen, "•", "the SecureString param row is masked with bullets, proving it renders (not just absent)")
+	assert.Contains(t, screen, "https://cdn-new.example.com", "a plaintext param row is NOT masked")
+	golden.RequireEqual(t, screen)
+}
+
+// TestStaging_SecureStringParamValueViewGolden pins the same masking after
+// toggling to value view.
+func TestStaging_SecureStringParamValueViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", true)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secureStringParamValue, "no revealed SecureString param value in the value-view golden")
+	assert.Contains(t, screen, "•", "the SecureString param row is masked with bullets, proving it renders (not just absent)")
+	golden.RequireEqual(t, screen)
 }
 
 // TestStaging_DiffViewGolden renders the staging page in the default diff view.

@@ -69,6 +69,59 @@ func TestParamSourceShowMasksAndGates(t *testing.T) {
 	assert.NotContains(t, labels, "Namespace", "AWS param has no namespace axis")
 }
 
+// TestParamSourceVersionContentsSecret pins that a SecureString param's diff
+// content is flagged secret, so the diff page masks both sides even though this
+// is the param service (#677).
+func TestParamSourceVersionContentsSecret(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			// Map "#13"/"#14" suffixes to ids so the two versions differ.
+			id := "14"
+			if len(spec) >= 3 && spec[:3] == "#13" {
+				id = "13"
+			}
+
+			return provider.NewVersionRef(id), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name: name, Value: "secret-" + ref.ID(), Type: domain.ValueTypeSecret,
+				Version: domain.Version{ID: ref.ID()},
+			}, nil
+		},
+	}
+
+	src := data.NewParamSource(capFor(t, "aws", "param"), func(context.Context, string) (provider.Store, error) {
+		return store, nil
+	})
+
+	content, err := src.VersionContents(context.Background(), "/app/api/DATABASE_URL", "13", "14", "")
+	require.NoError(t, err)
+	assert.True(t, content.Secret, "a SecureString param diff must be flagged secret")
+
+	// A plaintext (String) param diff must NOT be flagged secret.
+	plainStore := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
+			return provider.NewVersionRef("14"), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name: name, Value: "plain", Type: domain.ValueTypePlaintext,
+				Version: domain.Version{ID: ref.ID()},
+			}, nil
+		},
+	}
+	plainSrc := data.NewParamSource(capFor(t, "aws", "param"), func(context.Context, string) (provider.Store, error) {
+		return plainStore, nil
+	})
+
+	plainContent, err := plainSrc.VersionContents(context.Background(), "/app/x", "14", "14", "")
+	require.NoError(t, err)
+	assert.False(t, plainContent.Secret, "a String param diff is not secret")
+}
+
 // TestSecretSourceStateNotInferred pins that a version's State and StagingLabels
 // are carried as-is (never one inferred from the other), and the ARN comes from
 // Extra.
