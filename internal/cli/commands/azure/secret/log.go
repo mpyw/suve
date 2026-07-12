@@ -6,12 +6,14 @@ import (
 	"io"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
 	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
@@ -68,10 +70,7 @@ func (p *logPresenter) Fetch(ctx context.Context) error {
 func (p *logPresenter) Len() int { return len(p.result.Entries) }
 
 func (p *logPresenter) RenderJSON(stdout io.Writer) error {
-	entries := p.result.Entries
-	items := make([]logJSONItem, 0, len(entries))
-
-	for _, entry := range entries {
+	items := lo.Map(p.result.Entries, func(entry azure.LogEntry, _ int) logJSONItem {
 		item := logJSONItem{Version: entry.Version, State: entry.State}
 
 		if entry.CreatedDate != nil {
@@ -91,8 +90,8 @@ func (p *logPresenter) RenderJSON(stdout io.Writer) error {
 			}
 		}
 
-		items = append(items, item)
-	}
+		return item
+	})
 
 	return output.WriteJSON(stdout, items)
 }
@@ -133,10 +132,9 @@ func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 
 	// Key Vault tags are per version, so show this version's own tags.
 	if len(entry.Tags) > 0 {
-		pairs := make([]string, 0, len(entry.Tags))
-		for _, tag := range entry.Tags {
-			pairs = append(pairs, fmt.Sprintf("%s=%s", tag.Key, tag.Value))
-		}
+		pairs := lo.Map(entry.Tags, func(tag domain.Tag, _ int) string {
+			return fmt.Sprintf("%s=%s", tag.Key, tag.Value)
+		})
 
 		output.Printf(stdout, "%s %s\n", colors.For(stdout).FieldLabel("Tags:"), strings.Join(pairs, ", "))
 	}

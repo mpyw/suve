@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
@@ -66,10 +67,7 @@ func (p *logPresenter) Fetch(ctx context.Context) error {
 func (p *logPresenter) Len() int { return len(p.result.Entries) }
 
 func (p *logPresenter) RenderJSON(stdout io.Writer) error {
-	entries := p.result.Entries
-	items := make([]logJSONItem, 0, len(entries))
-
-	for _, entry := range entries {
+	items := lo.Map(p.result.Entries, func(entry gcloud.LogEntry, _ int) logJSONItem {
 		item := logJSONItem{Version: entry.Version, State: entry.State}
 
 		if entry.CreatedDate != nil {
@@ -82,8 +80,8 @@ func (p *logPresenter) RenderJSON(stdout io.Writer) error {
 			item.Value = &entry.Value
 		}
 
-		items = append(items, item)
-	}
+		return item
+	})
 
 	return output.WriteJSON(stdout, items)
 }

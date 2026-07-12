@@ -77,24 +77,22 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	// For JSON output without --show, output names only
 	if r.Options.Output == output.FormatJSON && !r.Options.Show {
-		items := make([]JSONOutputItem, len(entries))
-		for i, entry := range entries {
-			items[i] = JSONOutputItem{Name: entry.Name}
-		}
+		items := lo.Map(entries, func(entry Entry, _ int) JSONOutputItem {
+			return JSONOutputItem{Name: entry.Name}
+		})
 
 		return output.WriteJSON(r.Stdout, items)
 	}
 
 	// JSON output with values
 	if r.Options.Output == output.FormatJSON {
-		items := make([]JSONOutputItem, 0, len(entries))
-		for _, entry := range entries {
+		items := lo.Map(entries, func(entry Entry, _ int) JSONOutputItem {
 			if entry.Error != nil {
-				items = append(items, JSONOutputItem{Name: entry.Name, Error: entry.Error.Error()})
-			} else {
-				items = append(items, JSONOutputItem{Name: entry.Name, Value: entry.Value})
+				return JSONOutputItem{Name: entry.Name, Error: entry.Error.Error()}
 			}
-		}
+
+			return JSONOutputItem{Name: entry.Name, Value: entry.Value}
+		})
 
 		return output.WriteJSON(r.Stdout, items)
 	}
