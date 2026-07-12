@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/cli/commands/aws/param/paramtype"
@@ -19,10 +20,14 @@ import (
 // WriteOutcome carries the semantic result of a mutation the UI must voice.
 // Skipped is set when a staged edit equalled the live value (nothing staged);
 // Unstaged when an edit-back-to-base or a delete-of-staged-create auto-unstaged
-// the entry (EditOutput.Skipped/Unstaged, DeleteOutput.Unstaged).
+// the entry (EditOutput.Skipped/Unstaged, DeleteOutput.Unstaged); Updated when
+// an immediate create fell back to update because the entry already existed
+// (the create-or-update/upsert branch), so the status voices an update rather
+// than a create — matching the GUI (ParamSet) and CLI (`param set`).
 type WriteOutcome struct {
 	Skipped  bool
 	Unstaged bool
+	Updated  bool
 }
 
 // Mutator is the write-path seam the mutation dialogs depend on. Every method is
@@ -140,13 +145,35 @@ func (m *paramMutator) Create(
 		return WriteOutcome{}, err
 	}
 
-	uc := &param.CreateUseCase{Writer: store}
+	valueType := paramtype.Parse(typeLabel)
 
-	_, err = uc.Execute(ctx, param.CreateInput{
-		Name: key.Name, Value: value, Type: paramtype.Parse(typeLabel), Description: description,
+	// Immediate create is a create-or-update (upsert), matching the GUI (ParamSet)
+	// and the CLI (`param set`): try create first, and if the parameter already
+	// exists fall back to update instead of surfacing the raw ErrAlreadyExists.
+	// The staged branch above is untouched — stage-time add validation is unchanged.
+	createUC := &param.CreateUseCase{Writer: store}
+
+	_, err = createUC.Execute(ctx, param.CreateInput{
+		Name: key.Name, Value: value, Type: valueType, Description: description,
 	})
+	if err == nil {
+		return WriteOutcome{}, nil
+	}
 
-	return WriteOutcome{}, err
+	if !errors.Is(err, provider.ErrAlreadyExists) {
+		return WriteOutcome{}, err
+	}
+
+	updateUC := &param.UpdateUseCase{Store: store}
+
+	_, err = updateUC.Execute(ctx, param.UpdateInput{
+		Name: key.Name, Value: value, Type: valueType, Description: description,
+	})
+	if err != nil {
+		return WriteOutcome{}, err
+	}
+
+	return WriteOutcome{Updated: true}, nil
 }
 
 func (m *paramMutator) Update(

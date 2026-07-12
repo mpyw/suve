@@ -466,8 +466,12 @@ func entryStatus(edit, staged bool, o data.WriteOutcome) string {
 		return "Reverted to the base value — change auto-unstaged."
 	}
 
+	// An immediate create that upserted onto an existing entry (o.Updated) reports
+	// as an update, so the status matches what actually happened (create-or-update
+	// parity with the GUI/CLI). Staged creates never upsert, so o.Updated is only
+	// ever set on the immediate path.
 	verb := "create"
-	if edit {
+	if edit || o.Updated {
 		verb = "update"
 	}
 
