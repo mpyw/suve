@@ -107,6 +107,35 @@ func TestBrowser_AWSParamHistoryFocusGolden(t *testing.T) { //nolint:paralleltes
 	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight))
 }
 
+// TestBrowser_DeleteStagedGateStatusGolden pins #692: on an entry staged for
+// deletion, pressing `t` (edit/delete/tag are all dead-end transitions there)
+// does not open the tag dialog but surfaces a one-line status message instead —
+// matching the GUI, which hides those controls. The delete-staged entry is the
+// default selection (index 0), so the gate fires on the first `t`.
+func TestBrowser_DeleteStagedGateStatusGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	doomed := data.StagedKey{Name: "prod/api/key"}
+	probe := staticProbe{
+		keys:       map[data.StagedKey]struct{}{doomed: {}},
+		deleteKeys: map[data.StagedKey]struct{}{doomed: {}},
+		entryCount: 1,
+	}
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		service:   "secret",
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("secret", awsSecretSource(), probe),
+	})
+
+	raw := captureBrowserAfterKeys(t, m, "Version ID", keyPress('t'))
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	require.Contains(t, screen, "cannot tag: staged for deletion", "the gate surfaces a status message rather than the tag dialog")
+	golden.RequireEqual(t, screen)
+}
+
 // TestBrowser_AWSSecretGolden renders the AWS secret browser (staging labels +
 // ARN, masked value).
 func TestBrowser_AWSSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel

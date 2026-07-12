@@ -224,6 +224,40 @@ func TestTagForm_StagedOnlyHidesModeToggle(t *testing.T) {
 	assert.True(t, mut.staged, "a staged-only submit writes staged, never immediate")
 }
 
+// TestEntryForm_CreateNameRejectsDeleteStaged pins the create-name client-side
+// validation half of #692: the name field's validator rejects a name that is
+// already staged for deletion with an inline friendly message, so the write never
+// reaches the reducer's raw post-submit "cannot add to delete-staged" error. The
+// key is (name, namespace), so a same-name entry under a different namespace does
+// not collide, and a required-name error still fires for an empty name.
+func TestEntryForm_CreateNameRejectsDeleteStaged(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+
+	m, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		DeleteStagedKeys: map[data.StagedKey]struct{}{{Name: "/app/doomed"}: {}},
+	})
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+
+	validate := d.nameValidator()
+
+	err := validate("/app/doomed")
+	require.Error(t, err, "a delete-staged name is rejected client-side")
+	assert.Contains(t, err.Error(), "staged for deletion", "the message names the reason")
+
+	require.NoError(t, validate("/app/fresh"), "a name that is not delete-staged is accepted")
+	require.Error(t, validate(""), "the required-name check still fires")
+
+	// The key is (name, namespace): the same name under a different namespace is
+	// not the delete-staged (empty-namespace) key, so it is accepted.
+	d.namespace = "other"
+
+	require.NoError(t, validate("/app/doomed"), "a same-name entry under a different namespace does not collide")
+}
+
 // newAppConfigEntry builds an App Configuration (namespaced) create/edit form
 // seeded with a namespace, for the namespace read-only assertions.
 func newAppConfigEntry(t *testing.T, edit bool, namespace string) *entryForm {

@@ -332,22 +332,21 @@ func (f *sourceFactory) resolveAWSStagingScope() (provider.Scope, error) {
 }
 
 // lazyStagingProbe defers building the real probe (and thus the on-disk store)
-// to the first StagedKeys call, so page construction never blocks on the
-// keychain.
+// to the first Staged call, so page construction never blocks on the keychain.
 type lazyStagingProbe struct {
 	build func() (data.StagingProbe, error)
 }
 
-func (p *lazyStagingProbe) StagedKeys(ctx context.Context) (map[data.StagedKey]struct{}, error) {
+func (p *lazyStagingProbe) Staged(ctx context.Context) (data.StagingSnapshot, error) {
 	probe, err := p.build()
 	if err != nil {
 		// A build failure is a store-construction hard-fail (e.g. a keychain
 		// key-loss while encrypted state exists). Mark it so the browser surfaces it
 		// on the error line instead of silently dropping the staging badges.
-		return nil, &data.StoreUnavailableError{Err: err}
+		return data.StagingSnapshot{}, &data.StoreUnavailableError{Err: err}
 	}
 
-	return probe.StagedKeys(ctx)
+	return probe.Staged(ctx)
 }
 
 // capabilityFor looks up the ServiceCapability for a provider+service in the

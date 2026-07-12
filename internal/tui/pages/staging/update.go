@@ -35,10 +35,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 }
 
 // onReviewLoaded applies a staged-review response when fresh, rebuilds the rows,
-// and reports the section's authoritative staged count (entries + tag changes,
-// counted separately) so the Staging tab badge is exact — fixing the browser's
-// best-effort undercount, which deduplicates an item that has both an entry and
-// a tag change into one.
+// and reports the section's staged count as entries + tag changes (counted
+// separately). The browser's staged probe reports the same entries+tags total,
+// so the Staging tab badge reads one consistent count from either surface (#693).
 func (m *Model) onReviewLoaded(msg reviewLoadedMsg) tea.Cmd {
 	if msg.section >= len(m.sections) {
 		return nil

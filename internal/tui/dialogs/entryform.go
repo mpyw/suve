@@ -58,6 +58,11 @@ type entryForm struct {
 	// review page's edit path); the browser leaves it false and keeps the toggle.
 	stagedOnly bool
 
+	// deleteStagedKeys is the set of (name, namespace) keys staged for deletion,
+	// used by the create name validator to reject a delete-staged name inline
+	// rather than dead-ending on the reducer's post-submit error (#692).
+	deleteStagedKeys map[data.StagedKey]struct{}
+
 	// Bound form values.
 	name        string
 	namespace   string
@@ -92,6 +97,9 @@ type EntryFormInput struct {
 	// review can never launch an immediate write that bypasses the staging store.
 	StagedOnly  bool
 	Description string
+	// DeleteStagedKeys lets a create dialog reject a name already staged for
+	// deletion with an inline validation error (#692). Unset for an edit.
+	DeleteStagedKeys map[data.StagedKey]struct{}
 }
 
 // NewEntryForm builds a create/edit dialog. It returns the dialog and its Init
@@ -100,18 +108,19 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 	svcCap := in.Mutator.Capability()
 
 	d := &entryForm{
-		ctx:         in.Ctx,
-		mutator:     in.Mutator,
-		svcCap:      svcCap,
-		service:     in.Service,
-		styles:      in.Styles,
-		edit:        in.Edit,
-		name:        in.Name,
-		namespace:   in.Namespace,
-		valueType:   defaultTypeLabel(svcCap, in.TypeLabel),
-		value:       in.Value,
-		description: in.Description,
-		stagedOnly:  in.StagedOnly,
+		ctx:              in.Ctx,
+		mutator:          in.Mutator,
+		svcCap:           svcCap,
+		service:          in.Service,
+		styles:           in.Styles,
+		edit:             in.Edit,
+		name:             in.Name,
+		namespace:        in.Namespace,
+		valueType:        defaultTypeLabel(svcCap, in.TypeLabel),
+		value:            in.Value,
+		description:      in.Description,
+		stagedOnly:       in.StagedOnly,
+		deleteStagedKeys: in.DeleteStagedKeys,
 		// Staged by default when the service supports staging; otherwise always
 		// immediate (the mode toggle is hidden). A staged-only surface forces
 		// staged regardless (its toggle is hidden too).
@@ -159,7 +168,7 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 
 	if !d.edit {
 		fields = append(fields, huh.NewInput().Key("name").Title("Name").
-			Value(&d.name).Validate(requiredField("name")))
+			Value(&d.name).Validate(d.nameValidator()))
 	}
 
 	if d.svcCap.HasNamespaces {
@@ -476,6 +485,32 @@ func entryStatus(edit, staged bool, o data.WriteOutcome) string {
 	}
 
 	return "Applied " + verb + "."
+}
+
+// nameValidator builds the create name field's validator: the name is required,
+// and it must not already be staged for deletion. Validating client-side against
+// the delete-staged key set the browser already holds turns what would otherwise
+// be a raw post-submit reducer error ("cannot add to delete-staged") into an
+// inline, friendly message before the write is ever attempted (#692). The key is
+// (typed name, current namespace) read from the live namespace pointer; for the
+// common create (a concrete seeded namespace — an all-namespaces create is
+// blocked upstream) the namespace is fixed, so the check is exact. Should a later
+// namespace edit slip a delete-staged name past this, the reducer still refuses
+// the write — this only upgrades the common case to a friendlier message.
+func (d *entryForm) nameValidator() func(string) error {
+	required := requiredField("name")
+
+	return func(s string) error {
+		if err := required(s); err != nil {
+			return err
+		}
+
+		if _, ok := d.deleteStagedKeys[data.StagedKey{Name: s, Namespace: d.namespace}]; ok {
+			return stringError(s + " is staged for deletion — reset it first")
+		}
+
+		return nil
+	}
 }
 
 // requiredField builds a huh validator that rejects an empty/whitespace value.
