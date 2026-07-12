@@ -10,23 +10,21 @@ import {
 } from './fixtures/wails-mock';
 
 // ============================================================================
-// GUI secret-service masking leaks (#714, #715)
+// GUI secret-service diff reveal vs passive masking (#714, #715, #735)
 //
-// Pre-existing GUI leaks surfaced during the #704 audit while fixing #677/#702
-// (PR #711 fixed the value-type SecureString-param diff + the TUI staging
-// review, but left these two GUI secret-SERVICE surfaces unmasked):
+// Per the confirmed policy, an EXPLICIT diff surface — the "Version Comparison"
+// modal and the staging DIFF view's remote-vs-staged ± comparison — is REVEALED
+// by default (the user opened it to inspect the change), with a Hide/Show toggle
+// (#735). PASSIVE surfaces stay masked by default:
 //
-//   #714 — SecretView "Version Comparison" rendered both secret values in
-//          cleartext (the detail pane already masks by default).
-//   #715 — the GUI staging review rendered secret-service staged/remote values
-//          in cleartext, in both diff and value view modes.
+//   - the staging VALUE view (plain staged-value listing),
+//   - a staged CREATE (a lone new value, not a remote-vs-staged comparison).
 //
-// The reference behavior is the GUI's own masked-by-default secret handling
-// (detail pane / Version History). These tests assert no plaintext secret value
-// reaches either surface and that masking bullets/asterisks are present.
+// These tests assert the diff comparison reveals and the toggle hides, while the
+// passive value view and create values remain masked with bullets/asterisks.
 // ============================================================================
 
-test.describe('Secret-service version diff masking (#714)', () => {
+test.describe('Secret-service version diff reveal + hide toggle (#714/#735)', () => {
   test.beforeEach(async ({ page }) => {
     // Default mock state ships my-secret with three versions carrying
     // distinctive cleartext values.
@@ -36,7 +34,7 @@ test.describe('Secret-service version diff masking (#714)', () => {
     await waitForItemList(page);
   });
 
-  test('masks both sides of a secret version comparison', async ({ page }) => {
+  test('reveals both sides of a secret version comparison by default, hides on toggle', async ({ page }) => {
     await clickItemByName(page, 'my-secret');
 
     await page.getByRole('button', { name: /Compare/i }).click();
@@ -46,18 +44,22 @@ test.describe('Secret-service version diff masking (#714)', () => {
 
     await expect(page.getByText('Version Comparison')).toBeVisible();
 
-    const oldSide = (await page.locator('.diff-value.diff-old').textContent()) ?? '';
-    const newSide = (await page.locator('.diff-value.diff-new').textContent()) ?? '';
+    // Revealed by default: the explicit comparison shows real values so the diff
+    // is meaningful (#735).
+    let oldSide = (await page.locator('.diff-value.diff-old').textContent()) ?? '';
+    let newSide = (await page.locator('.diff-value.diff-new').textContent()) ?? '';
+    expect(oldSide + newSide).toContain('secret-value');
 
-    // No cleartext version value may appear on either side.
+    // The Hide toggle masks both sides — no cleartext version value remains.
+    await page.locator('.btn-mask-toggle').click();
+    oldSide = (await page.locator('.diff-value.diff-old').textContent()) ?? '';
+    newSide = (await page.locator('.diff-value.diff-new').textContent()) ?? '';
     for (const side of [oldSide, newSide]) {
       expect(side).not.toContain('secret-value-1');
       expect(side).not.toContain('secret-value-old');
       expect(side).not.toContain('secret-value-initial');
       expect(side).not.toContain('secret-value');
     }
-
-    // Both sides are masked (a change still shows as differing asterisk runs).
     expect(oldSide).toMatch(/\*/);
     expect(newSide).toMatch(/\*/);
   });
@@ -84,19 +86,32 @@ test.describe('Secret-service staging review masking (#715)', () => {
     await expect(page.locator('.entry-item').first()).toBeVisible();
   }
 
-  test('masks staged/remote values in diff view', async ({ page }) => {
+  test('reveals staged/remote comparison values in diff view (create stays masked), hides on toggle', async ({ page }) => {
     await gotoSecretStaging(page);
     // Default view mode is Diff.
     await expect(page.getByRole('button', { name: 'Diff' })).toHaveClass(/active/);
 
-    const body = (await page.locator('.staging-content').textContent()) ?? '';
-    expect(body).not.toContain(UPDATE_VALUE);
+    let body = (await page.locator('.staging-content').textContent()) ?? '';
+    // An update/delete is a real remote-vs-staged comparison → revealed by
+    // default so the change is meaningful (#735).
+    expect(body).toContain(UPDATE_VALUE);
+    expect(body).toContain(REMOTE_VALUE);
+    // A create is a lone new value (no comparison) → stays masked (#719).
     expect(body).not.toContain(CREATE_VALUE);
-    expect(body).not.toContain(REMOTE_VALUE);
-    // Something is still rendered as masked bullets/asterisks.
     expect(body).toMatch(/\*/);
     // The delete sentinel stays readable (it is not secret material).
     expect(body).toContain('(deleted)');
+
+    // Hiding every comparison (each toggle clicked once) masks the revealed values.
+    const toggles = page.locator('.btn-mask-toggle');
+    const count = await toggles.count();
+    for (let i = 0; i < count; i++) {
+      await toggles.nth(i).click();
+    }
+    body = (await page.locator('.staging-content').textContent()) ?? '';
+    expect(body).not.toContain(UPDATE_VALUE);
+    expect(body).not.toContain(REMOTE_VALUE);
+    expect(body).toMatch(/\*/);
   });
 
   test('masks staged values in value view', async ({ page }) => {

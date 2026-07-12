@@ -144,7 +144,14 @@ func (m *Model) footerLine(width int) string {
 // apply/reset. These are page-local (not in keys.Map), so the global help bar
 // never lists them; this line makes them discoverable (#655).
 func (m *Model) hintLine(width int) string {
-	const hint = "e edit · u unstage · t tags · x reveal · enter detail · v view · a apply · r reset"
+	// `x` is view-aware: it hides the revealed diff comparison in diff view, and
+	// reveals the selected masked value in value view (see onReveal).
+	xHint := "x reveal"
+	if m.diffView {
+		xHint = "x hide"
+	}
+
+	hint := "e edit · u unstage · t tags · " + xHint + " · enter detail · v view · a apply · r reset"
 
 	return m.styles.PageHint.Render(clip(hint, width))
 }
@@ -322,23 +329,29 @@ func (m *Model) entryLines(sec *section, e data.StagedDiffRow, rowIdx int) []str
 	return append([]string{head}, m.diffLines(sec, e, rowIdx)...)
 }
 
-// diffLines renders an entry's Remote-vs-Staged ± lines (masked for secrets,
-// revealed only when rowIdx is the selected row — see maskValue).
+// diffLines renders an entry's Remote-vs-Staged ± lines. An update/delete is a
+// real remote-vs-staged comparison, revealed by default so the change is
+// meaningful (#735); `x` in diff view hides it (see maskDiffValue). A create has
+// no remote to compare against — it is a lone new value, not a comparison — so
+// it stays masked as a plain value (peekable per-row in value view), never
+// revealed as part of the diff (#719).
 func (m *Model) diffLines(sec *section, e data.StagedDiffRow, rowIdx int) []string {
-	var lines []string
-
 	// A SecureString param row is secret even in a non-secret (param) section, so
 	// OR the row's own flag into the section's (#677).
 	secret := sec.secret || e.Secret
-	remote := m.maskValue(e.RemoteValue, secret, rowIdx)
-	staged := m.maskValue(e.StagedValue, secret, rowIdx)
 
-	if e.Operation != operationCreate {
-		lines = append(lines, "    "+m.styles.DiffRemoved.Render("- "+firstLine(remote)))
+	if e.Operation == operationCreate {
+		staged := firstLine(m.maskValue(e.StagedValue, secret, rowIdx))
+
+		return []string{"    " + m.styles.DiffAdded.Render("+ "+staged)}
 	}
 
+	remote := firstLine(m.maskDiffValue(e.RemoteValue, secret))
+	lines := []string{"    " + m.styles.DiffRemoved.Render("- "+remote)}
+
 	if e.Operation != operationDelete {
-		lines = append(lines, "    "+m.styles.DiffAdded.Render("+ "+firstLine(staged)))
+		staged := firstLine(m.maskDiffValue(e.StagedValue, secret))
+		lines = append(lines, "    "+m.styles.DiffAdded.Render("+ "+staged))
 	}
 
 	return lines

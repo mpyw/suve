@@ -362,12 +362,11 @@ func TestDiff_AWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv 
 	diffGolden(t, host, "@@")
 }
 
-// TestDiff_AWSParamSecureStringGolden pins a SecureString PARAM diff: the two
-// versions differ, so the diff renders +/- lines — every one a run of mask
-// bullets, never a revealed value. A SecureString is a secret on the value-type
-// axis even though it lives on the param service, so its diff must mask exactly
-// like a secret-service diff (#677). The fixture's cleartext value must NOT
-// appear in the golden.
+// TestDiff_AWSParamSecureStringGolden pins a SecureString PARAM diff: the
+// Compare/diff view is a surface the user explicitly opened to inspect the
+// change, so its values are REVEALED by default (#702/#735) — a SecureString is
+// a secret on the value-type axis, so `x` can still hide it, but the default
+// shows the real +/- change. The fixture's cleartext values appear in the golden.
 func TestDiff_AWSParamSecureStringGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
 	goldenEnv(t)
 
@@ -376,9 +375,8 @@ func TestDiff_AWSParamSecureStringGolden(t *testing.T) { //nolint:paralleltest /
 	raw := captureUntil(t, host, "diff:", goldenTermWidth, goldenTermHeight)
 	screen := renderVisibleScreenSize(t, raw, goldenTermWidth, goldenTermHeight)
 
-	require.NotContains(t, screen, secureStringDiffValue, "no revealed SecureString value in the diff golden")
-	require.NotContains(t, screen, secureStringDiffOldValue, "no revealed SecureString value in the diff golden")
-	require.Contains(t, screen, "•", "the SecureString diff is masked with bullets, proving it renders (not just absent)")
+	require.Contains(t, screen, secureStringDiffValue, "the SecureString diff is revealed by default (#702/#735)")
+	require.Contains(t, screen, secureStringDiffOldValue, "both SecureString versions are shown")
 	golden.RequireEqual(t, screen)
 }
 
@@ -390,10 +388,10 @@ func TestDiff_AWSSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv
 	diffGolden(t, host, "diff:")
 }
 
-// TestDiff_GCloudSecretGolden pins a SECRET diff: the two versions differ, so the
-// diff renders +/- lines — and every one is a run of mask bullets, never a
-// revealed secret value (the fixture values, e.g. "googlecloud-secret-value-…",
-// must not appear in the golden).
+// TestDiff_GCloudSecretGolden pins a SECRET diff: the Compare/diff view is
+// explicitly opened to inspect the change, so the two differing versions are
+// REVEALED by default (#735) — the real +/- content shows (the `x` toggle can
+// still hide it).
 func TestDiff_GCloudSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
 	goldenEnv(t)
 

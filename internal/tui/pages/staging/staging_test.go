@@ -226,6 +226,54 @@ func TestUpdate_RevealIsPerSelectedRow(t *testing.T) {
 	assert.NotContains(t, screen, valueRow0, "the earlier row stays masked")
 }
 
+// TestUpdate_DiffViewRevealedByDefault pins #735: in the DEFAULT diff view a
+// secret entry's remote-vs-staged comparison is SHOWN (both sides), so the diff
+// is meaningful — the whole diff view reveals together (not per-row), and `x`
+// toggles a page-level hide that masks every secret comparison at once.
+func TestUpdate_DiffViewRevealedByDefault(t *testing.T) {
+	t.Parallel()
+
+	const (
+		remote0 = "REMOTE-ROW-ZERO"
+		staged0 = "STAGED-ROW-ZERO"
+		remote1 = "REMOTE-ROW-ONE"
+		staged1 = "STAGED-ROW-ONE"
+	)
+
+	sec := &stubService{
+		service: "secret", label: "Secret", svcCap: capFor("aws", "secret"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{
+			{Name: "prod/api/one", Type: data.StagedDiffNormal, Operation: "update", RemoteValue: remote0, StagedValue: staged0},
+			{Name: "prod/api/two", Type: data.StagedDiffNormal, Operation: "update", RemoteValue: remote1, StagedValue: staged1},
+		}},
+	}
+	m := newModel(t, sec)
+	require.True(t, m.diffView, "diff is the default view")
+
+	// Revealed by default: every row's remote and staged values are shown.
+	screen := m.View(100, 30)
+	for _, v := range []string{remote0, staged0, remote1, staged1} {
+		assert.Contains(t, screen, v, "diff view reveals %q by default", v)
+	}
+
+	// `x` hides the whole diff view (page-level, not per-selected-row): no secret
+	// value remains, but bullets prove the rows still render.
+	m, _ = m.Update(keyPress('x'))
+	require.True(t, m.diffHidden, "x hides the diff view")
+
+	screen = m.View(100, 30)
+	for _, v := range []string{remote0, staged0, remote1, staged1} {
+		assert.NotContains(t, screen, v, "x masks %q across the whole diff view", v)
+	}
+
+	assert.Contains(t, screen, "•", "masked diff rows still render as bullets")
+
+	// `x` again reveals everything.
+	m, _ = m.Update(keyPress('x'))
+	require.False(t, m.diffHidden, "x toggles back to revealed")
+	assert.Contains(t, m.View(100, 30), staged1, "toggling back shows the values again")
+}
+
 // tagOpsReview is a param section with one staged tag add and one staged tag
 // removal (no entry rows), used to exercise the tag-row key handling.
 func tagOpsReview() data.StagingReview {
@@ -289,11 +337,12 @@ func TestUpdate_TagRowRevealAndEnterNonDestructive(t *testing.T) {
 	for _, row := range []int{0, 1} {
 		m.selected = row
 
-		// `x` reveals only: it flips reveal and dispatches nothing.
-		before := m.reveal
+		// `x` only toggles masking (here the diff-view page-level hide, the default
+		// view) and dispatches nothing — it never cancels a staged tag change.
+		before := m.diffHidden
 		m, cmd := m.Update(keyPress('x'))
 		assert.Nil(t, cmd, "x dispatches no command on a tag row")
-		assert.Equal(t, !before, m.reveal, "x toggles reveal on a tag row")
+		assert.Equal(t, !before, m.diffHidden, "x toggles the diff-view mask on a tag row")
 
 		// enter is a no-op: no command, no cancel.
 		_, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

@@ -250,9 +250,8 @@ func TestStaging_SecureStringParamDiffViewGolden(t *testing.T) { //nolint:parall
 	raw := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", false)
 	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
 
-	assert.NotContains(t, screen, secureStringParamValue, "no revealed SecureString param value in the diff-view golden")
-	assert.Contains(t, screen, "•", "the SecureString param row is masked with bullets, proving it renders (not just absent)")
-	assert.Contains(t, screen, "https://cdn-new.example.com", "a plaintext param row is NOT masked")
+	assert.Contains(t, screen, secureStringParamValue, "the SecureString param diff is revealed by default (#677/#735)")
+	assert.Contains(t, screen, "https://cdn-new.example.com", "a plaintext param row is shown too")
 	golden.RequireEqual(t, screen)
 }
 
@@ -270,14 +269,29 @@ func TestStaging_SecureStringParamValueViewGolden(t *testing.T) { //nolint:paral
 }
 
 // TestStaging_DiffViewGolden renders the staging page in the default diff view.
-// Secret values are masked on both diff sides, so the secret value never appears.
+// The remote-vs-staged comparison is a surface the user explicitly opened to
+// inspect the change, so secret values are REVEALED by default (#735).
 func TestStaging_DiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
 	raw := captureStaging(t, stagingApp(), "prod/api/session", false)
 	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
 
-	assert.NotContains(t, screen, secretStagedValue, "no revealed secret value in the diff-view golden")
+	assert.Contains(t, screen, secretStagedValue, "the secret remote-vs-staged diff is revealed by default (#735)")
+	golden.RequireEqual(t, screen)
+}
+
+// TestStaging_DiffViewHiddenGolden pins the diff-view mask toggle: pressing `x`
+// in diff view hides every secret comparison (page-level), so no secret value
+// appears while the rows still render as masked bullet runs.
+func TestStaging_DiffViewHiddenGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStagingKeys(t, stagingApp(), "prod/api/session", keyPress('x'))
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secretStagedValue, "x hides the revealed secret diff")
+	assert.Contains(t, screen, "•", "the hidden diff still renders as masked bullets")
 	golden.RequireEqual(t, screen)
 }
 

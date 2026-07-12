@@ -154,6 +154,7 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 func (m *Model) toggleView() tea.Cmd {
 	m.diffView = !m.diffView
 	m.reveal = false
+	m.diffHidden = false
 
 	return tea.ClearScreen
 }
@@ -172,12 +173,25 @@ func (m *Model) moveSelection(delta int) {
 	m.reveal = false
 }
 
-// onReveal toggles the reveal for the SELECTED row's value only (never
-// page-global): pressing `x` unmasks just the selected secret, and moving the
-// selection resets it (#694). It is reveal-only on every row kind (including tag
-// rows): removing a staged change — entry or tag — is `u`'s job, never `x`, so a
-// user who learned `x` = reveal never destroys a staged change by peeking (#682).
+// onReveal toggles secret masking with `x`, view-aware:
+//
+//   - In DIFF view the remote-vs-staged comparison is revealed by default (the
+//     surface the user explicitly opened to inspect the change, #735); `x`
+//     toggles a page-level HIDE so the diff can still be masked.
+//   - In VALUE view the raw staged value is masked by default; `x` unmasks only
+//     the SELECTED row's value (never page-global), and moving the selection
+//     resets it (#694).
+//
+// It never removes a staged change — that is `u`'s job on every row kind
+// (including tag rows) — so a user who learned `x` never destroys a staged
+// change by peeking (#682).
 func (m *Model) onReveal() {
+	if m.diffView {
+		m.diffHidden = !m.diffHidden
+
+		return
+	}
+
 	m.reveal = !m.reveal
 }
 
@@ -367,6 +381,19 @@ func (m *Model) noticeVisible() bool {
 func (m *Model) maskValue(value string, secret bool, rowIdx int) string {
 	revealed := m.reveal && rowIdx == m.selected
 	if secret && !revealed {
+		return components.MaskValue(value)
+	}
+
+	return value
+}
+
+// maskDiffValue masks a secret value for the DIFF view. The diff view is shown
+// revealed by default so the remote-vs-staged change is meaningful (#735); it is
+// masked only while the page-level hide is on (`x` in diff view). Unlike
+// maskValue this is page-level, not per-selected-row: the whole diff view masks
+// or reveals together.
+func (m *Model) maskDiffValue(value string, secret bool) string {
+	if secret && m.diffHidden {
 		return components.MaskValue(value)
 	}
 

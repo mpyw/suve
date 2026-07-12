@@ -176,12 +176,15 @@
           {#if entry.operation === 'delete'}
             {#if viewMode === 'diff'}
               <div class="entry-diff">
-                <!-- The staged side is the literal "(deleted)" sentinel (not
-                     secret), so mask only the remote value here rather than
-                     passing `secret` (which would mask both sides). -->
+                <!-- The remote-vs-staged comparison is revealed by default (the
+                     user explicitly opened this diff, #735); the DiffDisplay
+                     Hide/Show toggle can mask it. Only the remote side is secret
+                     — the staged side is the literal "(deleted)" sentinel — so
+                     pass oldSecret rather than secret (which would mask both). -->
                 <DiffDisplay
-                  oldValue={rowSecret ? maskValue(entry.remoteValue || '') : (entry.remoteValue || '')}
+                  oldValue={entry.remoteValue || ''}
                   newValue="(deleted)"
+                  oldSecret={rowSecret}
                   oldLabel="Remote"
                   newLabel="Staged"
                   oldSubLabel={entry.remoteIdentifier || ''}

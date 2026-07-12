@@ -100,9 +100,14 @@ type Model struct {
 
 	// diffView selects diff (Remote vs Staged) vs value (raw staged) rendering.
 	diffView bool
-	// reveal unmasks the SELECTED row's secret staged value (never page-global);
-	// reset on a selection move, a view toggle, and reload (#694).
+	// reveal unmasks the SELECTED row's secret staged value in VALUE view (never
+	// page-global); reset on a selection move, a view toggle, and reload (#694).
 	reveal bool
+	// diffHidden masks the DIFF view's remote-vs-staged secret values. The diff
+	// view is a surface the user explicitly opened to inspect the change, so it is
+	// revealed by default (diffHidden=false, #735); `x` in diff view toggles it to
+	// hide. Reset on a view toggle and reload.
+	diffHidden bool
 	// noticeDismissed hides the auto-unstaged notice until the next load.
 	noticeDismissed bool
 	// status is a transient one-line message shown in the footer for an invalid
@@ -189,6 +194,7 @@ func (m *Model) CapturesInput() bool { return false }
 func (m *Model) reload() tea.Cmd {
 	m.noticeDismissed = false
 	m.reveal = false
+	m.diffHidden = false
 
 	cmds := make([]tea.Cmd, 0, len(m.sections))
 	for i := range m.sections {
