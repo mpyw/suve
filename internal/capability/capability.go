@@ -33,13 +33,13 @@ type ServiceCapability struct {
 	HasTags bool `json:"hasTags"`
 	// TagsPerVersion is true when tags are scoped to a specific version rather
 	// than the resource (Azure Key Vault only): each version has its own tags,
-	// so the GUI shows them per version in the history and writes target the
+	// so the frontend shows them per version in the history and writes target the
 	// latest version. Every other provider keeps tags at the resource level.
 	TagsPerVersion bool `json:"tagsPerVersion"`
 	// HasRestore is true when a soft-deleted item can be restored (AWS Secrets
 	// Manager only).
 	HasRestore bool `json:"hasRestore"`
-	// HasStaging is true when the GUI's staging workflow applies to this
+	// HasStaging is true when the frontend's staging workflow applies to this
 	// service (every provider service today); the frontend hides the staging
 	// tab/banner/checkbox when false.
 	HasStaging bool `json:"hasStaging"`

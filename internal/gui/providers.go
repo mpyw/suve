@@ -85,16 +85,18 @@ func providerStrings(ps []provider.Provider) []string {
 // Capabilities
 // =============================================================================
 
-// ServiceCapability is re-exported from the neutral internal/capability package
-// so the Wails binding surface (and the generated TypeScript models) stay stable
-// while the matrix itself lives untagged and is shared with the TUI. The alias
-// resolves to the same JSON shape, so the generated bindings need no
-// regeneration.
+// ServiceCapability and ProviderCapability are re-exported from the neutral
+// internal/capability package so the matrix lives untagged and is shared with the
+// TUI. The aliases keep the marshaled JSON byte-identical, so the committed
+// wailsjs bindings under the gui namespace stay runtime-correct. Regenerating
+// would resolve each alias to its underlying type and relocate both into a
+// capability namespace in the generated TypeScript, forcing an update of every
+// frontend ref (gui.ProviderCapability / gui.ServiceCapability) for no runtime
+// gain — so the bindings are intentionally kept under gui and not regenerated for
+// this refactor.
 type ServiceCapability = capability.ServiceCapability
 
-// ProviderCapability is re-exported from the neutral internal/capability package
-// so the Wails binding surface stays stable while the matrix lives untagged and
-// is shared with the TUI. The alias resolves to the same JSON shape.
+// ProviderCapability — see ServiceCapability above.
 type ProviderCapability = capability.ProviderCapability
 
 // Capabilities returns the static capability descriptor for every provider,
