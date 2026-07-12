@@ -584,6 +584,7 @@
         entries={secretEntries}
         tagEntries={secretTagEntries}
         hasTags={secretSvc?.hasTags ?? true}
+        secret={true}
         {viewMode}
         onapply={() => openApplyModal('secret')}
         onreset={() => openResetModal('secret')}

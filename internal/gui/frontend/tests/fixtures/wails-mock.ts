@@ -48,6 +48,10 @@ export interface StagedEntry {
   // per-service envelope round-trips back into the same service regardless of
   // the name shape (Google Cloud/Azure names carry no leading '/').
   service?: Service;
+  // Optional value-type secret flag. When set, StagingDiff stamps it onto the
+  // entry's DTO (mirroring the backend's DiffEntry.Secret) so the staging review
+  // masks a SecureString param even in the non-secret Param section.
+  secret?: boolean;
 }
 
 export interface StagedTagEntry {
@@ -1210,6 +1214,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
             stagedValue: s.value || '',
             description: '',
             warning: '',
+            // Mirror the backend's value-type secret flag: secret-service
+            // entries are secret material (the create path leaves it unset —
+            // the section-level flag masks those). A per-entry override wins so
+            // a SecureString param can be flagged too.
+            secret: s.secret ?? (service === 'secret' && s.operation !== 'create'),
           })),
           tagEntries: tagStaged.map((t: any) => ({
             name: t.name,

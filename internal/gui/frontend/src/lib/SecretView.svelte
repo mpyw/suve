@@ -830,6 +830,7 @@
     <DiffDisplay
       oldValue={formatJsonValue(diffResult.oldValue)}
       newValue={formatJsonValue(diffResult.newValue)}
+      secret={true}
       oldLabel="Old"
       newLabel="New"
       oldSubLabel={diffResult.oldVersionId}
