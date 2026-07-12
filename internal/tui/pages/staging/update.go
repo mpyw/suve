@@ -85,6 +85,10 @@ func (m *Model) onActionDone(msg actionDoneMsg) tea.Cmd {
 
 // handleKey routes a key press to a page action.
 func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
+	// Clear the transient invalid-action status on any key; the action below
+	// re-sets it when the pressed key is itself invalid for the selected row.
+	m.status = ""
+
 	// The auto-unstaged notice dismisses on esc while it is showing.
 	if key.Matches(msg, m.keys.Back) && m.noticeVisible() {
 		m.noticeDismissed = true
@@ -117,7 +121,9 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Select):
 		return m, m.onEnter()
 	case key.Matches(msg, revealKey):
-		return m, m.onReveal()
+		m.onReveal()
+
+		return m, nil
 	}
 
 	return m.handleActionKey(msg)
@@ -157,52 +163,30 @@ func (m *Model) moveSelection(delta int) {
 	m.scrollToSelection = true
 }
 
-// onReveal toggles value-view masking, or — on a staged tag-add row — cancels
-// that add (the `x` cancel affordance).
-func (m *Model) onReveal() tea.Cmd {
-	if row, ok := m.selectedRow(); ok && row.kind == rowTagAdd {
-		return m.cancelTag(row)
-	}
-
+// onReveal toggles value-view masking. It is reveal-only on every row kind
+// (including tag rows): removing a staged change — entry or tag — is `u`'s job,
+// never `x`, so a user who learned `x` = reveal never destroys a staged change
+// by peeking (#682).
+func (m *Model) onReveal() {
 	m.reveal = !m.reveal
-
-	return nil
 }
 
-// onEnter opens the full-diff detail for an entry row, or cancels a staged tag
-// change for a tag row (the `↩` cancel affordance).
+// onEnter opens the full-diff detail for an entry row. On a tag row it is a
+// no-op: enter is detail-only, never a destructive cancel (#682). Removing a
+// staged tag change is `u`'s job (see unstageSelected).
 func (m *Model) onEnter() tea.Cmd {
 	row, ok := m.selectedRow()
-	if !ok {
+	if !ok || row.kind != rowEntry {
 		return nil
 	}
 
-	switch row.kind {
-	case rowEntry:
-		return m.openDetail(row)
-	case rowTagAdd, rowTagRemove:
-		return m.cancelTag(row)
-	default:
-		return nil
-	}
+	return m.openDetail(row)
 }
 
-// cancelTag cancels the selected tag add/removal (busy-guarded).
-func (m *Model) cancelTag(row rowRef) tea.Cmd {
-	if m.actionBusy {
-		return nil
-	}
-
-	m.actionBusy = true
-
-	if row.kind == rowTagRemove {
-		return m.cancelRemoveTagCmd(row.section, row.key, row.tagKey)
-	}
-
-	return m.cancelAddTagCmd(row.section, row.key, row.tagKey)
-}
-
-// unstageSelected unstages the selected row's item (entry + its tags).
+// unstageSelected removes the selected row's staged change: for an entry row the
+// whole entry (and its tags); for a tag row that single tag add/removal. `u` is
+// the one removal affordance across all row kinds — `x` reveals and enter shows
+// detail, neither ever removes (#682).
 func (m *Model) unstageSelected() tea.Cmd {
 	row, ok := m.selectedRow()
 	if !ok || m.actionBusy {
@@ -211,7 +195,14 @@ func (m *Model) unstageSelected() tea.Cmd {
 
 	m.actionBusy = true
 
-	return m.unstageCmd(row.section, row.key)
+	switch row.kind {
+	case rowTagAdd:
+		return m.cancelAddTagCmd(row.section, row.key, row.tagKey)
+	case rowTagRemove:
+		return m.cancelRemoveTagCmd(row.section, row.key, row.tagKey)
+	default: // rowEntry
+		return m.unstageCmd(row.section, row.key)
+	}
 }
 
 // editSelected reuses the mutation entry form to edit a staged create/update's
@@ -235,11 +226,20 @@ func (m *Model) editSelected() tea.Cmd {
 	}
 }
 
-// tagSelected reuses the tag form to stage a tag add on the selected
-// row's item.
+// tagSelected reuses the tag form to stage a tag add on the selected row's item.
+// Tagging a delete-staged entry is a statically impossible transition (the
+// reducer returns ErrCannotTagDelete), so it is gated off at the affordance —
+// mirroring editSelected and the GUI's hidden "+ Add Tag" — with a one-line
+// status message instead of a guaranteed dead-end form (#684).
 func (m *Model) tagSelected() tea.Cmd {
 	row, ok := m.selectedRow()
 	if !ok {
+		return nil
+	}
+
+	if row.kind == rowEntry && row.entry.Operation == operationDelete {
+		m.status = "cannot tag: staged for deletion — reset first"
+
 		return nil
 	}
 

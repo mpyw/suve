@@ -172,29 +172,36 @@ func TestUpdate_ValueViewCollapsesMultiline(t *testing.T) {
 	assert.NotContains(t, screen, "SECOND_LINE_MARKER", "later lines never render as extra rows")
 }
 
-// TestUpdate_CancelTagOps pins that `x` cancels a staged tag add and enter
-// cancels a staged tag removal, each addressing the correct (item, tagKey).
-func TestUpdate_CancelTagOps(t *testing.T) {
+// tagOpsReview is a param section with one staged tag add and one staged tag
+// removal (no entry rows), used to exercise the tag-row key handling.
+func tagOpsReview() data.StagingReview {
+	return data.StagingReview{
+		Tags: []data.StagedTagRow{{
+			Name:    "/app/api/DATABASE_URL",
+			Adds:    []data.Tag{{Key: "owner", Value: "platform"}},
+			Removes: []data.TagRemoval{{Key: "env", Value: "prod"}},
+		}},
+	}
+}
+
+// TestUpdate_UnstageTagRows pins #682: `u` is the single removal affordance for
+// tag rows too — it cancels a staged tag add and a staged tag removal, each
+// addressing the correct (item, tagKey).
+func TestUpdate_UnstageTagRows(t *testing.T) {
 	t.Parallel()
 
 	sec := &stubService{
 		service: "param", label: "Param", svcCap: capFor("aws", "param"),
-		review: data.StagingReview{
-			Tags: []data.StagedTagRow{{
-				Name:    "/app/api/DATABASE_URL",
-				Adds:    []data.Tag{{Key: "owner", Value: "platform"}},
-				Removes: []data.TagRemoval{{Key: "env", Value: "prod"}},
-			}},
-		},
+		review: tagOpsReview(),
 	}
 	m := newModel(t, sec)
 
 	require.Len(t, m.rows, 2, "one add row and one remove row")
 
-	// Row 0 is the add; `x` cancels it.
+	// Row 0 is the tag add; `u` cancels it.
 	m.selected = 0
-	m, cmd := m.Update(keyPress('x'))
-	require.NotNil(t, cmd)
+	m, cmd := m.Update(keyPress('u'))
+	require.NotNil(t, cmd, "u dispatches a cancel on a tag-add row")
 
 	m, _ = m.Update(cmd()) // feed the actionDoneMsg back, clearing the busy guard
 
@@ -202,14 +209,107 @@ func TestUpdate_CancelTagOps(t *testing.T) {
 	assert.Equal(t, "owner", sec.cancelAdds[0].tagKey)
 	assert.Equal(t, "/app/api/DATABASE_URL", sec.cancelAdds[0].key.Name)
 
-	// Row 1 is the removal; enter (↩) cancels it.
+	// Row 1 is the tag removal; `u` cancels it too.
 	m.selected = 1
-	_, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	require.NotNil(t, cmd)
+	_, cmd = m.Update(keyPress('u'))
+	require.NotNil(t, cmd, "u dispatches a cancel on a tag-remove row")
 	_ = cmd()
 
 	require.Len(t, sec.cancelRemoves, 1)
 	assert.Equal(t, "env", sec.cancelRemoves[0].tagKey)
+}
+
+// TestUpdate_TagRowRevealAndEnterNonDestructive pins #682: on a tag row `x` only
+// toggles reveal (never cancels) and enter is a no-op (never cancels). Removal is
+// `u`-only, so neither key touches the staged tag state.
+func TestUpdate_TagRowRevealAndEnterNonDestructive(t *testing.T) {
+	t.Parallel()
+
+	sec := &stubService{
+		service: "param", label: "Param", svcCap: capFor("aws", "param"),
+		review: tagOpsReview(),
+	}
+	m := newModel(t, sec)
+	require.Len(t, m.rows, 2, "one add row and one remove row")
+
+	for _, row := range []int{0, 1} {
+		m.selected = row
+
+		// `x` reveals only: it flips reveal and dispatches nothing.
+		before := m.reveal
+		m, cmd := m.Update(keyPress('x'))
+		assert.Nil(t, cmd, "x dispatches no command on a tag row")
+		assert.Equal(t, !before, m.reveal, "x toggles reveal on a tag row")
+
+		// enter is a no-op: no command, no cancel.
+		_, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		assert.Nil(t, cmd, "enter is a no-op on a tag row")
+	}
+
+	assert.Empty(t, sec.cancelAdds, "x/enter never cancel a staged tag add")
+	assert.Empty(t, sec.cancelRemoves, "x/enter never cancel a staged tag removal")
+}
+
+// TestUpdate_EnterOnEntryOpensDetail pins that enter on an entry row opens the
+// remote-vs-staged detail (the detail-only behavior of enter, #682).
+func TestUpdate_EnterOnEntryOpensDetail(t *testing.T) {
+	t.Parallel()
+
+	sec := &stubService{service: "param", label: "Param", svcCap: capFor("aws", "param"), review: updateReview()}
+	m := newModel(t, sec)
+
+	m.selected = 0
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	require.NotNil(t, cmd, "enter on an entry row dispatches")
+
+	msg, ok := cmd().(nav.OpenStagingDetail)
+	require.True(t, ok, "enter on an entry row opens the diff detail")
+	assert.Equal(t, "/app/web/CDN_URL", msg.Title)
+}
+
+// TestUpdate_TagGatedOnDeleteStaged pins #684: `t` is not dispatched on a
+// delete-staged entry (a statically impossible transition) and instead sets a
+// one-line status message; it is still offered on a normal entry row.
+func TestUpdate_TagGatedOnDeleteStaged(t *testing.T) {
+	t.Parallel()
+
+	sec := &stubService{
+		service: "param", label: "Param", svcCap: capFor("aws", "param"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{
+			{Name: "/app/web/GONE", Type: data.StagedDiffNormal, Operation: "delete", RemoteValue: "v"},
+			{Name: "/app/web/CDN_URL", Type: data.StagedDiffNormal, Operation: "update", StagedValue: "v"},
+		}},
+	}
+	m := newModel(t, sec)
+
+	// Row 0 is the delete: `t` is gated off with a status message, no OpenTag.
+	m.selected = 0
+	m, cmd := m.Update(keyPress('t'))
+	assert.Nil(t, cmd, "t is not dispatched on a delete-staged row")
+	assert.Equal(t, "cannot tag: staged for deletion — reset first", m.status, "the gate surfaces a status message")
+	assert.Contains(t, m.View(100, 30), "cannot tag: staged for deletion", "the status message renders in the footer")
+
+	// Row 1 is a normal update: `t` opens the tag form (gate is narrow).
+	m.selected = 1
+	_, cmd = m.Update(keyPress('t'))
+	require.NotNil(t, cmd, "t is still offered on a non-delete row")
+	msg, ok := cmd().(nav.OpenTag)
+	require.True(t, ok, "t opens the tag form on a non-delete row")
+	assert.Equal(t, "/app/web/CDN_URL", msg.Name)
+
+	// The status message is transient: the next key press clears it.
+	m.selected = 0
+	m, _ = m.Update(keyPress('t'))
+	require.NotEmpty(t, m.status, "the gate re-sets the status")
+	m, _ = m.Update(keyPress('j'))
+	assert.Empty(t, m.status, "any subsequent key clears the transient status")
+
+	// A reload also clears it, so the message can never outlive its row.
+	m.selected = 0
+	m, _ = m.Update(keyPress('t'))
+	require.NotEmpty(t, m.status, "the gate re-sets the status")
+	m, _ = m.Update(reviewLoadedMsg{section: 0, seq: m.sections[0].loadSeq, review: sec.review})
+	assert.Empty(t, m.status, "a reload clears the transient status")
 }
 
 // TestUpdate_UnstageAndApplyKeys pins the `u` unstage action (entry + its tags)
@@ -289,11 +389,12 @@ func TestUpdate_BadgeCountAuthoritative(t *testing.T) {
 	assert.Equal(t, 2, msg.Count, "one entry + one tag change counts as two")
 }
 
-// TestUpdate_MouseClickApplyResetCancelTag pins the mouse rule: a click on a
-// section's apply/reset button and on a tag-cancel row reduces to the SAME
-// internal action its key equivalent performs, with coordinates read from the
-// rendered geometry (never hard-coded).
-func TestUpdate_MouseClickApplyResetCancelTag(t *testing.T) {
+// TestUpdate_MouseClickApplyResetSelectRow pins the mouse rule: a click on a
+// section's apply/reset button reduces to the SAME internal action its key
+// equivalent performs, and a click on a tag row only selects it (never the
+// destructive cancel — removal is `u`-only, #682), with coordinates read from
+// the rendered geometry (never hard-coded).
+func TestUpdate_MouseClickApplyResetSelectRow(t *testing.T) {
 	t.Parallel()
 
 	sec := &stubService{
@@ -327,16 +428,15 @@ func TestUpdate_MouseClickApplyResetCancelTag(t *testing.T) {
 	_, ok = cmd().(nav.OpenReset)
 	assert.True(t, ok, "clicking reset opens the reset confirmation")
 
-	// Click the tag-add row → cancel that add (reduces to the `x` key path).
+	// Click the tag-add row → it only selects the row (no destructive cancel).
 	tagLine := findRowLine(m, 1) // row 1 is the tag add (row 0 is the entry)
 	require.GreaterOrEqual(t, tagLine, 0, "the tag row was rendered")
 
+	m.selected = 0
 	_, cmd = m.Update(tea.MouseClickMsg{X: 4, Y: m.geom.bodyTop + tagLine, Button: tea.MouseLeft})
-	require.NotNil(t, cmd)
-	_ = cmd()
-
-	require.Len(t, sec.cancelAdds, 1, "clicking the tag row cancels its staged add")
-	assert.Equal(t, "owner", sec.cancelAdds[0].tagKey)
+	assert.Nil(t, cmd, "clicking a tag row dispatches nothing (enter is a no-op there)")
+	assert.Equal(t, 1, m.selected, "clicking the tag row selects it")
+	assert.Empty(t, sec.cancelAdds, "clicking a tag row never cancels its staged add")
 }
 
 // findHeaderLine returns the body-relative line index of the first section header
