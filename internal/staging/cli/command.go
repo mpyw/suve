@@ -47,6 +47,14 @@ type CommandConfig struct {
 	// state. When nil, it defaults to AWSScopeResolver, preserving AWS behavior.
 	ScopeResolver staging.ScopeResolver
 
+	// HasDescription reports whether this service's writer honors a free-text
+	// description (AWS param/secret and Google Cloud secret). When true, `stage
+	// add`/`stage edit` register a --description flag; when false the flag is not
+	// registered at all, so a description on an unsupported provider (Azure Key
+	// Vault / App Configuration) is rejected as an unknown flag rather than being
+	// accepted and then silently dropped on apply.
+	HasDescription bool
+
 	// Namespace resolves the App Configuration namespace a single-item staging
 	// op targets, from the command context (the --namespace flag). It records
 	// the namespace on the staged entry as part of its identity. Nil for
@@ -58,6 +66,32 @@ type CommandConfig struct {
 	// its own namespace (App Configuration keeps all namespaces in one staging
 	// store). Nil for providers without a namespace axis.
 	StrategyForNamespace func(ctx context.Context, namespace string) (staging.FullStrategy, error)
+}
+
+// descriptionFlags returns the --description flag for add/edit when the service
+// honors a description, or an empty slice otherwise (so an unsupported provider
+// rejects --description as an unknown flag rather than silently dropping it).
+func (c CommandConfig) descriptionFlags() []cli.Flag {
+	if !c.HasDescription {
+		return nil
+	}
+
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:  "description",
+			Usage: fmt.Sprintf("Description for the %s", c.ItemName),
+		},
+	}
+}
+
+// description reads the --description flag value; it is always "" when the flag
+// is not registered (unsupported provider).
+func (c CommandConfig) description(cmd *cli.Command) string {
+	if !c.HasDescription {
+		return ""
+	}
+
+	return cmd.String("description")
 }
 
 // namespaceFor returns the single-item namespace for this command context, or ""
@@ -211,12 +245,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 		Usage:       fmt.Sprintf("Create new %s and stage it", cfg.ItemName),
 		ArgsUsage:   "<name> [value]",
 		Description: addDescription(cfg),
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "description",
-				Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
-			},
-		},
+		Flags:       cfg.descriptionFlags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
 				return fmt.Errorf("usage: suve stage %s add <name> [value]", cfg.CommandName)
@@ -251,7 +280,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 			return r.Run(ctx, AddOptions{
 				Name:        name,
 				Value:       value,
-				Description: cmd.String("description"),
+				Description: cfg.description(cmd),
 				Namespace:   cfg.namespaceFor(ctx),
 			})
 		},
@@ -265,12 +294,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 		Usage:       fmt.Sprintf("Edit %s value and stage changes", cfg.ItemName),
 		ArgsUsage:   "<name> [value]",
 		Description: editDescription(cfg),
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "description",
-				Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
-			},
-		},
+		Flags:       cfg.descriptionFlags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
 				return fmt.Errorf("usage: suve stage %s edit <name> [value]", cfg.CommandName)
@@ -305,7 +329,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 			return r.Run(ctx, EditOptions{
 				Name:        name,
 				Value:       value,
-				Description: cmd.String("description"),
+				Description: cfg.description(cmd),
 				Namespace:   cfg.namespaceFor(ctx),
 			})
 		},

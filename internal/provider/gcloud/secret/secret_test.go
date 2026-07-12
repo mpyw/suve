@@ -209,8 +209,9 @@ func TestGet(t *testing.T) {
 		},
 		getFunc: func(_ context.Context, _ *secretmanagerpb.GetSecretRequest) (*secretmanagerpb.Secret, error) {
 			return &secretmanagerpb.Secret{
-				Name:   "projects/my-project/secrets/my-secret",
-				Labels: map[string]string{"env": "prod", "team": "backend"},
+				Name:        "projects/my-project/secrets/my-secret",
+				Labels:      map[string]string{"env": "prod", "team": "backend"},
+				Annotations: map[string]string{"description": "app credentials"},
 			}, nil
 		},
 	}
@@ -226,6 +227,8 @@ func TestGet(t *testing.T) {
 	assert.Equal(t, created, *entry.Version.Created)
 	assert.Nil(t, entry.Extra)
 	assert.Equal(t, []domain.Tag{{Key: "env", Value: "prod"}, {Key: "team", Value: "backend"}}, entry.Tags)
+	// The "description" annotation surfaces as the neutral Description field.
+	assert.Equal(t, "app credentials", entry.Description)
 }
 
 func TestGet_NotFound(t *testing.T) {
@@ -335,6 +338,50 @@ func TestCreate(t *testing.T) {
 		_, err := store.Create(t.Context(), "my-secret", "value", domain.ValueTypeSecret, "")
 		require.ErrorIs(t, err, provider.ErrAlreadyExists)
 	})
+
+	t.Run("description sets the description annotation", func(t *testing.T) {
+		t.Parallel()
+
+		var annotations map[string]string
+
+		m := &mockClient{
+			createFunc: func(_ context.Context, req *secretmanagerpb.CreateSecretRequest) (*secretmanagerpb.Secret, error) {
+				annotations = req.GetSecret().GetAnnotations()
+
+				return &secretmanagerpb.Secret{Name: "projects/my-project/secrets/my-secret"}, nil
+			},
+			addFunc: func(_ context.Context, _ *secretmanagerpb.AddSecretVersionRequest) (*secretmanagerpb.SecretVersion, error) {
+				return &secretmanagerpb.SecretVersion{Name: versionName(1)}, nil
+			},
+		}
+		store := newStore(m)
+
+		_, err := store.Create(t.Context(), "my-secret", "value", domain.ValueTypeSecret, "app credentials")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"description": "app credentials"}, annotations)
+	})
+
+	t.Run("empty description leaves annotations unset", func(t *testing.T) {
+		t.Parallel()
+
+		var annotations map[string]string
+
+		m := &mockClient{
+			createFunc: func(_ context.Context, req *secretmanagerpb.CreateSecretRequest) (*secretmanagerpb.Secret, error) {
+				annotations = req.GetSecret().GetAnnotations()
+
+				return &secretmanagerpb.Secret{Name: "projects/my-project/secrets/my-secret"}, nil
+			},
+			addFunc: func(_ context.Context, _ *secretmanagerpb.AddSecretVersionRequest) (*secretmanagerpb.SecretVersion, error) {
+				return &secretmanagerpb.SecretVersion{Name: versionName(1)}, nil
+			},
+		}
+		store := newStore(m)
+
+		_, err := store.Create(t.Context(), "my-secret", "value", domain.ValueTypeSecret, "")
+		require.NoError(t, err)
+		assert.Empty(t, annotations)
+	})
 }
 
 func TestPut(t *testing.T) {
@@ -379,6 +426,101 @@ func TestPut(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "1", v.ID)
 		assert.Equal(t, 2, addCalls)
+	})
+
+	t.Run("description updates the annotation on an existing secret", func(t *testing.T) {
+		t.Parallel()
+
+		var written map[string]string
+
+		var mask []string
+
+		m := &mockClient{
+			addFunc: func(_ context.Context, _ *secretmanagerpb.AddSecretVersionRequest) (*secretmanagerpb.SecretVersion, error) {
+				return &secretmanagerpb.SecretVersion{Name: versionName(4)}, nil
+			},
+			getFunc: func(_ context.Context, _ *secretmanagerpb.GetSecretRequest) (*secretmanagerpb.Secret, error) {
+				return &secretmanagerpb.Secret{Annotations: map[string]string{"other": "keep"}}, nil
+			},
+			updateFunc: func(_ context.Context, req *secretmanagerpb.UpdateSecretRequest) (*secretmanagerpb.Secret, error) {
+				written = req.GetSecret().GetAnnotations()
+				mask = req.GetUpdateMask().GetPaths()
+
+				return req.GetSecret(), nil
+			},
+		}
+		store := newStore(m)
+
+		v, err := store.Put(t.Context(), "my-secret", "value", domain.ValueTypeSecret, "rotated key")
+		require.NoError(t, err)
+		assert.Equal(t, "4", v.ID)
+		// The description annotation is merged in, preserving any other annotation.
+		assert.Equal(t, map[string]string{"other": "keep", "description": "rotated key"}, written)
+		assert.Equal(t, []string{"annotations"}, mask)
+	})
+
+	t.Run("description applied via update when a concurrent create wins the race", func(t *testing.T) {
+		t.Parallel()
+
+		var written map[string]string
+
+		m := &mockClient{
+			addFunc: func(_ context.Context, _ *secretmanagerpb.AddSecretVersionRequest) (*secretmanagerpb.SecretVersion, error) {
+				// First AddSecretVersion 404s (no secret yet); the retry after create succeeds.
+				if written == nil {
+					return nil, status.Error(codes.NotFound, "no secret")
+				}
+
+				return &secretmanagerpb.SecretVersion{Name: versionName(1)}, nil
+			},
+			createFunc: func(_ context.Context, _ *secretmanagerpb.CreateSecretRequest) (*secretmanagerpb.Secret, error) {
+				// A concurrent writer created the secret first.
+				return nil, status.Error(codes.AlreadyExists, "exists")
+			},
+			getFunc: func(_ context.Context, _ *secretmanagerpb.GetSecretRequest) (*secretmanagerpb.Secret, error) {
+				return &secretmanagerpb.Secret{}, nil
+			},
+			updateFunc: func(_ context.Context, req *secretmanagerpb.UpdateSecretRequest) (*secretmanagerpb.Secret, error) {
+				written = req.GetSecret().GetAnnotations()
+
+				return req.GetSecret(), nil
+			},
+		}
+		store := newStore(m)
+
+		_, err := store.Put(t.Context(), "my-secret", "value", domain.ValueTypeSecret, "raced desc")
+		require.NoError(t, err)
+		// Even though our create lost the race, the description annotation is applied.
+		assert.Equal(t, map[string]string{"description": "raced desc"}, written)
+	})
+
+	t.Run("description sets the annotation when creating on first write", func(t *testing.T) {
+		t.Parallel()
+
+		var addCalls int
+
+		var annotations map[string]string
+
+		m := &mockClient{
+			addFunc: func(_ context.Context, _ *secretmanagerpb.AddSecretVersionRequest) (*secretmanagerpb.SecretVersion, error) {
+				addCalls++
+				if addCalls == 1 {
+					return nil, status.Error(codes.NotFound, "no secret")
+				}
+
+				return &secretmanagerpb.SecretVersion{Name: versionName(1)}, nil
+			},
+			createFunc: func(_ context.Context, req *secretmanagerpb.CreateSecretRequest) (*secretmanagerpb.Secret, error) {
+				annotations = req.GetSecret().GetAnnotations()
+
+				return &secretmanagerpb.Secret{Name: "projects/my-project/secrets/my-secret"}, nil
+			},
+		}
+		store := newStore(m)
+
+		_, err := store.Put(t.Context(), "my-secret", "value", domain.ValueTypeSecret, "created with desc")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"description": "created with desc"}, annotations)
 	})
 }
 

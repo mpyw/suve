@@ -11,10 +11,11 @@ import (
 
 //nolint:gochecknoglobals // package-level config for command factory
 var config = stgcli.CommandConfig{
-	CommandName:   "param",
-	ItemName:      "parameter",
-	Factory:       cliinternal.AWSParamStrategyFactory,
-	ParserFactory: staging.AWSParamParserFactory,
+	CommandName:    "param",
+	ItemName:       "parameter",
+	Factory:        cliinternal.AWSParamStrategyFactory,
+	ParserFactory:  staging.AWSParamParserFactory,
+	HasDescription: true,
 }
 
 // Config returns the AWS SSM Parameter Store staging command config. It is used

@@ -22,8 +22,9 @@ type UpdateRunner struct {
 
 // UpdateOptions holds the options for the update command.
 type UpdateOptions struct {
-	Name  string
-	Value string
+	Name        string
+	Value       string
+	Description string
 }
 
 // UpdateCommand returns the Google Cloud Secret Manager update command.
@@ -36,6 +37,9 @@ func UpdateCommand() *cli.Command {
 
 The new version becomes the latest; prior versions remain accessible by number.
 Use 'suve gcloud secret create' to create a new secret.
+
+A --description updates the secret's "description" annotation (Google Cloud
+secrets have no native description field).
 
 The value may be given as a positional argument, read from stdin with
 --value-stdin (so it never appears in argv/ps or shell history), or, when
@@ -52,6 +56,10 @@ EXAMPLES:
 				Usage: "Skip confirmation prompt",
 			},
 			cliinternal.ValueStdinFlag(),
+			&cli.StringFlag{
+				Name:  "description",
+				Usage: "Description for the secret (stored as the \"description\" annotation)",
+			},
 		},
 		Action: updateAction,
 	}
@@ -123,12 +131,12 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		Stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, UpdateOptions{Name: name, Value: newValue})
+	return r.Run(ctx, UpdateOptions{Name: name, Value: newValue, Description: cmd.String("description")})
 }
 
 // Run executes the update command.
 func (r *UpdateRunner) Run(ctx context.Context, opts UpdateOptions) error {
-	result, err := r.UseCase.Execute(ctx, gcloud.UpdateInput{Name: opts.Name, Value: opts.Value})
+	result, err := r.UseCase.Execute(ctx, gcloud.UpdateInput{Name: opts.Name, Value: opts.Value, Description: opts.Description})
 	if err != nil {
 		return err
 	}

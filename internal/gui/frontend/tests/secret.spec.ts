@@ -557,3 +557,34 @@ test.describe('Secret version-meta heading is concept-driven (#419)', () => {
     await expect(page.locator('.detail-meta .badge-stage')).toHaveText(['AWSCURRENT', 'AWSPREVIOUS']);
   });
 });
+
+// #666: a Google Cloud secret's description (stored as the "description"
+// annotation) surfaces in the read view, the same as an AWS description. The
+// detail view already renders `description` when present, provider-agnostically;
+// this pins that a gcloud secret's description reaches and renders in the GUI.
+test.describe('Secret description display (#666)', () => {
+  test('Google Cloud: an annotation-backed description shows in the detail view', async ({ page }) => {
+    await setupWailsMocks(page, createGoogleCloudState());
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // Google Cloud launches straight into the secret view; gcloud-secret-1 is
+    // seeded with a description.
+    await clickItemByName(page, 'gcloud-secret-1');
+    await expect(page.locator('.detail-panel')).toBeVisible();
+
+    const descSection = page.locator('.detail-section').filter({ has: page.locator('h4', { hasText: 'Description' }) });
+    await expect(descSection).toBeVisible();
+    await expect(descSection.locator('.description-text')).toHaveText('app credentials');
+  });
+
+  test('Google Cloud: a secret without a description omits the section', async ({ page }) => {
+    await setupWailsMocks(page, createGoogleCloudState());
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await clickItemByName(page, 'gcloud-secret-2');
+    await expect(page.locator('.detail-panel')).toBeVisible();
+    await expect(page.locator('.detail-section h4', { hasText: 'Description' })).toHaveCount(0);
+  });
+});

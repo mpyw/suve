@@ -625,7 +625,9 @@ export function createGoogleCloudState(overrides: Partial<MockState> = {}): Part
     // Google Cloud secret versions are integers and carry no ARN/staging labels;
     // they carry a per-version state (enabled/disabled/destroyed) instead.
     secrets: [
-      { name: 'gcloud-secret-1', value: 'v1', arn: '', stagingLabels: [], state: 'enabled' },
+      // gcloud-secret-1 carries a description (the "description" annotation) so a
+      // spec can assert the detail view surfaces it (#666 gcloud support).
+      { name: 'gcloud-secret-1', value: 'v1', arn: '', stagingLabels: [], state: 'enabled', description: 'app credentials' },
       { name: 'gcloud-secret-2', value: 'v2', arn: '', stagingLabels: [], state: 'enabled' },
     ],
     secretVersions: {
@@ -1093,7 +1095,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           stagingLabels: secret?.stagingLabels !== undefined ? secret.stagingLabels : ['AWSCURRENT'],
           state: secret?.state ?? '',
           value: secret?.value || 'mock-secret',
-          description: '',
+          description: secret?.description ?? '',
           createdDate: new Date().toISOString(),
           tags,
         };

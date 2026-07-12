@@ -12,6 +12,11 @@
 //   - Deletion is permanent (no recovery window), so this store implements
 //     neither provider.Restorer nor provider.Describer.
 //   - Tags are secret "labels" mutated via an UpdateSecret read-modify-write.
+//   - A description is stored as a secret ANNOTATION under the "description" key.
+//     Google Cloud secrets have no native description field, but annotations
+//     (secretmanagerpb.Secret.Annotations, distinct from the labels that back
+//     suve's tag axis) are exactly "for client tools to store their own state",
+//     so a description annotation adds description support with no collision.
 package secret
 
 import (
@@ -81,6 +86,11 @@ type Store struct {
 
 // Compile-time assertion that Store implements the provider contract.
 var _ provider.Store = (*Store)(nil)
+
+// descriptionAnnotation is the secret-annotation key under which suve stores a
+// secret's free-text description. Annotations are distinct from labels (which
+// back the tag axis), so this never collides with a user tag.
+const descriptionAnnotation = "description"
 
 // New builds a Store backed by the given client for the given project id.
 func New(client Client, project string) *Store {
@@ -181,8 +191,9 @@ func (s *Store) versionsNewestFirst(ctx context.Context, name string) ([]*secret
 
 // Get retrieves the secret value at the given ref (latest when ref is latest)
 // and maps it to a domain.Entry. Type is always secret; the integer version and
-// creation time populate Version; the secret's labels become Tags. Extra is
-// left empty (Google Cloud has no ARN-like metadata to surface).
+// creation time populate Version; the secret's labels become Tags and its
+// "description" annotation becomes Description. Extra is left empty (Google
+// Cloud has no ARN-like metadata to surface).
 func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
 	version := ref.ID()
 	if version == "" {
@@ -218,11 +229,13 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		entry.Modified = created
 	}
 
-	// Best-effort: labels live on the secret, not the version.
+	// Best-effort: labels and the description annotation live on the secret, not
+	// the version.
 	if sec, serr := s.client.GetSecret(ctx, &secretmanagerpb.GetSecretRequest{
 		Name: s.secretPath(name),
 	}); serr == nil && sec != nil {
 		entry.Tags = mapLabels(sec.GetLabels())
+		entry.Description = sec.GetAnnotations()[descriptionAnnotation]
 	}
 
 	return entry, nil
@@ -270,12 +283,12 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 
 // Create creates a new secret (create-only) and adds its initial value as the
 // first version. It returns a wrapped provider.ErrAlreadyExists if the secret
-// already exists. The valueType and description are ignored (Google Cloud
-// values are always secret and secrets carry no description field).
+// already exists. The valueType is ignored (Google Cloud values are always
+// secret); a non-empty description is stored as the "description" annotation.
 func (s *Store) Create(
-	ctx context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+	ctx context.Context, name, value string, _ domain.ValueType, description string, _ ...provider.WriteOption,
 ) (domain.Version, error) {
-	_, err := s.client.CreateSecret(ctx, s.createRequest(name))
+	_, err := s.client.CreateSecret(ctx, s.createRequest(name, description))
 	if err != nil {
 		if status.Code(err) == codes.AlreadyExists {
 			return domain.Version{}, fmt.Errorf("%w: %s", provider.ErrAlreadyExists, name)
@@ -288,13 +301,25 @@ func (s *Store) Create(
 }
 
 // Put adds a new version to the secret (upsert). If the secret does not yet
-// exist it is created first, then the version is added. The valueType and
-// description are ignored.
+// exist it is created first, then the version is added. The valueType is
+// ignored; a non-empty description is written to the "description" annotation
+// (updating it on an already-existing secret, mirroring the AWS Put contract).
+//
+// Unlike AWS (whose UpdateSecret sets value and description atomically), Secret
+// Manager needs a separate UpdateSecret for the annotation, so on an existing
+// secret the new version is committed first and the annotation second. A failure
+// to write the annotation is reported (never silently dropped, per #666), even
+// though the value version has already landed.
 func (s *Store) Put(
-	ctx context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+	ctx context.Context, name, value string, _ domain.ValueType, description string, _ ...provider.WriteOption,
 ) (domain.Version, error) {
 	sv, err := s.client.AddSecretVersion(ctx, s.addRequest(name, value))
 	if err == nil {
+		// The secret already existed: update its description annotation to match.
+		if aerr := s.applyDescription(ctx, name, description); aerr != nil {
+			return domain.Version{}, aerr
+		}
+
 		return domain.Version{ID: versionNumber(sv.GetName())}, nil
 	}
 
@@ -303,10 +328,16 @@ func (s *Store) Put(
 		return domain.Version{}, fmt.Errorf("failed to add secret version: %w", err)
 	}
 
-	if _, cerr := s.client.CreateSecret(ctx, s.createRequest(name)); cerr != nil {
+	if _, cerr := s.client.CreateSecret(ctx, s.createRequest(name, description)); cerr != nil {
 		// A concurrent create is fine; any other failure is fatal.
 		if status.Code(cerr) != codes.AlreadyExists {
 			return domain.Version{}, fmt.Errorf("failed to create secret: %w", cerr)
+		}
+
+		// A concurrent create won the race, so our annotation was not applied;
+		// set it now to honor the requested description.
+		if aerr := s.applyDescription(ctx, name, description); aerr != nil {
+			return domain.Version{}, aerr
 		}
 	}
 
@@ -323,19 +354,72 @@ func (s *Store) addVersion(ctx context.Context, name, value string) (domain.Vers
 	return domain.Version{ID: versionNumber(sv.GetName())}, nil
 }
 
-// createRequest builds a CreateSecretRequest with automatic replication.
-func (s *Store) createRequest(name string) *secretmanagerpb.CreateSecretRequest {
-	return &secretmanagerpb.CreateSecretRequest{
-		Parent:   s.parent(),
-		SecretId: name,
-		Secret: &secretmanagerpb.Secret{
-			Replication: &secretmanagerpb.Replication{
-				Replication: &secretmanagerpb.Replication_Automatic_{
-					Automatic: &secretmanagerpb.Replication_Automatic{},
-				},
+// createRequest builds a CreateSecretRequest with automatic replication. A
+// non-empty description is carried as the "description" annotation on the new
+// secret; an empty description leaves annotations unset.
+func (s *Store) createRequest(name, description string) *secretmanagerpb.CreateSecretRequest {
+	sec := &secretmanagerpb.Secret{
+		Replication: &secretmanagerpb.Replication{
+			Replication: &secretmanagerpb.Replication_Automatic_{
+				Automatic: &secretmanagerpb.Replication_Automatic{},
 			},
 		},
 	}
+
+	if description != "" {
+		sec.Annotations = map[string]string{descriptionAnnotation: description}
+	}
+
+	return &secretmanagerpb.CreateSecretRequest{
+		Parent:   s.parent(),
+		SecretId: name,
+		Secret:   sec,
+	}
+}
+
+// applyDescription writes a non-empty description to the "description"
+// annotation of an existing secret via a read-modify-write UpdateSecret,
+// preserving any other annotations. An empty description is a no-op (Put/Create
+// never clear an existing description, mirroring the AWS contract).
+func (s *Store) applyDescription(ctx context.Context, name, description string) error {
+	if description == "" {
+		return nil
+	}
+
+	annotations, err := s.currentAnnotations(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	annotations[descriptionAnnotation] = description
+
+	_, err = s.client.UpdateSecret(ctx, &secretmanagerpb.UpdateSecretRequest{
+		Secret: &secretmanagerpb.Secret{
+			Name:        s.secretPath(name),
+			Annotations: annotations,
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"annotations"}},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update secret description: %w", err)
+	}
+
+	return nil
+}
+
+// currentAnnotations fetches the secret's current annotations as a mutable map.
+func (s *Store) currentAnnotations(ctx context.Context, name string) (map[string]string, error) {
+	sec, err := s.client.GetSecret(ctx, &secretmanagerpb.GetSecretRequest{
+		Name: s.secretPath(name),
+	})
+	if err != nil {
+		return nil, mapError(err, name, "get secret")
+	}
+
+	annotations := make(map[string]string, len(sec.GetAnnotations()))
+	maps.Copy(annotations, sec.GetAnnotations())
+
+	return annotations, nil
 }
 
 // addRequest builds an AddSecretVersionRequest carrying the given value.
