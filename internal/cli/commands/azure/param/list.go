@@ -102,10 +102,9 @@ func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Con
 			return nil, err
 		}
 
-		entries := make([]genericlist.Entry, len(result.Entries))
-		for i, e := range result.Entries {
-			entries[i] = genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
-		}
+		entries := lo.Map(result.Entries, func(e azure.ListEntry, _ int) genericlist.Entry {
+			return genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
+		})
 
 		return entries, nil
 	}
@@ -158,17 +157,14 @@ func collapseToKeyOnly(rows []azure.ListNamespacesEntry) []genericlist.Entry {
 
 	slices.Sort(names)
 
-	entries := make([]genericlist.Entry, 0, len(names))
-
-	for _, name := range names {
-		if c := byName[name]; c.ambiguous {
-			entries = append(entries, genericlist.Entry{Name: name, Error: errAmbiguousValue})
-		} else {
-			entries = append(entries, genericlist.Entry{Name: name, Value: lo.ToPtr(c.value)})
+	return lo.Map(names, func(name string, _ int) genericlist.Entry {
+		c := byName[name]
+		if c.ambiguous {
+			return genericlist.Entry{Name: name, Error: errAmbiguousValue}
 		}
-	}
 
-	return entries
+		return genericlist.Entry{Name: name, Value: lo.ToPtr(c.value)}
+	})
 }
 
 // errAmbiguousValue marks a key whose value differs across the namespaces a
@@ -187,10 +183,9 @@ func (r *ListRunner) runNamespaced(ctx context.Context, opts ListOptions) error 
 	}
 
 	if opts.Output == output.FormatJSON {
-		items := make([]namespaceJSONItem, len(result.Entries))
-		for i, e := range result.Entries {
-			items[i] = namespaceJSONItem{Namespace: e.Namespace, Name: e.Name, Value: e.Value}
-		}
+		items := lo.Map(result.Entries, func(e azure.ListNamespacesEntry, _ int) namespaceJSONItem {
+			return namespaceJSONItem{Namespace: e.Namespace, Name: e.Name, Value: e.Value}
+		})
 
 		return output.WriteJSON(r.Stdout, items)
 	}

@@ -3,6 +3,7 @@ package gcloud
 import (
 	"context"
 
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	genericlist "github.com/mpyw/suve/internal/cli/commands/generic/list"
@@ -67,10 +68,9 @@ EXAMPLES:
 					return nil, err
 				}
 
-				entries := make([]genericlist.Entry, len(result.Entries))
-				for i, e := range result.Entries {
-					entries[i] = genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
-				}
+				entries := lo.Map(result.Entries, func(e gcloud.ListEntry, _ int) genericlist.Entry {
+					return genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
+				})
 
 				return entries, nil
 			}, nil
