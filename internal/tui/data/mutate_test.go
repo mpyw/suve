@@ -229,6 +229,100 @@ func TestParamMutator_StagedRoundTrip(t *testing.T) {
 	})
 }
 
+// TestParamMutator_StagedCarriesValueType pins the #664/#680 end-to-end fix: a
+// staged SecureString create routed through the TUI param mutator stores the
+// SecureString value type in the working staging store AND, on apply through the
+// AWS SSM param strategy, writes the parameter as SecureString (domain
+// ValueTypeSecret) rather than silently downgrading it to plaintext String.
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv
+func TestParamMutator_StagedCarriesValueType(t *testing.T) {
+	ctx := context.Background()
+
+	var (
+		appliedType  domain.ValueType
+		appliedValue string
+	)
+
+	provStore := &providermock.Store{
+		GetFunc: func(context.Context, string, provider.VersionRef) (*domain.Entry, error) {
+			return nil, provider.ErrNotFound
+		},
+		CreateFunc: func(
+			_ context.Context, _, value string, valueType domain.ValueType, _ string, _ ...provider.WriteOption,
+		) (domain.Version, error) {
+			appliedValue, appliedType = value, valueType
+
+			return domain.Version{ID: "1"}, nil
+		},
+	}
+
+	mut, st := newParamMutator(t, provStore)
+
+	// TUI staged create with Type = SecureString.
+	_, err := mut.Create(ctx, data.StagedKey{Name: "/app/SECRET"}, "s3cr3t", "SecureString", "", true)
+	require.NoError(t, err)
+
+	// The staged entry carries the SecureString value type end-to-end.
+	entry, err := st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/SECRET"})
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationCreate, entry.Operation)
+	assert.Equal(t, domain.ValueTypeSecret, entry.ValueType, "staged create carries the SecureString type")
+
+	// Apply the staged create through the AWS SSM param strategy: the parameter is
+	// written as SecureString, not the old hardcoded plaintext String.
+	strategy := staging.NewAWSParamStrategy(provStore)
+	require.NoError(t, strategy.Apply(ctx, "/app/SECRET", *entry))
+	assert.Equal(t, "s3cr3t", appliedValue)
+	assert.Equal(t, domain.ValueTypeSecret, appliedType, "apply writes the parameter as SecureString")
+}
+
+// TestParamMutator_StagedEditValueType pins the staged-edit value-type rules: an
+// explicit type is stored (so a staged edit can change the type), while an empty
+// type — passed by the staging-review edit, which cannot seed the current type —
+// preserves the existing staged type instead of downgrading it.
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv
+func TestParamMutator_StagedEditValueType(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("explicit type is stored", func(t *testing.T) {
+		mut, st := newParamMutator(t, existingParamStore("old"))
+
+		_, err := mut.Update(ctx, data.StagedKey{Name: existingParamName}, "new", "SecureString", "", true)
+		require.NoError(t, err)
+
+		entry, err := st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: existingParamName})
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationUpdate, entry.Operation)
+		assert.Equal(t, domain.ValueTypeSecret, entry.ValueType, "an explicit staged-edit type is stored")
+	})
+
+	t.Run("empty type preserves a staged SecureString create", func(t *testing.T) {
+		mut, st := newParamMutator(t, &providermock.Store{
+			GetFunc: func(context.Context, string, provider.VersionRef) (*domain.Entry, error) {
+				return nil, provider.ErrNotFound
+			},
+		})
+
+		// Stage a SecureString create, then edit its value with no type (the
+		// staging-review edit path passes an empty type): the create's SecureString
+		// type must survive rather than downgrade to plaintext.
+		_, err := mut.Create(ctx, data.StagedKey{Name: "/app/NEW"}, "v1", "SecureString", "", true)
+		require.NoError(t, err)
+
+		_, err = mut.Update(ctx, data.StagedKey{Name: "/app/NEW"}, "v2", "", "", true)
+		require.NoError(t, err)
+
+		entry, err := st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/NEW"})
+		require.NoError(t, err)
+		assert.Equal(t, staging.OperationCreate, entry.Operation, "editing a staged create keeps it a create")
+		require.NotNil(t, entry.Value)
+		assert.Equal(t, "v2", *entry.Value, "the edit updates the draft value")
+		assert.Equal(t, domain.ValueTypeSecret, entry.ValueType, "an empty edit type preserves the staged SecureString")
+	})
+}
+
 // TestParamMutator_ImmediateRouting asserts an immediate write reaches the
 // provider store directly and never touches the staging store.
 //

@@ -175,11 +175,10 @@ func goldenCap(prov, service string) capability.ServiceCapability {
 }
 
 // TestDialog_EntryFormAWSParamGolden renders the create form for AWS SSM param in
-// its default (staged) mode: name, value textarea, Description, and the mode
-// toggle. The Type select is NOT drawn — it is offered only in immediate mode
-// (#664 containment: a staged write drops the value type, so a staged
-// SecureString would silently downgrade to plaintext). No value is seeded, so no
-// secret is rendered.
+// its default (staged) mode: name, the Type select, value textarea, Description,
+// and the mode toggle. The Type select is drawn in both modes — the value type
+// flows through the staged path as well as the immediate path (the #664/#680
+// fix). No value is seeded, so no secret is rendered.
 func TestDialog_EntryFormAWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 

@@ -125,15 +125,17 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 
 // showType reports whether the typed-param Type select is offered: only the AWS
 // SSM param service has a value type (App Configuration is untyped; secret has
-// none) — parity with the GUI's ParamTypeOptions — AND only in immediate mode.
+// none) — parity with the GUI's ParamTypeOptions. It does NOT depend on the mode
+// toggle, so the select is reachable for a staged create and flows through to
+// apply (the #664/#680 fix); the immediate path maps it via paramtype.Parse and
+// the staged create carries it into the staging store.
 //
-// Containment for #664: the staged write path drops the value type (staging
-// apply hardcodes a plaintext String), so a staged SecureString create would
-// silently apply as plaintext String. Until the systemic staged-type fix lands
-// (#664), the Type select is offered only in immediate mode, where it takes
-// effect; staged mode never presents a Type control that can't be honored.
+// It is hidden on a staged-only surface (the staging review page's edit): there
+// the write is always a staged edit, which preserves the existing type rather
+// than taking a new one, and the dialog cannot seed the entry's current type — so
+// a Type control there could neither be honored nor shown accurately.
 func (d *entryForm) showType() bool {
-	return d.svcCap.Service == serviceParam && !d.svcCap.HasNamespaces && !d.staged
+	return d.svcCap.Service == serviceParam && !d.svcCap.HasNamespaces && !d.stagedOnly
 }
 
 // defaultTypeLabel picks the Type select's initial value: the seeded label when
@@ -267,7 +269,17 @@ func (d *entryForm) valueFieldFocused() bool {
 func (d *entryForm) submit() tea.Cmd {
 	key := data.StagedKey{Name: d.name, Namespace: d.namespace}
 	staged := d.staged
-	value, valueType, description := d.value, d.valueType, d.description
+	// Pass the value type only when a Type control was actually offered. When it
+	// was not (a secret, an App Configuration setting, or a staging-review edit
+	// that cannot seed the entry's current type), an empty label signals "no
+	// explicit type" so the staged edit preserves the existing type instead of
+	// forcing the select's default and downgrading it.
+	valueType := ""
+	if d.showType() {
+		valueType = d.valueType
+	}
+
+	value, description := d.value, d.description
 	edit := d.edit
 	mut, ctx := d.mutator, d.ctx
 
