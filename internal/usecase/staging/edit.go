@@ -8,6 +8,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
@@ -20,6 +21,12 @@ type EditInput struct {
 	Key         staging.EntryKey
 	Value       string
 	Description string
+	// ValueType is the provider-neutral value type for the staged update. It is
+	// only meaningful on the AWS SSM Parameter Store axis (String / SecureString /
+	// StringList); other providers leave it empty. An empty value preserves the
+	// existing (staged or cloud) type, so callers that do not set it keep the
+	// prior type-preserving behavior.
+	ValueType domain.ValueType
 }
 
 // EditOutput holds the result of the edit use case.
@@ -92,9 +99,18 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 		baseModifiedAt = awsBaseModifiedAt
 	}
 
+	// Resolve the staged value type. When the caller specifies none, preserve a
+	// previously staged type so a follow-up edit never silently downgrades it;
+	// aws_param then falls back to the existing cloud type when this stays empty.
+	valueType := input.ValueType
+	if valueType == "" && stagedEntry != nil {
+		valueType = stagedEntry.ValueType
+	}
+
 	// Build options with metadata
 	opts := &transition.EntryExecuteOptions{
 		BaseModifiedAt: baseModifiedAt,
+		ValueType:      valueType,
 	}
 	if input.Description != "" {
 		opts.Description = &input.Description

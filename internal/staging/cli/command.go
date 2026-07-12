@@ -10,6 +10,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
@@ -58,6 +59,28 @@ type CommandConfig struct {
 	// its own namespace (App Configuration keeps all namespaces in one staging
 	// store). Nil for providers without a namespace axis.
 	StrategyForNamespace func(ctx context.Context, namespace string) (staging.FullStrategy, error)
+
+	// ValueTypeFlags are provider-specific flags appended to the add and edit
+	// commands so the staged entry can carry a value type (the AWS SSM Parameter
+	// Store --type/--secure axis). Nil for providers without a value-type axis.
+	ValueTypeFlags []cli.Flag
+
+	// ValueTypeFromCmd validates and resolves the staged value type from the
+	// add/edit command flags (ValueTypeFlags). Nil for providers without a
+	// value-type axis, in which case the staged value type is left unset. An
+	// empty return means "not specified": create applies plaintext and update
+	// preserves the existing type.
+	ValueTypeFromCmd func(cmd *cli.Command) (domain.ValueType, error)
+}
+
+// valueTypeFor resolves the staged value type from the command flags, or ""
+// when the provider has no value-type axis.
+func (c CommandConfig) valueTypeFor(cmd *cli.Command) (domain.ValueType, error) {
+	if c.ValueTypeFromCmd == nil {
+		return "", nil
+	}
+
+	return c.ValueTypeFromCmd(cmd)
 }
 
 // namespaceFor returns the single-item namespace for this command context, or ""
@@ -211,12 +234,12 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 		Usage:       fmt.Sprintf("Create new %s and stage it", cfg.ItemName),
 		ArgsUsage:   "<name> [value]",
 		Description: addDescription(cfg),
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
 				Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
 			},
-		},
+		}, cfg.ValueTypeFlags...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
 				return fmt.Errorf("usage: suve stage %s add <name> [value]", cfg.CommandName)
@@ -227,6 +250,11 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 			var value string
 			if cmd.Args().Len() >= 2 { //nolint:mnd // check for optional value argument
 				value = cmd.Args().Get(1)
+			}
+
+			valueType, err := cfg.valueTypeFor(cmd)
+			if err != nil {
+				return err
 			}
 
 			store, _, err := workingStore(ctx, cfg.ScopeResolver)
@@ -253,6 +281,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 				Value:       value,
 				Description: cmd.String("description"),
 				Namespace:   cfg.namespaceFor(ctx),
+				ValueType:   valueType,
 			})
 		},
 	}
@@ -265,12 +294,12 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 		Usage:       fmt.Sprintf("Edit %s value and stage changes", cfg.ItemName),
 		ArgsUsage:   "<name> [value]",
 		Description: editDescription(cfg),
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
 				Usage: fmt.Sprintf("Description for the %s", cfg.ItemName),
 			},
-		},
+		}, cfg.ValueTypeFlags...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
 				return fmt.Errorf("usage: suve stage %s edit <name> [value]", cfg.CommandName)
@@ -281,6 +310,11 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 			var value string
 			if cmd.Args().Len() >= 2 { //nolint:mnd // check for optional value argument
 				value = cmd.Args().Get(1)
+			}
+
+			valueType, err := cfg.valueTypeFor(cmd)
+			if err != nil {
+				return err
 			}
 
 			store, _, err := workingStore(ctx, cfg.ScopeResolver)
@@ -307,6 +341,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 				Value:       value,
 				Description: cmd.String("description"),
 				Namespace:   cfg.namespaceFor(ctx),
+				ValueType:   valueType,
 			})
 		},
 	}

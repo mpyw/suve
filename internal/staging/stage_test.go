@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -318,6 +319,78 @@ func TestState_UnmarshalJSON_Duplicate(t *testing.T) {
 		err := json.Unmarshal([]byte(data), &state)
 		require.NoError(t, err)
 		assert.Equal(t, 2, state.EntryCount())
+	})
+}
+
+func TestState_UnmarshalJSON_ValueType(t *testing.T) {
+	t.Parallel()
+
+	key := staging.EntryKey{Name: "/app/x"}
+
+	t.Run("entry written before value_type existed decodes as unset", func(t *testing.T) {
+		t.Parallel()
+
+		// A v3 working-store file written before #664 has no "value_type" field.
+		// It must load without error and default to the empty (plaintext) type.
+		data := `{"version":3,"entries":{"param":[` +
+			`{"name":"/app/x","operation":"create","value":"v","staged_at":"2024-01-01T00:00:00Z"}]}}`
+
+		var state staging.State
+
+		require.NoError(t, json.Unmarshal([]byte(data), &state))
+
+		entry := state.Entries[staging.ServiceParam][key]
+		assert.Equal(t, staging.OperationCreate, entry.Operation)
+		assert.Empty(t, string(entry.ValueType))
+	})
+
+	t.Run("entry with value_type decodes it", func(t *testing.T) {
+		t.Parallel()
+
+		data := `{"version":3,"entries":{"param":[` +
+			`{"name":"/app/x","operation":"create","value":"v","value_type":"secret","staged_at":"2024-01-01T00:00:00Z"}]}}`
+
+		var state staging.State
+
+		require.NoError(t, json.Unmarshal([]byte(data), &state))
+
+		entry := state.Entries[staging.ServiceParam][key]
+		assert.Equal(t, domain.ValueTypeSecret, entry.ValueType)
+	})
+
+	t.Run("round-trips through marshal", func(t *testing.T) {
+		t.Parallel()
+
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam][key] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("v"),
+			ValueType: domain.ValueTypeSecret,
+			StagedAt:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		}
+
+		data, err := json.Marshal(state)
+		require.NoError(t, err)
+
+		var got staging.State
+
+		require.NoError(t, json.Unmarshal(data, &got))
+		assert.Equal(t, domain.ValueTypeSecret, got.Entries[staging.ServiceParam][key].ValueType)
+	})
+
+	t.Run("unset type is omitted from the marshaled form", func(t *testing.T) {
+		t.Parallel()
+
+		state := staging.NewEmptyState()
+		state.Entries[staging.ServiceParam][key] = staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("v"),
+			StagedAt:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		}
+
+		data, err := json.Marshal(state)
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), "value_type")
 	})
 }
 

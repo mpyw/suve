@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
@@ -71,6 +72,59 @@ func TestEditUseCase_Execute(t *testing.T) {
 	assert.Equal(t, staging.OperationUpdate, entry.Operation)
 	assert.Equal(t, "updated-value", lo.FromPtr(entry.Value))
 	assert.NotNil(t, entry.BaseModifiedAt)
+}
+
+func TestEditUseCase_Execute_RecordsValueType(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategy(),
+		Store:    store,
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Key:       staging.EntryKey{Name: "/app/config"},
+		Value:     "updated-value",
+		ValueType: domain.ValueTypeSecret,
+	})
+	require.NoError(t, err)
+
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ValueTypeSecret, entry.ValueType)
+}
+
+func TestEditUseCase_Execute_PreservesStagedTypeWhenUnset(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	// A create was previously staged as SecureString.
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secure"}, staging.Entry{
+		Operation: staging.OperationCreate,
+		Value:     lo.ToPtr("v1"),
+		ValueType: domain.ValueTypeSecret,
+		StagedAt:  time.Now(),
+	}))
+
+	uc := &usecasestaging.EditUseCase{
+		Strategy: newMockEditStrategyNotFound(),
+		Store:    store,
+	}
+
+	// Editing the staged draft value without a type must preserve SecureString.
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{
+		Key:   staging.EntryKey{Name: "/app/secure"},
+		Value: "v2",
+	})
+	require.NoError(t, err)
+
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secure"})
+	require.NoError(t, err)
+	assert.Equal(t, "v2", lo.FromPtr(entry.Value))
+	assert.Equal(t, domain.ValueTypeSecret, entry.ValueType)
+	// Operation stays create (editing a staged create keeps it a create).
+	assert.Equal(t, staging.OperationCreate, entry.Operation)
 }
 
 func TestEditUseCase_Execute_RejectsNonUTF8Value(t *testing.T) {
