@@ -154,3 +154,31 @@ func (m *Model) selectedItem() (data.Item, bool) {
 
 	return m.items[idx], true
 }
+
+// selectedKey returns the identity (name+namespace) of the currently-selected
+// item, so a reload can re-resolve the SAME entry to its new index rather than
+// trusting the clamped index (#699).
+func (m *Model) selectedKey() (data.StagedKey, bool) {
+	item, ok := m.selectedItem()
+	if !ok {
+		return data.StagedKey{}, false
+	}
+
+	return dataStagedKey(item), true
+}
+
+// reselect moves the selection to the row whose identity matches key, called
+// after a rebuild so an insert/remove above the previous selection keeps the
+// detail on the same entry. When the entry is gone (e.g. it was the one just
+// deleted), it leaves the clamped selection SetRows already produced —
+// selectionCmd then loads whatever is now selected, or clears the detail when
+// the list is empty (the graceful, GUI-parity fallback).
+func (m *Model) reselect(key data.StagedKey) {
+	for i, it := range m.items {
+		if dataStagedKey(it) == key {
+			m.list.SelectIndex(i)
+
+			return
+		}
+	}
+}
