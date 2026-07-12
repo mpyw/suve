@@ -370,7 +370,7 @@ func (m *App) openTag(req nav.OpenTag) tea.Cmd {
 
 	d, cmd := dialogs.NewTagForm(dialogs.TagInput{
 		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
-		Name: req.Name, Namespace: req.Namespace, StagedOnly: req.StagedOnly,
+		Name: req.Name, Namespace: req.Namespace, Tags: req.Tags, StagedOnly: req.StagedOnly,
 	})
 
 	return m.pushDialog(d, cmd)

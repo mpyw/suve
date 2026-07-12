@@ -460,20 +460,23 @@ func (m *Model) openDelete() tea.Cmd {
 }
 
 // openTag requests the tag add/remove dialog for the selected entry (only when
-// the service supports tags).
+// the service supports tags). It is seeded from the loaded detail — like openEdit
+// — so the Remove action can offer the entry's CURRENT tags (m.detail.Tags)
+// rather than a blind free-text key (#705); it is therefore a no-op until a
+// detail is loaded, and the seeded tags always match the seeded name.
 func (m *Model) openTag() tea.Cmd {
-	if !m.svcCap.HasTags {
+	if !m.svcCap.HasTags || !m.detailOK {
 		return nil
 	}
 
-	item, ok := m.selectedItem()
-	if !ok {
-		return nil
+	req := nav.OpenTag{
+		Service:   m.svcCap.Service,
+		Name:      m.detail.Name,
+		Namespace: m.detail.Namespace,
+		Tags:      m.detail.Tags,
 	}
 
-	return func() tea.Msg {
-		return nav.OpenTag{Service: m.svcCap.Service, Name: item.Name, Namespace: item.Namespace}
-	}
+	return func() tea.Msg { return req }
 }
 
 // openRestore requests the restore dialog (name input), only when the service

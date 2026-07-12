@@ -687,20 +687,150 @@ func TestTagForm_Routing(t *testing.T) {
 	mut := &fakeMutator{svcCap: awsParamCap()}
 	m, _ := NewTagForm(TagInput{
 		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+		Tags: []data.Tag{{Key: "owner", Value: "team"}},
 	})
 	d, ok := m.(*tagForm)
 	require.True(t, ok)
 
-	d.tagKey, d.tagValue, d.staged = "owner", "team", true
+	d.tagKey, d.tagValue, d.staged = "env", "prod", true
 
 	d.remove = false
 	execCmd(t, d.submit())
-	assert.True(t, mut.addTagCalled, "add action routes to AddTag")
+	assert.True(t, mut.addTagCalled, "add action routes to AddTag with the free-text key")
+	assert.Equal(t, "env", mut.tagKey)
 	assert.True(t, mut.staged)
 
+	// Remove routes the key chosen from the existing-tags select (removeKey), never
+	// the free-text Add key.
 	d.remove = true
+	d.removeKey = "owner"
 	execCmd(t, d.submit())
-	assert.Equal(t, "owner", mut.tagKey, "remove action routes to RemoveTag with the key")
+	assert.Equal(t, "owner", mut.tagKey, "remove action routes to RemoveTag with the selected key")
+}
+
+// TestTagForm_RemoveConstrainedToExistingTags pins the #705 fix: the Remove
+// action is a select of the entry's CURRENT tags (labelled key=value, valued by
+// key so it routes straight to RemoveTag), never a blind free-text key. The
+// select seeds a present key by default, so a Remove always has a valid target,
+// and choosing a present tag stages the untag with that key. Add stays a
+// free-text key + value (adding a new tag is legitimately open-ended).
+func TestTagForm_RemoveConstrainedToExistingTags(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+	m, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+		Tags: []data.Tag{{Key: "env", Value: "prod"}, {Key: "team", Value: "api"}},
+	})
+	d, ok := m.(*tagForm)
+	require.True(t, ok)
+
+	// Add (the default) is a free-text key input, unchanged.
+	assert.Contains(t, stripANSI(d.View()), "Key", "Add offers a free-text key input")
+	assert.Contains(t, stripANSI(d.View()), "(add only)", "Add offers the value input")
+
+	// Remove offers a select of the existing tags, not a free-text key.
+	_, isSelect := d.removeField().(*huh.Select[string])
+	assert.True(t, isSelect, "Remove offers a select of existing tags, not a free-text key")
+
+	d.remove = true
+	require.NotNil(t, d.rebuildForm())
+	assert.Equal(t, "env", d.removeKey, "the select seeds the first existing tag as the default target")
+
+	view := stripANSI(d.View())
+	assert.Contains(t, view, "env=prod", "the select lists the existing tags as key=value options")
+	assert.Contains(t, view, "team=api")
+	assert.NotContains(t, view, "(add only)", "the Add-only value input is gone in Remove mode")
+
+	// Selecting a present tag stages the untag with that key.
+	d.removeKey = "team"
+	execCmd(t, d.submit())
+	assert.Equal(t, "team", mut.tagKey, "the chosen present key is the untag target")
+}
+
+// TestTagForm_StagedOnlyIsAddOnly pins the staged-only surface (the staging
+// review page) is Add-only: it never has the remote tag set to constrain a
+// Remove, so it offers no Remove action rather than a guaranteed empty-state
+// dead-end. Removing a remote tag is done from the browser.
+func TestTagForm_StagedOnlyIsAddOnly(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+	m, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
+		Name: "/app/X", StagedOnly: true,
+	})
+	d, ok := m.(*tagForm)
+	require.True(t, ok)
+
+	view := stripANSI(d.View())
+	assert.Contains(t, view, "Add tag", "the staged-only tag form offers Add")
+	assert.NotContains(t, view, "Remove tag", "the staged-only tag form offers no Remove action")
+
+	// A browser launch (not staged-only) still offers Remove.
+	bm, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+	})
+	b, ok := bm.(*tagForm)
+	require.True(t, ok)
+
+	_, _ = b.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	assert.True(t, b.remove, "a browser launch can toggle to Remove")
+}
+
+// TestTagForm_RemoveEmptyState pins the #705 empty state: an entry with no tags
+// has nothing to untag, so Remove shows a "(no tags to remove)" note instead of a
+// free-text key, and completing the Remove action is blocked — the guard reopens
+// with the note rather than dead-ending on a guaranteed-failing untag, and no
+// untag is ever submitted.
+func TestTagForm_RemoveEmptyState(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+	m, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+	})
+	d, ok := m.(*tagForm)
+	require.True(t, ok)
+
+	_, isNote := d.removeField().(*huh.Note)
+	assert.True(t, isNote, "with no tags, Remove shows a note, not a free-text key")
+
+	d.remove = true
+	require.NotNil(t, d.rebuildForm())
+	assert.Contains(t, stripANSI(d.View()), "(no tags to remove)", "the empty state names why nothing can be removed")
+
+	// The empty Remove has no key to route, and the completion guard blocks it (see
+	// the teatest TestTUI_TagRemoveEmptyBlocksSubmit for the end-to-end proof that
+	// no untag is submitted). Here we pin that nothing has been routed yet.
+	assert.Empty(t, mut.tagKey, "no untag key is set for an entry with no tags")
+	assert.False(t, d.busy)
+}
+
+// TestTagForm_ActionToggleMorphsKeyField pins that toggling the action select
+// rebuilds the form so the key field morphs between the free-text Add input and
+// the Remove select — the mechanism behind the #705 constraint.
+func TestTagForm_ActionToggleMorphsKeyField(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+	m, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+		Tags: []data.Tag{{Key: "env", Value: "prod"}},
+	})
+	d, ok := m.(*tagForm)
+	require.True(t, ok)
+
+	_, _ = d.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	require.False(t, d.builtRemove, "the form starts on the Add branch")
+
+	// Right arrow toggles the inline action select to Remove; the next Update pass
+	// rebuilds the form onto the Remove branch.
+	_, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	assert.True(t, d.remove, "right toggles the action to Remove")
+	assert.True(t, d.builtRemove, "the form rebuilt onto the Remove branch")
+	assert.Contains(t, stripANSI(d.View()), "env=prod", "the Remove select is now shown")
 }
 
 // TestDeleteConfirm_ResultVoicing pins the delete status voicing, including the
