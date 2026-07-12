@@ -190,6 +190,162 @@ func TestCompareSelectionOpensDiff(t *testing.T) {
 // keyForSpace builds the space key press (Bubble Tea v2 spells it "space").
 func keyForSpace() tea.KeyPressMsg { return tea.KeyPressMsg{Code: ' '} }
 
+// loadedHistoryModel builds a browser over a versioned source with a loaded
+// selection and history, rendered once so the widgets carry the page's focus.
+func loadedHistoryModel(t *testing.T) *Model {
+	t.Helper()
+
+	src := &stubSource{
+		svcCap: awsParamCap(),
+		history: []data.HistoryRow{
+			{Version: "14", Label: "#14", IsCurrent: true},
+			{Version: "13", Label: "#13"},
+		},
+	}
+	m := newModel(t, src)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/x"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/x"}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: src.history})
+
+	return m
+}
+
+// TestFocusHighlightDistinctBetweenPanes pins #685: the focused pane carries the
+// active selection cursor (▸) and the unfocused pane a dimmed one (▹), and the
+// two swap as focus moves list↔history — so the two panes never look equally
+// selected at once. Rendering the page sets each widget's focus from the page's
+// current focus, which the widget's own View then reflects.
+func TestFocusHighlightDistinctBetweenPanes(t *testing.T) {
+	t.Parallel()
+
+	m := loadedHistoryModel(t)
+	require.Equal(t, focusList, m.focus, "focus starts on the list")
+
+	_ = m.View(m.width, m.height)
+
+	assert.Contains(t, m.list.View(), "▸", "the focused list shows the active cursor")
+	assert.NotContains(t, m.list.View(), "▹", "the focused list does not show the dimmed cursor")
+	assert.Contains(t, m.history.View(), "▹", "the unfocused history shows the dimmed cursor")
+	assert.NotContains(t, m.history.View(), "▸", "the unfocused history does not show the active cursor")
+
+	// Enter moves focus into the history; the highlights swap.
+	m, _ = update(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	require.Equal(t, focusHistory, m.focus, "enter moves focus into the history")
+
+	_ = m.View(m.width, m.height)
+
+	assert.Contains(t, m.history.View(), "▸", "the focused history shows the active cursor")
+	assert.NotContains(t, m.history.View(), "▹", "the focused history does not show the dimmed cursor")
+	assert.Contains(t, m.list.View(), "▹", "the unfocused list shows the dimmed cursor")
+	assert.NotContains(t, m.list.View(), "▸", "the unfocused list does not show the active cursor")
+}
+
+// TestHistoryHeaderHintAdaptsToFocus pins #685's discoverability affordance: the
+// history header advertises `enter: history` while the list is focused and
+// `esc: list` once focus is in the history, so the enter→history / esc→list
+// transitions are visible rather than trial-and-error.
+func TestHistoryHeaderHintAdaptsToFocus(t *testing.T) {
+	t.Parallel()
+
+	m := loadedHistoryModel(t)
+
+	const width = 80
+
+	assert.Contains(t, m.historyHeaderLine(width), "enter: history", "the list advertises how to enter the history")
+	assert.NotContains(t, m.historyHeaderLine(width), "esc: list")
+
+	m, _ = update(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	require.Equal(t, focusHistory, m.focus)
+
+	assert.Contains(t, m.historyHeaderLine(width), "esc: list", "the history advertises how to return to the list")
+	assert.NotContains(t, m.historyHeaderLine(width), "enter: history")
+}
+
+// TestHistoryHeaderHintSuppressedWhenEmpty pins that the enter→history affordance
+// is not advertised for an entry with no versions: onSelect no-ops there, so the
+// header must not promise a transition that does nothing.
+func TestHistoryHeaderHintSuppressedWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	src := &stubSource{svcCap: awsParamCap()} // no history rows
+	m := newModel(t, src)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/app/x"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/x"}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: nil})
+	require.Zero(t, m.history.Len(), "the entry has no versions")
+
+	line := m.historyHeaderLine(80)
+	assert.Contains(t, line, "History", "the header title still renders")
+	assert.NotContains(t, line, "enter: history", "no false enter→history affordance for a version-less entry")
+}
+
+// TestStaleErrorClearedByLaterSuccessfulLoad pins #688: a transient history (or
+// detail) error must not linger over a later successful load. The single
+// selection funnel clears the per-source detail/history errors up front, and each
+// source also clears its own error when it next succeeds.
+func TestStaleErrorClearedByLaterSuccessfulLoad(t *testing.T) {
+	t.Parallel()
+
+	src := &stubSource{svcCap: awsParamCap()}
+	m := newModel(t, src)
+
+	items := []data.Item{{Name: "/a"}, {Name: "/b"}}
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: items}})
+
+	// Entry A: the detail loads, but the history fetch fails transiently.
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/a"}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, err: errors.New("history fetch failed")})
+	require.Contains(t, m.historyErr, "history fetch failed")
+	require.NotEmpty(t, m.errLines(), "the transient history error is shown")
+
+	// Select entry B: the selection funnel clears the stale per-source errors up
+	// front, before B's responses even land.
+	_ = m.move(1)
+	assert.Empty(t, m.historyErr, "selecting a new entry clears the stale history error immediately")
+	assert.Empty(t, m.detailErr)
+
+	// B's detail and history both succeed → the error line stays clear.
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/b"}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: nil})
+	assert.Empty(t, m.errLines(), "a successful load after an error clears the error line")
+}
+
+// TestDetailErrorClearedOnItsOwnSuccessfulLoad pins that a detail error clears the
+// moment a detail load succeeds, independent of the selection funnel — the
+// per-source clearing path onDetailLoaded owns.
+func TestDetailErrorClearedOnItsOwnSuccessfulLoad(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/a"}}}})
+
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, err: errors.New("show failed")})
+	require.Contains(t, m.detailErr, "show failed")
+
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/a"}})
+	assert.Empty(t, m.detailErr, "a successful detail load clears its own error")
+	assert.True(t, m.detailOK)
+}
+
+// TestStagedErrorSurvivesSelectionChange pins the deliberate divergence: the
+// staging-store hard-fail (a launch-time key-loss) is a persistent condition, so
+// a selection change clears the transient detail/history errors but NOT the
+// staged error.
+func TestStagedErrorSurvivesSelectionChange(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/a"}, {Name: "/b"}}}})
+
+	m.stagedErr = "cannot access the staging encryption key"
+	m.detailErr = "stale detail error"
+
+	_ = m.move(1)
+
+	assert.Empty(t, m.detailErr, "the selection funnel clears the transient detail error")
+	assert.Contains(t, m.stagedErr, "staging encryption key", "the persistent staged hard-fail survives a selection change")
+}
+
 // TestMaskToggle pins that x flips the detail value pane's mask for a secret and
 // that the golden default is masked.
 func TestMaskToggle(t *testing.T) {
@@ -494,12 +650,12 @@ func TestOnStagedLoadedSurfacesStoreHardFail(t *testing.T) {
 
 	// A transient probe read error is swallowed.
 	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, err: errors.New("probe timeout")})
-	assert.Empty(t, m.err, "a transient probe error does not spam the error line")
+	assert.Empty(t, m.stagedErr, "a transient probe error does not spam the error line")
 
 	// A store-construction hard-fail (key-loss) is surfaced.
 	hard := &data.StoreUnavailableError{Err: errors.New("cannot access the staging encryption key")}
 	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, err: hard})
-	assert.Contains(t, m.err, "staging encryption key", "a key-loss hard-fail is surfaced on the read path")
+	assert.Contains(t, m.stagedErr, "staging encryption key", "a key-loss hard-fail is surfaced on the read path")
 }
 
 // TestOpenNewBlocksAllNamespaces pins the App Configuration create-block: a write

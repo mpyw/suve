@@ -126,8 +126,14 @@ func (m *Model) loadNamespacesCmd() tea.Cmd {
 }
 
 // selectionCmd loads the detail and history for the currently-selected item, as
-// two independent fetches.
+// two independent fetches. It clears the per-source detail/history errors up
+// front (the single selection funnel, mirroring the GUI clearing its error at the
+// start of selectParam) so a stale error from the previous entry never lingers
+// over the new selection's loads.
 func (m *Model) selectionCmd() tea.Cmd {
+	m.detailErr = ""
+	m.historyErr = ""
+
 	item, ok := m.selectedItem()
 	if !ok {
 		m.detailOK = false

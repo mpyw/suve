@@ -87,6 +87,26 @@ func TestBrowser_AWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenE
 	browserGolden(t, m, "SecureString")
 }
 
+// TestBrowser_AWSParamHistoryFocusGolden renders the AWS param browser after
+// pressing enter to move focus into the version history (#685): the history pane
+// carries the active selection cursor (▸) and the `esc: list` hint, while the
+// list drops to the dimmed cursor (▹) — so the focused pane is unambiguous.
+func TestBrowser_AWSParamHistoryFocusGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
+	goldenEnv(t)
+
+	probe := staticProbe{keys: map[data.StagedKey]struct{}{{Name: "/app/web/BASE_URL"}: {}}}
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), probe),
+	})
+
+	// Drive to the loaded state, then press enter to focus the history pane.
+	raw := captureBrowserAfterKeys(t, m, "SecureString", keyEnterMsg())
+	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight))
+}
+
 // TestBrowser_AWSSecretGolden renders the AWS secret browser (staging labels +
 // ARN, masked value).
 func TestBrowser_AWSSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
@@ -262,6 +282,33 @@ func browserGolden(t *testing.T, m *App, marker string) {
 
 	raw := captureUntil(t, m, marker, browserTermWidth, browserTermHeight)
 	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight))
+}
+
+// captureBrowserAfterKeys drives a browser app to its loaded state (waiting for
+// marker), sends follow-up key presses (e.g. enter to focus the history), lets
+// the frame settle, then quits and returns the full captured stream.
+func captureBrowserAfterKeys(t *testing.T, m *App, marker string, keys ...tea.KeyPressMsg) []byte {
+	t.Helper()
+
+	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
+
+	var buf bytes.Buffer
+
+	waitFor(t, tm, &buf, marker)
+
+	for _, k := range keys {
+		tm.Send(k)
+		time.Sleep(100 * time.Millisecond)
+
+		_, _ = io.Copy(&buf, tm.Output())
+	}
+
+	tm.Send(keyPress('q'))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+
+	_, _ = io.Copy(&buf, tm.Output())
+
+	return buf.Bytes()
 }
 
 // diffGolden drives a diff host to its loaded state at the shell size and
