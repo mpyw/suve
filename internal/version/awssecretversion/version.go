@@ -1,6 +1,6 @@
-// Package secretversion provides version spec parsing and display helpers for
+// Package awssecretversion provides version spec parsing and display helpers for
 // AWS Secrets Manager.
-package secretversion
+package awssecretversion
 
 // TruncateVersionID truncates a version ID to 8 characters for display.
 // Secrets Manager version IDs are UUIDs which are long; this provides

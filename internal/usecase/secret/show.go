@@ -9,12 +9,12 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // ShowInput holds input for the show use case.
 type ShowInput struct {
-	Spec *secretversion.Spec
+	Spec *awssecretversion.Spec
 }
 
 // ShowTag represents a tag key-value pair.

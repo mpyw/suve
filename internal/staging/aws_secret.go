@@ -13,7 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // AWSSecretStrategy implements ServiceStrategy for Secrets Manager. It is backed by
@@ -172,7 +172,7 @@ func (s *AWSSecretStrategy) FetchCurrent(ctx context.Context, name string) (*Fet
 
 	return &FetchResult{
 		Value:      entry.Value,
-		Identifier: "#" + secretversion.TruncateVersionID(entry.Version.ID),
+		Identifier: "#" + awssecretversion.TruncateVersionID(entry.Version.ID),
 	}, nil
 }
 
@@ -202,7 +202,7 @@ func (s *AWSSecretStrategy) FetchCurrentTags(ctx context.Context, name string) (
 
 // ParseName parses and validates a name for editing.
 func (s *AWSSecretStrategy) ParseName(input string) (string, error) {
-	spec, err := secretversion.Parse(input)
+	spec, err := awssecretversion.Parse(input)
 	if err != nil {
 		return "", err
 	}
@@ -239,7 +239,7 @@ func (s *AWSSecretStrategy) FetchCurrentValue(ctx context.Context, name string) 
 
 // ParseSpec parses a version spec string for reset.
 func (s *AWSSecretStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
-	spec, err := secretversion.Parse(input)
+	spec, err := awssecretversion.Parse(input)
 	if err != nil {
 		return "", false, err
 	}
@@ -251,7 +251,7 @@ func (s *AWSSecretStrategy) ParseSpec(input string) (name string, hasVersion boo
 
 // FetchVersion fetches the value for a specific version.
 func (s *AWSSecretStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
-	spec, err := secretversion.Parse(input)
+	spec, err := awssecretversion.Parse(input)
 	if err != nil {
 		return "", "", err
 	}
@@ -266,12 +266,12 @@ func (s *AWSSecretStrategy) FetchVersion(ctx context.Context, input string) (val
 		return "", "", err
 	}
 
-	return entry.Value, "#" + secretversion.TruncateVersionID(entry.Version.ID), nil
+	return entry.Value, "#" + awssecretversion.TruncateVersionID(entry.Version.ID), nil
 }
 
 // secretSpecSuffix reconstructs the version-spec suffix (the part after the name)
 // so that name+suffix re-parses to an equivalent spec, as provider.Reader.Resolve expects.
-func secretSpecSuffix(spec *secretversion.Spec) string {
+func secretSpecSuffix(spec *awssecretversion.Spec) string {
 	var b strings.Builder
 
 	switch {

@@ -12,7 +12,7 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 // AWSParamStrategy implements ServiceStrategy for SSM Parameter Store. It is backed
@@ -189,7 +189,7 @@ func (s *AWSParamStrategy) FetchCurrentTags(ctx context.Context, name string) (m
 
 // ParseName parses and validates a name for editing.
 func (s *AWSParamStrategy) ParseName(input string) (string, error) {
-	spec, err := paramversion.Parse(input)
+	spec, err := awsparamversion.Parse(input)
 	if err != nil {
 		return "", err
 	}
@@ -226,7 +226,7 @@ func (s *AWSParamStrategy) FetchCurrentValue(ctx context.Context, name string) (
 
 // ParseSpec parses a version spec string for reset.
 func (s *AWSParamStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
-	spec, err := paramversion.Parse(input)
+	spec, err := awsparamversion.Parse(input)
 	if err != nil {
 		return "", false, err
 	}
@@ -238,7 +238,7 @@ func (s *AWSParamStrategy) ParseSpec(input string) (name string, hasVersion bool
 
 // FetchVersion fetches the value for a specific version.
 func (s *AWSParamStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
-	spec, err := paramversion.Parse(input)
+	spec, err := awsparamversion.Parse(input)
 	if err != nil {
 		return "", "", err
 	}
@@ -258,7 +258,7 @@ func (s *AWSParamStrategy) FetchVersion(ctx context.Context, input string) (valu
 
 // paramSpecSuffix reconstructs the version-spec suffix (the part after the name)
 // so that name+suffix re-parses to an equivalent spec, as provider.Reader.Resolve expects.
-func paramSpecSuffix(spec *paramversion.Spec) string {
+func paramSpecSuffix(spec *awsparamversion.Spec) string {
 	var b strings.Builder
 
 	if spec.Absolute.Version != nil {

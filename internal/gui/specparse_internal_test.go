@@ -108,7 +108,7 @@ func TestApp_parseSecretSpec(t *testing.T) {
 			input: "sec:AWSCURRENT", wantName: "sec", wantLabel: ptrStr("AWSCURRENT"),
 		},
 		{
-			// Google Cloud integer version adapts to a secretversion ID whose
+			// Google Cloud integer version adapts to a awssecretversion ID whose
 			// suffix ("#3") the Secret Manager adapter re-parses as integer 3.
 			name: "google cloud integer version", provider: provider.ProviderGoogleCloud,
 			input: "sec#3", wantName: "sec", wantID: ptrStr("3"),

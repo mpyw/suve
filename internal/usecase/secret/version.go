@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/mpyw/suve/internal/domain"
-	"github.com/mpyw/suve/internal/version/secretversion"
+	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // specSuffix reconstructs the version-spec suffix (the part after the name)
@@ -19,7 +19,7 @@ import (
 //	{Shift:2}                    -> "~2"
 //	{Label:"AWSCURRENT", Shift:1}-> ":AWSCURRENT~1"
 //	{}                           -> ""  (current/latest)
-func specSuffix(spec *secretversion.Spec) string {
+func specSuffix(spec *awssecretversion.Spec) string {
 	var b strings.Builder
 
 	switch {

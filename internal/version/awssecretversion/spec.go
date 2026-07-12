@@ -1,4 +1,4 @@
-package secretversion
+package awssecretversion
 
 import (
 	"errors"

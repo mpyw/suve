@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/paramversion"
+	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 // diffJSONOutput represents the JSON output structure for the diff command.
@@ -30,14 +30,14 @@ type diffJSONOutput struct {
 // diffPresenter renders SSM Parameter Store diff output byte-for-byte as before.
 type diffPresenter struct {
 	uc     *param.DiffUseCase
-	spec1  *paramversion.Spec
-	spec2  *paramversion.Spec
+	spec1  *awsparamversion.Spec
+	spec2  *awsparamversion.Spec
 	result *param.DiffOutput
 }
 
 // NewDiffPresenter builds a param diff presenter over the given reader and specs.
 // It is exported for the shared golden-output test harness.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *paramversion.Spec) genericdiff.Presenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *awsparamversion.Spec) genericdiff.Presenter {
 	return &diffPresenter{uc: &param.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
@@ -81,7 +81,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the SSM Parameter Store diff command.
 func DiffCommand() *cli.Command {
-	return genericdiff.Command(genericdiff.Config[*paramversion.Spec]{
+	return genericdiff.Command(genericdiff.Config[*awsparamversion.Spec]{
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
 		Description: `Compare two versions of a parameter in unified diff format.
@@ -102,8 +102,8 @@ EXAMPLES:
   suve param diff --output=json /app/config~      Output comparison as JSON
 
 For comparing staged values, use: suve stage param diff`,
-		ParseDiffArgs: paramversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *paramversion.Spec) (genericdiff.Presenter, error) {
+		ParseDiffArgs: awsparamversion.ParseDiffArgs,
+		NewPresenter: func(ctx context.Context, spec1, spec2 *awsparamversion.Spec) (genericdiff.Presenter, error) {
 			store, err := cliinternal.ParamStore(ctx)
 			if err != nil {
 				return nil, err
