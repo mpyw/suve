@@ -123,6 +123,24 @@ func newEntry(t *testing.T, svcCap capability.ServiceCapability, edit bool) (*en
 	return d, mut
 }
 
+// newStagedOnlyEntry builds a staged-only edit form (the staging review page's
+// edit path): the mode toggle is hidden and the write is forced staged.
+func newStagedOnlyEntry(t *testing.T, svcCap capability.ServiceCapability) *entryForm {
+	t.Helper()
+
+	mut := &fakeMutator{svcCap: svcCap}
+
+	m, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: svcCap.Service, Styles: styles.New(),
+		Edit: true, Name: "/app/X", Value: "old", StagedOnly: true,
+	})
+
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+
+	return d
+}
+
 // execCmd runs a command for its side effect on the recording mutator.
 func execCmd(t *testing.T, cmd tea.Cmd) {
 	t.Helper()
@@ -245,19 +263,19 @@ func TestEntryForm_NamespaceReadOnlyOnEdit(t *testing.T) {
 	assert.Equal(t, "(default)", namespaceDisplay(""))
 }
 
-// TestEntryForm_TypeSelectGating pins the Type select is offered only for the
-// typed AWS SSM param service (App Configuration is untyped; secret has none)
-// AND only in immediate mode: containment for #664, since the staged path drops
-// the value type (staging apply hardcodes a plaintext String), so a staged
-// SecureString would silently downgrade to plaintext. Staged mode must not
-// present a Type control that can't take effect.
+// TestEntryForm_TypeSelectGating pins the Type select is offered for the typed
+// AWS SSM param service (App Configuration is untyped; secret has none) in BOTH
+// modes: the value type flows through the staged path as well as the immediate
+// path (the #664 fix), so the select is reachable regardless of the mode toggle
+// — where it was previously hidden in staged mode as a #664 containment. It must
+// stay absent for the untyped services.
 func TestEntryForm_TypeSelectGating(t *testing.T) {
 	t.Parallel()
 
 	awsParam, _ := newEntry(t, awsParamCap(), false)
 	require.True(t, awsParam.staged, "AWS param defaults to staged")
-	assert.False(t, awsParam.showType(), "staged mode hides the Type select (#664 containment)")
-	assert.NotContains(t, awsParam.View(), "Type", "staged form draws no Type row")
+	assert.True(t, awsParam.showType(), "staged mode still offers the Type select")
+	assert.Contains(t, awsParam.View(), "Type", "the staged form draws the Type row (default mode)")
 
 	awsParam.staged = false
 	require.NotNil(t, awsParam.rebuildForm())
@@ -265,14 +283,65 @@ func TestEntryForm_TypeSelectGating(t *testing.T) {
 	assert.Contains(t, awsParam.View(), "Type", "immediate form draws the Type row")
 
 	appConfig, _ := newEntry(t, appConfigCap(), false)
+	assert.False(t, appConfig.showType(), "App Configuration is untyped in either mode")
 	appConfig.staged = false
 	require.NotNil(t, appConfig.rebuildForm())
-	assert.False(t, appConfig.showType(), "App Configuration is untyped even in immediate mode")
+	assert.False(t, appConfig.showType(), "App Configuration is untyped in either mode")
 
 	secret, _ := newEntry(t, awsSecretCap(), false)
+	assert.False(t, secret.showType(), "secret has no value type in either mode")
 	secret.staged = false
 	require.NotNil(t, secret.rebuildForm())
-	assert.False(t, secret.showType(), "secret has no value type even in immediate mode")
+	assert.False(t, secret.showType(), "secret has no value type in either mode")
+
+	// A staged-only surface (the staging review page's edit) hides the Type select:
+	// the write is always a staged edit that preserves the existing type, and the
+	// dialog cannot seed the entry's current type.
+	stagedOnly := newStagedOnlyEntry(t, awsParamCap())
+	assert.False(t, stagedOnly.showType(), "a staged-only edit hides the Type select")
+	assert.NotContains(t, stagedOnly.View(), "Type", "a staged-only edit draws no Type row")
+}
+
+// TestEntryForm_StagedCarriesType pins that a staged param create routes the
+// selected value type (e.g. SecureString) through to the mutator — the TUI half
+// of the #664/#680 fix. Previously the staged path dropped the type, silently
+// creating the parameter as plaintext String.
+func TestEntryForm_StagedCarriesType(t *testing.T) {
+	t.Parallel()
+
+	d, mut := newEntry(t, awsParamCap(), false)
+	d.name = "/app/SECRET"
+	d.value = "s3cr3t"
+	d.valueType = "SecureString"
+	d.staged = true
+
+	execCmd(t, d.submit())
+
+	assert.True(t, mut.createCalled)
+	assert.True(t, mut.staged, "the write is staged")
+	assert.Equal(t, "SecureString", mut.typeLabel, "the staged create carries the selected type")
+}
+
+// TestEntryForm_StagedOnlyEditPreservesType pins that a staged-only edit (the
+// staging review page's edit, which shows no Type control and cannot seed the
+// entry's current type) submits an EMPTY type label. An empty label preserves the
+// existing staged/cloud type in the staging apply, so re-editing a staged
+// SecureString from the review page never silently downgrades it to plaintext —
+// the failure this would otherwise reintroduce once the Type select is reachable.
+func TestEntryForm_StagedOnlyEditPreservesType(t *testing.T) {
+	t.Parallel()
+
+	d := newStagedOnlyEntry(t, awsParamCap())
+	d.value = "new"
+
+	mut, ok := d.mutator.(*fakeMutator)
+	require.True(t, ok)
+
+	execCmd(t, d.submit())
+
+	assert.True(t, mut.updateCalled)
+	assert.True(t, mut.staged, "a staged-only edit is staged")
+	assert.Empty(t, mut.typeLabel, "a staged-only edit passes no type, so the existing type is preserved")
 }
 
 // TestEntryForm_DescriptionGating pins that the Description field is drawn only
