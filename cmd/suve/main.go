@@ -19,6 +19,15 @@ func isShellCompletion(args []string) bool {
 func main() {
 	// Register GUI flag (only effective when built with -tags production)
 	registerGUIFlag()
+
+	// Register the TUI --tui flag and usage. RegisterTUIFlag runs after
+	// registerGUIFlag so the --tui Before-wrapper sits outermost and chains to
+	// the GUI wrapper (and then enableDebug). RegisterTUIDescription runs before
+	// registerGUIDescription so the usage composes to "CLI/GUI/TUI" in the GUI
+	// build ("CLI/TUI" in the default build, where the GUI rewrite is a no-op).
+	commands.RegisterTUIFlag()
+	commands.RegisterTUIDescription()
+
 	registerGUIDescription()
 
 	ctx := context.Background()
