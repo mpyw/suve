@@ -27,7 +27,7 @@ type (
 	}
 	stagedLoadedMsg struct {
 		seq  int
-		keys map[data.StagedKey]struct{}
+		snap data.StagingSnapshot
 		err  error
 	}
 	namespacesLoadedMsg struct {
@@ -105,9 +105,9 @@ func (m *Model) loadStagedCmd() tea.Cmd {
 	probe := m.staging
 
 	return func() tea.Msg {
-		keys, err := probe.StagedKeys(ctx)
+		snap, err := probe.Staged(ctx)
 
-		return stagedLoadedMsg{seq: seq, keys: keys, err: err}
+		return stagedLoadedMsg{seq: seq, snap: snap, err: err}
 	}
 }
 

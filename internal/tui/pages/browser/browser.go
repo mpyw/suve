@@ -115,8 +115,12 @@ type Model struct {
 	items      []data.Item
 	nextToken  string
 	stagedKeys map[data.StagedKey]struct{}
-	loading    bool
-	spinner    spinner.Model
+	// deleteStagedKeys is the subset of stagedKeys staged for deletion; the
+	// edit/delete/tag affordances are dead-end transitions on such an entry (the
+	// reducer rejects them), so they are gated on this set (#692).
+	deleteStagedKeys map[data.StagedKey]struct{}
+	loading          bool
+	spinner          spinner.Model
 
 	// Detail state.
 	valuePane       components.ValuePane
@@ -135,6 +139,11 @@ type Model struct {
 	detailErr  string
 	historyErr string
 	stagedErr  string
+	// actionStatus is a transient one-line message shown when a key is pressed on
+	// a row where its transition is a dead-end (e.g. edit/delete/tag on a
+	// delete-staged entry) — the browser's parity with the staging page's #684
+	// invalid-action status. It is cleared on the next key press.
+	actionStatus string
 
 	// Monotonic sequence guards (GUI loadSeq pattern): a response is applied only
 	// when its seq still matches the latest issued one.
@@ -180,19 +189,20 @@ func New(ctx context.Context, source data.Source, staging data.StagingProbe, st 
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 
 	m := &Model{
-		ctx:        ctx,
-		source:     source,
-		staging:    staging,
-		svcCap:     source.Capability(),
-		styles:     st,
-		keys:       km,
-		prefix:     prefix,
-		filter:     filter,
-		spinner:    sp,
-		list:       components.NewEntryList(st),
-		history:    components.NewHistoryTable(st),
-		valuePane:  components.NewValuePane(),
-		stagedKeys: map[data.StagedKey]struct{}{},
+		ctx:              ctx,
+		source:           source,
+		staging:          staging,
+		svcCap:           source.Capability(),
+		styles:           st,
+		keys:             km,
+		prefix:           prefix,
+		filter:           filter,
+		spinner:          sp,
+		list:             components.NewEntryList(st),
+		history:          components.NewHistoryTable(st),
+		valuePane:        components.NewValuePane(),
+		stagedKeys:       map[data.StagedKey]struct{}{},
+		deleteStagedKeys: map[data.StagedKey]struct{}{},
 		// Recursive listing defaults on (GUI parity): a param browser shows the whole
 		// subtree under a prefix by default. The toggle is only shown/effective for a
 		// non-namespaced param service; elsewhere the field is inert.

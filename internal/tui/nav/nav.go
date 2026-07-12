@@ -69,6 +69,12 @@ type OpenEntryForm struct {
 	// GUI's dedicated StagingEdit/StagingAddTag calls, which offer no immediate mode.
 	StagedOnly  bool
 	Description string
+	// DeleteStagedKeys is the set of (name, namespace) keys currently staged for
+	// deletion, carried into a create dialog so the name field can reject a name
+	// that is delete-staged client-side (an inline friendly message) instead of
+	// letting the write dead-end on the reducer's post-submit error (#692). It is
+	// unset for an edit (the name is fixed).
+	DeleteStagedKeys map[data.StagedKey]struct{}
 }
 
 // OpenDelete asks the app to open the delete-confirm dialog for the selected

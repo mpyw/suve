@@ -8,6 +8,10 @@ import (
 // selects that row and loads its detail (reducing to the same selection a key
 // move performs), and — in compare mode — a history row click picks it.
 func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
+	// A mouse interaction dismisses the transient invalid-action status, matching
+	// the key path and the staging page.
+	m.actionStatus = ""
+
 	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}

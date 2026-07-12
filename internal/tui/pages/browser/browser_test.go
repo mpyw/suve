@@ -638,24 +638,123 @@ func TestStagingJump(t *testing.T) {
 	assert.True(t, ok, "S emits nav.OpenStaging")
 }
 
-// TestOnStagedLoadedSurfacesStoreHardFail pins the read-path key-loss surfacing:
-// a staging store-construction hard-fail (a key-loss while encrypted state exists)
-// is shown on the browser error line, while an ordinary transient probe read error
-// stays quiet (badges just do not show — no error-line spam).
-func TestOnStagedLoadedSurfacesStoreHardFail(t *testing.T) {
+// TestOnStagedLoadedSurfacesProbeErrors pins the read-path error surfacing (#695):
+// a transient probe read error shows a short "staged status unavailable" note
+// rather than being swallowed (silent swallowing would hide every [staged] badge,
+// making a staged entry look un-staged), and a store-construction hard-fail
+// (a key-loss while encrypted state exists) shows its own actionable message.
+func TestOnStagedLoadedSurfacesProbeErrors(t *testing.T) {
 	t.Parallel()
 
 	m := newModel(t, &stubSource{svcCap: awsParamCap()})
 	_ = m.loadStagedCmd() // advance stagedSeq so the messages are current
 
-	// A transient probe read error is swallowed.
+	// A transient probe read error is surfaced as a non-fatal note, not swallowed.
 	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, err: errors.New("probe timeout")})
-	assert.Empty(t, m.stagedErr, "a transient probe error does not spam the error line")
+	assert.Equal(t, "staged status unavailable", m.stagedErr, "a transient probe error is surfaced, not silently dropped")
+	assert.Contains(t, m.errLines(), "staged status unavailable", "the note reaches the rendered error region")
 
-	// A store-construction hard-fail (key-loss) is surfaced.
+	// A store-construction hard-fail (key-loss) is surfaced with its own message.
 	hard := &data.StoreUnavailableError{Err: errors.New("cannot access the staging encryption key")}
 	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, err: hard})
 	assert.Contains(t, m.stagedErr, "staging encryption key", "a key-loss hard-fail is surfaced on the read path")
+}
+
+// TestStagedCountUsesEntriesPlusTags pins #693: the browser reports the Staging
+// tab badge count as entries + tag changes (the staging page's definition), so an
+// item with both an entry change and a tag change counts as 2 — never the
+// deduplicated key count (1) the browser used before, which made the badge
+// oscillate between the two surfaces.
+func TestStagedCountUsesEntriesPlusTags(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsSecretCap()})
+	_ = m.loadStagedCmd()
+
+	key := data.StagedKey{Name: "prod/api/key"}
+	// One item carries BOTH a staged entry change and a staged tag change: one
+	// deduplicated key, but two changes.
+	snap := data.StagingSnapshot{
+		Keys:       map[data.StagedKey]struct{}{key: {}},
+		DeleteKeys: map[data.StagedKey]struct{}{},
+		EntryCount: 1,
+		TagCount:   1,
+	}
+
+	_, cmd := update(t, m, stagedLoadedMsg{seq: m.stagedSeq, snap: snap})
+	require.NotNil(t, cmd, "a fresh staged load reports the tab count")
+
+	count, ok := cmd().(nav.StagedCount)
+	require.True(t, ok, "onStagedLoaded emits nav.StagedCount")
+	assert.Equal(t, 2, count.Count, "the badge counts entries + tags (2), not the deduplicated key (1)")
+}
+
+// TestEditDeleteTagGatedOnDeleteStaged pins #692: on an entry staged for deletion,
+// e/d/t do not open their (dead-end) dialogs but set a one-line status message
+// instead — matching the GUI, which hides those controls. A non-delete-staged
+// entry keeps the affordances.
+func TestEditDeleteTagGatedOnDeleteStaged(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsSecretCap()}) // has tags
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "prod/live"}, {Name: "prod/doomed"},
+	}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "prod/live", Value: "v"}})
+
+	// prod/doomed (index 1) is staged for deletion.
+	doomed := data.StagedKey{Name: "prod/doomed"}
+	snap := data.StagingSnapshot{
+		Keys:       map[data.StagedKey]struct{}{doomed: {}},
+		DeleteKeys: map[data.StagedKey]struct{}{doomed: {}},
+		EntryCount: 1,
+	}
+	m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, snap: snap})
+
+	m.list.SelectIndex(1) // select the delete-staged entry
+	require.True(t, m.selectedIsDeleteStaged(), "prod/doomed is delete-staged")
+
+	for _, tc := range []struct {
+		key  rune
+		want string
+	}{
+		{'e', "cannot edit: staged for deletion"},
+		{'d', "already staged for deletion"},
+		{'t', "cannot tag: staged for deletion"},
+	} {
+		m, cmd := update(t, m, keyPress(tc.key))
+		assert.Nil(t, cmd, "%c on a delete-staged entry opens no dialog", tc.key)
+		assert.Contains(t, m.actionStatus, tc.want, "%c surfaces the gate status", tc.key)
+		assert.Contains(t, m.errLines(), m.actionStatus, "the gate status renders in the error region")
+	}
+
+	// A non-delete-staged entry keeps the affordances: e opens the edit form.
+	m.list.SelectIndex(0)
+	require.False(t, m.selectedIsDeleteStaged(), "prod/live is not delete-staged")
+	m, cmd := update(t, m, keyPress('e'))
+	require.NotNil(t, cmd, "edit is offered on a non-delete-staged entry")
+	_, ok := cmd().(nav.OpenEntryForm)
+	assert.True(t, ok, "e opens the entry form when the entry is not delete-staged")
+	assert.Empty(t, m.actionStatus, "no gate status on a valid action")
+}
+
+// TestOpenNewCarriesDeleteStagedKeys pins that the create dialog request carries
+// the delete-staged key set, so the entry form can reject a delete-staged name
+// client-side (#692) instead of dead-ending on the reducer.
+func TestOpenNewCarriesDeleteStagedKeys(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	doomed := data.StagedKey{Name: "/app/doomed"}
+	m.deleteStagedKeys = map[data.StagedKey]struct{}{doomed: {}}
+
+	cmd := m.openNew()
+	require.NotNil(t, cmd)
+	form, ok := cmd().(nav.OpenEntryForm)
+	require.True(t, ok, "openNew emits nav.OpenEntryForm")
+	assert.False(t, form.Edit)
+	_, carried := form.DeleteStagedKeys[doomed]
+	assert.True(t, carried, "the create request carries the delete-staged keys for client-side validation")
 }
 
 // TestOpenNewBlocksAllNamespaces pins the App Configuration create-block: a write

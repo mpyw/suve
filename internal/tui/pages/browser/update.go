@@ -143,12 +143,16 @@ func (m *Model) onHistoryLoaded(msg historyLoadedMsg) {
 	m.historyVersions = versionIDs(msg.rows)
 }
 
-// onStagedLoaded records the staged-key set, rebuilds the rows so badges appear,
-// and reports the staged count to the app for the Staging tab badge. An ordinary
-// probe read error is non-fatal (badges simply do not show), but a
+// onStagedLoaded records the staged snapshot, rebuilds the rows so badges appear,
+// and reports the staged count to the app for the Staging tab badge. Any probe
+// read error is surfaced on the error line rather than swallowed: a
 // store-construction hard-fail (a staging key-loss while encrypted state exists)
-// is surfaced on the error line so a launch-time key-loss is visible on the read
-// path, not only when the user attempts a write.
+// shows its actionable message, and an ordinary transient read error shows a
+// short "staged status unavailable" note — never full silence, which would hide
+// every [staged] badge and make a staged entry look un-staged (#695). The tab
+// badge counts entries + tag changes — the same definition the staging page uses
+// — so the two surfaces share one count rather than oscillating between a
+// deduplicated-key count and entries+tags (#693).
 func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 	if msg.seq != m.stagedSeq {
 		return nil
@@ -158,29 +162,32 @@ func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 		var storeErr *data.StoreUnavailableError
 		if errors.As(msg.err, &storeErr) {
 			m.stagedErr = storeErr.Error()
+		} else {
+			m.stagedErr = "staged status unavailable"
 		}
 
 		return nil
 	}
 
 	m.stagedErr = ""
-	m.stagedKeys = msg.keys
+	m.stagedKeys = msg.snap.Keys
+	m.deleteStagedKeys = msg.snap.DeleteKeys
 	m.rebuildRows()
 
 	service := m.svcCap.Service
-	count := len(msg.keys)
+	count := msg.snap.EntryCount + msg.snap.TagCount
 
 	return func() tea.Msg { return nav.StagedCount{Service: service, Count: count} }
 }
 
 // errLines returns the active error lines in a stable order — list, detail,
-// history, then the staging-store hard-fail — each owned by its own source so a
-// transient failure clears when that source next succeeds without masking or
-// lingering over another source's state.
+// history, the staging-store/probe note, then the transient invalid-action
+// status — each owned by its own source so a transient failure clears when that
+// source next succeeds without masking or lingering over another source's state.
 func (m *Model) errLines() []string {
-	lines := make([]string, 0, 4) //nolint:mnd // the four error sources
+	lines := make([]string, 0, 5) //nolint:mnd // the four error sources plus the action status
 
-	for _, e := range []string{m.listErr, m.detailErr, m.historyErr, m.stagedErr} {
+	for _, e := range []string{m.listErr, m.detailErr, m.historyErr, m.stagedErr, m.actionStatus} {
 		if e != "" {
 			lines = append(lines, e)
 		}
@@ -235,6 +242,11 @@ func (m *Model) CapturesInput() bool {
 // handleKey routes a key: to a focused text input when editing, else to the
 // page-local bindings, else to the focused list/history widget.
 func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
+	// Clear the transient invalid-action status on any key; a dead-end action
+	// below re-sets it when the pressed key is itself invalid for the selection
+	// (mirrors the staging page's #684 status handling).
+	m.actionStatus = ""
+
 	if m.focus == focusPrefix || m.focus == focusFilter {
 		return m.handleInputKey(msg)
 	}
@@ -308,16 +320,52 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case key.Matches(msg, newKey):
 		return true, m.openNew()
 	case key.Matches(msg, editKey):
+		if m.selectedIsDeleteStaged() {
+			m.actionStatus = "cannot edit: staged for deletion — reset first"
+
+			return true, nil
+		}
+
 		return true, m.openEdit()
 	case key.Matches(msg, deleteKey):
+		if m.selectedIsDeleteStaged() {
+			m.actionStatus = "already staged for deletion — reset first"
+
+			return true, nil
+		}
+
 		return true, m.openDelete()
 	case key.Matches(msg, tagKey):
+		// A no-tags service ignores `t` entirely (openTag is a no-op there), so it
+		// must not surface a delete-staged status that implies tagging is otherwise
+		// possible.
+		if m.svcCap.HasTags && m.selectedIsDeleteStaged() {
+			m.actionStatus = "cannot tag: staged for deletion — reset first"
+
+			return true, nil
+		}
+
 		return true, m.openTag()
 	case key.Matches(msg, restoreKey):
 		return true, m.openRestore()
 	}
 
 	return false, nil
+}
+
+// selectedIsDeleteStaged reports whether the currently-selected entry is staged
+// for deletion. Editing, deleting, or tagging such an entry is a dead-end the
+// reducer rejects post-submit, so the affordance is gated with a friendly status
+// instead (#692), matching the GUI's staging tab, which hides those controls.
+func (m *Model) selectedIsDeleteStaged() bool {
+	item, ok := m.selectedItem()
+	if !ok {
+		return false
+	}
+
+	_, deleteStaged := m.deleteStagedKeys[dataStagedKey(item)]
+
+	return deleteStaged
 }
 
 // openNew requests the create dialog. Creating while viewing all/multiple App
@@ -334,7 +382,11 @@ func (m *Model) openNew() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		return nav.OpenEntryForm{Service: m.svcCap.Service, Namespace: m.currentNamespace()}
+		return nav.OpenEntryForm{
+			Service:          m.svcCap.Service,
+			Namespace:        m.currentNamespace(),
+			DeleteStagedKeys: m.deleteStagedKeys,
+		}
 	}
 }
 

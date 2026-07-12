@@ -332,7 +332,7 @@ func (m *App) openEntryForm(req nav.OpenEntryForm) tea.Cmd {
 		Ctx: m.runCtx, Mutator: mut, Service: req.Service, Styles: m.styles,
 		Edit: req.Edit, Name: req.Name, Namespace: req.Namespace,
 		Value: req.Value, TypeLabel: req.TypeLabel, Description: req.Description,
-		StagedOnly: req.StagedOnly,
+		StagedOnly: req.StagedOnly, DeleteStagedKeys: req.DeleteStagedKeys,
 	})
 
 	return m.pushDialog(d, cmd)
