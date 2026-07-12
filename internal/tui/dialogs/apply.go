@@ -12,7 +12,15 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/tui/data"
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/styles"
+)
+
+// Apply confirm-phase button region IDs (the results phase reuses regionClose).
+const (
+	applyRegionIgnore = "ignore"
+	applyRegionApply  = "apply"
+	applyRegionCancel = "apply-cancel"
 )
 
 // resultsChrome is the vertical overhead the results view reserves around its
@@ -78,6 +86,9 @@ type applyDialog struct {
 	// scrollable records whether the last synced body overflowed the viewport, so
 	// the close hint can advertise the scroll keys only when they do something.
 	scrollable bool
+	// hits maps a click on the confirm controls (ignore/apply/cancel) or the
+	// results close hint to the same action their key equivalents perform.
+	hits *hit.Map
 }
 
 // ApplyInput configures an apply dialog.
@@ -149,11 +160,49 @@ func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 		d.vp, cmd = d.vp.Update(msg)
 
 		return d, cmd
+	case tea.MouseClickMsg:
+		return d.handleClick(msg)
 	case tea.KeyPressMsg:
 		return d.handleKey(msg)
 	}
 
 	return d, nil
+}
+
+// handleClick reduces a click to the same action its key equivalent performs: in
+// the results phase the close hint closes (like enter); in the confirm phase the
+// ignore/apply/cancel controls each focus + activate. Busy swallows clicks (the
+// #568 double-fire guard).
+func (d *applyDialog) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
+	if d.phase == phaseBusy {
+		return d, nil
+	}
+
+	id, _, _, ok := d.hits.At(msg.X, msg.Y)
+	if !ok {
+		return d, nil
+	}
+
+	if d.phase == phaseResults {
+		if id == regionClose {
+			return d, doneCmd("", d.summary(), true)
+		}
+
+		return d, nil
+	}
+
+	switch id {
+	case applyRegionIgnore:
+		d.focus = int(ctrlIgnore)
+	case applyRegionApply:
+		d.focus = int(ctrlApply)
+	case applyRegionCancel:
+		d.focus = int(ctrlApplyCancel)
+	default:
+		return d, nil
+	}
+
+	return d.activate()
 }
 
 func (d *applyDialog) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -246,22 +295,42 @@ func (d *applyDialog) View() string {
 func (d *applyDialog) confirmView() string {
 	var b strings.Builder
 
-	b.WriteString(d.fit(d.styles.PaneTitle.Render(d.title)))
+	title := d.fit(d.styles.PaneTitle.Render(d.title))
+	target := d.fit(d.styles.FieldLabel.Render("Target  ") + " " + d.targetLine)
+	changes := d.fit(d.styles.FieldLabel.Render("Changes ") + " " + d.changesLine())
+
+	b.WriteString(title)
 	b.WriteString("\n\n")
-	b.WriteString(d.fit(d.styles.FieldLabel.Render("Target  ")+" "+d.targetLine) + "\n")
-	b.WriteString(d.fit(d.styles.FieldLabel.Render("Changes ")+" "+d.changesLine()) + "\n\n")
+	b.WriteString(target + "\n")
+	b.WriteString(changes + "\n\n")
 
 	if d.phase == phaseBusy {
+		d.hits = hit.New() // no controls while applying
 		b.WriteString(d.styles.PageHint.Render("applying…"))
 
 		return b.String()
 	}
 
-	b.WriteString(d.confirmRow(ctrlIgnore, checkbox(d.ignoreConflicts)+" Ignore conflicts"))
+	ignoreRow := d.confirmRow(ctrlIgnore, checkbox(d.ignoreConflicts)+" Ignore conflicts")
+	applyBtn := d.confirmRow(ctrlApply, "[ Apply ]")
+	cancelBtn := d.confirmRow(ctrlApplyCancel, "[ Cancel ]")
+
+	b.WriteString(ignoreRow)
 	b.WriteString("\n\n")
-	b.WriteString(d.confirmRow(ctrlApply, "[ Apply ]") + "    " + d.confirmRow(ctrlApplyCancel, "[ Cancel ]"))
+	b.WriteString(applyBtn + "    " + cancelBtn)
 	b.WriteString("\n\n")
 	b.WriteString(d.styles.PageHint.Render("↑↓: move · space/enter: toggle/confirm · esc: cancel"))
+
+	// The ignore row sits below the title, its blank line, the target/changes
+	// lines, and their blank line; the Apply/Cancel buttons one blank line below it.
+	ignoreY := lipgloss.Height(title) + 1 + lipgloss.Height(target) + lipgloss.Height(changes) + 1
+	buttonY := ignoreY + lipgloss.Height(ignoreRow) + 1
+	applyW := lipgloss.Width(applyBtn)
+	d.hits = hit.New(
+		hit.Region(applyRegionIgnore, 0, ignoreY, max(lipgloss.Width(ignoreRow), 1), 1),
+		hit.Region(applyRegionApply, 0, buttonY, applyW, 1),
+		hit.Region(applyRegionCancel, applyW+buttonGap, buttonY, lipgloss.Width(cancelBtn), 1),
+	)
 
 	return b.String()
 }
@@ -309,14 +378,21 @@ func (d *applyDialog) resultsView() string {
 	// Once sized, the body scrolls inside the viewport; before the first
 	// WindowSizeMsg it renders inline (uncapped) so a size-less unit render still
 	// shows every line.
+	body := d.resultsBody()
 	if d.sized() {
-		b.WriteString(d.vp.View())
-	} else {
-		b.WriteString(d.resultsBody())
+		body = d.vp.View()
 	}
 
+	b.WriteString(body)
 	b.WriteString("\n\n")
-	b.WriteString(d.styles.PageHint.Render(d.resultsHint()))
+
+	hint := d.styles.PageHint.Render(d.resultsHint())
+	b.WriteString(hint)
+
+	// The close hint sits below the pinned title, its blank line, the results body,
+	// and its blank line; a click on it closes like enter/esc.
+	closeY := 1 + 1 + lipgloss.Height(body) + 1
+	d.hits = hit.New(hit.Region(regionClose, 0, closeY, lipgloss.Width(hint), 1))
 
 	return b.String()
 }

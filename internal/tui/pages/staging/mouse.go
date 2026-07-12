@@ -1,16 +1,19 @@
 package staging
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 )
 
-// handleMouseClick maps a left click onto the last-rendered geometry, reducing
-// each click to the SAME internal action its keyboard equivalent performs: a
-// section's apply/reset button to apply/reset that section, an entry row to the
-// full-diff detail (like enter), a tag row to just selecting it (enter is a
-// no-op there — removal is `u`-only, never a click, #682), and the auto-unstaged
-// notice to dismiss. It follows the browser's hand-rolled geom hit-testing so
-// #663 can migrate both pages to the compositor uniformly.
+// handleMouseClick resolves a left click against the last-rendered hit map and
+// reduces it to the SAME internal action its keyboard equivalent performs: the
+// header toggle flips the diff/value view (like v); apply-all/reset-all/refresh
+// mirror A/R/ctrl+r; a section's apply/reset button applies/resets that section;
+// the notice dismisses (like esc); and a row click only SELECTS the row (never a
+// destructive cancel — removal is `u`-only, and enter's detail stays a key
+// action, resolving the browser/staging row-click divergence toward a single
+// "click selects" model).
 func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
 	m.status = "" // a mouse interaction dismisses the transient invalid-action status
 
@@ -18,66 +21,60 @@ func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.geom.noticeRow >= 0 && msg.Y == m.geom.noticeRow {
+	id, _, _, ok := m.hits.At(msg.X, msg.Y)
+	if !ok {
+		return m, nil
+	}
+
+	switch {
+	case id == regionNotice:
 		m.noticeDismissed = true
-
-		return m, nil
-	}
-
-	line := msg.Y - m.geom.bodyTop
-	if line < 0 || line >= len(m.geom.lines) {
-		return m, nil
-	}
-
-	desc := m.geom.lines[line]
-
-	if desc.section >= 0 {
-		return m.clickSection(desc, msg.X)
-	}
-
-	if desc.row >= 0 {
-		return m.clickRow(desc.row)
+	case id == regionViewToggle:
+		return m, m.toggleView()
+	case id == regionApplyAll:
+		return m, m.apply(true)
+	case id == regionResetAll:
+		return m, m.reset(true)
+	case id == regionRefresh:
+		return m, m.reload()
+	case strings.HasPrefix(id, prefixSecApply):
+		return m, m.clickSection(id, prefixSecApply, m.applyServices)
+	case strings.HasPrefix(id, prefixSecReset):
+		return m, m.clickSection(id, prefixSecReset, m.resetServices)
+	case strings.HasPrefix(id, prefixRow):
+		return m.selectClickedRow(id)
 	}
 
 	return m, nil
 }
 
-// clickSection handles a click on a section header: apply/reset when the click
-// falls on the corresponding button columns.
-func (m *Model) clickSection(desc lineDesc, x int) (*Model, tea.Cmd) {
-	if desc.section >= len(m.sections) {
-		return m, nil
+// clickSection resolves a section-button region to its service and calls the
+// per-service apply/reset (the same reduction the header a/r keys perform).
+func (m *Model) clickSection(id, prefix string, action func([]string, bool) tea.Cmd) tea.Cmd {
+	i, ok := idIndex(id, prefix)
+	if !ok || i >= len(m.sections) {
+		return nil
 	}
 
-	service := m.sections[desc.section].service
-
-	switch {
-	case inRange(x, desc.apply):
-		return m, m.applyServices([]string{service}, false)
-	case inRange(x, desc.reset):
-		return m, m.resetServices([]string{service}, false)
-	default:
-		return m, nil
-	}
+	return action([]string{m.sections[i].service}, false)
 }
 
-// clickRow selects a row and performs its enter action (detail for an entry;
-// a no-op for a tag change, which is only selected), so a click reduces to the
-// key path.
-func (m *Model) clickRow(row int) (*Model, tea.Cmd) {
-	if row >= len(m.rows) {
+// selectClickedRow selects the clicked row (resetting the reveal like a key move,
+// #694) without performing any row action — a single click only navigates.
+func (m *Model) selectClickedRow(id string) (*Model, tea.Cmd) {
+	row, ok := idIndex(id, prefixRow)
+	if !ok || row >= len(m.rows) {
 		return m, nil
 	}
 
 	m.selected = row
-	// A selection move resets the reveal so a peek never persists onto another row
-	// (mirrors moveSelection; the reveal is scoped to the selected row — #694).
 	m.reveal = false
 
-	return m, m.onEnter()
+	return m, nil
 }
 
-// handleMouseWheel scrolls the section body.
+// handleMouseWheel scrolls the section body regardless of the pointer's column,
+// so there is no dead zone (the staging page has a single scrollable body).
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) (*Model, tea.Cmd) {
 	m.status = "" // a mouse interaction dismisses the transient invalid-action status
 
@@ -102,9 +99,4 @@ func wheelDelta(button tea.MouseButton) int {
 	default:
 		return 0
 	}
-}
-
-// inRange reports whether x is within the [start,end) column range.
-func inRange(x int, r [2]int) bool {
-	return x >= r[0] && x < r[1]
 }

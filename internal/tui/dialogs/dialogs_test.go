@@ -765,6 +765,65 @@ func TestRestoreForm_Routing(t *testing.T) {
 	assert.True(t, mut.restoreCalled)
 }
 
+// TestDeleteConfirm_MouseClickControls pins #663's delete-dialog coverage: a
+// click on the force checkbox, the mode radio, the Delete button, and Cancel each
+// reduces to the same action navigating to the control and pressing enter/space
+// performs, with coordinates from the drawn control regions.
+func TestDeleteConfirm_MouseClickControls(t *testing.T) {
+	t.Parallel()
+
+	sized := func() *deleteConfirm {
+		d := newDelete(t, awsSecretCap())
+		_, _ = d.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+		_ = d.View()
+
+		return d
+	}
+
+	// Cancel click cancels.
+	d := sized()
+	_, cmd := d.Update(clickAt(t, d.hits, deleteControlID(ctrlCancel)))
+	require.NotNil(t, cmd)
+	_, ok := cmd().(CanceledMsg)
+	assert.True(t, ok, "clicking Cancel cancels")
+
+	// Force checkbox click toggles force (like space/enter on it).
+	d = sized()
+	require.False(t, d.force)
+	_, _ = d.Update(clickAt(t, d.hits, deleteControlID(ctrlForce)))
+	assert.True(t, d.force, "clicking the force checkbox toggles it")
+
+	// Mode radio click toggles the staged/immediate mode.
+	d = sized()
+	require.True(t, d.staged)
+	_, _ = d.Update(clickAt(t, d.hits, deleteControlID(ctrlMode)))
+	assert.False(t, d.staged, "clicking the mode radio toggles the mode")
+
+	// Delete button click submits: busy + mutation command.
+	d = sized()
+	_, cmd = d.Update(clickAt(t, d.hits, deleteControlID(ctrlDelete)))
+	assert.True(t, d.busy, "clicking Delete starts the mutation")
+	require.NotNil(t, cmd, "clicking Delete dispatches the delete command")
+}
+
+// TestErrorDialog_MouseClickCloses pins that clicking the error dialog's close
+// hint dismisses it, reducing to the same CanceledMsg enter/esc emit.
+func TestErrorDialog_MouseClickCloses(t *testing.T) {
+	t.Parallel()
+
+	m := NewError(styles.New(), "Cannot create here", "Select a single namespace before creating.")
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	_ = m.View()
+
+	d, ok := m.(*errorDialog)
+	require.True(t, ok)
+
+	_, cmd := d.Update(clickAt(t, d.hits, regionClose))
+	require.NotNil(t, cmd, "clicking the close hint dispatches")
+	_, isCancel := cmd().(CanceledMsg)
+	assert.True(t, isCancel, "clicking close dismisses (like enter/esc)")
+}
+
 func newDelete(t *testing.T, svcCap capability.ServiceCapability) *deleteConfirm {
 	t.Helper()
 

@@ -8,12 +8,17 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
 // errorSpacerRows is the two blank lines the error dialog pins (one below the
 // title, one above the close hint) around the scrollable message body.
 const errorSpacerRows = 2
+
+// regionClose is the close-hint region ID (shared by the error dialog and any
+// confirm dialog whose close hint is clickable).
+const regionClose = "close"
 
 // errorDialog is a plain modal that surfaces a message the app could not handle
 // inline — a blocked operation (e.g. creating while viewing all namespaces) or a
@@ -33,6 +38,8 @@ type errorDialog struct {
 	// scrollable records whether the last synced body overflowed the viewport, so
 	// the close hint advertises the scroll keys only when they do something.
 	scrollable bool
+	// hits maps a click on the close hint to the same dismissal enter/esc perform.
+	hits *hit.Map
 }
 
 // NewError builds an error dialog with a title and message.
@@ -59,6 +66,12 @@ func (d *errorDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 		d.vp, cmd = d.vp.Update(msg)
 
 		return d, cmd
+	case tea.MouseClickMsg:
+		if id, _, _, ok := d.hits.At(msg.X, msg.Y); ok && id == regionClose {
+			return d, canceledCmd
+		}
+
+		return d, nil
 	case tea.KeyPressMsg:
 		if key.Matches(msg, navSelect) {
 			return d, canceledCmd
@@ -104,20 +117,28 @@ func (d *errorDialog) syncViewport() {
 func (d *errorDialog) View() string {
 	var b strings.Builder
 
-	b.WriteString(d.header())
+	header := d.header()
+	b.WriteString(header)
 	b.WriteString("\n\n")
 
 	// Once sized, the message scrolls inside the viewport; before the first
 	// WindowSizeMsg it renders inline (uncapped) so a size-less unit render still
 	// shows the whole message.
+	body := d.message
 	if d.sized() {
-		b.WriteString(d.vp.View())
-	} else {
-		b.WriteString(d.message)
+		body = d.vp.View()
 	}
 
+	b.WriteString(body)
 	b.WriteString("\n\n")
-	b.WriteString(d.hint())
+
+	hint := d.hint()
+	b.WriteString(hint)
+
+	// The close hint is clickable (the shell forwards a content-local click here),
+	// reducing to the same dismissal enter/esc perform.
+	hintY := lipgloss.Height(header) + 1 + lipgloss.Height(body) + 1
+	d.hits = hit.New(hit.Region(regionClose, 0, hintY, lipgloss.Width(hint), 1))
 
 	return b.String()
 }

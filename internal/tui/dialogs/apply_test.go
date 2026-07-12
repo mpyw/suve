@@ -12,8 +12,20 @@ import (
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/tui/data"
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
+
+// clickAt builds a left click at a hit region's drawn origin, so a dialog mouse
+// test derives its coordinate from the layout instead of hard-coding one.
+func clickAt(t *testing.T, hits *hit.Map, id string) tea.MouseClickMsg {
+	t.Helper()
+
+	x, y, ok := hits.Origin(id)
+	require.True(t, ok, "region %q was drawn", id)
+
+	return tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft}
+}
 
 // stubStaging is a controllable data.StagingService for the apply/reset dialog
 // tests: Apply returns a preset result (or a conflict result until conflicts are
@@ -395,6 +407,101 @@ func TestReset_FanOutAggregation(t *testing.T) {
 	require.True(t, ok, "reset emits a done message")
 	assert.Contains(t, done.Status, "5", "the aggregate voices the summed unstaged count (2+3)")
 	assert.False(t, next.Busy(), "the dialog clears busy once the reset finishes")
+}
+
+// TestApply_MouseClickConfirmControls pins #663's confirm-dialog coverage: a
+// click on the Ignore checkbox, Apply, and Cancel reduces to the same action the
+// key path performs (toggle, confirm, cancel), with coordinates from the drawn
+// control regions.
+func TestApply_MouseClickConfirmControls(t *testing.T) {
+	t.Parallel()
+
+	newDialog := func() *applyDialog {
+		svc := &stubStaging{service: "param", label: "Param", result: data.StagingApplyResult{ServiceLabel: "Param"}}
+		m := NewApply(ApplyInput{
+			Ctx: context.Background(), Targets: []data.StagingService{svc},
+			TargetLine: "aws", Title: "Apply staged changes — Param", EntryCount: 1, Styles: styles.New(),
+		})
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+		_ = m.View()
+		d, ok := m.(*applyDialog)
+		require.True(t, ok)
+
+		return d
+	}
+
+	// Ignore checkbox click toggles ignoreConflicts (like enter on it).
+	d := newDialog()
+	require.False(t, d.ignoreConflicts)
+	_, _ = d.Update(clickAt(t, d.hits, applyRegionIgnore))
+	assert.True(t, d.ignoreConflicts, "clicking the Ignore checkbox toggles it")
+
+	// Apply button click confirms: busy + fan-out command (like focus Apply + enter).
+	d = newDialog()
+	_, cmd := d.Update(clickAt(t, d.hits, applyRegionApply))
+	assert.True(t, d.Busy(), "clicking Apply starts the fan-out")
+	require.NotNil(t, cmd, "clicking Apply dispatches the apply command")
+
+	// Cancel button click cancels.
+	d = newDialog()
+	_, cmd = d.Update(clickAt(t, d.hits, applyRegionCancel))
+	require.NotNil(t, cmd)
+	_, ok := cmd().(CanceledMsg)
+	assert.True(t, ok, "clicking Cancel cancels")
+}
+
+// TestApply_MouseClickResultsCloses pins that clicking the results close hint
+// closes with the same reload+voice enter performs.
+func TestApply_MouseClickResultsCloses(t *testing.T) {
+	t.Parallel()
+
+	d := appliedResults(t, data.StagingApplyResult{
+		ServiceLabel: "Param",
+		Entries:      []data.ApplyEntryResult{{Name: "a", Status: "updated"}},
+	})
+	_ = d.View() // build the results-phase close region
+
+	_, cmd := d.Update(clickAt(t, d.hits, regionClose))
+	require.NotNil(t, cmd, "clicking the close hint dispatches")
+	done, ok := cmd().(MutationDoneMsg)
+	require.True(t, ok, "clicking close emits MutationDoneMsg (like enter)")
+	assert.Contains(t, done.Status, "Applied", "the outcome is voiced")
+}
+
+// TestReset_MouseClickButtons pins that clicking the Reset/Cancel buttons reduces
+// to the same action the key path performs.
+func TestReset_MouseClickButtons(t *testing.T) {
+	t.Parallel()
+
+	newDialog := func() *resetDialog {
+		svc := &stubStaging{
+			service: "param", label: "Param",
+			resetResult: data.StagingResetResult{Type: data.StagingResetUnstagedAll, Count: 1},
+		}
+		m := NewReset(ResetInput{
+			Ctx: context.Background(), Targets: []data.StagingService{svc},
+			Title: "Reset staged changes — Param", Styles: styles.New(),
+		})
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+		_ = m.View()
+		d, ok := m.(*resetDialog)
+		require.True(t, ok)
+
+		return d
+	}
+
+	// Cancel click cancels.
+	d := newDialog()
+	_, cmd := d.Update(clickAt(t, d.hits, resetRegionCancel))
+	require.NotNil(t, cmd)
+	_, ok := cmd().(CanceledMsg)
+	assert.True(t, ok, "clicking Cancel cancels")
+
+	// Reset click confirms: busy + reset command.
+	d = newDialog()
+	_, cmd = d.Update(clickAt(t, d.hits, resetRegionReset))
+	assert.True(t, d.Busy(), "clicking Reset starts the reset")
+	require.NotNil(t, cmd, "clicking Reset dispatches the reset command")
 }
 
 // TestReset_DefaultFocusCancels pins that the reset confirm opens focused on

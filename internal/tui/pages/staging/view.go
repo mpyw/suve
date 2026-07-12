@@ -8,6 +8,7 @@ import (
 
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/tui/data"
+	"github.com/mpyw/suve/internal/tui/hit"
 )
 
 // Operation keys (the neutral staging operation strings).
@@ -17,7 +18,9 @@ const (
 	operationDelete = "delete"
 )
 
-// lineDesc maps one rendered body line to what a mouse click on it acts on.
+// lineDesc maps one rendered body line to what a mouse click on it acts on. It
+// is intermediate layout state: View turns the visible descriptors into hit
+// regions once per frame.
 type lineDesc struct {
 	// row is the selectable row index this line belongs to, or -1.
 	row int
@@ -30,32 +33,29 @@ type lineDesc struct {
 	reset [2]int
 }
 
-// stagingGeom records the last-rendered hit-map so mouse handlers hit-test what
-// is on screen (the browser geom pattern; #663 migrates it to the compositor).
-type stagingGeom struct {
-	// bodyTop is the page-local screen row the scroll body starts on.
-	bodyTop int
-	// bodyRows is the visible body height.
-	bodyRows int
-	// lines maps a body-relative screen row to its descriptor.
-	lines []lineDesc
-	// noticeRow is the page-local row of the dismissible notice, or -1.
-	noticeRow int
+// headerRanges holds the fixed-header affordances' [start,end) column ranges,
+// computed from the plain layout so hit-testing is color-safe.
+type headerRanges struct {
+	view     [2]int
+	applyAll [2]int
+	resetAll [2]int
+	refresh  [2]int
 }
 
-// View renders the staging page into the content area and records the geometry.
+// View renders the staging page into the content area and rebuilds the hit map.
 func (m *Model) View(width, height int) string {
 	m.width, m.height = width, height
 	if width <= 0 || height <= 0 {
 		return ""
 	}
 
-	m.geom = stagingGeom{noticeRow: -1}
+	header, hRanges := m.headerLine(width)
+	head := []string{header}
 
-	head := []string{m.headerLine(width)}
+	noticeRow := -1
 
 	if m.noticeVisible() {
-		m.geom.noticeRow = len(head)
+		noticeRow = len(head)
 		head = append(head, m.noticeLine(width))
 	}
 
@@ -67,19 +67,67 @@ func (m *Model) View(width, height int) string {
 
 	bodyTop := len(head)
 	bodyH := max(height-bodyTop-1, 0)
-	m.geom.bodyTop = bodyTop
-	m.geom.bodyRows = bodyH
 
 	lines, descs, rowFirst := m.bodyLines(width)
 	m.clampScroll(len(lines), bodyH, rowFirst)
 
 	visible, visDescs := window(lines, descs, m.scroll, bodyH)
-	m.geom.lines = visDescs
+
+	m.hits = m.buildHits(width, bodyTop, noticeRow, hRanges, visDescs)
 
 	out := append(head, visible...) //nolint:gocritic // head is a fresh slice; appending body then footer is intentional
 	out = append(out, footer)
 
 	return strings.Join(out, "\n")
+}
+
+// buildHits assembles the frame's hit regions in page-local coordinates: the
+// fixed-header affordances at row 0, the dismissible notice (when shown), and —
+// from the VISIBLE body descriptors — each section's apply/reset buttons and each
+// selectable row (spanning its consecutive lines). Rows fill the full width so a
+// click anywhere on a row selects it; the section buttons sit above (higher Z) on
+// their header line.
+func (m *Model) buildHits(width, bodyTop, noticeRow int, h headerRanges, visDescs []lineDesc) *hit.Map {
+	regions := []*lipgloss.Layer{
+		rangeRegion(regionViewToggle, h.view, 0),
+		rangeRegion(regionApplyAll, h.applyAll, 0),
+		rangeRegion(regionResetAll, h.resetAll, 0),
+		rangeRegion(regionRefresh, h.refresh, 0),
+	}
+
+	if noticeRow >= 0 {
+		regions = append(regions, hit.Region(regionNotice, 0, noticeRow, width, 1))
+	}
+
+	for i := 0; i < len(visDescs); {
+		d := visDescs[i]
+		y := bodyTop + i
+
+		switch {
+		case d.section >= 0:
+			regions = append(regions,
+				rangeRegion(secApplyID(d.section), d.apply, y).Z(1),
+				rangeRegion(secResetID(d.section), d.reset, y).Z(1),
+			)
+			i++
+		case d.row >= 0:
+			start := i
+			for i < len(visDescs) && visDescs[i].row == d.row {
+				i++
+			}
+
+			regions = append(regions, hit.Region(rowID(d.row), 0, bodyTop+start, width, i-start))
+		default:
+			i++
+		}
+	}
+
+	return hit.New(regions...)
+}
+
+// rangeRegion builds a 1-row region for a [start,end) column range at row y.
+func rangeRegion(id string, r [2]int, y int) *lipgloss.Layer {
+	return hit.Region(id, r[0], y, r[1]-r[0], 1)
 }
 
 // footerLine renders the reserved bottom row: a pending invalid-action status
@@ -101,13 +149,43 @@ func (m *Model) hintLine(width int) string {
 	return m.styles.PageHint.Render(clip(hint, width))
 }
 
-// headerLine renders the fixed top line: the view toggle and the global
-// apply-all / reset-all / refresh affordances.
-func (m *Model) headerLine(width int) string {
-	toggle := "view: " + m.styles.PaneTitle.Render(bracket("diff", m.diffView)) + " " + bracket("value", !m.diffView)
-	actions := m.styles.PageHint.Render("A apply-all · R reset-all · ctrl+r refresh")
+// headerLine renders the fixed top line — the view toggle and the global
+// apply-all / reset-all / refresh affordances — and returns each affordance's
+// clickable column range, so a header click reduces to the same action its key
+// equivalent performs. The ranges come from the plain layout (byte == column for
+// this ASCII line), so styling never shifts a hit range (color-safe).
+func (m *Model) headerLine(width int) (string, headerRanges) {
+	const (
+		applyText   = "A apply-all"
+		resetText   = "R reset-all"
+		refreshText = "ctrl+r refresh"
+	)
 
-	return clip(toggle+"   "+actions, width)
+	toggleText := "view: " + bracket("diff", m.diffView) + " " + bracket("value", !m.diffView)
+	actionsText := applyText + " · " + resetText + " · " + refreshText
+	plain := toggleText + "   " + actionsText
+
+	ranges := headerRanges{
+		view:     [2]int{0, lipgloss.Width(toggleText)},
+		applyAll: indexSpan(plain, applyText),
+		resetAll: indexSpan(plain, resetText),
+		refresh:  indexSpan(plain, refreshText),
+	}
+
+	toggle := "view: " + m.styles.PaneTitle.Render(bracket("diff", m.diffView)) + " " + bracket("value", !m.diffView)
+	actions := m.styles.PageHint.Render(actionsText)
+
+	return clip(toggle+"   "+actions, width), ranges
+}
+
+// indexSpan finds sub in plain and returns its [start,end) column range.
+func indexSpan(plain, sub string) [2]int {
+	start := strings.Index(plain, sub)
+	if start < 0 {
+		return [2]int{0, 0}
+	}
+
+	return [2]int{start, start + len(sub)}
 }
 
 // noticeLine renders the dismissible auto-unstaged notice.

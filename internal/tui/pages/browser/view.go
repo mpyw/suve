@@ -7,19 +7,37 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/tui/components"
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// View renders the browser page into the content area and records the geometry
-// mouse handlers hit-test against.
+// headerSep is the three-space gap between header segments.
+const headerSep = "   "
+
+// headerSeg records a header segment's clickable column range in page-local
+// coordinates: the region ID and its [x, x+w) span on the header row.
+type headerSeg struct {
+	id string
+	x  int
+	w  int
+}
+
+// View renders the browser page into the content area and rebuilds the hit map
+// mouse handlers test against.
 func (m *Model) View(width, height int) string {
 	m.width, m.height = width, height
 	if width <= 0 || height <= 0 {
 		return ""
 	}
 
-	header := m.renderHeader(width)
+	m.regions = m.regions[:0]
+
+	header, segs := m.renderHeader(width)
 	headerH := lipgloss.Height(header)
+
+	for _, s := range segs {
+		m.regions = append(m.regions, hit.Region(s.id, s.x, 0, s.w, 1))
+	}
 
 	parts := []string{header}
 	offset := headerH
@@ -32,42 +50,71 @@ func (m *Model) View(width, height int) string {
 	bodyH := max(height-offset, 0)
 	parts = append(parts, m.renderBody(width, bodyH, offset))
 
+	m.hits = hit.New(m.regions...)
+
 	return strings.Join(parts, "\n")
 }
 
-// renderHeader renders the single prefix/filter/toggles line, plus the App
-// Config namespace filter and a spinner while loading.
-func (m *Model) renderHeader(width int) string {
-	var b strings.Builder
+// renderHeader renders the single prefix/filter/toggles line (plus the App Config
+// namespace filter and a spinner while loading) and returns each clickable
+// segment's column range, so a header click reduces to the same action its key
+// equivalent performs. Segment widths come from the rendered display width, so
+// styling never shifts a hit range (color-safe, like the section-button ranges).
+func (m *Model) renderHeader(width int) (string, []headerSeg) {
+	type piece struct {
+		s  string
+		id string // "" for an inert spacer
+	}
+
+	var pieces []piece
 
 	if m.svcCap.HasNamespaces {
-		b.WriteString(m.styles.FieldLabel.Render("ns: "))
-		b.WriteString(m.styles.StatusValue.Render(namespaceBadge(m.currentNamespace())))
-		b.WriteString("   ")
+		pieces = append(pieces,
+			piece{m.styles.FieldLabel.Render("ns: ") + m.styles.StatusValue.Render(namespaceBadge(m.currentNamespace())), regionNamespace},
+			piece{headerSep, ""},
+		)
 	}
 
-	b.WriteString(m.styles.FieldLabel.Render("prefix: "))
-	b.WriteString(fieldValue(m.prefix.Value(), m.focus == focusPrefix))
-	b.WriteString("   ")
-	b.WriteString(m.styles.FieldLabel.Render("filter: "))
-	b.WriteString(fieldValue(m.filter.Value(), m.focus == focusFilter))
-	b.WriteString("   ")
-	b.WriteString(toggle(m.styles, "values", m.valuesOn))
+	pieces = append(pieces,
+		piece{m.styles.FieldLabel.Render("prefix: ") + fieldValue(m.prefix.Value(), m.focus == focusPrefix), regionPrefix},
+		piece{headerSep, ""},
+		piece{m.styles.FieldLabel.Render("filter: ") + fieldValue(m.filter.Value(), m.focus == focusFilter), regionFilter},
+		piece{headerSep, ""},
+		piece{toggle(m.styles, "values", m.valuesOn), regionValues},
+	)
 
 	if m.svcCap.Service == "param" && !m.svcCap.HasNamespaces {
-		b.WriteString("  ")
-		b.WriteString(toggle(m.styles, "recursive", m.recursive))
+		pieces = append(pieces,
+			piece{"  ", ""},
+			piece{toggle(m.styles, "recursive", m.recursive), regionRecursive},
+		)
 	}
 
-	b.WriteString("  ")
-
+	refresh := "⟳"
 	if m.loading {
-		b.WriteString(m.spinner.View())
-	} else {
-		b.WriteString("⟳")
+		refresh = m.spinner.View()
 	}
 
-	return clip(b.String(), width)
+	pieces = append(pieces, piece{"  ", ""}, piece{refresh, regionRefresh})
+
+	var (
+		b    strings.Builder
+		segs []headerSeg
+		col  int
+	)
+
+	for _, p := range pieces {
+		w := lipgloss.Width(p.s)
+		if p.id != "" {
+			segs = append(segs, headerSeg{id: p.id, x: col, w: w})
+		}
+
+		b.WriteString(p.s)
+
+		col += w
+	}
+
+	return clip(b.String(), width), segs
 }
 
 // renderBody renders the list and detail panes (side by side or stacked) and
@@ -106,7 +153,7 @@ func (m *Model) renderStacked(width, height, yOffset int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, listPane, detailPane)
 }
 
-// renderListPane sizes the list widget, records its geometry, and frames it. The
+// renderListPane sizes the list widget, records its hit region, and frames it. The
 // pane is drawn focused (accent border, active selection cursor) when the list
 // holds keyboard focus, so the user can see where the arrow keys will land.
 func (m *Model) renderListPane(width, height, paneTop, paneLeft int) string {
@@ -116,19 +163,22 @@ func (m *Model) renderListPane(width, height, paneTop, paneLeft int) string {
 	focused := m.focus == focusList
 	m.list.SetFocused(focused)
 
-	m.geom.listTop = paneTop + paneContentTop
-	m.geom.listLeft = paneLeft + paneBorderLeft
-	m.geom.listRight = m.geom.listLeft + innerW
-	m.geom.listRows = innerH
+	listTop := paneTop + paneContentTop
+	listLeft := paneLeft + paneBorderLeft
+	// The list region stops at its content's right edge so it never swallows a
+	// click/wheel aimed at the detail pane, which shares its vertical band in the
+	// two-pane layout.
+	m.regions = append(m.regions, hit.Region(regionList, listLeft, listTop, innerW, innerH))
 
 	title := "entries (" + strconv.Itoa(m.list.Len()) + ")"
 
 	return framePane(m.styles, focused, title, m.list.View(), width, height)
 }
 
-// renderDetailPane sizes the detail widgets, records the history geometry, and
-// frames the detail. The pane is drawn focused when the history holds keyboard
-// focus (the detail pane's only navigable widget), so the active pane is obvious.
+// renderDetailPane sizes the detail widgets, records the detail/value/history hit
+// regions, and frames the detail. The pane is drawn focused when the history holds
+// keyboard focus (the detail pane's only navigable widget), so the active pane is
+// obvious.
 func (m *Model) renderDetailPane(width, height, paneTop, paneLeft int) string {
 	innerW, innerH := components.PaneInner(width, height)
 
@@ -137,13 +187,25 @@ func (m *Model) renderDetailPane(width, height, paneTop, paneLeft int) string {
 		title = m.detail.Name
 	}
 
-	body, historyLocalTop, historyRows := m.renderDetail(innerW, innerH)
+	body, valueLabelLocalTop, historyLocalTop, historyRows := m.renderDetail(innerW, innerH)
 
-	// History content sits at: pane top + border + title + lines before history.
-	m.geom.historyTop = paneTop + paneContentTop + historyLocalTop
-	m.geom.historyLeft = paneLeft + paneBorderLeft
-	m.geom.historyRight = m.geom.historyLeft + innerW
-	m.geom.historyRows = historyRows
+	detailTop := paneTop + paneContentTop
+	detailLeft := paneLeft + paneBorderLeft
+
+	// The whole detail content is one region so a wheel anywhere in it scrolls the
+	// value pane; the value-label row and the history band sit above it (higher Z)
+	// so a click/wheel on them is resolved first.
+	m.regions = append(m.regions, hit.Region(regionDetail, detailLeft, detailTop, innerW, innerH))
+
+	if valueLabelLocalTop >= 0 {
+		m.regions = append(m.regions,
+			hit.Region(regionValueLabel, detailLeft, detailTop+valueLabelLocalTop, innerW, 1).Z(1))
+	}
+
+	if historyRows > 0 {
+		m.regions = append(m.regions,
+			hit.Region(regionHistory, detailLeft, detailTop+historyLocalTop, innerW, historyRows).Z(1))
+	}
 
 	return framePane(m.styles, m.focus == focusHistory, title, body, width, height)
 }
@@ -157,12 +219,13 @@ func framePane(st styles.Styles, focused bool, title, body string, width, height
 	return components.Pane(st, title, body, width, height)
 }
 
-// renderDetail builds the detail body and returns the line offset (within the
-// body) at which the history content begins and how many history rows are shown,
-// so the pane can record where clicks land.
-func (m *Model) renderDetail(innerW, innerH int) (string, int, int) {
+// renderDetail builds the detail body and returns the body-local line the value
+// label sits on (-1 when no detail is shown), the line the history content begins
+// on, and how many history rows are shown, so the pane can place the value-label
+// and history hit regions where they are drawn.
+func (m *Model) renderDetail(innerW, innerH int) (body string, valueLabelTop, historyTop, historyRows int) {
 	if !m.detailOK {
-		return m.styles.PageHint.Render("select an entry"), 0, 0
+		return m.styles.PageHint.Render("select an entry"), -1, 0, 0
 	}
 
 	var lines []string
@@ -172,6 +235,7 @@ func (m *Model) renderDetail(innerW, innerH int) (string, int, int) {
 		lines = append(lines, "")
 	}
 
+	valueLabelTop = len(lines)
 	lines = append(lines, m.valueLabelLine(innerW))
 	m.valuePane.SetSize(innerW, valuePaneHeight)
 	lines = append(lines, strings.Split(m.valuePane.View(), "\n")...)
@@ -185,19 +249,19 @@ func (m *Model) renderDetail(innerW, innerH int) (string, int, int) {
 	lines = append(lines, m.tagLine(innerW))
 
 	if !m.svcCap.HasVersionHistory {
-		return fitLines(lines, innerH), 0, 0
+		return fitLines(lines, innerH), valueLabelTop, 0, 0
 	}
 
 	lines = append(lines, "")
 	lines = append(lines, m.historyHeaderLine(innerW))
 
-	historyLocalTop := len(lines)
-	historyH := max(innerH-historyLocalTop, 0)
+	historyTop = len(lines)
+	historyH := max(innerH-historyTop, 0)
 	m.history.SetSize(innerW, historyH)
 	m.history.SetFocused(m.focus == focusHistory)
 	lines = append(lines, strings.Split(m.history.View(), "\n")...)
 
-	return fitLines(lines, innerH), historyLocalTop, historyH
+	return fitLines(lines, innerH), valueLabelTop, historyTop, historyH
 }
 
 // valueLabelLine renders the "Value  (x to reveal)" / "(J to format)" label row.

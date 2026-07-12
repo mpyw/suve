@@ -13,6 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/tui/data"
+	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
@@ -66,6 +67,23 @@ type deleteConfirm struct {
 	focus int
 	busy  bool
 	err   string
+	// hits maps a click on a control row to focusing (and, for a toggle/button,
+	// activating) that control — the same reduction its keyboard navigation +
+	// enter performs.
+	hits *hit.Map
+}
+
+// deleteControlID / deleteControlFromID map a control to a stable region ID and
+// back, so a click resolves to the exact control it lands on.
+func deleteControlID(c deleteControl) string { return "ctrl-" + strconv.Itoa(int(c)) }
+
+func deleteControlFromID(id string) (deleteControl, bool) {
+	n, err := strconv.Atoi(strings.TrimPrefix(id, "ctrl-"))
+	if err != nil {
+		return 0, false
+	}
+
+	return deleteControl(n), true
 }
 
 // DeleteInput configures a delete dialog.
@@ -136,6 +154,12 @@ func (d *deleteConfirm) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return d, nil
 	case mutationResultMsg:
 		return d.onResult(msg)
+	case tea.MouseClickMsg:
+		if d.busy {
+			return d, nil // double-submit guard
+		}
+
+		return d.handleClick(msg)
 	case tea.KeyPressMsg:
 		if d.busy {
 			return d, nil // double-submit guard
@@ -145,6 +169,30 @@ func (d *deleteConfirm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return d, nil
+}
+
+// handleClick resolves a click against the control regions and reduces it to
+// focusing that control, then activating it when it is a toggle or button — the
+// same reduction as navigating to the control and pressing enter. The recovery
+// row only takes focus (its value adjusts with ←/→, not a click).
+func (d *deleteConfirm) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
+	id, _, _, ok := d.hits.At(msg.X, msg.Y)
+	if !ok {
+		return d, nil
+	}
+
+	c, cok := deleteControlFromID(id)
+	if !cok {
+		return d, nil
+	}
+
+	d.focusControl(c)
+
+	if c == ctrlRecovery {
+		return d, nil
+	}
+
+	return d.activate()
 }
 
 func (d *deleteConfirm) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -195,17 +243,30 @@ func (d *deleteConfirm) adjust(delta int) {
 }
 
 // activate acts on the focused control: toggles force/mode, submits, or cancels.
+//
+// Toggling force/mode adds or removes the recovery-window row, reshaping the
+// dialog's height. Bubble Tea would service that shrink/grow with a partial
+// cell-update optimization whose exact bytes depend on the terminal's
+// synchronized-output negotiation, so under CI (which negotiates differently
+// than a local run) a byte-stream assertion on the post-toggle frame can miss a
+// string split across the partial writes. Forcing a full repaint on the reshape
+// makes the toggle frame environment-independent — the same fix the staging
+// page's view toggle applies.
 func (d *deleteConfirm) activate() (Model, tea.Cmd) {
 	switch d.focused() {
 	case ctrlForce:
 		d.force = !d.force
 		// Toggling force changes the control set (hides/shows recovery); keep focus.
 		d.focusControl(ctrlForce)
+
+		return d, tea.ClearScreen
 	case ctrlMode:
 		d.staged = !d.staged
 		// Toggling mode changes the control set (staged shows the recovery row);
 		// keep focus on the mode row rather than letting the index drift.
 		d.focusControl(ctrlMode)
+
+		return d, tea.ClearScreen
 	case ctrlDelete:
 		d.busy = true
 
@@ -272,16 +333,35 @@ func (d *deleteConfirm) View() string {
 	b.WriteString("\n\n")
 
 	if d.busy {
+		d.hits = hit.New() // no controls while working
 		b.WriteString(d.styles.PageHint.Render("working…"))
 
 		return b.String()
 	}
 
-	var controls strings.Builder
+	// Controls begin below the header, its blank line, the name, and its blank
+	// line; each is one row except the recovery row (its "recoverable until" hint
+	// adds a second). Record a hit region per control at its drawn rows.
+	firstControl := lipgloss.Height(header) + 1 + lipgloss.Height(name) + 1
+	ctrlWidth := max(d.contentWidth(), 1)
+
+	var (
+		controls strings.Builder
+		regions  []*lipgloss.Layer
+		line     = firstControl
+	)
+
 	for _, c := range d.controls() {
-		controls.WriteString(d.renderControl(c))
+		rc := d.renderControl(c)
+		h := lipgloss.Height(rc)
+		regions = append(regions, hit.Region(deleteControlID(c), 0, line, ctrlWidth, h))
+		line += h
+
+		controls.WriteString(rc)
 		controls.WriteString("\n")
 	}
+
+	d.hits = hit.New(regions...)
 
 	// Wrap the hint too: it is the widest fixed line and would otherwise push the
 	// box past a 60-column terminal, clipping "esc: cancel" off the edge.
