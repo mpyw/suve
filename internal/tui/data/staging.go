@@ -19,13 +19,19 @@ type StagedKey struct {
 // StagingSnapshot is the browser's read-only view of a service's staged state.
 // Keys drives the [staged] badge and the detail banner; DeleteKeys is the subset
 // staged for deletion, so the browser can gate the edit/delete/tag affordances
-// that the reducer would reject as dead-end transitions (#692). EntryCount and
+// that the reducer would reject as dead-end transitions (#692). EntryKeys and
+// TagKeys split Keys by change kind — a value/entry change and a tag change —
+// so the detail banner can distinguish value-only / tag-only / both, mirroring
+// the GUI's StagingStatus {hasEntry, hasTags} pair
+// (internal/gui/frontend/src/lib/StagingBanner.svelte) (#701). EntryCount and
 // TagCount are the staged entry-row and tag-change totals whose sum feeds the
 // Staging tab badge — the same entries+tags definition the staging page uses, so
 // the badge no longer oscillates between two counts (#693).
 type StagingSnapshot struct {
 	Keys       map[StagedKey]struct{}
 	DeleteKeys map[StagedKey]struct{}
+	EntryKeys  map[StagedKey]struct{}
+	TagKeys    map[StagedKey]struct{}
 	EntryCount int
 	TagCount   int
 }
@@ -77,6 +83,8 @@ func (p *stagingProbe) Staged(ctx context.Context) (StagingSnapshot, error) {
 	snap := StagingSnapshot{
 		Keys:       make(map[StagedKey]struct{}, len(out.Entries)+len(out.TagEntries)),
 		DeleteKeys: map[StagedKey]struct{}{},
+		EntryKeys:  make(map[StagedKey]struct{}, len(out.Entries)),
+		TagKeys:    make(map[StagedKey]struct{}, len(out.TagEntries)),
 		EntryCount: len(out.Entries),
 		TagCount:   len(out.TagEntries),
 	}
@@ -84,6 +92,7 @@ func (p *stagingProbe) Staged(ctx context.Context) (StagingSnapshot, error) {
 	for _, e := range out.Entries {
 		key := StagedKey{Name: e.Name, Namespace: e.Namespace}
 		snap.Keys[key] = struct{}{}
+		snap.EntryKeys[key] = struct{}{}
 
 		if e.Operation == staging.OperationDelete {
 			snap.DeleteKeys[key] = struct{}{}
@@ -91,7 +100,9 @@ func (p *stagingProbe) Staged(ctx context.Context) (StagingSnapshot, error) {
 	}
 
 	for _, t := range out.TagEntries {
-		snap.Keys[StagedKey{Name: t.Name, Namespace: t.Namespace}] = struct{}{}
+		key := StagedKey{Name: t.Name, Namespace: t.Namespace}
+		snap.Keys[key] = struct{}{}
+		snap.TagKeys[key] = struct{}{}
 	}
 
 	return snap, nil

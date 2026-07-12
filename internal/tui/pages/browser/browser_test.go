@@ -757,6 +757,60 @@ func TestOpenNewCarriesDeleteStagedKeys(t *testing.T) {
 	assert.True(t, carried, "the create request carries the delete-staged keys for client-side validation")
 }
 
+// TestStagedBannerDistinguishesKind pins #701: the detail-pane staged banner
+// distinguishes a staged value change, a staged tag change, and both — matching
+// the GUI's StagingBanner — rather than collapsing every staged kind into one
+// message. Each case stages the default-selected entry with a different change
+// kind and asserts the rendered banner wording.
+func TestStagedBannerDistinguishesKind(t *testing.T) {
+	t.Parallel()
+
+	const name = "/app/x"
+
+	key := data.StagedKey{Name: name}
+	keySet := map[data.StagedKey]struct{}{key: {}}
+
+	cases := []struct {
+		label   string
+		entry   bool
+		tags    bool
+		want    string
+		notWant string
+	}{
+		{"value-only", true, false, "⚠ staged value changes — S: staging", "tag changes"},
+		{"tag-only", false, true, "⚠ staged tag changes — S: staging", "value and tag"},
+		{"both", true, true, "⚠ staged value and tag changes — S: staging", ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			t.Parallel()
+
+			m := newModel(t, &stubSource{svcCap: awsParamCap()})
+			m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: name}}}})
+			m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: name}})
+
+			snap := data.StagingSnapshot{Keys: keySet}
+			if tc.entry {
+				snap.EntryKeys = keySet
+			}
+
+			if tc.tags {
+				snap.TagKeys = keySet
+			}
+
+			m, _ = update(t, m, stagedLoadedMsg{seq: m.stagedSeq, snap: snap})
+
+			out := m.View(m.width, m.height)
+			assert.Contains(t, out, tc.want, "banner reflects the staged change kind")
+
+			if tc.notWant != "" {
+				assert.NotContains(t, out, tc.notWant, "banner must not use another kind's wording")
+			}
+		})
+	}
+}
+
 // TestOpenNewBlocksAllNamespaces pins the App Configuration create-block: a write
 // targets one concrete namespace, so requesting the create dialog while the
 // header filter is on `*` (all namespaces) emits an OpenError rather than the

@@ -172,6 +172,8 @@ func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 	m.stagedErr = ""
 	m.stagedKeys = msg.snap.Keys
 	m.deleteStagedKeys = msg.snap.DeleteKeys
+	m.entryStagedKeys = msg.snap.EntryKeys
+	m.tagStagedKeys = msg.snap.TagKeys
 	m.rebuildRows()
 
 	service := m.svcCap.Service

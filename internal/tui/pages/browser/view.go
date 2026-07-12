@@ -167,8 +167,8 @@ func (m *Model) renderDetail(innerW, innerH int) (string, int, int) {
 
 	var lines []string
 
-	if m.isSelectedStaged() {
-		lines = append(lines, m.styles.Banner.Render(clip("⚠ staged changes — S: staging", innerW)))
+	if text, staged := m.selectedStagedBanner(); staged {
+		lines = append(lines, m.styles.Banner.Render(clip(text, innerW)))
 		lines = append(lines, "")
 	}
 
@@ -273,18 +273,38 @@ func (m *Model) historyHeaderLine(width int) string {
 	return clip(title+"   "+m.styles.PageHint.Render(hint), width)
 }
 
-// isSelectedStaged reports whether the selected entry has staged changes. It
-// resolves the item by index (see selectedItem) so a namespaced duplicate keys
-// the banner off the correct (name, namespace) pair.
-func (m *Model) isSelectedStaged() bool {
+// selectedStagedBanner returns the detail-pane banner text for the selected
+// entry and whether it is staged at all. The text distinguishes a staged value
+// change, a staged tag change, and both — mirroring the GUI's StagingBanner
+// (internal/gui/frontend/src/lib/StagingBanner.svelte) so the affordance no
+// longer collapses every staged kind into one message (#701). It resolves the
+// item by index (see selectedItem) so a namespaced duplicate keys the banner off
+// the correct (name, namespace) pair.
+func (m *Model) selectedStagedBanner() (string, bool) {
 	item, ok := m.selectedItem()
 	if !ok {
-		return false
+		return "", false
 	}
 
-	_, staged := m.stagedKeys[dataStagedKey(item)]
+	key := dataStagedKey(item)
+	if _, staged := m.stagedKeys[key]; !staged {
+		return "", false
+	}
 
-	return staged
+	_, hasEntry := m.entryStagedKeys[key]
+	_, hasTags := m.tagStagedKeys[key]
+
+	switch {
+	case hasEntry && hasTags:
+		return "⚠ staged value and tag changes — S: staging", true
+	case hasTags:
+		return "⚠ staged tag changes — S: staging", true
+	default:
+		// A staged key with no tag change is a value/entry change (create, edit, or
+		// delete); the value wording also covers the defensive case of a staged key
+		// absent from both split sets.
+		return "⚠ staged value changes — S: staging", true
+	}
 }
 
 // fieldLine renders a "Label  value" metadata row, clipped to width.

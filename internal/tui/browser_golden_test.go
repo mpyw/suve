@@ -136,6 +136,72 @@ func TestBrowser_DeleteStagedGateStatusGolden(t *testing.T) { //nolint:parallelt
 	golden.RequireEqual(t, screen)
 }
 
+// The default selection is index 0 (/app/api/DATABASE_URL); staging that entry
+// makes its detail-pane banner render, so the three staged-kind goldens below
+// pin the value-only / tag-only / both wording (#701).
+//
+//nolint:gochecknoglobals // immutable test fixture
+var stagedSelectedKey = data.StagedKey{Name: "/app/api/DATABASE_URL"}
+
+// awsParamStagedBannerApp builds the AWS param browser with the default-selected
+// entry staged for the given change kinds.
+func awsParamStagedBannerApp(entry, tags bool) *App {
+	keySet := map[data.StagedKey]struct{}{stagedSelectedKey: {}}
+	probe := staticProbe{keys: keySet}
+
+	if entry {
+		probe.entryKeys = keySet
+	}
+
+	if tags {
+		probe.tagKeys = keySet
+	}
+
+	return newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), probe),
+	})
+}
+
+// TestBrowser_StagedValueBannerGolden pins the value-only staged banner: the
+// selected entry has a staged value change and no tag change.
+func TestBrowser_StagedValueBannerGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureUntil(t, awsParamStagedBannerApp(true, false), "staged value changes", browserTermWidth, browserTermHeight)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	require.Contains(t, screen, "⚠ staged value changes — S: staging", "value-only shows the value-change banner")
+	require.NotContains(t, screen, "tag changes", "value-only must not mention tag changes")
+	golden.RequireEqual(t, screen)
+}
+
+// TestBrowser_StagedTagBannerGolden pins the tag-only staged banner: the selected
+// entry has a staged tag change and no value change.
+func TestBrowser_StagedTagBannerGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureUntil(t, awsParamStagedBannerApp(false, true), "staged tag changes", browserTermWidth, browserTermHeight)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	require.Contains(t, screen, "⚠ staged tag changes — S: staging", "tag-only shows the tag-change banner")
+	require.NotContains(t, screen, "value and tag", "tag-only must not use the combined wording")
+	golden.RequireEqual(t, screen)
+}
+
+// TestBrowser_StagedValueAndTagBannerGolden pins the combined staged banner: the
+// selected entry has both a staged value change and a staged tag change.
+func TestBrowser_StagedValueAndTagBannerGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureUntil(t, awsParamStagedBannerApp(true, true), "staged value and tag changes", browserTermWidth, browserTermHeight)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	require.Contains(t, screen, "⚠ staged value and tag changes — S: staging", "both shows the combined banner")
+	golden.RequireEqual(t, screen)
+}
+
 // TestBrowser_AWSSecretGolden renders the AWS secret browser (staging labels +
 // ARN, masked value).
 func TestBrowser_AWSSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel

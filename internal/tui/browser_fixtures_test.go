@@ -32,12 +32,16 @@ func capFor(prov, service string) capability.ServiceCapability {
 
 // staticProbe is a test staging probe returning a fixed staged snapshot, so a
 // golden can exercise the [staged] badge, the staged-changes banner, and the
-// delete-staged affordance gate without a keychain. deleteKeys/entryCount/tagCount
-// are optional; when both counts are left zero they default to one staged entry
-// per key, so an existing golden that sets only keys keeps its Staging(n) badge.
+// delete-staged affordance gate without a keychain. deleteKeys/entryKeys/tagKeys
+// and entryCount/tagCount are optional; when both counts are left zero they
+// default to one staged entry per key, and when neither entryKeys nor tagKeys is
+// set every key defaults to an entry (value) change — so an existing golden that
+// sets only keys keeps its Staging(n) badge and its value-change banner.
 type staticProbe struct {
 	keys       map[data.StagedKey]struct{}
 	deleteKeys map[data.StagedKey]struct{}
+	entryKeys  map[data.StagedKey]struct{}
+	tagKeys    map[data.StagedKey]struct{}
 	entryCount int
 	tagCount   int
 }
@@ -48,9 +52,16 @@ func (p staticProbe) Staged(context.Context) (data.StagingSnapshot, error) {
 		entryCount = len(p.keys)
 	}
 
+	entryKeys, tagKeys := p.entryKeys, p.tagKeys
+	if entryKeys == nil && tagKeys == nil {
+		entryKeys = p.keys
+	}
+
 	return data.StagingSnapshot{
 		Keys:       p.keys,
 		DeleteKeys: p.deleteKeys,
+		EntryKeys:  entryKeys,
+		TagKeys:    tagKeys,
 		EntryCount: entryCount,
 		TagCount:   tagCount,
 	}, nil
