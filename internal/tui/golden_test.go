@@ -58,13 +58,28 @@ func renderVisibleScreen(tb testing.TB, raw []byte) string {
 	// is harmless to replay onto the cell grid.
 	_, _ = e.Write(bytes.ReplaceAll(raw, []byte("\x1b[?1049l"), nil))
 
-	_ = e.Close()
+	// Snapshot the visible screen before any teardown; String() reads the cell
+	// grid, which every Write above has already settled.
+	//
+	// Emulator.String() already trims trailing spaces per line; also drop trailing
+	// blank rows so the golden ends at the last drawn line.
+	screen := strings.TrimRight(e.String(), "\n")
+
+	// Shut down without racing the drain goroutine. Emulator.Read/Write/Close all
+	// touch an unsynchronized `closed` field, so Close() must not overlap the
+	// goroutine's Read(). Closing the input (reply) pipe makes the in-flight Read
+	// return EOF — the pipe's own lock orders that against the goroutine — so the
+	// goroutine has fully exited by the time <-done returns; only then is it safe
+	// to Close() the emulator with no reader in flight.
+	if c, ok := e.InputPipe().(io.Closer); ok {
+		_ = c.Close()
+	}
 
 	<-done
 
-	// Emulator.String() already trims trailing spaces per line; also drop trailing
-	// blank rows so the golden ends at the last drawn line.
-	return strings.TrimRight(e.String(), "\n")
+	_ = e.Close()
+
+	return screen
 }
 
 // TestRenderVisibleScreen_AbsorbsCapabilityPreamble is the CI-divergence
