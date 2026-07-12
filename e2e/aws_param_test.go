@@ -1483,6 +1483,48 @@ func TestAWSParam_UpdateWithType(t *testing.T) {
 	})
 }
 
+// TestAWSParam_UpdatePreservesTypeWhenUnspecified verifies that a value-only
+// update (no --type/--secure) keeps the parameter's existing type instead of
+// silently downgrading a SecureString to String (see #738).
+func TestAWSParam_UpdatePreservesTypeWhenUnspecified(t *testing.T) {
+	setupEnv(t)
+
+	paramName := "/suve-e2e-update/preserve-type-test"
+
+	// Cleanup
+	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	})
+
+	// Create as SecureString.
+	t.Run("create-secure", func(t *testing.T) {
+		_, _, err := runCommand(t, paramcreate.Command(), "--secure", paramName, "secret-v1")
+		require.NoError(t, err)
+	})
+
+	t.Run("verify-created-secure", func(t *testing.T) {
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "SecureString")
+	})
+
+	// Update the value only, with neither --secure nor --type.
+	t.Run("update-value-only", func(t *testing.T) {
+		stdout, _, err := runCommand(t, paramupdate.Command(), "--yes", paramName, "secret-v2")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Updated")
+	})
+
+	// The type must still be SecureString across the new version.
+	t.Run("verify-still-secure", func(t *testing.T) {
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "SecureString")
+		assert.NotContains(t, stdout, "Type: String")
+	})
+}
+
 // TestAWSParam_UpdateConflictingFlags tests error handling for conflicting flags.
 func TestAWSParam_UpdateConflictingFlags(t *testing.T) {
 	setupEnv(t)
