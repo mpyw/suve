@@ -31,6 +31,24 @@ type Styles struct {
 	HelpBar lipgloss.Style
 	// Dialog styles a modal dialog box drawn over the page.
 	Dialog lipgloss.Style
+
+	// Pane frames a titled content pane (the list and detail boxes).
+	Pane lipgloss.Style
+	// PaneTitle styles a pane's title line.
+	PaneTitle lipgloss.Style
+	// FieldLabel styles a metadata row label (e.g. "Version").
+	FieldLabel lipgloss.Style
+	// Banner styles the detail pane's staged-changes warning banner.
+	Banner lipgloss.Style
+	// ErrorText styles the page's error line.
+	ErrorText lipgloss.Style
+
+	// DiffHeader / DiffHunk / DiffAdded / DiffRemoved style the four diff line
+	// classes in the diff page's viewport.
+	DiffHeader  lipgloss.Style
+	DiffHunk    lipgloss.Style
+	DiffAdded   lipgloss.Style
+	DiffRemoved lipgloss.Style
 }
 
 // New builds the default Styles. When NO_COLOR is set the palette collapses to
@@ -48,6 +66,15 @@ func New() Styles {
 			PageHint:    lipgloss.NewStyle(),
 			HelpBar:     lipgloss.NewStyle(),
 			Dialog:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
+			Pane:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
+			PaneTitle:   lipgloss.NewStyle().Bold(true),
+			FieldLabel:  lipgloss.NewStyle(),
+			Banner:      lipgloss.NewStyle(),
+			ErrorText:   lipgloss.NewStyle().Bold(true),
+			DiffHeader:  lipgloss.NewStyle().Bold(true),
+			DiffHunk:    lipgloss.NewStyle(),
+			DiffAdded:   lipgloss.NewStyle(),
+			DiffRemoved: lipgloss.NewStyle(),
 		}
 	}
 
@@ -56,6 +83,9 @@ func New() Styles {
 		muted    = lipgloss.Color("241") // gray
 		subtle   = lipgloss.Color("244")
 		fgBright = lipgloss.Color("15")
+		yellow   = lipgloss.Color("3")
+		green    = lipgloss.Color("2")
+		red      = lipgloss.Color("1")
 	)
 
 	return Styles{
@@ -68,5 +98,14 @@ func New() Styles {
 		PageHint:    lipgloss.NewStyle().Foreground(muted).Italic(true),
 		HelpBar:     lipgloss.NewStyle().Foreground(muted),
 		Dialog:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Foreground(fgBright).Padding(0, 1),
+		Pane:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted),
+		PaneTitle:   lipgloss.NewStyle().Bold(true).Foreground(accent),
+		FieldLabel:  lipgloss.NewStyle().Foreground(muted),
+		Banner:      lipgloss.NewStyle().Foreground(yellow),
+		ErrorText:   lipgloss.NewStyle().Bold(true).Foreground(red),
+		DiffHeader:  lipgloss.NewStyle().Bold(true).Foreground(accent),
+		DiffHunk:    lipgloss.NewStyle().Foreground(muted),
+		DiffAdded:   lipgloss.NewStyle().Foreground(green),
+		DiffRemoved: lipgloss.NewStyle().Foreground(red),
 	}
 }

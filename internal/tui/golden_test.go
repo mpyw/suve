@@ -34,7 +34,16 @@ const (
 func renderVisibleScreen(tb testing.TB, raw []byte) string {
 	tb.Helper()
 
-	e := vt.NewEmulator(goldenTermWidth, goldenTermHeight)
+	return renderVisibleScreenSize(tb, raw, goldenTermWidth, goldenTermHeight)
+}
+
+// renderVisibleScreenSize is renderVisibleScreen at an explicit terminal size,
+// so a wider page (the two-pane browser needs ≥110 columns) can be goldened
+// through the same cell-grid emulator.
+func renderVisibleScreenSize(tb testing.TB, raw []byte, width, height int) string {
+	tb.Helper()
+
+	e := vt.NewEmulator(width, height)
 
 	// Drain the emulator's reply pipe. Capability queries make the emulator write
 	// a response; with no reader that write blocks the emulator forever. Draining
