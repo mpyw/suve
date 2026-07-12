@@ -36,6 +36,11 @@ const secretStagedValue = "super-secret-token-value"
 // type, not the section's service axis (#677); it must never render revealed.
 const secureStringParamValue = "securestring-db-password-value"
 
+// secureStringCreateValue is a SecureString PARAM staged CREATE value. A create
+// has no remote to fetch, so its Secret flag is derived from the staged value
+// type (#719); it must never render revealed.
+const secureStringCreateValue = "securestring-created-api-key-value"
+
 // goldenStaging is a golden-only data.StagingService returning a fixed review
 // and (for the results golden) a fixed apply result. It never touches a store.
 type goldenStaging struct {
@@ -162,6 +167,77 @@ func secureStringStagingApp() *App {
 		identity:   awsIdentityFixture(),
 		stagingFor: secureStringStagingFixture(),
 	})
+}
+
+// secureStringCreateStagingFixture wires a param section holding a single
+// SecureString param staged CREATE (Secret=true) alongside a plaintext param
+// create, so a golden can prove the SecureString create value is masked in the
+// PARAM (non-secret) section while the plaintext one is not — a create has no
+// remote, so its Secret flag comes from the staged value type (#719).
+func secureStringCreateStagingFixture() func(string) data.StagingService {
+	param := &goldenStaging{
+		service: "param", label: "Param", svcCap: goldenCap("aws", "param"),
+		review: data.StagingReview{
+			Entries: []data.StagedDiffRow{
+				{
+					Name: "/app/api/SECURE_CREATE", Type: data.StagedDiffCreate, Operation: "create", Secret: true,
+					StagedValue: secureStringCreateValue,
+				},
+				{
+					Name: "/app/web/NEW_CDN_URL", Type: data.StagedDiffCreate, Operation: "create",
+					StagedValue: "https://cdn-new.example.com",
+				},
+			},
+		},
+	}
+
+	return func(service string) data.StagingService {
+		if service == "param" {
+			return param
+		}
+
+		return nil
+	}
+}
+
+// secureStringCreateStagingApp lands on the Staging tab with only the
+// SecureString param create fixture wired.
+func secureStringCreateStagingApp() *App {
+	return newApp(config{
+		scope:      provider.Scope{Provider: provider.ProviderAWS},
+		service:    "staging",
+		identity:   awsIdentityFixture(),
+		stagingFor: secureStringCreateStagingFixture(),
+	})
+}
+
+// TestStaging_SecureStringParamCreateDiffViewGolden pins that a SecureString
+// param staged CREATE is masked in the PARAM section, while a plaintext param
+// create is shown verbatim — a create derives its Secret flag from the staged
+// value type (#719).
+func TestStaging_SecureStringParamCreateDiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStaging(t, secureStringCreateStagingApp(), "SECURE_CREATE", false)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secureStringCreateValue, "no revealed SecureString param create value in the diff-view golden")
+	assert.Contains(t, screen, "•", "the SecureString param create row is masked with bullets, proving it renders (not just absent)")
+	assert.Contains(t, screen, "https://cdn-new.example.com", "a plaintext param create row is NOT masked")
+	golden.RequireEqual(t, screen)
+}
+
+// TestStaging_SecureStringParamCreateValueViewGolden pins the same masking after
+// toggling to value view.
+func TestStaging_SecureStringParamCreateValueViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	raw := captureStaging(t, secureStringCreateStagingApp(), "SECURE_CREATE", true)
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	assert.NotContains(t, screen, secureStringCreateValue, "no revealed SecureString param create value in the value-view golden")
+	assert.Contains(t, screen, "•", "the SecureString param create row is masked with bullets, proving it renders (not just absent)")
+	golden.RequireEqual(t, screen)
 }
 
 // TestStaging_SecureStringParamDiffViewGolden pins that a SecureString param
