@@ -969,11 +969,20 @@ func TestOpenTagHasTagsGate(t *testing.T) {
 
 	tagging := newModel(t, &stubSource{svcCap: awsParamCap()})
 	tagging, _ = update(t, tagging, listLoadedMsg{seq: tagging.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/x"}}}})
+
+	// The tag dialog seeds from the loaded detail, so it is a no-op until one loads.
+	assert.Nil(t, tagging.openTag(), "tag is a no-op until a detail is loaded")
+
+	tagging, _ = update(t, tagging, detailLoadedMsg{seq: tagging.detailSeq, d: data.Detail{
+		Name: "/x", Tags: []data.Tag{{Key: "env", Value: "prod"}},
+	}})
 	cmd := tagging.openTag()
-	require.NotNil(t, cmd, "a tagging service with a selection opens the tag dialog")
+	require.NotNil(t, cmd, "a tagging service with a loaded detail opens the tag dialog")
 	open, ok := cmd().(nav.OpenTag)
 	require.True(t, ok, "tag emits nav.OpenTag")
 	assert.Equal(t, "/x", open.Name)
+	assert.Equal(t, []data.Tag{{Key: "env", Value: "prod"}}, open.Tags,
+		"the entry's current tags seed the Remove action's choices (#705)")
 	assert.False(t, open.StagedOnly, "a browser tag keeps the immediate-mode toggle (not a staged-only surface)")
 }
 

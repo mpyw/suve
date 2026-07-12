@@ -207,6 +207,10 @@ func captureDialogWithKeys(t *testing.T, host *dialogHost, marker string, keys .
 func keyDownMsg() tea.KeyPressMsg  { return tea.KeyPressMsg{Code: tea.KeyDown} }
 func keyEnterMsg() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyEnter} }
 
+// keyRightMsg toggles an inline huh select (e.g. the tag dialog's Add/Remove
+// action) to its next option.
+func keyRightMsg() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyRight} }
+
 func goldenCap(prov, service string) capability.ServiceCapability {
 	sc, _ := capabilityFor(provider.Provider(prov), service)
 
@@ -321,6 +325,41 @@ func TestDialog_TagAWSParamGolden(t *testing.T) { //nolint:paralleltest // golde
 	})
 
 	dialogGolden(t, newDialogHost(m, cmd), "Action")
+}
+
+// TestDialog_TagRemoveSelectGolden renders the tag form after toggling to the
+// Remove action on an entry that has tags: the key field is a select of the
+// entry's CURRENT tags (env=prod / team=api), not a blind free-text key, so an
+// untag can only target a tag that is actually present (#705).
+func TestDialog_TagRemoveSelectGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m, cmd := dialogs.NewTagForm(dialogs.TagInput{
+		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "param")},
+		Service: "param", Styles: styles.New(), Name: "/app/api/DATABASE_URL",
+		Tags: []data.Tag{{Key: "env", Value: "prod"}, {Key: "team", Value: "api"}},
+	})
+
+	// Right toggles the inline action select from Add to Remove; the form rebuilds
+	// onto the Remove branch and shows the existing-tags select.
+	raw := captureDialogWithKeys(t, newDialogHost(m, cmd), "env=prod", keyRightMsg())
+	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+}
+
+// TestDialog_TagRemoveEmptyGolden renders the tag form after toggling to Remove
+// on an entry with NO tags: instead of a free-text key, Remove shows a
+// "(no tags to remove)" note, the empty state that keeps an untag from being
+// invited when there is nothing to remove (#705).
+func TestDialog_TagRemoveEmptyGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m, cmd := dialogs.NewTagForm(dialogs.TagInput{
+		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "param")},
+		Service: "param", Styles: styles.New(), Name: "/app/api/DATABASE_URL",
+	})
+
+	raw := captureDialogWithKeys(t, newDialogHost(m, cmd), "(no tags to remove)", keyRightMsg())
+	golden.RequireEqual(t, renderVisibleScreen(t, raw))
 }
 
 // TestDialog_EntryFormStagedOnlyGolden renders the edit form as launched from the

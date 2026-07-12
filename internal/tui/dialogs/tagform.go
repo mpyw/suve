@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	huh "charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/tui/data"
@@ -26,14 +27,27 @@ type tagForm struct {
 
 	name      string
 	namespace string
+	// tags is the entry's current tag set, seeding the Remove action's choices so
+	// an untag can only target a tag that is actually present (#705). Empty when the
+	// caller has none to offer (e.g. the staging review page), in which case Remove
+	// shows an empty state rather than a blind free-text key.
+	tags []data.Tag
 
 	remove   bool
-	tagKey   string
-	tagValue string
-	staged   bool
+	tagKey   string // Add: the free-text key to add
+	tagValue string // Add: the value to add
+	// removeKey is the key chosen for removal, bound to the Remove action's select
+	// (seeded from tags). It is distinct from the Add key so a typed Add key never
+	// masquerades as a removable one, keeping the empty-tags guard honest.
+	removeKey string
+	staged    bool
 	// stagedOnly hides the mode toggle and forces a staged tag write (the staging
 	// review page's tag path); the browser leaves it false and keeps the toggle.
 	stagedOnly bool
+	// builtRemove records the action the current form was built for, so Update can
+	// rebuild the form when the action toggles — morphing the key field between the
+	// free-text Add input and the Remove select of existing tags.
+	builtRemove bool
 
 	form *huh.Form
 	busy bool
@@ -48,6 +62,9 @@ type TagInput struct {
 	Styles    styles.Styles
 	Name      string
 	Namespace string
+	// Tags is the entry's current tag set, offered as the Remove action's choices
+	// (#705). Empty when the caller has none to offer.
+	Tags []data.Tag
 	// StagedOnly opens the dialog from a staged-only surface (the staging review
 	// page): the mode toggle is hidden and the tag write is forced staged.
 	StagedOnly bool
@@ -65,6 +82,7 @@ func NewTagForm(in TagInput) (Model, tea.Cmd) {
 		styles:     in.Styles,
 		name:       in.Name,
 		namespace:  in.Namespace,
+		tags:       in.Tags,
 		stagedOnly: in.StagedOnly,
 		// Staged by default when the service supports staging; a staged-only surface
 		// forces staged regardless (its toggle is hidden too).
@@ -77,13 +95,37 @@ func NewTagForm(in TagInput) (Model, tea.Cmd) {
 }
 
 func (d *tagForm) rebuildForm() tea.Cmd {
+	// Remove is offered only on a surface that can supply the entry's current tag
+	// set to constrain it (the browser). A staged-only surface (the staging review
+	// page) knows only the staged deltas, never the remote tag set, so it offers
+	// Add only — removing a remote tag is done from the browser, where the tag set
+	// is visible; this keeps Remove from becoming a guaranteed empty-state dead-end
+	// there (#705), mirroring how the mode toggle is hidden on that surface.
+	actionOpts := []huh.Option[bool]{huh.NewOption("Add tag", false)}
+	if !d.stagedOnly {
+		actionOpts = append(actionOpts, huh.NewOption("Remove tag", true))
+	}
+
 	fields := []huh.Field{
 		huh.NewSelect[bool]().Key("action").Title("Action").Inline(true).
-			Options(huh.NewOption("Add tag", false), huh.NewOption("Remove tag", true)).
-			Value(&d.remove),
-		huh.NewInput().Key("tagkey").Title("Key").Value(&d.tagKey).Validate(requiredField("key")),
-		huh.NewInput().Key("tagvalue").Title("Value").Placeholder("(add only)").Value(&d.tagValue),
+			Options(actionOpts...).Value(&d.remove),
 	}
+
+	// The key field morphs with the action: Add takes a free-text key + value (a
+	// new tag is legitimately open-ended); Remove is constrained to the entry's
+	// CURRENT tags so an untag can only target a tag that is actually present —
+	// mirroring the GUI's per-chip remove — instead of a blind free-text key that
+	// would invite a guaranteed stage-time/provider failure (#705).
+	if d.remove {
+		fields = append(fields, d.removeField())
+	} else {
+		fields = append(fields,
+			huh.NewInput().Key("tagkey").Title("Key").Value(&d.tagKey).Validate(requiredField("key")),
+			huh.NewInput().Key("tagvalue").Title("Value").Placeholder("(add only)").Value(&d.tagValue),
+		)
+	}
+
+	d.builtRemove = d.remove
 
 	// The mode toggle is offered only when staging is supported AND the dialog was
 	// not launched from a staged-only surface (the staging review page), which has
@@ -100,6 +142,24 @@ func (d *tagForm) rebuildForm() tea.Cmd {
 	// Init the (re)built form, then cap its body to the known terminal size so a
 	// retry after an error never renders at full natural height off-screen.
 	return tea.Batch(d.form.Init(), d.syncFormSize())
+}
+
+// removeField builds the Remove action's key field: a select of the entry's
+// current tags (labelled "key=value", valued by key so it routes straight to
+// RemoveTag), or a read-only note when the entry has no tags. The select binds
+// removeKey, which huh seeds to the first tag on build, so a Remove always has a
+// valid target; the note path is blocked from submitting by the empty-tags guard
+// in Update.
+func (d *tagForm) removeField() huh.Field {
+	if len(d.tags) == 0 {
+		return huh.NewNote().Title("Tag").Description("(no tags to remove)")
+	}
+
+	opts := lo.Map(d.tags, func(t data.Tag, _ int) huh.Option[string] {
+		return huh.NewOption(t.Key+"="+t.Value, t.Key)
+	})
+
+	return huh.NewSelect[string]().Key("removekey").Title("Tag").Options(opts...).Value(&d.removeKey)
 }
 
 // syncFormSize re-caps the embedded form's scrollable body to the current
@@ -153,8 +213,24 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 		d.form = f
 	}
 
+	// The action toggled: rebuild so the key field morphs between the free-text Add
+	// input and the Remove select of existing tags. Clear any stale error first.
+	if d.remove != d.builtRemove {
+		d.err = ""
+
+		return d, d.rebuildForm()
+	}
+
 	switch d.form.State {
 	case huh.StateCompleted:
+		// A Remove on an entry with no tags has nothing to target: reopen with a
+		// note rather than dead-ending on a guaranteed-failing untag (#705).
+		if d.remove && len(d.tags) == 0 {
+			d.err = "no tags to remove"
+
+			return d, d.rebuildForm()
+		}
+
 		d.busy = true
 
 		return d, d.submit()
@@ -169,13 +245,16 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (d *tagForm) submit() tea.Cmd {
 	key := data.StagedKey{Name: d.name, Namespace: d.namespace}
 	remove := d.remove
+	// Remove routes the key chosen from the existing-tags select; Add routes the
+	// free-text key + value.
+	removeKey := d.removeKey
 	tagKey, tagValue := d.tagKey, d.tagValue
 	staged := d.staged
 	mut, ctx := d.mutator, d.ctx
 
 	return runMutation(func() (data.WriteOutcome, error) {
 		if remove {
-			return mut.RemoveTag(ctx, key, tagKey, staged)
+			return mut.RemoveTag(ctx, key, removeKey, staged)
 		}
 
 		return mut.AddTag(ctx, key, tagKey, tagValue, staged)

@@ -90,6 +90,12 @@ type OpenTag struct {
 	Service   string
 	Name      string
 	Namespace string
+	// Tags is the entry's current tag set, seeding the Remove action's choices so
+	// an untag can only target a tag that is actually present (a blind free-text
+	// key would invite a guaranteed stage-time/provider failure — #705). Empty when
+	// the caller has no tag set to offer (e.g. the staging review page, which knows
+	// only the staged deltas), in which case Remove shows an empty state.
+	Tags []data.Tag
 	// StagedOnly launches the tag dialog in a staged-only context (the staging
 	// review page): the mode toggle is hidden and the tag write is forced staged.
 	// An immediate tag write from a staged surface can silently revert on a later
