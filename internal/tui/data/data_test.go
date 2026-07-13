@@ -2,6 +2,7 @@ package data_test
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -231,6 +232,80 @@ func TestSecretSourceHistoryCarriesValues(t *testing.T) {
 	require.Len(t, rows, 2)
 	assert.Equal(t, "token-v2", rows[0].Value)
 	assert.True(t, rows[0].Secret, "every secret history value is masked by default")
+}
+
+// TestParamSourceHistoryCapsAtLimit pins #747: the param history fetch bounds the
+// version list to 10 (GUI parity), so even a name with far more versions renders
+// at most 10 rows and issues at most 10 per-version value fetches.
+func TestParamSourceHistoryCapsAtLimit(t *testing.T) {
+	t.Parallel()
+
+	all := make([]domain.Version, 25)
+	for i := range all {
+		all[i] = domain.Version{ID: strconv.Itoa(25 - i)} // newest first
+	}
+
+	var gets int
+
+	store := &providermock.Store{
+		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
+			return all, nil
+		},
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(spec[1:]), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			gets++
+
+			return &domain.Entry{Name: name, Value: "v" + ref.ID(), Version: domain.Version{ID: ref.ID()}}, nil
+		},
+	}
+
+	src := data.NewParamSource(capFor(t, "aws", "param"), func(context.Context, string) (provider.Store, error) {
+		return store, nil
+	})
+
+	rows, err := src.History(context.Background(), "/app/x", "")
+	require.NoError(t, err)
+	require.Len(t, rows, 10, "history is capped at 10 rows like the GUI")
+	assert.Equal(t, 10, gets, "only the capped set's values are fetched, not every version's")
+}
+
+// TestSecretSourceHistoryCapsAtLimit pins #747 for the secret service: a secret
+// with many versions bounds the per-selection value fetches to 10.
+func TestSecretSourceHistoryCapsAtLimit(t *testing.T) {
+	t.Parallel()
+
+	all := make([]domain.Version, 25)
+	for i := range all {
+		all[i] = domain.Version{ID: "v" + strconv.Itoa(25-i)} // newest first
+	}
+
+	var gets int
+
+	store := &providermock.Store{
+		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
+			return all, nil
+		},
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(spec[1:]), nil
+		},
+		GetFunc: func(_ context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
+			gets++
+
+			return &domain.Entry{
+				Name: name, Value: "token-" + ref.ID(), Type: domain.ValueTypeSecret,
+				Version: domain.Version{ID: ref.ID()},
+			}, nil
+		},
+	}
+
+	src := data.NewSecretSource(capFor(t, "aws", "secret"), store)
+
+	rows, err := src.History(context.Background(), "prod/key", "")
+	require.NoError(t, err)
+	require.Len(t, rows, 10, "history is capped at 10 rows like the GUI")
+	assert.Equal(t, 10, gets, "only the capped set's values are fetched, not every version's")
 }
 
 func metaLabels(rows []data.MetaRow) []string {

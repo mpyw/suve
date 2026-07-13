@@ -31,6 +31,12 @@ import (
 	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
+// historyLimit caps how many version-history rows the browser fetches per
+// selection. It matches the GUI's cap (ParamLog/SecretLog pass 10) so both
+// front-ends bound the same surface identically; without it a secret with many
+// versions would fetch every version's value on each selection change (#747).
+const historyLimit int32 = 10
+
 // ListParams are the list inputs a browser header collects.
 type ListParams struct {
 	Prefix    string
@@ -329,7 +335,7 @@ func (s *paramSource) History(ctx context.Context, name, namespace string) ([]Hi
 
 	uc := &param.LogUseCase{Reader: store}
 
-	out, err := uc.Execute(ctx, param.LogInput{Name: name})
+	out, err := uc.Execute(ctx, param.LogInput{Name: name, MaxResults: historyLimit})
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +499,7 @@ func (s *secretSource) History(ctx context.Context, name, _ string) ([]HistoryRo
 
 	uc := &secret.LogUseCase{Reader: s.store}
 
-	out, err := uc.Execute(ctx, secret.LogInput{Name: name})
+	out, err := uc.Execute(ctx, secret.LogInput{Name: name, MaxResults: historyLimit})
 	if err != nil {
 		return nil, err
 	}
