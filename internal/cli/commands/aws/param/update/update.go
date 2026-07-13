@@ -30,6 +30,10 @@ type Options struct {
 	Value       string
 	Type        string
 	Description string
+	// PreserveType keeps the parameter's existing type when neither --type nor
+	// --secure was given, so a value-only update never downgrades a
+	// SecureString/StringList to String. When true, Type is ignored.
+	PreserveType bool
 	// ParamOpts holds the raw AWS-specific option flag values (tier, data
 	// type, allowed pattern, policies). Empty fields contribute no option.
 	ParamOpts paramopts.Values
@@ -49,9 +53,13 @@ Use 'suve param create' to create a new parameter.
 To manage tags, use 'suve param tag' and 'suve param untag' commands.
 
 PARAMETER TYPES:
-   String        Plain text value (default)
+   String        Plain text value
    StringList    Comma-separated list of values
    SecureString  Encrypted value using AWS KMS
+
+When neither --type nor --secure is given, the parameter's existing type is
+preserved, so a value-only update never downgrades a SecureString or StringList
+to String. Pass --type/--secure to change the type intentionally.
 
 The --secure flag is a shorthand for --type SecureString.
 You cannot use both --secure and --type together.
@@ -69,8 +77,7 @@ EXAMPLES:
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
-				Value: "String",
-				Usage: "Parameter type (String, StringList, SecureString)",
+				Usage: "Parameter type (String, StringList, SecureString); omit to preserve the existing type",
 			},
 			&cli.BoolFlag{
 				Name:  "secure",
@@ -123,6 +130,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	if secure {
 		paramType = "SecureString"
 	}
+
+	// With neither --type nor --secure, preserve the parameter's existing type
+	// instead of defaulting to String, so a value-only update never downgrades a
+	// SecureString (dropping KMS encryption) or StringList.
+	preserveType := !secure && !cmd.IsSet("type")
 
 	if err := paramtype.Validate(paramType); err != nil {
 		return err
@@ -200,10 +212,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return r.Run(ctx, Options{
-		Name:        name,
-		Value:       newValue,
-		Type:        paramType,
-		Description: cmd.String("description"),
+		Name:         name,
+		Value:        newValue,
+		Type:         paramType,
+		PreserveType: preserveType,
+		Description:  cmd.String("description"),
 		ParamOpts: paramopts.Values{
 			Tier:           cmd.String("tier"),
 			DataType:       cmd.String("data-type"),
@@ -216,11 +229,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 // Run executes the update command.
 func (r *Runner) Run(ctx context.Context, opts Options) error {
 	result, err := r.UseCase.Execute(ctx, param.UpdateInput{
-		Name:        opts.Name,
-		Value:       opts.Value,
-		Type:        paramtype.Parse(opts.Type),
-		Description: opts.Description,
-		Options:     paramopts.Build(opts.ParamOpts),
+		Name:         opts.Name,
+		Value:        opts.Value,
+		Type:         paramtype.Parse(opts.Type),
+		PreserveType: opts.PreserveType,
+		Description:  opts.Description,
+		Options:      paramopts.Build(opts.ParamOpts),
 	})
 	if err != nil {
 		return err

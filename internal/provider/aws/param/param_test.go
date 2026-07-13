@@ -194,6 +194,11 @@ func TestGet_LatestWithTypeMappingAndTags(t *testing.T) {
 				{Key: aws.String("env"), Value: aws.String("prod")},
 			}}, nil
 		},
+		describe: func(_ *ssm.DescribeParametersInput) (*ssm.DescribeParametersOutput, error) {
+			return &ssm.DescribeParametersOutput{Parameters: []types.ParameterMetadata{
+				{Name: aws.String("/my/param"), Description: aws.String("app credentials")},
+			}}, nil
+		},
 	})
 
 	entry, err := store.Get(t.Context(), "/my/param", provider.NewVersionRef(""))
@@ -202,9 +207,39 @@ func TestGet_LatestWithTypeMappingAndTags(t *testing.T) {
 	assert.Equal(t, "hunter2", entry.Value)
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "3", entry.Version.ID)
+	assert.Equal(t, "app credentials", entry.Description)
 	require.Len(t, entry.Tags, 1)
 	assert.Equal(t, "env", entry.Tags[0].Key)
 	assert.Equal(t, "prod", entry.Tags[0].Value)
+}
+
+// TestGet_DescriptionReadIsBestEffort guards that a DescribeParameters failure
+// (the only source of a parameter's description) leaves Description empty but
+// does not fail the value read, mirroring the best-effort tags discipline.
+func TestGet_DescriptionReadIsBestEffort(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		getParameter: func(_ *ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{Parameter: &types.Parameter{
+				Name:    aws.String("/my/param"),
+				Value:   aws.String("hunter2"),
+				Version: 1,
+				Type:    types.ParameterTypeString,
+			}}, nil
+		},
+		listTags: func(_ *ssm.ListTagsForResourceInput) (*ssm.ListTagsForResourceOutput, error) {
+			return &ssm.ListTagsForResourceOutput{}, nil
+		},
+		describe: func(_ *ssm.DescribeParametersInput) (*ssm.DescribeParametersOutput, error) {
+			return nil, assert.AnError
+		},
+	})
+
+	entry, err := store.Get(t.Context(), "/my/param", provider.NewVersionRef(""))
+	require.NoError(t, err)
+	assert.Equal(t, "hunter2", entry.Value)
+	assert.Empty(t, entry.Description)
 }
 
 func TestGet_SpecificVersionSuffix(t *testing.T) {
@@ -222,6 +257,9 @@ func TestGet_SpecificVersionSuffix(t *testing.T) {
 		},
 		listTags: func(_ *ssm.ListTagsForResourceInput) (*ssm.ListTagsForResourceOutput, error) {
 			return &ssm.ListTagsForResourceOutput{}, nil
+		},
+		describe: func(_ *ssm.DescribeParametersInput) (*ssm.DescribeParametersOutput, error) {
+			return &ssm.DescribeParametersOutput{}, nil
 		},
 	})
 

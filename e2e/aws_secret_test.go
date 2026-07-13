@@ -702,6 +702,39 @@ func TestAWSSecret_CreateAndTag(t *testing.T) {
 	assert.Contains(t, stdout, "team: suve")
 }
 
+// TestAWSSecret_CreateWithDescription guards #753: a secret created with a
+// description must surface it back through `show` (text and JSON). The adapter
+// already reads it via DescribeSecret; this proves the show presenter renders it.
+func TestAWSSecret_CreateWithDescription(t *testing.T) {
+	setupEnv(t)
+
+	secretName := "suve-e2e-create/with-description"
+
+	// Cleanup
+	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	})
+
+	// Create secret with description
+	stdout, _, err := runCommand(t, secretcreate.Command(), "--description", "app credentials", secretName, "value")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Created")
+
+	t.Run("show-renders-description", func(t *testing.T) {
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Description")
+		assert.Contains(t, stdout, "app credentials")
+	})
+
+	t.Run("show-json-includes-description", func(t *testing.T) {
+		stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--output=json", secretName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, `"description": "app credentials"`)
+	})
+}
+
 // TestAWSSecret_CreateDuplicate tests creating a duplicate secret.
 func TestAWSSecret_CreateDuplicate(t *testing.T) {
 	setupEnv(t)
