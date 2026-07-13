@@ -19,12 +19,13 @@ import (
 
 // showJSONOutput represents the JSON output structure for the show command.
 type showJSONOutput struct {
-	Name    string            `json:"name"`
-	Version string            `json:"version,omitempty"`
-	State   string            `json:"state,omitempty"`
-	Created string            `json:"created,omitempty"`
-	Labels  map[string]string `json:"labels"`
-	Value   string            `json:"value"`
+	Name        string            `json:"name"`
+	Version     string            `json:"version,omitempty"`
+	State       string            `json:"state,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Created     string            `json:"created,omitempty"`
+	Labels      map[string]string `json:"labels"`
+	Value       string            `json:"value"`
 }
 
 // showPresenter renders Google Cloud Secret Manager show output.
@@ -73,6 +74,10 @@ func (p *showPresenter) RenderText(stdout io.Writer, value string) {
 		out.Field("State", result.State)
 	}
 
+	if result.Description != "" {
+		out.Field("Description", result.Description)
+	}
+
 	if result.CreatedDate != nil {
 		out.Field("Created", timeutil.FormatRFC3339(*result.CreatedDate))
 	}
@@ -93,10 +98,11 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 	result := p.result
 
 	jsonOut := showJSONOutput{
-		Name:    result.Name,
-		Version: result.Version,
-		State:   result.State,
-		Value:   value,
+		Name:        result.Name,
+		Version:     result.Version,
+		State:       result.State,
+		Description: result.Description,
+		Value:       value,
 	}
 
 	if result.CreatedDate != nil {

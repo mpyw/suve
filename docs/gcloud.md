@@ -12,7 +12,7 @@ Primary command: `gcloud secret`
 > [!NOTE]
 > Google Cloud secrets are integer-versioned (`1`, `2`, `3`, ... or `latest`) and have **no staging labels**.
 
-Google Cloud also supports the local **staging workflow** via `suve gcloud stage` (or the bare `suve stage` alias when Google Cloud is the only active staging backend). Because Google Cloud is secret-only, `gcloud stage` operates on secrets directly: `add`, `edit`, `delete`, `status`, `diff`, `apply`, `reset`, `tag`, `untag`, `export`, and `import`. Since Secret Manager versions are immutable, a staged `edit` applies as a new version, and there are no force / recovery-window delete options. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
+Google Cloud also supports the local **staging workflow** via `suve gcloud stage` (or the bare `suve stage` alias when Google Cloud is the only active staging backend). Because Google Cloud is secret-only, `gcloud stage` operates on secrets directly: `add`, `edit`, `delete`, `status`, `diff`, `apply`, `reset`, `tag`, `untag`, `export`, and `import`. Since Secret Manager versions are immutable, a staged `edit` applies as a new version, and there are no force / recovery-window delete options. `stage add` / `stage edit` accept `--description` (stored as the `description` annotation, applied on `stage apply`). See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
 
 ## Authentication and Configuration
 
@@ -36,6 +36,10 @@ suve gcloud --project my-project secret list
 export GOOGLE_CLOUD_PROJECT=my-project
 suve gcloud secret list
 ```
+
+## TUI
+
+Launch the terminal UI with `suve gcloud --tui` (or bare `suve --tui` when Google Cloud is the only active provider). It consumes the same project scope as the CLI — `--project` or `GOOGLE_CLOUD_PROJECT` — and offers the Secret tab (Google Cloud has no param service). See [TUI mode](../README.md#tui-mode) for the keymap.
 
 ## Version Specification
 
@@ -276,9 +280,13 @@ suve gcloud secret create [options] <name> [<value>]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+| `--description` | - | - | Description for the secret (stored as the `description` annotation) |
 
 > [!NOTE]
 > The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
+
+> [!NOTE]
+> Google Cloud secrets have no native description field. suve stores `--description` as the secret's `description` annotation, which is distinct from the labels that back the tag axis, so it never collides with a tag.
 
 **Examples:**
 
@@ -288,6 +296,9 @@ suve gcloud secret create my-api-key "sk-12345"
 
 # Create a JSON secret
 suve gcloud secret create my-config '{"host":"db"}'
+
+# Create with a description
+suve gcloud secret create --description "app credentials" my-api-key "sk-12345"
 ```
 
 > [!NOTE]
@@ -316,6 +327,7 @@ suve gcloud secret update [options] <name> [<value>]
 |--------|-------|---------|-------------|
 | `--yes` | - | `false` | Skip confirmation prompt |
 | `--value-stdin` | - | `false` | Read the value from stdin instead of the positional argument (keeps it out of argv/ps and shell history) |
+| `--description` | - | - | Description for the secret (updates the `description` annotation) |
 
 > [!NOTE]
 > The value can be provided as a positional argument, piped in with `--value-stdin` (so it never appears in `ps`/argv or shell history), or typed into `$EDITOR` when omitted.
@@ -328,6 +340,9 @@ suve gcloud secret update my-api-key "new-value"
 
 # Update without confirmation
 suve gcloud secret update --yes my-api-key "new-value"
+
+# Update the description
+suve gcloud secret update --description "rotated key" my-api-key "new-value"
 ```
 
 > [!NOTE]

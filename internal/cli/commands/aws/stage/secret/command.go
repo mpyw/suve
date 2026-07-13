@@ -14,10 +14,11 @@ const nounSecret = "secret"
 
 //nolint:gochecknoglobals // package-level config for command factory
 var config = stgcli.CommandConfig{
-	CommandName:   nounSecret,
-	ItemName:      nounSecret,
-	Factory:       cliinternal.AWSSecretStrategyFactory,
-	ParserFactory: staging.AWSSecretParserFactory,
+	CommandName:    nounSecret,
+	ItemName:       nounSecret,
+	Factory:        cliinternal.AWSSecretStrategyFactory,
+	ParserFactory:  staging.AWSSecretParserFactory,
+	HasDescription: true,
 }
 
 // Config returns the AWS Secrets Manager staging command config. It is used by

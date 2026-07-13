@@ -151,3 +151,40 @@ func TestGoogleCloudSecret_FullWorkflow(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// TestGoogleCloudSecret_Description exercises the --description flag (stored as
+// the secret's "description" annotation) across immediate create/update and the
+// read view. This is #666's Google Cloud description support: the flag was
+// previously absent on gcloud, and staged descriptions were silently dropped.
+func TestGoogleCloudSecret_Description(t *testing.T) {
+	setupGoogleCloud(t)
+
+	const name = "suve-e2e-gcloud-secret-desc"
+
+	// Best-effort cleanup from a previous run.
+	_, _ = runGcloud(t, "secret", "delete", "--yes", name)
+
+	t.Run("create with --description", func(t *testing.T) {
+		_, err := runGcloud(t, "secret", "create", name, "initial-value", "--description", "app credentials")
+		require.NoError(t, err)
+
+		stdout, err := runGcloud(t, "secret", "show", name)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Description")
+		assert.Contains(t, stdout, "app credentials")
+	})
+
+	t.Run("update --description changes the annotation", func(t *testing.T) {
+		_, err := runGcloud(t, "secret", "update", "--yes", name, "next-value", "--description", "rotated key")
+		require.NoError(t, err)
+
+		stdout, err := runGcloud(t, "secret", "show", name)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "rotated key")
+	})
+
+	t.Run("cleanup", func(t *testing.T) {
+		_, err := runGcloud(t, "secret", "delete", "--yes", name)
+		require.NoError(t, err)
+	})
+}

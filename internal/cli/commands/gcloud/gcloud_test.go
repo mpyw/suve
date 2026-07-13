@@ -79,13 +79,17 @@ func TestCommandValidation(t *testing.T) {
 func TestCreateRunner(t *testing.T) {
 	t.Parallel()
 
+	var gotDescription string
+
 	store := &providermock.Store{
 		CreateFunc: func(
-			_ context.Context, name, value string, vt domain.ValueType, _ string, _ ...provider.WriteOption,
+			_ context.Context, name, value string, vt domain.ValueType, description string, _ ...provider.WriteOption,
 		) (domain.Version, error) {
 			assert.Equal(t, "my-secret", name)
 			assert.Equal(t, "value", value)
 			assert.Equal(t, domain.ValueTypeSecret, vt)
+
+			gotDescription = description
 
 			return domain.Version{ID: "1"}, nil
 		},
@@ -98,22 +102,27 @@ func TestCreateRunner(t *testing.T) {
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
-	require.NoError(t, r.Run(t.Context(), gcloud.CreateOptions{Name: "my-secret", Value: "value"}))
+	require.NoError(t, r.Run(t.Context(), gcloud.CreateOptions{Name: "my-secret", Value: "value", Description: "app credentials"}))
 	assert.Contains(t, buf.String(), "Created secret my-secret")
 	assert.Contains(t, buf.String(), "version: 1")
+	assert.Equal(t, "app credentials", gotDescription, "the --description value reaches the writer")
 }
 
 func TestUpdateRunner(t *testing.T) {
 	t.Parallel()
+
+	var gotDescription string
 
 	store := &providermock.Store{
 		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 			return &domain.Entry{Name: "my-secret", Value: "old"}, nil
 		},
 		PutFunc: func(
-			_ context.Context, _, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
+			_ context.Context, _, value string, _ domain.ValueType, description string, _ ...provider.WriteOption,
 		) (domain.Version, error) {
 			assert.Equal(t, "new", value)
+
+			gotDescription = description
 
 			return domain.Version{ID: "2"}, nil
 		},
@@ -126,9 +135,10 @@ func TestUpdateRunner(t *testing.T) {
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
-	require.NoError(t, r.Run(t.Context(), gcloud.UpdateOptions{Name: "my-secret", Value: "new"}))
+	require.NoError(t, r.Run(t.Context(), gcloud.UpdateOptions{Name: "my-secret", Value: "new", Description: "rotated key"}))
 	assert.Contains(t, buf.String(), "Updated secret my-secret")
 	assert.Contains(t, buf.String(), "version: 2")
+	assert.Equal(t, "rotated key", gotDescription, "the --description value reaches the writer")
 }
 
 func TestUpdateRunner_NotFound(t *testing.T) {
@@ -189,11 +199,12 @@ func TestShowPresenter(t *testing.T) {
 		},
 		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
 			return &domain.Entry{
-				Name:    name,
-				Value:   "s3cr3t",
-				Type:    domain.ValueTypeSecret,
-				Version: domain.Version{ID: "3", State: "enabled", Created: &created},
-				Tags:    []domain.Tag{{Key: "env", Value: "prod"}},
+				Name:        name,
+				Value:       "s3cr3t",
+				Type:        domain.ValueTypeSecret,
+				Version:     domain.Version{ID: "3", State: "enabled", Created: &created},
+				Description: "app credentials",
+				Tags:        []domain.Tag{{Key: "env", Value: "prod"}},
 			}, nil
 		},
 	}
@@ -215,6 +226,9 @@ func TestShowPresenter(t *testing.T) {
 	assert.Contains(t, out, "3")
 	assert.Contains(t, out, "s3cr3t")
 	assert.Contains(t, out, "env")
+	// The "description" annotation surfaces as a Description field in the read view.
+	assert.Contains(t, out, "Description")
+	assert.Contains(t, out, "app credentials")
 	// No ARN or Stages fields for Google Cloud.
 	assert.NotContains(t, out, "ARN")
 	assert.NotContains(t, out, "Stages")
