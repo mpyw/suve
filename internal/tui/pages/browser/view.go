@@ -132,16 +132,58 @@ func (m *Model) renderBody(width, height, yOffset int) string {
 }
 
 // renderTwoPane lays the list on the left and the detail on the right, with a
-// blank gutter column between them so the two borders never fuse (#698).
+// blank gutter column between them so the two borders never fuse (#698). The
+// gutter doubles as a draggable divider: its column band is registered as a hit
+// region (above the panes) so a mouse press there starts a resize drag (#784).
 func (m *Model) renderTwoPane(width, height, yOffset int) string {
-	listW := min(listPaneMaxWidth, width*listWidthNum/listWidthDen)
+	listW := m.listOuterWidth(width)
 	detailW := width - listW - paneGutter
 
 	listPane := m.renderListPane(listW, height, yOffset, 0)
 	detailPane := m.renderDetailPane(detailW, height, yOffset, listW+paneGutter)
 	gutter := gutterColumn(paneGutter, lipgloss.Height(listPane))
 
+	// The divider band covers the gutter column plus the two adjacent pane border
+	// columns, so it is easy to grab; it sits above the panes (higher Z) so a press
+	// there resolves to the divider rather than a pane. Its geometry derives from
+	// the composed layout (listW), so it can never drift from the render (#661/#663).
+	// dividerGrabCols widens the grabbable band to the gutter plus the two adjacent
+	// pane border columns; dividerZ sits it above the value-label/history bands
+	// (Z 1) so a press there resolves to the divider.
+	const (
+		dividerGrabCols = paneGutter + 2
+		dividerZ        = 2
+	)
+
+	dividerX := max(listW-1, 0)
+	dividerW := min(dividerGrabCols, width-dividerX)
+	m.regions = append(m.regions,
+		hit.Region(regionDivider, dividerX, yOffset, dividerW, height).Z(dividerZ))
+
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, gutter, detailPane)
+}
+
+// listOuterWidth returns the list pane's outer width for the current terminal
+// width: the user's session width when set, else the default ratio, clamped so
+// neither pane collapses.
+func (m *Model) listOuterWidth(width int) int {
+	target := m.listWidth
+	if target <= 0 {
+		target = width * defaultListWidthNum / defaultListWidthDen
+	}
+
+	return clampListWidth(target, width)
+}
+
+// clampListWidth clamps a desired list outer width to [minListWidth,
+// width-minDetailWidth-paneGutter]. When the terminal is too narrow to honor both
+// minimums the list keeps its minimum and the detail takes whatever remains.
+func clampListWidth(target, width int) int {
+	// When the terminal cannot honor both minimums the list keeps its minimum and
+	// the detail takes whatever remains.
+	hi := max(width-minDetailWidth-paneGutter, minListWidth)
+
+	return max(minListWidth, min(target, hi))
 }
 
 // gutterColumn builds a blank w×h spacer used as the between-pane gutter.
@@ -253,15 +295,23 @@ func (m *Model) renderDetail(innerW, innerH int) (body string, valueLabelTop, hi
 		lines = append(lines, "")
 	}
 
+	// Size the value pane to its content, using the vertical space the metadata,
+	// tags, and (when present) the reserved history minimum leave free — so a short
+	// value shows fully, a tall multi-line JSON value grows toward the available
+	// space and then scrolls, and the history always keeps its minimum (#783).
+	metaLines := m.metaLines(innerW)
+	hasDesc := m.detail.Description != ""
+	valueH := m.valueHeight(innerH, len(lines), len(metaLines), hasDesc)
+
 	valueLabelTop = len(lines)
 	lines = append(lines, m.valueLabelLine(innerW))
-	m.valuePane.SetSize(innerW, valuePaneHeight)
+	m.valuePane.SetSize(innerW, valueH)
 	lines = append(lines, strings.Split(m.valuePane.View(), "\n")...)
 	lines = append(lines, "")
-	lines = append(lines, m.metaLines(innerW)...)
+	lines = append(lines, metaLines...)
 
-	if desc := m.detail.Description; desc != "" {
-		lines = append(lines, fieldLine(m.styles, "Description", desc, innerW))
+	if hasDesc {
+		lines = append(lines, fieldLine(m.styles, "Description", m.detail.Description, innerW))
 	}
 
 	lines = append(lines, m.tagLine(innerW))
@@ -280,6 +330,33 @@ func (m *Model) renderDetail(innerW, innerH int) (body string, valueLabelTop, hi
 	lines = append(lines, strings.Split(m.history.View(), "\n")...)
 
 	return fitLines(lines, innerH), valueLabelTop, historyTop, historyH
+}
+
+// valueHeight computes the adaptive value-pane height: the rows left after the
+// value label, the trailing blank, the metadata (bannerLines already counts the
+// staged banner rows), an optional description, the tag line, and — when the
+// service has version history — the history header, its leading blank, and the
+// reserved minimum history height. The value grows to fill that space, floored at
+// minValueHeight and capped at the available rows (beyond which the pane scrolls).
+func (m *Model) valueHeight(innerH, bannerLines, metaLines int, hasDesc bool) int {
+	reserved := bannerLines
+	reserved++ // value label row
+	reserved++ // blank line after the value
+	reserved += metaLines
+
+	if hasDesc {
+		reserved++
+	}
+
+	reserved++ // tag line
+
+	if m.svcCap.HasVersionHistory {
+		reserved += 1 + 1 + minHistoryHeight // leading blank + history header + reserved history
+	}
+
+	available := max(innerH-reserved, minValueHeight)
+
+	return max(minValueHeight, min(m.valuePane.ContentHeight(), available))
 }
 
 // valueLabelLine renders the "Value  (x to reveal)" label row. A JSON value is

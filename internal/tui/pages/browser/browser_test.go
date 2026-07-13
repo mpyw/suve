@@ -919,18 +919,6 @@ func TestLoadMoreInFlightGuard(t *testing.T) {
 	assert.Nil(t, m2.loadMore(), "loadMore is a no-op while a full reload is pending")
 }
 
-// TestStagingJump pins that S emits the OpenStaging navigation request.
-func TestStagingJump(t *testing.T) {
-	t.Parallel()
-
-	m := newModel(t, &stubSource{svcCap: awsParamCap()})
-
-	_, cmd := update(t, m, keyPress('S'))
-	require.NotNil(t, cmd)
-	_, ok := cmd().(nav.OpenStaging)
-	assert.True(t, ok, "S emits nav.OpenStaging")
-}
-
 // TestOnStagedLoadedSurfacesProbeErrors pins the read-path error surfacing (#695):
 // a transient probe read error shows a short "staged status unavailable" note
 // rather than being swallowed (silent swallowing would hide every [staged] badge,
@@ -1546,4 +1534,211 @@ func TestMouseClickValueLabelTogglesMask(t *testing.T) {
 	_ = m.View(m.width, m.height)
 	m, _ = update(t, m, tea.MouseClickMsg{X: vx, Y: vy, Button: tea.MouseLeft})
 	assert.True(t, m.valuePane.Masked(), "clicking the value label again re-masks")
+}
+
+// TestValueHeightAdaptsToContent pins #783's adaptive value height: a short value
+// is floored at minValueHeight, a tall value grows to its content height when
+// there is room, and a value taller than the space is capped at the available
+// rows — leaving the version history at least its reserved minimum.
+func TestValueHeightAdaptsToContent(t *testing.T) {
+	t.Parallel()
+
+	// awsParamCap has version history, so the reserve includes the history minimum.
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+
+	const (
+		innerH   = 40
+		metaRows = 3
+	)
+
+	// A short (single-line) value floors at minValueHeight.
+	m.valuePane.SetValue("just one line", false)
+	assert.Equal(t, minValueHeight, m.valueHeight(innerH, 0, metaRows, false),
+		"a short value is floored at minValueHeight")
+
+	// A tall value with abundant room grows to its full content height.
+	tall := strings.Repeat("line\n", 19) + "line" // 20 display lines
+	m.valuePane.SetValue(tall, false)
+	require.Equal(t, 20, m.valuePane.ContentHeight(), "sanity: the value has 20 display lines")
+	assert.Equal(t, 20, m.valueHeight(innerH, 0, metaRows, false),
+		"a tall value grows to its content height when there is room")
+
+	// When the pane is short, the value is capped at the available rows and the
+	// history keeps its minimum: reserved = label+blank+meta+tag + (blank+header+min).
+	const shortH = 18
+
+	reserved := 1 + 1 + metaRows + 1 + (1 + 1 + minHistoryHeight)
+	wantCap := shortH - reserved
+	assert.Equal(t, wantCap, m.valueHeight(shortH, 0, metaRows, false),
+		"a value taller than the space is capped at the available rows (then scrolls)")
+	assert.GreaterOrEqual(t, wantCap, minValueHeight, "the cap never drops below the value floor here")
+}
+
+// TestValueHeightGrowsInRenderAndHistoryKeepsMinimum pins the render-level effect:
+// a multi-line JSON value is shown in full (not clipped) when there is room, and
+// the returned history band still gets at least its reserved minimum.
+func TestValueHeightGrowsInRenderAndHistoryKeepsMinimum(t *testing.T) {
+	t.Parallel()
+
+	const compact = `{"host":"db.internal","port":5432,"tls":true,"retries":5,"backoff":"1s"}`
+
+	src := &stubSource{
+		svcCap:  awsParamCap(),
+		history: []data.HistoryRow{{Version: "1", Label: "#1", IsCurrent: true}},
+	}
+	m := newModel(t, src)
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/cfg"}}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/cfg", Value: compact}})
+	m, _ = update(t, m, historyLoadedMsg{seq: m.historySeq, rows: src.history})
+
+	out := m.View(120, 40)
+	assert.Contains(t, out, `"backoff": "1s"`, "the whole formatted JSON value is shown, not clipped (#783)")
+	assert.Contains(t, out, "}", "the closing brace is shown")
+
+	_, _, historyTop, historyRows := m.renderDetail(70, 40)
+	assert.Positive(t, historyTop, "the history band is placed below the (grown) value pane")
+	assert.GreaterOrEqual(t, historyRows, minHistoryHeight, "the history keeps at least its reserved minimum")
+}
+
+// TestListWidthKeyboardResize pins #784's keyboard resize: `]` widens and `[`
+// narrows the list by listWidthStep, within the clamps.
+func TestListWidthKeyboardResize(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()}) // width 120
+	_ = m.View(m.width, m.height)
+
+	before := m.listOuterWidth(m.width)
+
+	m, _ = update(t, m, keyPress(']'))
+	assert.Equal(t, before+listWidthStep, m.listOuterWidth(m.width), "] widens the list by one step")
+
+	m, _ = update(t, m, keyPress('['))
+	assert.Equal(t, before, m.listOuterWidth(m.width), "[ narrows it back")
+}
+
+// TestListWidthClampBounds pins that a resize never collapses either pane: the
+// list is clamped to [minListWidth, width-minDetailWidth-paneGutter].
+func TestListWidthClampBounds(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()}) // width 120
+
+	m.setListWidth(10000)
+	assert.Equal(t, m.width-minDetailWidth-paneGutter, m.listOuterWidth(m.width),
+		"a huge target is clamped so the detail keeps its minimum")
+
+	m.setListWidth(1)
+	assert.Equal(t, minListWidth, m.listOuterWidth(m.width),
+		"a tiny target is clamped so the list keeps its minimum")
+}
+
+// TestDividerDragResizesList pins #784's mouse drag: a press on the gutter divider
+// begins a drag (without moving the split), subsequent motion follows the cursor
+// X (clamped), and release ends the drag so later motion no longer resizes.
+func TestDividerDragResizesList(t *testing.T) {
+	t.Parallel()
+
+	m := loadedWheelModel(t) // rendered at 120×30 (two-pane, divider registered)
+
+	dx, dy := regionOrigin(t, m, regionDivider)
+	before := m.listOuterWidth(m.width)
+
+	// Press on the divider: drag begins, split unchanged.
+	m, _ = update(t, m, tea.MouseClickMsg{X: dx, Y: dy, Button: tea.MouseLeft})
+	require.True(t, m.draggingDivider, "a press on the divider begins a drag")
+	assert.Equal(t, before, m.listOuterWidth(m.width), "the press alone does not resize")
+
+	// Motion follows the cursor X (clamped).
+	m, _ = update(t, m, tea.MouseMotionMsg{X: 80, Y: dy, Button: tea.MouseLeft})
+	assert.Equal(t, clampListWidth(80, m.width), m.listOuterWidth(m.width),
+		"motion during the drag resizes the list to follow the cursor")
+
+	// Release ends the drag; further motion no longer resizes.
+	m, _ = update(t, m, tea.MouseReleaseMsg{X: 80, Y: dy})
+	require.False(t, m.draggingDivider, "button-up ends the drag")
+
+	settled := m.listOuterWidth(m.width)
+	m, _ = update(t, m, tea.MouseMotionMsg{X: 40, Y: dy})
+	assert.Equal(t, settled, m.listOuterWidth(m.width), "motion after release does not resize")
+}
+
+// TestClickSelectsRightRowAfterResize pins the #661/#663 desync guard: after the
+// list is resized, a click still hit-tests to the correct row (the regions are
+// re-derived from the composed layout, not stale constants).
+func TestClickSelectsRightRowAfterResize(t *testing.T) {
+	t.Parallel()
+
+	m := loadedWheelModel(t)
+
+	// Widen the list, then re-render so the hit map reflects the new width.
+	m, _ = update(t, m, keyPress(']'))
+	_ = m.View(m.width, m.height)
+
+	lx, ly := regionOrigin(t, m, regionList)
+	x, y := lx, ly+2 // row index 2
+
+	id, _, dy, ok := m.hits.At(x, y)
+	require.True(t, ok, "the point is inside a region after the resize")
+	require.Equal(t, regionList, id, "the point resolves to the list region")
+
+	m, cmd := update(t, m, tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	assert.Equal(t, 2, m.list.Selected(), "the click selects the row the geometry maps to, post-resize")
+	assert.Equal(t, 2, dy)
+	assert.NotNil(t, cmd, "the row click loads the selection's detail")
+}
+
+// TestPreviewWidthFollowsListWidth pins that the list value preview budget grows
+// with the list width, so a wider list shows a longer preview (#783/#784).
+func TestPreviewWidthFollowsListWidth(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()}) // width 120
+
+	narrow := m.previewWidth()
+
+	m.setListWidth(90) // widen toward the clamp
+	wide := m.previewWidth()
+	assert.Greater(t, wide, narrow, "a wider list yields a longer preview budget")
+
+	// The effect reaches the rendered rows: a long value's preview is longer.
+	longVal := strings.Repeat("a", 200)
+	m.valuesOn = true
+	m.listWidth = 0 // back to default
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/k", Value: &longVal},
+	}}})
+
+	row, ok := m.list.SelectedRow()
+	require.True(t, ok)
+
+	narrowPreview := len([]rune(row.Preview))
+
+	m.setListWidth(90) // rebuilds the rows at the new width
+	row, ok = m.list.SelectedRow()
+	require.True(t, ok)
+	assert.Greater(t, len([]rune(row.Preview)), narrowPreview, "widening the list lengthens the value preview")
+}
+
+// TestStackedLayoutUnaffectedByListWidth pins that below the two-pane threshold
+// the panes stack full-width, so a previously-set list width is inert and no
+// divider region is registered (there is nothing to drag).
+func TestStackedLayoutUnaffectedByListWidth(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/a"}}}})
+
+	// A width the user set while in the two-pane layout.
+	m.listWidth = 40
+
+	// Render below the two-pane threshold: the layout stacks.
+	_ = m.View(twoPaneMinWidth-1, 30)
+
+	_, _, ok := m.hits.Origin(regionDivider)
+	assert.False(t, ok, "no divider is registered in the stacked layout")
+
+	// The list region spans (near) the full width, not the 40-column session width.
+	_, _, listOK := m.hits.Origin(regionList)
+	require.True(t, listOK, "the list is still drawn when stacked")
 }

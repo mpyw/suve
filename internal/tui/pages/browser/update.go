@@ -19,6 +19,9 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// The list value preview follows the (resizable) list inner width, so a
+		// resize must recompute the previews (#783/#784).
+		m.rebuildRows()
 
 		return m, nil
 	case listLoadedMsg:
@@ -57,6 +60,12 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 		return m.handleMouseClick(msg)
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
+	case tea.MouseMotionMsg:
+		return m.handleMouseMotion(msg)
+	case tea.MouseReleaseMsg:
+		m.draggingDivider = false
+
+		return m, nil
 	default:
 		return m, nil
 	}
@@ -308,8 +317,14 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		m.history.SetReveal(!m.valuePane.Masked())
 
 		return true, nil
-	case key.Matches(msg, stagingKey):
-		return true, func() tea.Msg { return nav.OpenStaging{} }
+	case key.Matches(msg, widenKey):
+		m.stepListWidth(listWidthStep)
+
+		return true, nil
+	case key.Matches(msg, narrowKey):
+		m.stepListWidth(-listWidthStep)
+
+		return true, nil
 	case key.Matches(msg, compareKey):
 		m.toggleCompare()
 
@@ -387,6 +402,23 @@ func (m *Model) toggleRecursive() tea.Cmd {
 // refreshList reloads the list (a click on the ⟳ refresh affordance).
 func (m *Model) refreshList() tea.Cmd {
 	return m.loadListCmd(false)
+}
+
+// stepListWidth widens (positive delta) or narrows (negative) the list pane by
+// delta columns within the clamps — the keyboard counterpart to dragging the
+// divider ([ / ]). It seeds from the current effective width so the first press
+// steps off the default ratio rather than jumping. Rebuilding the rows keeps the
+// value preview width in step with the new list width (#784).
+func (m *Model) stepListWidth(delta int) {
+	m.listWidth = clampListWidth(m.listOuterWidth(m.width)+delta, m.width)
+	m.rebuildRows()
+}
+
+// setListWidth sets the list pane's outer width to place the divider under the
+// given page-local column x (clamped), used while dragging the divider.
+func (m *Model) setListWidth(x int) {
+	m.listWidth = clampListWidth(x, m.width)
+	m.rebuildRows()
 }
 
 // selectedIsDeleteStaged reports whether the currently-selected entry is staged

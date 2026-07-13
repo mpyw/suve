@@ -32,19 +32,34 @@ const (
 	// twoPaneMinWidth is the width at/above which the list and detail sit side by
 	// side; below it they stack.
 	twoPaneMinWidth = 110
-	// listPaneMaxWidth caps the list pane so a wide terminal gives the detail room.
-	listPaneMaxWidth = 46
-	// listWidthNum/listWidthDen give the list pane's target width as a fraction of
-	// the terminal (2/5), capped by listPaneMaxWidth.
-	listWidthNum = 2
-	listWidthDen = 5
+	// defaultListWidthNum/defaultListWidthDen give the list pane's default width as
+	// a fraction of the terminal (2/5) when the user has not resized it. The result
+	// is clamped to [minListWidth, width-minDetailWidth-paneGutter].
+	defaultListWidthNum = 2
+	defaultListWidthDen = 5
+	// minListWidth / minDetailWidth are the smallest outer widths the list and the
+	// detail panes may shrink to under a resize, so neither pane ever collapses.
+	minListWidth   = 24
+	minDetailWidth = 44
+	// listWidthStep is how many columns the keyboard widen/narrow keys move the
+	// list width by.
+	listWidthStep = 4
+	// listPreviewIndent mirrors the value-line indent EntryList.rowLines draws
+	// ("     "), so previewValue truncates to the columns actually available.
+	listPreviewIndent = 5
 	// stackedMinPaneHeight is the smallest a stacked pane may shrink to.
 	stackedMinPaneHeight = 3
 	// paneGutter is the blank column between the side-by-side list and detail
-	// panes, so their borders never fuse at the ╮╭ seam (#698).
+	// panes, so their borders never fuse at the ╮╭ seam (#698). It doubles as the
+	// draggable divider.
 	paneGutter = 1
-	// valuePaneHeight is the detail value pane's fixed line count.
-	valuePaneHeight = 3
+	// minValueHeight is the detail value pane's floor: a short value still gets at
+	// least this many rows, and it grows toward the available space for a taller
+	// (multi-line JSON) value before scrolling (adaptive value height, #783).
+	minValueHeight = 3
+	// minHistoryHeight is the row budget the version history keeps when the value
+	// pane grows, so a tall value never squeezes the history off screen.
+	minHistoryHeight = 4
 	// debounceDelay is how long a prefix/filter edit waits before reloading, so a
 	// burst of keystrokes issues one list load (the last-write-wins sequence guard
 	// drops the rest).
@@ -72,8 +87,12 @@ var (
 	loadMoreKey  = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "load more"))
 	revealKey    = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal"))
 	compareKey   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "compare"))
-	stagingKey   = key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "staging"))
 	spaceKey     = key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "pick/namespace"))
+
+	// List-width resize keys (the keyboard counterpart to dragging the divider):
+	// ] widens the list, [ narrows it, each stepping within the clamps (#784).
+	widenKey  = key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "widen list"))
+	narrowKey = key.NewBinding(key.WithKeys("["), key.WithHelp("[", "narrow list"))
 
 	// Mutation keys: open the create/edit/delete/tag/restore dialogs.
 	newKey     = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new"))
@@ -121,6 +140,16 @@ type Model struct {
 
 	width  int
 	height int
+
+	// listWidth is the session-held list pane OUTER width the user sets by dragging
+	// the divider or pressing the widen/narrow keys. Zero means "use the default
+	// ratio"; a non-zero value is re-clamped to [minListWidth, width-minDetailWidth-
+	// paneGutter] on every layout so a terminal resize never leaves a pane collapsed
+	// (#784).
+	listWidth int
+	// draggingDivider is true while a mouse drag that started on the gutter divider
+	// is in progress, so subsequent motion messages resize the list until release.
+	draggingDivider bool
 
 	// Header state.
 	prefix    textinput.Model
@@ -201,6 +230,7 @@ const (
 	regionDetail     = "detail"
 	regionHistory    = "history"
 	regionValueLabel = "value-label"
+	regionDivider    = "divider"
 	regionNamespace  = "ns"
 	regionPrefix     = "prefix"
 	regionFilter     = "filter"

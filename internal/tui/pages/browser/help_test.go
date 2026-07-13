@@ -102,6 +102,38 @@ func TestHelpKeyMap_FullHelpGatesOnCapability(t *testing.T) {
 	assert.Contains(t, secretFull, "restore", "AWS secret supports restore")
 }
 
+// TestHelpKeyMap_ResizeKeysGatedOnTwoPane pins #784's help: the list resize keys
+// (widen/narrow) are advertised in the two-pane layout and dropped once the panes
+// stack (where they would do nothing).
+func TestHelpKeyMap_ResizeKeysGatedOnTwoPane(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsParamCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "/k"}}}})
+
+	// newModel sizes the model at 120 wide (two-pane): the resize keys show.
+	twoPane := fullHelpDescs(m.HelpKeyMap())
+	assert.Contains(t, twoPane, "widen list", "the two-pane help advertises widen")
+	assert.Contains(t, twoPane, "narrow list", "the two-pane help advertises narrow")
+
+	// Narrow the terminal below the two-pane threshold: the keys drop out.
+	m.width = twoPaneMinWidth - 1
+	stacked := fullHelpDescs(m.HelpKeyMap())
+	assert.NotContains(t, stacked, "widen list", "the stacked help omits the resize keys")
+}
+
+// TestHelpKeyMap_NoStagingShortcut pins #785: the removed `S` staging jump is no
+// longer advertised anywhere in the browser help (Staging stays reachable via the
+// tab keys).
+func TestHelpKeyMap_NoStagingShortcut(t *testing.T) {
+	t.Parallel()
+
+	m := newModel(t, &stubSource{svcCap: awsSecretCap()})
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "k"}}}})
+
+	assert.NotContains(t, fullHelpDescs(m.HelpKeyMap()), "staging", "the broken S staging shortcut is gone (#785)")
+}
+
 // TestHelpKeyMap_LoadMoreGatedOnNextPage pins that load-more only appears while a
 // next page is pending.
 func TestHelpKeyMap_LoadMoreGatedOnNextPage(t *testing.T) {
