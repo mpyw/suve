@@ -90,18 +90,32 @@ func TestTUI_TagRemoveRoutesSelectedKey(t *testing.T) {
 
 	tm := teatest.NewTestModel(t, newDialogHost(m, cmd), teatest.WithInitialTermSize(goldenTermWidth, goldenTermHeight))
 
-	tm.Send(keyRightMsg()) // Add -> Remove
+	// Output-gated choreography (not blind sleeps): the Add->Remove toggle rebuilds
+	// the form through a command roundtrip, and each huh field transition and the
+	// completion->popup step also round-trip through the tea loop. Under CI load a
+	// rapid Enter would otherwise be swallowed against a half-built form or arrive
+	// before the popup is up (#796 class). One accumulating buffer keeps the full
+	// stream so every vt replay renders the true current screen.
+	var buf bytes.Buffer
 
-	// advance action -> select -> complete (opens the Stage/Apply popup) -> commit.
-	// A small pace between keys lets the async form rebuild (after the Add->Remove
-	// toggle) settle so a rapid Enter is not swallowed against a half-built form.
-	for range 4 {
-		tm.Send(keyEnterMsg())
-		time.Sleep(30 * time.Millisecond)
-	}
+	waitForInBuf(t, tm, &buf, "Action") // the initial (Add) form has rendered
+
+	tm.Send(keyRightMsg())                // Add -> Remove (rebuilds the form)
+	waitForInBuf(t, tm, &buf, "env=prod") // the Remove select rebuilt & rendered
+
+	// Two Enters complete the two-field Remove form (Action select -> existing-tags
+	// select -> complete). Each Enter drives exactly one field advance through huh's
+	// nextField command, so the count is timing-independent; then gate on the popup
+	// actually rendering before committing.
+	tm.Send(keyEnterMsg()) // Action -> the existing-tags select
+	tm.Send(keyEnterMsg()) // select -> complete -> Stage/Apply popup
+
+	waitForInBuf(t, tm, &buf, "Apply immediately")
+
+	tm.Send(keyEnterMsg()) // popup: commit (staged default)
 
 	// Wait for the submit to reach the mutator.
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		if remove, _, _, _ := mut.snapshot(); remove {
 			break

@@ -105,10 +105,20 @@ func TestTUI_EntryTabToOKSubmits(t *testing.T) {
 	tab()              // Value -> Description
 	typeStr("mydesc")
 	tab()   // Description -> [ OK ]
-	enter() // OK -> complete -> Stage/Apply popup
-	enter() // popup: commit (staged default)
+	enter() // OK -> complete -> Stage/Apply popup (async)
 
-	deadline := time.Now().Add(3 * time.Second)
+	// Enter on [ OK ] completes the huh form, but the form reaches StateCompleted
+	// through a nextField command roundtrip, so beginSubmit only opens the
+	// Stage/Apply popup a loop iteration later. Gate the commit Enter below on the
+	// popup being RENDERED — under CI load a blind Enter would otherwise arrive
+	// before the popup is up, be forwarded back into the completed form, and never
+	// reach the mutator (created stays false, #796 class). waitFor matches the
+	// vt-rendered screen, not the raw stream.
+	waitFor(t, tm, "Apply immediately")
+
+	tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter}) // popup: commit (staged default)
+
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		if created, _, _, _ := mut.snapshot(); created {
 			break
