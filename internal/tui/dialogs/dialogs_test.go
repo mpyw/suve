@@ -777,6 +777,21 @@ func TestEntryForm_NameValidatorRequired(t *testing.T) {
 	require.NoError(t, d.nameValidator()("/app/X"), "a non-empty name passes")
 }
 
+// TestEntryFormTheme_OKButtonInvertsOnFocus pins that the "[ OK ]" button is
+// reverse-video only while focused: huh's single-affirmative Confirm always renders
+// the affirmative with the group's FocusedButton, so the focus cue must live in the
+// focused-vs-blurred button styles. Reverse (no hard-coded colors) reads in both
+// light and dark terminals.
+func TestEntryFormTheme_OKButtonInvertsOnFocus(t *testing.T) {
+	t.Parallel()
+
+	for _, dark := range []bool{true, false} {
+		s := entryFormTheme().Theme(dark)
+		assert.True(t, s.Focused.FocusedButton.GetReverse(), "the focused OK button inverts (dark=%v)", dark)
+		assert.False(t, s.Blurred.FocusedButton.GetReverse(), "the blurred OK button is plain (dark=%v)", dark)
+	}
+}
+
 // TestFormKeyMap_MultilineBindings pins the multi-line field key contract: Enter
 // inserts a newline (never next/submit), Tab advances to the next field, and the
 // field never submits on its own — the form is completed from the "[ OK ]" button,

@@ -263,7 +263,8 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 		WithWidth(dialogContentWidth).
 		WithShowHelp(false).
 		WithShowErrors(true).
-		WithKeyMap(formKeyMap())
+		WithKeyMap(formKeyMap()).
+		WithTheme(entryFormTheme())
 
 	// Init the (re)built form, then immediately cap its body to the known
 	// terminal size so a retry after an error — or the initial build once the
@@ -288,6 +289,25 @@ func formKeyMap() *huh.KeyMap {
 	km.Text.Submit = key.NewBinding(key.WithDisabled())
 
 	return km
+}
+
+// entryFormTheme is huh's default (Charm) theme with only the "[ OK ]" button
+// restyled so it inverts ONLY while focused. huh's single-affirmative Confirm
+// always renders the affirmative with the field group's FocusedButton, and the
+// default theme copies Blurred = Focused, so the button never changed on focus (you
+// could not tell it was selected). Overriding the focused button to reverse-video
+// and the blurred one to plain gives the single-button form a clear focus cue. It
+// uses Reverse (no hard-coded colors), so it swaps whatever fg/bg is in effect and
+// reads well in both light and dark terminals; ThemeCharm(isDark) still supplies
+// every other style, so the rest of the form is unchanged.
+func entryFormTheme() huh.Theme {
+	return huh.ThemeFunc(func(isDark bool) *huh.Styles {
+		s := huh.ThemeCharm(isDark)
+		s.Focused.FocusedButton = lipgloss.NewStyle().Reverse(true).Padding(0, 1)
+		s.Blurred.FocusedButton = lipgloss.NewStyle().Padding(0, 1)
+
+		return s
+	})
 }
 
 // syncFormSize re-caps the embedded form's scrollable body to the current
@@ -712,10 +732,10 @@ func (d *entryForm) footer() string {
 // fields Enter also advances.
 func entryHint(onMultiline bool) string {
 	if onMultiline {
-		return "tab: fields · enter: newline · ctrl+o: $EDITOR · [OK]: submit · esc: cancel"
+		return "tab/shift+tab: fields · enter: newline · ctrl+o: $EDITOR · esc: cancel"
 	}
 
-	return "tab: fields · enter: next · [OK]: submit · esc: cancel"
+	return "tab/shift+tab: fields · enter: next · esc: cancel"
 }
 
 // namespaceDisplay renders a namespace for the read-only edit note, showing the

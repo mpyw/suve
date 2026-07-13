@@ -12,7 +12,7 @@
 │                                                          │
 │                                                          │
 │                                                          │
-│      OK                                                  │
-│  tab: fields · enter: newline · ctrl+o: $EDITOR · [OK]:  │
-│  submit · esc: cancel                                    │
+│     OK                                                   │
+│  tab/shift+tab: fields · enter: newline · ctrl+o:        │
+│  $EDITOR · esc: cancel                                   │
 ╰──────────────────────────────────────────────────────────╯
