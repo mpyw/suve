@@ -143,20 +143,20 @@ func (m *Model) renderTwoPane(width, height, yOffset int) string {
 	detailPane := m.renderDetailPane(detailW, height, yOffset, listW+paneGutter)
 	gutter := gutterColumn(paneGutter, lipgloss.Height(listPane))
 
-	// The divider band covers the gutter column plus the two adjacent pane border
-	// columns, so it is easy to grab; it sits above the panes (higher Z) so a press
-	// there resolves to the divider rather than a pane. Its geometry derives from
-	// the composed layout (listW), so it can never drift from the render (#661/#663).
-	// dividerGrabCols widens the grabbable band to the gutter plus the two adjacent
-	// pane border columns; dividerZ sits it above the value-label/history bands
-	// (Z 1) so a press there resolves to the divider.
-	const (
-		dividerGrabCols = paneGutter + 2
-		dividerZ        = 2
-	)
+	// The divider grab band spans the list pane's right border, the gutter, and the
+	// detail pane's whole LEFT WALL — its border AND its left padding — up to (but
+	// not including) the detail's first content column. So the entire left edge of
+	// the right pane is grabbable, not just the 1-column gutter (which was too thin
+	// to hit; #784 follow-up). It sits above the panes (higher Z) so a press there
+	// resolves to the divider rather than a pane, and its geometry derives from the
+	// composed layout so it can never drift from the render (#661/#663).
+	const dividerZ = 2 // above the value-label/history bands (Z 1)
 
 	dividerX := max(listW-1, 0)
-	dividerW := min(dividerGrabCols, width-dividerX)
+	// detailContentLeft is the first column of the detail pane's content (after its
+	// border + left padding); the band stops there so it never shadows detail rows.
+	detailContentLeft := listW + paneGutter + components.PaneContentLeft()
+	dividerW := min(max(detailContentLeft-dividerX, paneGutter), width-dividerX)
 	m.regions = append(m.regions,
 		hit.Region(regionDivider, dividerX, yOffset, dividerW, height).Z(dividerZ))
 
