@@ -9,5 +9,6 @@
 │                                                          │
 │    Value                                                 │
 │    > (add only)                                          │
-│  tab/↑↓: fields · enter: submit · esc: cancel            │
+│  tab/↑↓: fields · enter: next · ctrl+s / shift+enter:    │
+│  submit · esc: cancel                                    │
 ╰──────────────────────────────────────────────────────────╯

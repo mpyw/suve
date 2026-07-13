@@ -1,13 +1,14 @@
-╭──────────────────────────────────────────────────────────────────╮
-│  Edit /app/api/DATABASE_URL                                      │
-│                                                                  │
-│  ┃ Value                                                         │
-│  ┃ postgres://new                                                │
-│  ┃                                                               │
-│  ┃                                                               │
-│  ┃                                                               │
-│                                                                  │
-│    Description                                                   │
-│    > (optional)                                                  │
-│  tab/↑↓: fields · ctrl+e: $EDITOR · enter: submit · esc: cancel  │
-╰──────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────╮
+│  Edit /app/api/DATABASE_URL                              │
+│                                                          │
+│  ┃ Value                                                 │
+│  ┃ postgres://new                                        │
+│  ┃                                                       │
+│  ┃                                                       │
+│  ┃                                                       │
+│                                                          │
+│    Description                                           │
+│    > (optional)                                          │
+│  tab/↑↓: fields · enter: newline · ctrl+s /              │
+│  shift+enter: submit · ctrl+e: $EDITOR · esc: cancel     │
+╰──────────────────────────────────────────────────────────╯

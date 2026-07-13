@@ -71,8 +71,11 @@ func TestEntryForm_TallFormFitsMinSize(t *testing.T) {
 		"the dialog body fits inside the frame, so the shell never clips it")
 	assert.LessOrEqual(t, maxLineWidth(view), minWidth-dialogChrome,
 		"no line overflows the dialog width at the minimum size")
-	assert.Contains(t, stripANSI(view), "enter: submit", "the submit hint stays on-screen")
-	assert.Contains(t, stripANSI(view), "esc: cancel", "the cancel hint stays on-screen")
+	// The longer #791 hint folds across two lines at the minimum size, so match the
+	// wrap-safe affordance tokens rather than a phrase that may straddle the break.
+	assert.Contains(t, flatten(view), "ctrl+s", "the submit hint stays on-screen")
+	assert.Contains(t, flatten(view), "submit", "the submit hint stays on-screen")
+	assert.Contains(t, flatten(view), "cancel", "the cancel hint stays on-screen")
 }
 
 // TestEntryForm_CompressesWhenTallerThanScreen pins that the min-size form is
@@ -193,7 +196,7 @@ func TestEntryForm_LongErrorStaysBounded(t *testing.T) {
 		"a long error keeps the whole form within the terminal height")
 	assert.LessOrEqual(t, maxLineWidth(view), minWidth-dialogChrome,
 		"the wrapped error never overflows the dialog width")
-	assert.Contains(t, stripANSI(view), "esc: cancel", "the submit/cancel hint stays on-screen under a long error")
+	assert.Contains(t, flatten(view), "cancel", "the submit/cancel hint stays on-screen under a long error")
 }
 
 // TestErrorDialog_LongMessageWrapsAndScrollsMinSize pins that a long

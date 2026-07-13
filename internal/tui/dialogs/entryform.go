@@ -84,6 +84,19 @@ type entryForm struct {
 	description string
 	staged      bool
 
+	// initName/initNamespace/initValue/initDescription snapshot the seeded field
+	// values at construction so the discard guard (#790) can tell a DIRTY form
+	// (a free-text field changed from its seed) from a clean one. Only the
+	// text-bearing fields are tracked — the Type/Mode selects seed to sensible
+	// defaults and carry no typed data to lose.
+	initName        string
+	initNamespace   string
+	initValue       string
+	initDescription string
+	// armed records that a first Esc on a dirty form has shown the discard notice;
+	// a second consecutive Esc then discards. Any other key resets it.
+	armed bool
+
 	form *huh.Form
 
 	busy   bool
@@ -138,6 +151,11 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 		// immediate (the mode toggle is hidden). A staged-only surface forces
 		// staged regardless (its toggle is hidden too).
 		staged: svcCap.HasStaging || in.StagedOnly,
+		// Snapshot the seeded free-text values for the discard guard (#790).
+		initName:        in.Name,
+		initNamespace:   in.Namespace,
+		initValue:       in.Value,
+		initDescription: in.Description,
 	}
 
 	cmd := d.rebuildForm()
@@ -214,12 +232,29 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 	d.form = huh.NewForm(huh.NewGroup(fields...)).
 		WithWidth(dialogContentWidth).
 		WithShowHelp(false).
-		WithShowErrors(true)
+		WithShowErrors(true).
+		WithKeyMap(formKeyMap())
 
 	// Init the (re)built form, then immediately cap its body to the known
 	// terminal size so a retry after an error — or the initial build once the
 	// size has been seeded — never renders at full natural height off-screen.
 	return tea.Batch(d.form.Init(), d.syncFormSize())
+}
+
+// formKeyMap is the huh keymap the create/edit form uses so the multi-line Value
+// textarea can hold newlines (#791): in a huh Text field Enter inserts a newline
+// (NewLine) instead of advancing or submitting, and Tab advances. Every other
+// (single-line) field keeps huh's defaults, so Enter still advances — and submits
+// from the last field. Form submit from ANY field is driven by the dialog itself
+// (ctrl+s / shift+enter, see submitKey), which is why the textarea never needs to
+// submit on Enter.
+func formKeyMap() *huh.KeyMap {
+	km := huh.NewDefaultKeyMap()
+	km.Text.NewLine = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "new line"))
+	km.Text.Next = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next"))
+	km.Text.Submit = key.NewBinding(key.WithKeys("shift+enter"), key.WithHelp("shift+enter", "submit"))
+
+	return km
 }
 
 // syncFormSize re-caps the embedded form's scrollable body to the current
@@ -283,6 +318,18 @@ func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return d, nil // double-submit guard: swallow input mid-operation
 		}
 
+		if key.Matches(msg, escKey) {
+			return d.handleEsc()
+		}
+
+		// Any other key resets the discard-armed state so a later single Esc
+		// re-arms (a stray Esc after typing does not silently discard).
+		d.disarm()
+
+		if key.Matches(msg, submitKey) {
+			return d.forceSubmit()
+		}
+
 		if key.Matches(msg, ctrlEKey) && d.valueFieldFocused() {
 			return d, d.openEditor()
 		}
@@ -293,6 +340,65 @@ func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return d.forwardToForm(msg)
+}
+
+// InterceptEsc opts the form into the shell's discard guard (#790): the shell
+// forwards Esc into Update (see handleEsc) rather than bare-popping the dialog.
+func (*entryForm) InterceptEsc() bool { return true }
+
+// handleEsc implements the discard guard: on a DIRTY form the first Esc arms a
+// confirmation (shows the notice, stays open); a second consecutive Esc — or any
+// Esc on a clean/unchanged form — discards (CanceledMsg closes it).
+func (d *entryForm) handleEsc() (Model, tea.Cmd) {
+	if d.dirty() && !d.armed {
+		d.armed = true
+		d.notice = discardNotice
+
+		return d, d.syncFormSize()
+	}
+
+	return d, canceledCmd
+}
+
+// dirty reports whether any free-text field diverges from its seeded value — a
+// non-empty entry on create, or a changed value/description/etc. on edit.
+func (d *entryForm) dirty() bool {
+	return d.name != d.initName ||
+		d.namespace != d.initNamespace ||
+		d.value != d.initValue ||
+		d.description != d.initDescription
+}
+
+// disarm clears the discard-armed state (and its notice) after any non-Esc key,
+// so the two Escs must be consecutive.
+func (d *entryForm) disarm() {
+	if d.armed {
+		d.armed = false
+		d.notice = ""
+	}
+}
+
+// forceSubmit submits the form from any field (ctrl+s / shift+enter), so a
+// multi-line value — where Enter now inserts a newline instead of advancing —
+// can be submitted without tabbing to the last field. It re-runs the create name
+// validation huh would enforce inline, so an empty required name still stops the
+// submit (with a footer error) instead of dead-ending on the provider write. The
+// other bound values are already live (huh syncs each field's accessor on every
+// keystroke), so no field needs to be blurred first.
+func (d *entryForm) forceSubmit() (Model, tea.Cmd) {
+	if !d.edit {
+		if err := d.nameValidator()(d.name); err != nil {
+			d.err = err.Error()
+
+			return d, d.syncFormSize()
+		}
+	}
+
+	d.err = ""
+	d.notice = ""
+	d.busy = true
+
+	return d, d.submit()
 }
 
 // forwardToForm drives the embedded huh form and reacts to its completion.
@@ -487,7 +593,10 @@ func (d *entryForm) header() string {
 func (d *entryForm) footer() string {
 	parts := make([]string, 0, 3) //nolint:mnd // at most error + notice + hint
 
-	hint := d.styles.PageHint.Render(entryHint(d.valueFieldFocused()))
+	// Wrap the hint to the dialog's fixed content width so the (now longer, #791)
+	// key hint stays inside the box — folding to a second line at the minimum size
+	// — instead of overflowing the border, and the box keeps the form's width.
+	hint := d.styles.PageHint.Width(dialogContentWidth).Render(entryHint(d.valueFieldFocused()))
 	// Reserve the frame around the footer (title, spacer, the form's minimum body,
 	// the hint); the error then the notice each take what remains, so the form
 	// body never drops below minFormBody and the whole dialog fits.
@@ -509,14 +618,16 @@ func (d *entryForm) footer() string {
 	return strings.Join(parts, "\n")
 }
 
-// entryHint is the bottom hint line, adding the ctrl+e affordance while the
-// value field is focused.
+// entryHint is the bottom hint line. While the Value textarea is focused it
+// voices Enter = newline and the ctrl+e editor handoff; on the single-line
+// fields Enter advances. Submit is always ctrl+s (portable) or shift+enter
+// (needs an enhanced-keyboard terminal).
 func entryHint(onValue bool) string {
 	if onValue {
-		return "tab/↑↓: fields · ctrl+e: $EDITOR · enter: submit · esc: cancel"
+		return "tab/↑↓: fields · enter: newline · ctrl+s / shift+enter: submit · ctrl+e: $EDITOR · esc: cancel"
 	}
 
-	return "tab/↑↓: fields · enter: submit · esc: cancel"
+	return "tab/↑↓: fields · enter: next · ctrl+s / shift+enter: submit · esc: cancel"
 }
 
 // namespaceDisplay renders a namespace for the read-only edit note, showing the
