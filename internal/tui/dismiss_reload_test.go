@@ -40,7 +40,7 @@ func resultsPhaseApply(t *testing.T) dialogs.Model {
 
 	d := dialogs.NewApply(dialogs.ApplyInput{
 		Ctx: context.Background(), Targets: []data.StagingService{svc},
-		TargetLine: "aws", Title: "Apply staged changes — Param", EntryCount: 1, Styles: styles.New(),
+		TargetLine: string(provider.ProviderAWS), Title: "Apply staged changes — Param", EntryCount: 1, Styles: styles.New(),
 	})
 
 	d, _ = d.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
