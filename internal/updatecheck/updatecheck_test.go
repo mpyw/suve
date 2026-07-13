@@ -334,6 +334,14 @@ func TestSemverComparison(t *testing.T) {
 		{name: "newer patch", current: "v1.2.3", latest: "v1.2.4", wantNotice: true},
 		{name: "equal", current: "v1.2.3", latest: "v1.2.3", wantNotice: false},
 		{name: "older", current: "v1.2.3", latest: "v1.2.2", wantNotice: false},
+		// Pre-release current versions (e.g. a v2.0.0-alpha.1 build) must compare
+		// with SemVer 2.0 precedence and never nag a pre-release user to
+		// "downgrade" to the last stable — /releases/latest excludes pre-releases,
+		// so the last stable is what fetchLatest returns for such a build.
+		{name: "prerelease current, last stable is older -> no nag", current: "v2.0.0-alpha.1", latest: "v1.6.1", wantNotice: false},
+		{name: "prerelease current, final release is newer -> nag", current: "v2.0.0-alpha.1", latest: "v2.0.0", wantNotice: true},
+		{name: "prerelease current, later prerelease -> nag", current: "v2.0.0-alpha.1", latest: "v2.0.0-alpha.2", wantNotice: true},
+		{name: "prerelease current equals latest -> no nag", current: "v2.0.0-alpha.1", latest: "v2.0.0-alpha.1", wantNotice: false},
 	}
 
 	for _, tt := range tests {
