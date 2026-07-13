@@ -86,15 +86,21 @@ func waitGcloudSecretReadable(t *testing.T, name, want string) {
 
 	deadline := time.Now().Add(tuiWaitTimeout)
 	for time.Now().Before(deadline) {
-		out, err := runGcloud(t, "secret", "show", "--raw", name)
-		if err == nil && strings.TrimSpace(out) == want {
+		// Gate on BOTH read paths the TUI's detail load uses: the value
+		// (AccessSecretVersion) AND the version list (ListSecretVersions). The
+		// emulator can make the value readable before the version list is, so gating
+		// on the value alone left the TUI's history load racing a not-yet-listable
+		// secret ("failed to list secret versions: entry not found").
+		out, valErr := runGcloud(t, "secret", "show", "--raw", name)
+		_, logErr := runGcloud(t, "secret", "log", name)
+		if valErr == nil && logErr == nil && strings.TrimSpace(out) == want {
 			return
 		}
 
 		time.Sleep(50 * time.Millisecond) //nolint:mnd // poll interval
 	}
 
-	t.Fatalf("gcloud secret %q never became readable as %q within %s", name, want, tuiWaitTimeout)
+	t.Fatalf("gcloud secret %q never became readable+listable as %q within %s", name, want, tuiWaitTimeout)
 }
 
 // newGoogleCloudTUIModel builds the real TUI model launched on the Secret Manager
