@@ -130,6 +130,7 @@ export interface ServiceCapability {
   hasForceDelete: boolean;
   hasRecoveryWindow: boolean;
   hasNamespaces: boolean;
+  hasDescription: boolean;
 }
 
 export interface ProviderCapability {
@@ -295,8 +296,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'AWS',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false },
+      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true },
     ],
   },
   {
@@ -304,7 +305,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true },
     ],
   },
   {
@@ -312,8 +313,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false },
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true, hasDescription: false },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: false },
     ],
   },
 ];
@@ -993,7 +994,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           entries: versions.map((v: any) => ({ ...v, secret: v.type === 'SecureString' })),
         };
       },
-      ParamSet: async (name: string, value: string, _type: string, namespace?: string) => {
+      ParamSet: async (name: string, value: string, _type: string, namespace?: string, description?: string) => {
         // Simulate error if configured
         if (state.simulateError?.operation === 'ParamSet') {
           throw new Error(state.simulateError.message);
@@ -1002,11 +1003,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         // create under a new namespace doesn't collide with the same key
         // elsewhere. Empty namespace is the null/default.
         const ns = namespace ?? '';
+        const desc = description ?? '';
         const existing = state.params.find((p: any) => p.name === name && (p.namespace ?? '') === ns);
         if (existing) {
           existing.value = value;
+          // Empty description preserves the existing one (a no-op on update),
+          // mirroring the CLI/adapter contract threaded through the binding.
+          if (desc) existing.description = desc;
         } else {
-          state.params.push({ name, type: 'String', value, namespace: ns });
+          state.params.push({ name, type: 'String', value, namespace: ns, description: desc });
         }
         return { name, version: 2, isCreated: !existing };
       },
@@ -1125,17 +1130,21 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           entries: versions.map((v) => ({ ...v, tags: v.tags ?? [] })),
         };
       },
-      SecretCreate: async (name: string, value: string) => {
+      SecretCreate: async (name: string, value: string, description?: string) => {
         // Simulate error if configured
         if (state.simulateError?.operation === 'SecretCreate') {
           throw new Error(state.simulateError.message);
         }
-        state.secrets.push({ name, value });
+        state.secrets.push({ name, value, description: description ?? '' });
         return { name, versionId: 'v1', arn: `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}` };
       },
-      SecretUpdate: async (name: string, value: string) => {
+      SecretUpdate: async (name: string, value: string, description?: string) => {
         const existing = state.secrets.find((s: any) => s.name === name);
-        if (existing) existing.value = value;
+        if (existing) {
+          existing.value = value;
+          // Empty description preserves the existing one (a no-op on update).
+          if (description) existing.description = description;
+        }
         return { name, versionId: 'v2', arn: '' };
       },
       SecretDelete: async (name: string, force?: boolean) => {

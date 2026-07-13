@@ -58,8 +58,8 @@ export function ParamRemoveTag(arg1, arg2, arg3) {
   return window['go']['gui']['App']['ParamRemoveTag'](arg1, arg2, arg3);
 }
 
-export function ParamSet(arg1, arg2, arg3, arg4) {
-  return window['go']['gui']['App']['ParamSet'](arg1, arg2, arg3, arg4);
+export function ParamSet(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['gui']['App']['ParamSet'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function ParamShow(arg1, arg2) {
@@ -82,8 +82,8 @@ export function SecretAddTag(arg1, arg2, arg3) {
   return window['go']['gui']['App']['SecretAddTag'](arg1, arg2, arg3);
 }
 
-export function SecretCreate(arg1, arg2) {
-  return window['go']['gui']['App']['SecretCreate'](arg1, arg2);
+export function SecretCreate(arg1, arg2, arg3) {
+  return window['go']['gui']['App']['SecretCreate'](arg1, arg2, arg3);
 }
 
 export function SecretDelete(arg1, arg2) {
@@ -114,8 +114,8 @@ export function SecretShow(arg1) {
   return window['go']['gui']['App']['SecretShow'](arg1);
 }
 
-export function SecretUpdate(arg1, arg2) {
-  return window['go']['gui']['App']['SecretUpdate'](arg1, arg2);
+export function SecretUpdate(arg1, arg2, arg3) {
+  return window['go']['gui']['App']['SecretUpdate'](arg1, arg2, arg3);
 }
 
 export function SelectScope(arg1) {
