@@ -236,6 +236,33 @@ func TestAppCursor_BrowserPrefix(t *testing.T) {
 	requireCaretOnScreen(t, m)
 }
 
+// TestAppCursor_BrowserFilterTracksArrows pins that the caret follows the input's
+// cursor position: after typing, ← moves the drawn caret (and the real terminal
+// cursor) one cell left instead of leaving it pinned to the end.
+func TestAppCursor_BrowserFilterTracksArrows(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
+
+	m = updateApp(t, m, typeKey('/'))
+	for _, r := range "abc" {
+		m = updateApp(t, m, typeKey(r))
+	}
+
+	end := requireCaretOnScreen(t, m)
+
+	m = updateApp(t, m, tea.KeyPressMsg{Code: tea.KeyLeft})
+	left := requireCaretOnScreen(t, m)
+
+	assert.Equal(t, end.Y, left.Y, "← keeps the caret on the same row")
+	assert.Equal(t, end.X-1, left.X, "← moves the caret one cell left of the end")
+}
+
 func TestAppCursor_NoneWhenNoTextField(t *testing.T) {
 	t.Parallel()
 
