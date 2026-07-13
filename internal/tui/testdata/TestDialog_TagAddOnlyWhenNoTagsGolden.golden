@@ -2,12 +2,13 @@
 │Tag — /app/api/DATABASE_URL                           │
 │                                                      │
 │┃ Action                                              │
-│┃ ← Remove tag →                                      │
+│┃ ← Add tag →                                         │
 │                                                      │
-│  Tag                                                 │
+│  Key                                                 │
+│  >                                                   │
 │                                                      │
-│  (no tags to remove)                                 │
-│                                                      │
+│  Value                                               │
+│  > (add only)                                        │
 │                                                      │
 │  Mode                                                │
 │  (•) Stage    ( ) Apply immediately                  │

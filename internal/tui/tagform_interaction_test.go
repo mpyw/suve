@@ -116,11 +116,12 @@ func TestTUI_TagRemoveRoutesSelectedKey(t *testing.T) {
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 }
 
-// TestTUI_TagRemoveEmptyBlocksSubmit drives a Remove on an entry with NO tags
-// through the real event loop: completing the form never submits an untag — the
-// empty-tags guard reopens the "(no tags to remove)" note instead of routing a
-// guaranteed-failing empty untag to the mutator (#705).
-func TestTUI_TagRemoveEmptyBlocksSubmit(t *testing.T) {
+// TestTUI_TagEmptyNeverOffersRemove drives the tag dialog for an entry with NO
+// tags through the real event loop: the Action toggle never reaches Remove
+// (right-arrow is a no-op with a single Add option), so the user is never lured
+// into an unusable Remove and the "(no tags to remove)" dead-end never renders
+// (#761). No untag is ever routed.
+func TestTUI_TagEmptyNeverOffersRemove(t *testing.T) {
 	t.Parallel()
 
 	mut := &recordingMutator{cap: capability.ServiceCapability{Service: "param", HasTags: true, HasStaging: true}}
@@ -131,24 +132,26 @@ func TestTUI_TagRemoveEmptyBlocksSubmit(t *testing.T) {
 	host := newDialogHost(m, cmd)
 	tm := teatest.NewTestModel(t, host, teatest.WithInitialTermSize(goldenTermWidth, goldenTermHeight))
 
-	tm.Send(keyRightMsg()) // Add -> Remove
+	tm.Send(keyRightMsg()) // no-op: Remove is not offered, so the action stays on Add
 
 	for range 6 {
-		tm.Send(keyEnterMsg()) // try to complete; the guard must catch every completion
+		tm.Send(keyEnterMsg()) // an empty Add key fails required-field validation; nothing completes
 	}
 
-	// Give the loop time to process every enter (and any guarded rebuild).
+	// Give the loop time to process every key.
 	time.Sleep(300 * time.Millisecond)
 
 	remove, add, _, _ := mut.snapshot()
-	assert.False(t, remove, "no untag is submitted when the entry has no tags")
-	assert.False(t, add, "no tag write is submitted at all")
+	assert.False(t, remove, "no untag is ever submitted for an entry with no tags")
+	assert.False(t, add, "no tag write is submitted without a key")
 
-	// The empty state is still on screen (never dead-ended into a submit).
+	// The dead-end note is never rendered, and the action never reaches Remove.
 	var buf bytes.Buffer
 
 	_, _ = io.Copy(&buf, tm.Output())
-	assert.Contains(t, buf.String(), "(no tags to remove)", "the empty state persists")
+	out := buf.String()
+	assert.NotContains(t, out, "(no tags to remove)", "the dead-end note is never shown")
+	assert.NotContains(t, out, "Remove tag", "the action toggle never reaches Remove")
 
 	tm.Send(hostQuitMsg{})
 	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
