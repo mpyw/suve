@@ -134,8 +134,15 @@ func TestTUIAWS_ParamBrowse(t *testing.T) {
 	tm := teatest.NewTestModel(t, newTUIModel(t, string(staging.ServiceParam)),
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 
-	// Gate on the async list landing (both real entries rendered).
-	waitForScreen(t, tm, alphaName)
+	// Gate on the detail pane's async Show completing by waiting for the selected
+	// entry's value — not just the list name. The detail loads AFTER the list, so
+	// the value appearing proves both the list read and the async detail read
+	// landed before we quit, and the assertion never races the "select an entry"
+	// placeholder frame. A single gate (not list-then-value) is deliberate:
+	// waitForScreen consumes the output buffer, so when the list+detail frames
+	// batch a first wait on the name would swallow the value and a second wait
+	// would block forever.
+	waitForScreen(t, tm, alphaValue)
 
 	screen := finalScreen(t, tm)
 
@@ -169,9 +176,13 @@ func TestTUIAWS_SecretBrowse(t *testing.T) {
 	tm := teatest.NewTestModel(t, newTUIModel(t, string(staging.ServiceSecret)),
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 
-	// Gate on the async list landing, then explicitly reveal the value with `x`.
+	// Gate on the async list landing, then explicitly reveal the value with `x`
+	// and wait for the async fetch+reveal to render the value before capturing —
+	// the reveal triggers a fresh emulator read, so gating on the list alone
+	// would race the masked → revealed transition.
 	waitForScreen(t, tm, secretName)
 	tm.Send(keyRune('x'))
+	waitForScreen(t, tm, secretValue)
 
 	screen := finalScreen(t, tm)
 
