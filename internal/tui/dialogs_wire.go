@@ -36,3 +36,17 @@ func (a dialogAdapter) DismissCmd() tea.Cmd {
 
 	return nil
 }
+
+// interceptEsc forwards the optional dialogs.EscInterceptor seam through the
+// adapter (mirroring DismissCmd): the app stores every dialog as a dialogAdapter,
+// so the shell's Back handler asserts the seam against the adapter, not the
+// wrapped dialog. Returns the wrapped dialog's decision when it implements
+// EscInterceptor (the create/edit/tag forms' discard guard, #790), else false so
+// the shell dismisses exactly as before.
+func (a dialogAdapter) interceptEsc() bool {
+	if d, ok := a.m.(dialogs.EscInterceptor); ok {
+		return d.InterceptEsc()
+	}
+
+	return false
+}

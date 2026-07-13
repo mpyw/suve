@@ -101,6 +101,15 @@ type dialog interface {
 	busy() bool
 }
 
+// escInterceptor is a dialog that wants to own the Back (Esc) key rather than be
+// bare-popped — the create/edit/tag forms' discard guard (#790). The shell
+// forwards Esc into such a dialog's Update when interceptEsc reports true; the
+// dialog then arms a discard confirmation (dirty) or emits CanceledMsg (clean).
+// dialogAdapter forwards this to the wrapped dialogs.EscInterceptor.
+type escInterceptor interface {
+	interceptEsc() bool
+}
+
 // awsIdentityMsg carries a resolved AWS identity back to the model.
 type awsIdentityMsg struct{ id components.AWSIdentity }
 
@@ -527,12 +536,22 @@ func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, m.keys.Back) && !m.topDialogBusy() {
+			top := len(m.dialogs) - 1
+
+			// A free-text form guards against an accidental discard: it owns Esc
+			// itself (a dirty form arms a "press esc again" confirmation, a clean
+			// form closes) rather than being bare-popped (#790). Forwarding the Esc
+			// lets the form decide; it emits CanceledMsg when it actually closes.
+			if g, ok := m.dialogs[top].(escInterceptor); ok && g.interceptEsc() {
+				return m.updateTopDialog(msg)
+			}
+
 			// A dialog that has already mutated (the apply results view) closes on
 			// Back with the same reload+voice as enter, so the staging page and its
 			// badge refresh; the returned command emits MutationDoneMsg, which
 			// onMutationDone turns into the single pop+reload+voice. Every other
 			// dialog is bare-dismissed.
-			if d, ok := m.dialogs[len(m.dialogs)-1].(dialogs.DismissReloader); ok {
+			if d, ok := m.dialogs[top].(dialogs.DismissReloader); ok {
 				if cmd := d.DismissCmd(); cmd != nil {
 					return m, cmd
 				}
@@ -1037,6 +1056,13 @@ func (m *App) View() tea.View {
 	view := tea.NewView("")
 	view.AltScreen = true
 	view.MouseMode = tea.MouseModeCellMotion
+	// Request keyboard enhancements so an enhanced-keyboard terminal (Kitty
+	// protocol) reports shift+enter distinctly from a plain Enter, which lets the
+	// create/edit/tag forms bind shift+enter to submit while Enter inserts a
+	// newline in the Value textarea (#791). Bubble Tea v2 always requests basic key
+	// disambiguation with this set; terminals without the protocol (e.g. macOS
+	// Terminal.app) collapse shift+enter to Enter, so ctrl+s is the portable submit.
+	view.KeyboardEnhancements.ReportAlternateKeys = true
 
 	if m.width <= 0 || m.height <= 0 {
 		return view

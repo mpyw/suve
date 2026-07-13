@@ -379,7 +379,7 @@ func TestDialog_EntryFormMinSizeGolden(t *testing.T) { //nolint:paralleltest // 
 		Service: "secret", Styles: styles.New(),
 	})
 
-	dialogGoldenSize(t, newDialogHost(m, cmd), "esc: cancel", minGoldenWidth, minGoldenHeight)
+	dialogGoldenSize(t, newDialogHost(m, cmd), "cancel", minGoldenWidth, minGoldenHeight)
 }
 
 // TestDialog_ErrorLongMessageMinSizeGolden pins the #686 fix for a long error at

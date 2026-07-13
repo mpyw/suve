@@ -11,6 +11,7 @@
 package dialogs
 
 import (
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/mpyw/suve/internal/tui/data"
@@ -21,6 +22,39 @@ const (
 	serviceParam  = "param"
 	serviceSecret = "secret"
 )
+
+// discardNotice is the inline warning a free-text form shows after the first Esc
+// on a dirty form (#790); a second consecutive Esc then discards.
+const discardNotice = "unsaved changes — press esc again to discard"
+
+// submitKey submits a create/edit/tag form from any field (#791): ctrl+s is the
+// portable fallback that works in every terminal, while shift+enter is the
+// enhanced-keyboard binding (indistinguishable from a plain Enter unless the
+// terminal's Kitty keyboard protocol is active). It is handled by the dialog
+// itself — not the embedded huh form, which can only submit from its last field —
+// so a multi-line Value textarea (where Enter now inserts a newline) can still be
+// submitted while focused.
+//
+//nolint:gochecknoglobals // immutable dialog-local binding
+var submitKey = key.NewBinding(key.WithKeys("ctrl+s", "shift+enter"))
+
+// escKey is the discard/cancel binding the shell forwards into a discard-guarded
+// form (see EscInterceptor) so the form itself decides whether to arm a discard
+// confirmation (dirty) or close immediately (clean).
+//
+//nolint:gochecknoglobals // immutable dialog-local binding
+var escKey = key.NewBinding(key.WithKeys("esc"))
+
+// EscInterceptor is an optional dialog capability. A free-text form that guards
+// against discarding unsaved input implements it so the shell forwards the Back
+// (Esc) key into the dialog's Update — where a dirty form arms a discard
+// confirmation (a second Esc then discards) — instead of bare-popping it. A
+// clean form returns CanceledMsg on the first Esc, so the shell closes it exactly
+// as before. The shell still suppresses Esc entirely while the dialog is Busy (a
+// mutation in flight is never interrupted).
+type EscInterceptor interface {
+	InterceptEsc() bool
+}
 
 // Model is a modal dialog embedded in the app shell's dialog stack. It mirrors
 // the app's page contract but returns its own concrete interface (the app adapts

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	huh "charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
@@ -50,9 +51,19 @@ type tagForm struct {
 	// free-text Add input and the Remove select of existing tags.
 	builtRemove bool
 
-	form *huh.Form
-	busy bool
-	err  string
+	// initTagKey/initTagValue snapshot the seeded Add free-text fields so the
+	// discard guard (#790) can tell a dirty form from a clean one. The Remove
+	// select carries no typed data, so only the Add inputs are tracked.
+	initTagKey   string
+	initTagValue string
+	// armed records that a first Esc on a dirty form has shown the discard notice;
+	// a second consecutive Esc then discards. Any other key resets it.
+	armed bool
+
+	form   *huh.Form
+	busy   bool
+	err    string
+	notice string
 }
 
 // TagInput configures a tag dialog.
@@ -212,6 +223,18 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if d.busy {
 			return d, nil // double-submit guard
 		}
+
+		if key.Matches(msg, escKey) {
+			return d.handleEsc()
+		}
+
+		// Any other key resets the discard-armed state so a later single Esc
+		// re-arms (a stray Esc after typing does not silently discard).
+		d.disarm()
+
+		if key.Matches(msg, submitKey) {
+			return d.forceSubmit()
+		}
 	}
 
 	if d.busy {
@@ -242,6 +265,59 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return d, cmd
+}
+
+// InterceptEsc opts the form into the shell's discard guard (#790): the shell
+// forwards Esc into Update (see handleEsc) rather than bare-popping the dialog.
+func (*tagForm) InterceptEsc() bool { return true }
+
+// handleEsc implements the discard guard: on a DIRTY form (a typed Add key/value)
+// the first Esc arms a confirmation (shows the notice, stays open); a second
+// consecutive Esc — or any Esc on a clean form — discards.
+func (d *tagForm) handleEsc() (Model, tea.Cmd) {
+	if d.dirty() && !d.armed {
+		d.armed = true
+		d.notice = discardNotice
+
+		return d, d.syncFormSize()
+	}
+
+	return d, canceledCmd
+}
+
+// dirty reports whether the Add free-text fields diverge from empty. Only the Add
+// inputs carry typed data to lose; the Remove select is a pick from existing tags.
+func (d *tagForm) dirty() bool {
+	return d.tagKey != d.initTagKey || d.tagValue != d.initTagValue
+}
+
+// disarm clears the discard-armed state (and its notice) after any non-Esc key,
+// so the two Escs must be consecutive.
+func (d *tagForm) disarm() {
+	if d.armed {
+		d.armed = false
+		d.notice = ""
+	}
+}
+
+// forceSubmit submits the tag form from any field (ctrl+s / shift+enter). It
+// re-runs the Add key validation huh would enforce inline, so an empty required
+// key still stops the submit (with a footer error). Remove targets a key chosen
+// from the existing-tags select, which is always seeded, so it needs no check.
+func (d *tagForm) forceSubmit() (Model, tea.Cmd) {
+	if !d.remove {
+		if err := requiredField("key")(d.tagKey); err != nil {
+			d.err = err.Error()
+
+			return d, d.syncFormSize()
+		}
+	}
+
+	d.err = ""
+	d.notice = ""
+	d.busy = true
+
+	return d, d.submit()
 }
 
 func (d *tagForm) submit() tea.Cmd {
@@ -300,17 +376,27 @@ func (d *tagForm) header() string {
 	return d.fit(d.styles.PaneTitle.Render("Tag — " + clipName(d.name, d.namespace)))
 }
 
-// footer renders the pinned rows below the form: any active error (wrapped to the
-// dialog width and capped so the form keeps at least minFormBody rows) then the
-// key hint.
+// footer renders the pinned rows below the form: any active error and discard
+// notice (each wrapped to the dialog width and capped so the form keeps at least
+// minFormBody rows) then the key hint.
 func (d *tagForm) footer() string {
-	parts := make([]string, 0, 2) //nolint:mnd // at most error + hint
+	parts := make([]string, 0, 3) //nolint:mnd // at most error + notice + hint
 
-	hint := d.styles.PageHint.Render("tab/↑↓: fields · enter: submit · esc: cancel")
+	// Wrap the hint to the dialog's fixed content width so the (longer, #791) key
+	// hint folds to a second line at the minimum size instead of overflowing the
+	// border, and the box keeps the form's width.
+	hint := d.styles.PageHint.Width(dialogContentWidth).
+		Render("tab/↑↓: fields · enter: next · ctrl+s / shift+enter: submit · esc: cancel")
+	reserved := lipgloss.Height(d.header()) + titleSpacerRows + minFormBody + lipgloss.Height(hint)
 
 	if d.err != "" {
-		budget := d.errBudget(lipgloss.Height(d.header()) + titleSpacerRows + minFormBody + lipgloss.Height(hint))
-		parts = append(parts, d.wrapCapped(d.styles.ErrorText.Render(d.err), budget))
+		line := d.wrapCapped(d.styles.ErrorText.Render(d.err), d.errBudget(reserved))
+		parts = append(parts, line)
+		reserved += lipgloss.Height(line)
+	}
+
+	if d.notice != "" {
+		parts = append(parts, d.wrapCapped(d.styles.Banner.Render(d.notice), d.errBudget(reserved)))
 	}
 
 	parts = append(parts, hint)

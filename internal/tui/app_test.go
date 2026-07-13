@@ -17,6 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/dialogs"
 	"github.com/mpyw/suve/internal/tui/nav"
+	"github.com/mpyw/suve/internal/tui/styles"
 )
 
 // awsIdentityFixture is the deterministic identity used in AWS goldens so the
@@ -170,6 +171,52 @@ func TestUpdate_BusyDialogSuppressesDismiss(t *testing.T) {
 	idle.dialogs = []dialog{&fakeDialog{}}
 	idle = updateApp(t, idle, specialKey(tea.KeyEscape))
 	assert.Empty(t, idle.dialogs, "an idle dialog is dismissed by esc")
+}
+
+// TestUpdate_DirtyFormEscGuard pins the #790 guard end-to-end through the shell:
+// a create/edit form that has unsaved input owns Esc (the shell forwards it via
+// the EscInterceptor seam instead of bare-popping), so the first Esc arms a
+// discard confirmation (the dialog stays on the stack) and only the second
+// consecutive Esc closes it. A clean form still closes on the first Esc.
+func TestUpdate_DirtyFormEscGuard(t *testing.T) {
+	t.Parallel()
+
+	newModel := func() *App {
+		m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+		ef, _ := dialogs.NewEntryForm(dialogs.EntryFormInput{
+			Ctx: t.Context(), Mutator: capMutator{cap: goldenCap("aws", "secret")},
+			Service: "secret", Styles: styles.New(),
+		})
+		m.dialogs = []dialog{dialogAdapter{m: ef}}
+		m = updateApp(t, m, tea.WindowSizeMsg{Width: goldenTermWidth, Height: goldenTermHeight})
+
+		return m
+	}
+
+	// Clean form: the first Esc pops it (via the CanceledMsg the dialog emits).
+	clean := newModel()
+	next, cmd := clean.Update(specialKey(tea.KeyEscape))
+	clean, ok := next.(*App)
+	require.True(t, ok)
+	require.NotNil(t, cmd, "a clean form emits CanceledMsg on esc")
+	clean = updateApp(t, clean, cmd())
+	assert.Empty(t, clean.dialogs, "esc closes a clean form")
+
+	// Dirty form: typing a character makes it dirty.
+	dirty := newModel()
+	dirty = updateApp(t, dirty, keyPress('x'))
+
+	// First Esc arms — the dialog stays on the stack (not bare-popped).
+	dirty = updateApp(t, dirty, specialKey(tea.KeyEscape))
+	require.Len(t, dirty.dialogs, 1, "first esc on a dirty form arms, does not close")
+
+	// Second consecutive Esc discards: the dialog emits CanceledMsg, which pops it.
+	next, cmd = dirty.Update(specialKey(tea.KeyEscape))
+	dirty, ok = next.(*App)
+	require.True(t, ok)
+	require.NotNil(t, cmd, "the second esc emits CanceledMsg")
+	dirty = updateApp(t, dirty, cmd())
+	assert.Empty(t, dirty.dialogs, "a second consecutive esc discards")
 }
 
 // TestUpdate_StagedCountBadge pins that a staged-count report updates the Staging

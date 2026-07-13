@@ -575,6 +575,150 @@ func TestEntryForm_ImmediateCreateUpsertVoicesUpdate(t *testing.T) {
 	assert.Equal(t, "Applied update.", msg.Status, "an upsert voices an update, not a create")
 }
 
+// TestEntryForm_EscDiscardGuard pins the #790 double-Esc guard: a clean form
+// closes on the first Esc; a dirty form arms a confirmation on the first Esc
+// (stays open, shows the notice) and discards only on the second consecutive Esc;
+// any keystroke between the two Escs re-arms so a later single Esc is safe.
+func TestEntryForm_EscDiscardGuard(t *testing.T) {
+	t.Parallel()
+
+	// Clean create form: the first Esc cancels immediately.
+	clean, _ := newCreateEntry(t, awsSecretCap())
+	_, cmd := clean.Update(keyEsc())
+	assert.True(t, isCanceled(cmd), "esc on a clean form cancels immediately")
+	assert.False(t, clean.armed)
+
+	// Dirty form: a typed value diverges from the empty seed.
+	dirty, _ := newCreateEntry(t, awsSecretCap())
+	dirty.value = "half-typed value"
+
+	// First Esc arms — no cancel, notice shown, stays open.
+	_, cmd = dirty.Update(keyEsc())
+	assert.True(t, dirty.armed, "first esc on a dirty form arms the discard")
+	assert.Equal(t, discardNotice, dirty.notice)
+	assert.False(t, isCanceled(cmd), "first esc on a dirty form does not cancel")
+
+	// Second consecutive Esc discards.
+	_, cmd = dirty.Update(keyEsc())
+	assert.True(t, isCanceled(cmd), "a second consecutive esc discards")
+}
+
+// TestEntryForm_EscArmResetsOnKeystroke pins that any key between the two Escs
+// resets the armed state, so a stray Esc after typing again does not discard.
+func TestEntryForm_EscArmResetsOnKeystroke(t *testing.T) {
+	t.Parallel()
+
+	d, _ := newCreateEntry(t, awsSecretCap())
+	d.value = "half-typed value"
+
+	_, _ = d.Update(keyEsc())
+	require.True(t, d.armed)
+
+	// A keystroke resets the armed state (and clears the discard notice).
+	_, _ = d.Update(keyMsg('x'))
+	assert.False(t, d.armed, "a keystroke resets the armed state")
+	assert.Empty(t, d.notice)
+
+	// So the next single Esc only re-arms, it does not discard.
+	_, cmd := d.Update(keyEsc())
+	assert.True(t, d.armed, "a later single esc re-arms")
+	assert.False(t, isCanceled(cmd), "the re-armed first esc does not discard")
+}
+
+// TestEntryForm_ValueEnterInsertsNewline pins the #791 core: Enter in the Value
+// textarea inserts a newline (does not submit or advance). An edit form focuses
+// the Value field first, so a single Enter lands there.
+func TestEntryForm_ValueEnterInsertsNewline(t *testing.T) {
+	t.Parallel()
+
+	d, _ := newEntry(t, awsSecretCap(), true) // edit: value is the first field
+	m, _ := d.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+	require.Equal(t, "value", focusedFieldKey(d), "the edit form focuses the Value field first")
+
+	m, _ = d.Update(keyEnter())
+	d, ok = m.(*entryForm)
+	require.True(t, ok)
+
+	assert.Contains(t, d.value, "\n", "Enter inserts a newline in the Value textarea")
+	assert.False(t, d.busy, "Enter in Value does not submit")
+}
+
+// TestEntryForm_SingleLineEnterAdvances pins that Enter on a single-line field
+// (name) neither inserts a newline nor submits — it stays huh's advance key.
+func TestEntryForm_SingleLineEnterAdvances(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsSecretCap()}
+	m, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: "secret", Styles: styles.New(), Name: "the-name",
+	})
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+	require.Equal(t, "name", focusedFieldKey(d), "the create form focuses the Name field first")
+
+	m, _ = d.Update(keyEnter())
+	d, ok = m.(*entryForm)
+	require.True(t, ok)
+
+	assert.NotContains(t, d.name, "\n", "Enter on a single-line field inserts no newline")
+	assert.False(t, d.busy, "Enter on a single-line field does not submit")
+	assert.False(t, mut.createCalled, "Enter on a single-line field does not write")
+}
+
+// TestEntryForm_SubmitKeys pins the #791 submit bindings: both ctrl+s (portable)
+// and shift+enter (enhanced-keyboard) submit the form from any field — here the
+// Value textarea, where Enter now inserts a newline instead.
+func TestEntryForm_SubmitKeys(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		key  tea.KeyPressMsg
+	}{
+		{"ctrl+s", keyCtrlS()},
+		{"shift+enter", keyShiftEnter()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			d, mut := newEntry(t, awsSecretCap(), true) // edit, value focused
+			d.value = "some value"
+
+			m, cmd := d.Update(tc.key)
+			d, ok := m.(*entryForm)
+			require.True(t, ok)
+
+			require.NotNil(t, cmd, "the submit key emits the mutation command")
+			assert.True(t, d.busy, "the submit key sets the busy guard")
+
+			_ = cmd() // run the mutation against the recording mutator
+
+			assert.True(t, mut.updateCalled, "the submit key routes through the mutator")
+		})
+	}
+}
+
+// TestEntryForm_CtrlSValidatesRequiredName pins that a forced submit (ctrl+s /
+// shift+enter) still enforces the create name validation huh would show inline:
+// an empty required name blocks the submit with a footer error rather than
+// dead-ending on the provider write.
+func TestEntryForm_CtrlSValidatesRequiredName(t *testing.T) {
+	t.Parallel()
+
+	d, mut := newCreateEntry(t, awsSecretCap())
+	d.value = "some value" // name left empty
+
+	m, _ := d.Update(keyCtrlS())
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+
+	assert.False(t, d.busy, "an empty required name blocks the forced submit")
+	assert.False(t, mut.createCalled, "no write is attempted with an invalid name")
+	assert.Contains(t, d.err, "name is required")
+}
+
 // TestDeleteConfirm_ForceRecoveryGating pins that force/recovery rows appear only
 // for a service with those capabilities, and are mutually exclusive (forcing
 // hides the recovery row).
@@ -852,6 +996,97 @@ func TestTagForm_EmptyTagsHidesRemove(t *testing.T) {
 	assert.Empty(t, mut.tagKey, "no tag write is routed")
 }
 
+// TestTagForm_EscDiscardGuard pins the #790 guard on the tag form: a clean form
+// closes on the first Esc; a form with a typed Add key arms on the first Esc and
+// discards only on the second.
+func TestTagForm_EscDiscardGuard(t *testing.T) {
+	t.Parallel()
+
+	newTag := func() *tagForm {
+		m, _ := NewTagForm(TagInput{
+			Ctx: context.Background(), Mutator: &fakeMutator{svcCap: awsParamCap()},
+			Service: "param", Styles: styles.New(), Name: "/app/X",
+		})
+		d, ok := m.(*tagForm)
+		require.True(t, ok)
+
+		return d
+	}
+
+	// Clean form: the first Esc cancels immediately.
+	clean := newTag()
+	_, cmd := clean.Update(keyEsc())
+	assert.True(t, isCanceled(cmd), "esc on a clean tag form cancels immediately")
+
+	// Dirty form (a typed Add key): first Esc arms, second discards.
+	dirty := newTag()
+	dirty.tagKey = "env"
+
+	_, cmd = dirty.Update(keyEsc())
+	assert.True(t, dirty.armed, "first esc on a dirty tag form arms the discard")
+	assert.Equal(t, discardNotice, dirty.notice)
+	assert.False(t, isCanceled(cmd), "first esc on a dirty tag form does not cancel")
+
+	_, cmd = dirty.Update(keyEsc())
+	assert.True(t, isCanceled(cmd), "a second consecutive esc discards")
+}
+
+// TestTagForm_SubmitKeys pins the #791 submit bindings on the tag form: ctrl+s
+// and shift+enter submit from any field, and a forced submit still enforces the
+// Add key-required validation.
+func TestTagForm_SubmitKeys(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		key  tea.KeyPressMsg
+	}{
+		{"ctrl+s", keyCtrlS()},
+		{"shift+enter", keyShiftEnter()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mut := &fakeMutator{svcCap: awsParamCap()}
+			m, _ := NewTagForm(TagInput{
+				Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+			})
+			d, ok := m.(*tagForm)
+			require.True(t, ok)
+
+			d.tagKey, d.tagValue = "env", "prod"
+
+			m, cmd := d.Update(tc.key)
+			d, ok = m.(*tagForm)
+			require.True(t, ok)
+
+			require.NotNil(t, cmd, "the submit key emits the mutation command")
+			assert.True(t, d.busy)
+
+			_ = cmd()
+
+			assert.True(t, mut.addTagCalled, "the submit key routes through AddTag")
+			assert.Equal(t, "env", mut.tagKey)
+		})
+	}
+
+	// A forced submit with an empty Add key is blocked with a footer error.
+	mut := &fakeMutator{svcCap: awsParamCap()}
+	m, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+	})
+	d, ok := m.(*tagForm)
+	require.True(t, ok)
+
+	m, _ = d.Update(keyCtrlS())
+	d, ok = m.(*tagForm)
+	require.True(t, ok)
+
+	assert.False(t, d.busy, "an empty required key blocks the forced submit")
+	assert.False(t, mut.addTagCalled, "no write is attempted with an empty key")
+	assert.Contains(t, d.err, "key is required")
+}
+
 // TestDeleteConfirm_ResultVoicing pins the delete status voicing, including the
 // auto-unstage case: deleting a staged create removes it (nothing left to
 // delete). The pure voicing is asserted, then routed through onResult to confirm
@@ -990,4 +1225,51 @@ func newDelete(t *testing.T, svcCap capability.ServiceCapability) *deleteConfirm
 // keyMsg builds a printable key press.
 func keyMsg(r rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: r, Text: string(r)}
+}
+
+// keyEnter / keyShiftEnter / keyCtrlS / keyEsc build the newline/submit/discard
+// key presses the #790/#791 guards react to. shift+enter carries ModShift so its
+// String() is "shift+enter" (distinct from a plain Enter), mirroring what an
+// enhanced-keyboard terminal reports.
+func keyEnter() tea.KeyPressMsg      { return tea.KeyPressMsg{Code: tea.KeyEnter} }
+func keyShiftEnter() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift} }
+func keyCtrlS() tea.KeyPressMsg      { return tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl} }
+func keyEsc() tea.KeyPressMsg        { return tea.KeyPressMsg{Code: tea.KeyEscape} }
+
+// focusedFieldKey reports the huh key of the currently focused field.
+func focusedFieldKey(d *entryForm) string {
+	f := d.form.GetFocusedField()
+	if f == nil {
+		return ""
+	}
+
+	return f.GetKey()
+}
+
+// newCreateEntry builds a create form with no seeded fields, so it starts clean
+// (every field empty) for the discard-guard tests.
+func newCreateEntry(t *testing.T, svcCap capability.ServiceCapability) (*entryForm, *fakeMutator) {
+	t.Helper()
+
+	mut := &fakeMutator{svcCap: svcCap}
+
+	m, _ := NewEntryForm(EntryFormInput{
+		Ctx: context.Background(), Mutator: mut, Service: svcCap.Service, Styles: styles.New(),
+	})
+
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+
+	return d, mut
+}
+
+// isCanceled reports whether running cmd yields a CanceledMsg (a nil cmd is not).
+func isCanceled(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+
+	_, ok := cmd().(CanceledMsg)
+
+	return ok
 }
