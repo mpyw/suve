@@ -22,6 +22,61 @@ func TestApp_Capabilities_DelegatesToCapabilityPackage(t *testing.T) {
 	assert.Equal(t, capability.All(), (&App{}).Capabilities())
 }
 
+// findService returns the ServiceCapability for (provider, service) from the
+// capability descriptor, failing the test when absent. (The capability matrix
+// now lives in internal/capability; this small lookup helper is kept local to
+// the HasDescription gating test below.)
+func findService(t *testing.T, caps []ProviderCapability, prov, service string) ServiceCapability {
+	t.Helper()
+
+	for _, p := range caps {
+		if p.Provider != prov {
+			continue
+		}
+
+		for _, s := range p.Services {
+			if s.Service == service {
+				return s
+			}
+		}
+	}
+
+	t.Fatalf("no capability for provider %q service %q", prov, service)
+
+	return ServiceCapability{}
+}
+
+// TestApp_Capabilities_HasDescription pins the HasDescription capability that
+// gates the create/edit Description input (#767): AWS Param + Secret and Google
+// Cloud Secret persist a description; Azure App Configuration and Key Vault
+// ignore it, so their inputs stay hidden.
+func TestApp_Capabilities_HasDescription(t *testing.T) {
+	t.Parallel()
+
+	caps := (&App{}).Capabilities()
+
+	tests := []struct {
+		provider       string
+		service        string
+		hasDescription bool
+	}{
+		{string(provider.ProviderAWS), "param", true},
+		{string(provider.ProviderAWS), "secret", true},
+		{string(provider.ProviderGoogleCloud), "secret", true},
+		{string(provider.ProviderAzure), "param", false},
+		{string(provider.ProviderAzure), "secret", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.provider+"/"+tt.service, func(t *testing.T) {
+			t.Parallel()
+
+			svc := findService(t, caps, tt.provider, tt.service)
+			assert.Equal(t, tt.hasDescription, svc.HasDescription, "HasDescription")
+		})
+	}
+}
+
 func TestApp_ParamTypeOptions_ScopeAware(t *testing.T) {
 	t.Parallel()
 

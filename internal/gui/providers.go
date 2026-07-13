@@ -93,8 +93,19 @@ func providerStrings(ps []provider.Provider) []string {
 // capability namespace in the generated TypeScript, forcing an update of every
 // frontend ref (gui.ProviderCapability / gui.ServiceCapability) for no runtime
 // gain — so the bindings are intentionally kept under gui and not regenerated for
-// this refactor.
+// this refactor. capability.ServiceCapability already carries HasDescription, so
+// the #767 Description-input gating works through the alias.
 type ServiceCapability = capability.ServiceCapability
+
+// descriptionSupported reports whether the current provider persists a
+// create/update description. It is the server-side backstop for the capability-
+// gated Description input: AWS (Param + Secret) and Google Cloud (Secret) honor
+// it; Azure App Configuration and Key Vault writers ignore it, so the binding
+// drops any description a stale/forged frontend might send (defense in depth,
+// #767). Mirrors ServiceCapability.HasDescription.
+func (a *App) descriptionSupported() bool {
+	return a.currentScope().Provider != provider.ProviderAzure
+}
 
 // ProviderCapability — see ServiceCapability above.
 type ProviderCapability = capability.ProviderCapability

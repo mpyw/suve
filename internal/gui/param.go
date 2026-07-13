@@ -331,10 +331,22 @@ func (a *App) ParamDiff(spec1Str, spec2Str, namespace string) (*ParamDiffResult,
 // other provider. It must name a single concrete namespace — a filter value
 // (`*` or a `,`-list) is rejected, since a write targets exactly one
 // (key, namespace).
-func (a *App) ParamSet(name, value, paramType, namespace string) (*ParamSetResult, error) {
+//
+// description is a human-readable description persisted by providers that
+// support it (AWS Param). An empty description preserves the existing one on
+// update (a no-op), matching the CLI/adapter contract. Providers without the
+// capability (Azure App Configuration) drop it server-side (#767).
+func (a *App) ParamSet(name, value, paramType, namespace, description string) (*ParamSetResult, error) {
 	namespace, err := a.validateParamNamespace(namespace)
 	if err != nil {
 		return nil, err
+	}
+
+	// Defense in depth: only honor a description where the provider persists it.
+	// The frontend hides the input for Azure, but drop it here too so a stale or
+	// forged call cannot smuggle one past the capability gate.
+	if !a.descriptionSupported() {
+		description = ""
 	}
 
 	store, err := a.paramStoreForNamespace(namespace)
@@ -348,9 +360,10 @@ func (a *App) ParamSet(name, value, paramType, namespace string) (*ParamSetResul
 	createUC := &param.CreateUseCase{Writer: store}
 
 	createResult, err := createUC.Execute(a.ctx, param.CreateInput{
-		Name:  name,
-		Value: value,
-		Type:  valueType,
+		Name:        name,
+		Value:       value,
+		Type:        valueType,
+		Description: description,
 	})
 	if err == nil {
 		return &ParamSetResult{
@@ -367,9 +380,10 @@ func (a *App) ParamSet(name, value, paramType, namespace string) (*ParamSetResul
 	updateUC := &param.UpdateUseCase{Store: store}
 
 	updateResult, err := updateUC.Execute(a.ctx, param.UpdateInput{
-		Name:  name,
-		Value: value,
-		Type:  valueType,
+		Name:        name,
+		Value:       value,
+		Type:        valueType,
+		Description: description,
 	})
 	if err != nil {
 		return nil, err
