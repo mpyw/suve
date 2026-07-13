@@ -777,21 +777,35 @@ func TestEntryForm_NameValidatorRequired(t *testing.T) {
 	require.NoError(t, d.nameValidator()("/app/X"), "a non-empty name passes")
 }
 
-// TestFormKeyMap_ValueDoneBindings pins the Value textarea's key contract: Enter
-// inserts a newline (so it cannot double as next/submit), while ctrl+s ("done")
-// confirms the value — advancing to the next field (Next) and, on the last field,
-// completing the form (Submit). This is what stops ctrl+s from skipping the field
-// below the value (e.g. Description).
-func TestFormKeyMap_ValueDoneBindings(t *testing.T) {
+// TestEntryFormTheme_OKButtonInvertsOnFocus pins that the "[ OK ]" button is
+// reverse-video only while focused: huh's single-affirmative Confirm always renders
+// the affirmative with the group's FocusedButton, so the focus cue must live in the
+// focused-vs-blurred button styles. Reverse (no hard-coded colors) reads in both
+// light and dark terminals.
+func TestEntryFormTheme_OKButtonInvertsOnFocus(t *testing.T) {
+	t.Parallel()
+
+	for _, dark := range []bool{true, false} {
+		s := entryFormTheme().Theme(dark)
+		assert.True(t, s.Focused.FocusedButton.GetReverse(), "the focused OK button inverts (dark=%v)", dark)
+		assert.False(t, s.Blurred.FocusedButton.GetReverse(), "the blurred OK button is plain (dark=%v)", dark)
+	}
+}
+
+// TestFormKeyMap_MultilineBindings pins the multi-line field key contract: Enter
+// inserts a newline (never next/submit), Tab advances to the next field, and the
+// field never submits on its own — the form is completed from the "[ OK ]" button,
+// so a multi-line field is never the last field and its Submit is disabled.
+func TestFormKeyMap_MultilineBindings(t *testing.T) {
 	t.Parallel()
 
 	km := formKeyMap()
-	ctrlS := tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
+	tab := tea.KeyPressMsg{Code: tea.KeyTab}
 
 	assert.True(t, key.Matches(keyEnter(), km.Text.NewLine), "enter inserts a newline")
-	assert.False(t, key.Matches(keyEnter(), km.Text.Submit), "enter never submits the textarea")
-	assert.True(t, key.Matches(ctrlS, km.Text.Next), "ctrl+s advances to the next field")
-	assert.True(t, key.Matches(ctrlS, km.Text.Submit), "ctrl+s completes the form from the last field")
+	assert.True(t, key.Matches(tab, km.Text.Next), "tab advances to the next field")
+	assert.False(t, key.Matches(keyEnter(), km.Text.Next), "enter does not advance (it inserts a newline)")
+	assert.False(t, key.Matches(keyEnter(), km.Text.Submit), "a multi-line field never submits on enter")
 }
 
 // TestDeleteConfirm_ForceRecoveryGating pins that force/recovery rows appear only
@@ -1011,9 +1025,10 @@ func TestTagForm_RemoveConstrainedToExistingTags(t *testing.T) {
 }
 
 // TestTagForm_StagedOnlyIsAddOnly pins the staged-only surface (the staging
-// review page) is Add-only: it never has the remote tag set to constrain a
-// Remove, so it offers no Remove action rather than a guaranteed empty-state
-// dead-end. Removing a remote tag is done from the browser.
+// review page) is Add-only: it never has the remote tag set to constrain a Remove,
+// so with only one possible action the Action select is dropped entirely — the form
+// opens straight on the Key field (no inert one-option select that still demands an
+// Enter). Removing a remote tag is done from the browser.
 func TestTagForm_StagedOnlyIsAddOnly(t *testing.T) {
 	t.Parallel()
 
@@ -1026,16 +1041,21 @@ func TestTagForm_StagedOnlyIsAddOnly(t *testing.T) {
 	require.True(t, ok)
 
 	view := stripANSI(d.View())
-	assert.Contains(t, view, "Add tag", "the staged-only tag form offers Add")
+	assert.NotContains(t, view, "Action", "a single-action tag form drops the Action select")
 	assert.NotContains(t, view, "Remove tag", "the staged-only tag form offers no Remove action")
+	assert.Contains(t, view, "Key", "the form opens straight on the Key field")
+	assert.False(t, d.remove, "a staged-only tag write is always an Add")
 
-	// A browser launch (not staged-only) with removable tags still offers Remove.
+	// A browser launch (not staged-only) with removable tags keeps the Action
+	// select and can toggle to Remove.
 	bm, _ := NewTagForm(TagInput{
 		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
 		Tags: []data.Tag{{Key: "env", Value: "prod"}},
 	})
 	b, ok := bm.(*tagForm)
 	require.True(t, ok)
+
+	assert.Contains(t, stripANSI(b.View()), "Action", "a genuine Add/Remove choice keeps the Action select")
 
 	_, _ = b.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	assert.True(t, b.remove, "a browser launch with tags can toggle to Remove")

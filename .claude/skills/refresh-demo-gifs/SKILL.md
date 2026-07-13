@@ -1,13 +1,15 @@
 ---
 name: refresh-demo-gifs
-description: Use when re-recording the CLI or GUI demo GIFs after a UI change or a user-visible CLI output change. Covers the record scripts, robust Playwright selectors, output-drift triggers, frame verification, and Git LFS.
+description: Use when re-recording the CLI, TUI, or GUI demo GIFs after a UI change or a user-visible output change. Covers the record scripts, robust Playwright selectors, output-drift triggers, frame verification, and Git LFS.
 ---
 
 # Refreshing the demo GIFs
 
-Two demos are recorded and committed as GIFs (PRs #619, #618, #61):
+The demos are recorded and committed as GIFs (PRs #619, #618, #61):
 
 - **CLI demo**: `demo/cli-demo.tape` recorded via `./demo/cli-record.sh` (vhs).
+- **TUI demo**: `demo/tui-demo.tape` recorded via `./demo/tui-record.sh` (vhs, same
+  terminal-recording path as the CLI demo — the TUI is pure Go, no browser).
 - **GUI demo**: `demo/gui-demo.spec.ts` recorded via `./demo/gui-record.sh`
   (Playwright-driven).
 
