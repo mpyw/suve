@@ -1,5 +1,6 @@
 <script lang="ts">
   import { computeInlineDiff } from './diff-utils';
+  import { maskValue } from './viewUtils';
 
   interface Props {
     oldValue: string;
@@ -8,12 +9,50 @@
     newLabel?: string;
     oldSubLabel?: string;
     newSubLabel?: string;
+    // secret marks BOTH sides as secret material. A Compare/diff view is a
+    // surface the user explicitly opened to inspect the change, so a secret diff
+    // is REVEALED by default (#702/#735); the Hide/Show toggle masks it. Use
+    // oldSecret/newSecret to mark only one side (e.g. a delete whose staged side
+    // is the literal "(deleted)" sentinel, not secret material).
+    secret?: boolean;
+    oldSecret?: boolean;
+    newSecret?: boolean;
   }
 
-  let { oldValue, newValue, oldLabel = 'Old', newLabel = 'New', oldSubLabel = '', newSubLabel = '' }: Props = $props();
+  let {
+    oldValue,
+    newValue,
+    oldLabel = 'Old',
+    newLabel = 'New',
+    oldSubLabel = '',
+    newSubLabel = '',
+    secret = false,
+    oldSecret = secret,
+    newSecret = secret,
+  }: Props = $props();
 
-  let diff = $derived(computeInlineDiff(oldValue, newValue));
+  // Explicit diff surfaces reveal by default; the toggle hides again.
+  let revealed = $state(true);
+  let anySecret = $derived(oldSecret || newSecret);
+
+  let displayOld = $derived(oldSecret && !revealed ? maskValue(oldValue) : oldValue);
+  let displayNew = $derived(newSecret && !revealed ? maskValue(newValue) : newValue);
+  let diff = $derived(computeInlineDiff(displayOld, displayNew));
 </script>
+
+{#if anySecret}
+  <div class="diff-mask-toggle">
+    <button
+      type="button"
+      class="btn-mask-toggle"
+      class:active={!revealed}
+      title={revealed ? 'Hide secret values' : 'Show secret values'}
+      onclick={() => (revealed = !revealed)}
+    >
+      {revealed ? 'Hide' : 'Show'}
+    </button>
+  </div>
+{/if}
 
 <div class="diff-container">
   <div class="diff-side">
@@ -37,6 +76,31 @@
 </div>
 
 <style>
+  .diff-mask-toggle {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+
+  .btn-mask-toggle {
+    padding: 4px 10px;
+    font-size: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: transparent;
+    color: #ccc;
+    cursor: pointer;
+  }
+
+  .btn-mask-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-mask-toggle.active {
+    border-color: #4a9eff;
+    color: #4a9eff;
+  }
+
   .diff-container {
     display: flex;
     gap: 16px;

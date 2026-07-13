@@ -811,6 +811,7 @@
     <DiffDisplay
       oldValue={diffResult.oldValue}
       newValue={diffResult.newValue}
+      secret={diffResult.secret}
       oldLabel="Old"
       newLabel="New"
       oldSubLabel={`v${diffMode.selectedVersions[0]}`}

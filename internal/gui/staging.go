@@ -167,6 +167,11 @@ type StagingDiffEntry struct {
 	StagedValue      string  `json:"stagedValue,omitempty"`
 	Description      *string `json:"description,omitempty"`
 	Warning          string  `json:"warning,omitempty"`
+	// Secret reports whether this entry's values are secret material (a
+	// SecureString param, or any secret-service entry) so the staging review
+	// masks them instead of rendering cleartext. Mirrors the TUI's per-row flag
+	// (staging/view.go); threaded from stagingusecase.DiffEntry.Secret (#715).
+	Secret bool `json:"secret"`
 }
 
 // StagingDiffTagEntry represents a single diff tag entry.
@@ -829,6 +834,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 			StagedValue:      e.StagedValue,
 			Description:      e.Description,
 			Warning:          e.Warning,
+			Secret:           e.Secret,
 		}
 	})
 
