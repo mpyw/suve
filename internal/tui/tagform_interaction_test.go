@@ -150,10 +150,12 @@ func TestTUI_TagEmptyNeverOffersRemove(t *testing.T) {
 	assert.False(t, add, "no tag write is submitted without a key")
 
 	// The dead-end note is never rendered, and the action never reaches Remove.
+	// Match against the vt-rendered screen (not the raw stream) so a marker split
+	// across incremental cell-updates cannot make a negative assertion pass falsely.
 	var buf bytes.Buffer
 
 	_, _ = io.Copy(&buf, tm.Output())
-	out := buf.String()
+	out := renderVisibleScreenSize(t, buf.Bytes(), waitRenderWidth, waitRenderHeight)
 	assert.NotContains(t, out, "(no tags to remove)", "the dead-end note is never shown")
 	assert.NotContains(t, out, "Remove tag", "the action toggle never reaches Remove")
 

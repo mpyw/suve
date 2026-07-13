@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -376,25 +377,41 @@ func settledAppScreen(t *testing.T, tm *teatest.TestModel) string {
 	return renderVisibleScreenSize(t, []byte(app.View().Content), browserTermWidth, browserTermHeight)
 }
 
-// waitFor drains the live output until marker appears (or the deadline). It only
-// gates on the async load having rendered; the golden is taken from the settled
-// FinalModel, not from this stream.
+// waitRenderWidth/waitRenderHeight size the emulator waitFor renders into. They
+// are deliberately larger than any test's real terminal (browser 120×34, dialogs
+// 100×30) so replaying a stream drawn for the smaller size never re-wraps a marker
+// across lines — content is placed at the columns it was drawn to, and the extra
+// blank columns/rows are trimmed. The golden itself is still captured at the real
+// size from the settled model.
+const (
+	waitRenderWidth  = 240
+	waitRenderHeight = 80
+)
+
+// waitFor drains the live output until marker appears in the RENDERED visible
+// screen (or the deadline). It matches against the vt-rendered screen — not the
+// raw output stream — because CI negotiates incremental cell-updates that can split
+// a marker across cursor-positioned writes (e.g. a redraw that keeps a shared
+// "Apply " prefix and rewrites only "results"), so a raw bytes.Contains misses text
+// the user plainly sees. Rendering through the same emulator the goldens use
+// rejoins the cells. It only gates on the async load having rendered; the golden is
+// taken from the settled FinalModel, not from this stream.
 func waitFor(t *testing.T, tm *teatest.TestModel, marker string) {
 	t.Helper()
 
 	var buf bytes.Buffer
 
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		_, _ = io.Copy(&buf, tm.Output())
-		if bytes.Contains(buf.Bytes(), []byte(marker)) {
+		if buf.Len() > 0 && strings.Contains(renderVisibleScreenSize(t, buf.Bytes(), waitRenderWidth, waitRenderHeight), marker) {
 			return
 		}
 
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	require.Contains(t, buf.String(), marker, "content never rendered")
+	require.Contains(t, renderVisibleScreenSize(t, buf.Bytes(), waitRenderWidth, waitRenderHeight), marker, "content never rendered")
 }
 
 // TestStaging_ApplyConfirmGolden renders the apply confirmation dialog (target
