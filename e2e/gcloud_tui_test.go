@@ -113,9 +113,13 @@ func TestGoogleCloudTUI_SecretBrowse(t *testing.T) {
 	tm := teatest.NewTestModel(t, newGoogleCloudTUIModel(t),
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 
-	// Gate on the async list landing, then explicitly reveal the value with `x`.
+	// Gate on the async list landing, then explicitly reveal the value with `x`
+	// and wait for the async fetch+reveal to render the value before capturing —
+	// the reveal triggers a fresh emulator read, so gating on the list alone
+	// would race the masked → revealed transition.
 	waitForScreen(t, tm, alphaName)
 	tm.Send(keyRune('x'))
+	waitForScreen(t, tm, alphaValue)
 
 	screen := finalScreen(t, tm)
 
@@ -179,6 +183,10 @@ func TestGoogleCloudTUI_SecretHistory(t *testing.T) {
 			teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 		waitForScreen(t, tm, "current")
 		tm.Send(keyRune('x'))
+		// Wait for the reveal's async fetch to render the deepest (oldest) history
+		// value: v1 rendering proves the whole reveal — current value plus every
+		// history row — landed before we capture, not just the list/detail frame.
+		waitForScreen(t, tm, v1Val)
 
 		return finalScreen(t, tm)
 	}()
