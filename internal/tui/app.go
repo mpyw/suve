@@ -244,6 +244,10 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// Give the help bar the terminal width so it can self-truncate its short
+		// help with an ellipsis rather than overflowing once a page contributes
+		// its own bindings (the latent overflow the static, width-less help had).
+		m.help.SetWidth(msg.Width)
 
 		return m, m.forwardResize(msg)
 	case awsIdentityMsg:
@@ -1088,8 +1092,73 @@ func clipStatus(s string, width int) string {
 }
 
 // helpView renders the bottom help bar (short by default, full when toggled).
+// It composes the active page's context-aware bindings with the global shell
+// keys, so the bar shows what the current page/context actually does — not just
+// the shell-global tab/help/quit — which is the adaptive discoverability the
+// static, global-only bar lacked (#681).
 func (m *App) helpView() string {
-	return m.styles.HelpBar.Render(" " + m.help.View(m.keys))
+	return m.styles.HelpBar.Render(" " + m.help.View(m.helpKeyMap()))
+}
+
+// helpKeyMap builds the help bar's key map: the active page's PageKeyMap (when
+// it supplies one) layered ahead of the shell keys.
+func (m *App) helpKeyMap() help.KeyMap {
+	return composedHelp{page: m.activePageHelp(), shell: m.keys}
+}
+
+// activePageHelp returns the active page's context-aware PageKeyMap, or nil when
+// the page supplies none (the placeholder falls back to shell-only help).
+func (m *App) activePageHelp() keys.PageKeyMap {
+	if h, ok := m.activePage().(helpMapper); ok {
+		return h.HelpKeyMap()
+	}
+
+	return nil
+}
+
+// helpMapper is implemented by a page that supplies a context-aware PageKeyMap
+// for the adaptive help bar. Checked with a type assertion (like copyable) so a
+// page without one — the placeholder — cleanly falls back to shell-only help.
+type helpMapper interface {
+	HelpKeyMap() keys.PageKeyMap
+}
+
+// composedHelp is the help bar's key map: the active page's bindings first, then
+// the always-present shell bindings (tab/help/quit). page may be nil, leaving
+// just the shell keys.
+type composedHelp struct {
+	page  keys.PageKeyMap
+	shell keys.Map
+}
+
+// ShortHelp lists the page's short bindings followed by the shell's.
+func (c composedHelp) ShortHelp() []key.Binding {
+	shell := c.shell.ShortHelp()
+	if c.page == nil {
+		return shell
+	}
+
+	page := c.page.ShortHelp()
+	out := make([]key.Binding, 0, len(page)+len(shell))
+	out = append(out, page...)
+	out = append(out, shell...)
+
+	return out
+}
+
+// FullHelp lists the page's full-help columns followed by the shell column.
+func (c composedHelp) FullHelp() [][]key.Binding {
+	shell := c.shell.FullHelp()
+	if c.page == nil {
+		return shell
+	}
+
+	page := c.page.FullHelp()
+	out := make([][]key.Binding, 0, len(page)+len(shell))
+	out = append(out, page...)
+	out = append(out, shell...)
+
+	return out
 }
 
 // overlayDialogs draws each dialog as a centered lipgloss v2 layer over the page

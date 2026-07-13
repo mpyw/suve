@@ -31,4 +31,4 @@ prefix: —   filter: —   values:off  recursive:on  ⟳
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 ╰────────────────────────────────────────────╯╰────────────────────────────────────────────────────────────────────────╯
- tab next tab • 1/2/3 jump to tab • ? help • q quit
+ ↑/↓ move • esc list • c compare • tab next tab • 1/2/3 jump to tab • ? help • q quit

@@ -84,6 +84,20 @@ var (
 	deleteKey  = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete"))
 	tagKey     = key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tag"))
 	restoreKey = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "restore"))
+
+	// Help-only bindings: they carry no new keys the reducer dispatches on (the
+	// real movement/enter/esc live in the global keys.Map), but give the help bar
+	// context-appropriate labels — "↑/↓ move" over the raw up/down entries, and an
+	// enter/esc whose label reflects the focused pane (history vs list vs a
+	// focused filter field).
+	moveKey     = key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("↑/↓", "move"))
+	historyKey  = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "history"))
+	diffPickKey = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "diff"))
+	backListKey = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "list"))
+	// applyInputKey advertises committing a focused prefix/filter field. Enter and
+	// esc are identical here (both blur the field and reload — handleInputKey), so
+	// the help shows one honest "apply" binding rather than a false esc="cancel".
+	applyInputKey = key.NewBinding(key.WithKeys("enter", "esc"), key.WithHelp("enter/esc", "apply"))
 )
 
 // Model is the browser page.

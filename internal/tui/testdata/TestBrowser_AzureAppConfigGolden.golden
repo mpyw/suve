@@ -31,4 +31,4 @@ ns: (NULL)   prefix: —   filter: —   values:off  ⟳
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 ╰────────────────────────────────────────────╯╰────────────────────────────────────────────────────────────────────────╯
- tab next tab • 1/2/3 jump to tab • ? help • q quit
+ ↑/↓ move • / filter • e edit • n new • tab next tab • 1/2/3 jump to tab • ? help • q quit

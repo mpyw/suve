@@ -133,3 +133,36 @@ func TestParamDiffShownAndParseJSONToggle(t *testing.T) {
 	assert.Contains(t, after, `"a": 2`, "parse-json expands the new value")
 	assert.NotContains(t, after, `{"a":1}`, "the compact form is gone after formatting")
 }
+
+// diffShortDescs flattens the diff page's short-help descriptions.
+func diffShortDescs(m *Model) []string {
+	km := m.HelpKeyMap()
+	descs := make([]string, 0, len(km.ShortHelp()))
+
+	for _, b := range km.ShortHelp() {
+		descs = append(descs, b.Help().Desc)
+	}
+
+	return descs
+}
+
+// TestHelpKeyMap_MaskGatedOnSecret pins that the diff page's help advertises the
+// `x` hide/show toggle only on a loaded secret diff — it is a no-op on a
+// non-secret diff, so it must not appear there.
+func TestHelpKeyMap_MaskGatedOnSecret(t *testing.T) {
+	t.Parallel()
+
+	nonSecret := newDiff(t)
+	nonSecret, _ = nonSecret.Update(loadedMsg{content: data.DiffContent{
+		OldLabel: "a#1", NewLabel: "a#2", OldValue: "1", NewValue: "2", Secret: false,
+	}})
+	assert.NotContains(t, diffShortDescs(nonSecret), "hide/show", "a non-secret diff has no mask toggle")
+	assert.Contains(t, diffShortDescs(nonSecret), "parse-json", "parse-json is always available")
+	assert.Contains(t, diffShortDescs(nonSecret), "back", "esc back is always available")
+
+	secret := newDiff(t)
+	secret, _ = secret.Update(loadedMsg{content: data.DiffContent{
+		OldLabel: "s#1", NewLabel: "s#2", OldValue: "a", NewValue: "b", Secret: true,
+	}})
+	assert.Contains(t, diffShortDescs(secret), "hide/show", "a secret diff advertises the mask toggle")
+}

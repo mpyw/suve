@@ -25,10 +25,10 @@ prefix: —   filter: —   values:off  ⟳
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
 ╰────────────────────────────────────────────╯╰────────────────────────────────────────────────────────────────────────╯
- ↑/↓ move • / filter • e edit • n new • enter history • tab next tab • 1/2/3 jump to tab • ? help • q quit
+ ↑/↓   move              p prefix               n new        c compare    tab       next tab
+enter history           / filter               e edit                    shift+tab prev tab
+esc   back              v values               d delete                  1/2/3     jump to tab
+space pick/namespace    r recursive/refresh    t tag                     ?         help
+                        x reveal               R restore                 q         quit
+                        J parse-json           y copy

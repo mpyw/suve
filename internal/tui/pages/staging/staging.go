@@ -55,6 +55,14 @@ var (
 	applyAllKey = key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "apply-all"))
 	resetAllKey = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reset-all"))
 	refreshKey  = key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "refresh"))
+
+	// Help-only bindings for the adaptive help bar. hideKey is the diff-view label
+	// for `x` (which hides a revealed diff there, versus revealing a masked value
+	// in value view — see onReveal); moveKey/detailKey give the bar the movement
+	// and enter labels the raw global up/down/enter would not.
+	hideKey   = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "hide"))
+	moveKey   = key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("↑/↓", "move"))
+	detailKey = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "detail"))
 )
 
 // section is one service's staged review plus its load/error state.
