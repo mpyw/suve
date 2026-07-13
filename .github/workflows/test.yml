@@ -262,7 +262,7 @@ jobs:
       - name: Run Azure e2e tests with coverage
         run: |
           COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
-          go test -v -race -tags e2e -run 'TestAzureAppConfig|TestAzureKeyVault' -coverprofile=coverage-e2e-azure.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
+          go test -v -race -tags e2e -run '^TestAzure(AppConfig|KeyVault)' -coverprofile=coverage-e2e-azure.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
         env:
           SUVE_AZURE_APPCONFIG_CONNECTION_STRING: "Endpoint=http://localhost:8080;Id=abcd;Secret=c2VjcmV0"
           SUVE_AZURE_KEYVAULT_ENDPOINT: "https://localhost:8443"
@@ -273,6 +273,67 @@ jobs:
           files: ./coverage-e2e-azure.txt
           flags: e2e
           name: codecov-suve-e2e-azure
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+  e2e-azure-tui:
+    # TUI e2e: drives the real TUI App (teatest) against BOTH Azure emulators,
+    # exercising the browse → stage → apply loop over the real data path.
+    # Separate from e2e-azure (which filters `^TestAzure(AppConfig|KeyVault)`)
+    # because the TUI tests use the `^TestTUIAzure` prefix and MUST run against a
+    # fresh emulator pair: sharing one pair with the CLI Azure suite lets its
+    # leftover settings contaminate the namespace-partitioning assertions here.
+    # This job runs exactly those tests and uploads coverage.
+    name: E2E Test (Azure TUI)
+    runs-on: ubuntu-latest
+    services:
+      # Azure App Configuration emulator (HTTP :8080, HMAC over plain HTTP),
+      # offline. A fork of tnc1997/azure-app-configuration-emulator patched to
+      # interoperate with the official Azure SDKs.
+      # https://github.com/mpyw/azure-app-configuration-emulator
+      azure-appconfig:
+        image: ghcr.io/mpyw/azure-app-configuration-emulator:latest
+        ports:
+          - 8080:8080
+        env:
+          ASPNETCORE_HTTP_PORTS: 8080
+      # Azure Key Vault emulator (lowkey-vault, HTTPS :8443, self-signed cert,
+      # auth present-but-ignored), offline.
+      azure-keyvault:
+        image: nagyesta/lowkey-vault:7.3.0
+        ports:
+          - 8443:8443
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
+        with:
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for the App Configuration emulator
+        run: timeout 60 bash -c 'until (echo > /dev/tcp/localhost/8080) 2>/dev/null; do sleep 1; done'
+
+      - name: Wait for the Key Vault emulator
+        run: timeout 60 bash -c 'until curl -sk -o /dev/null https://localhost:8443/ping; do sleep 1; done'
+
+      - name: Run Azure TUI e2e tests with coverage
+        run: |
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          go test -v -race -tags e2e -run '^TestTUIAzure' -coverprofile=coverage-e2e-azure-tui.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
+        env:
+          SUVE_AZURE_APPCONFIG_CONNECTION_STRING: "Endpoint=http://localhost:8080;Id=abcd;Secret=c2VjcmV0"
+          SUVE_AZURE_KEYVAULT_ENDPOINT: "https://localhost:8443"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: ./coverage-e2e-azure-tui.txt
+          flags: e2e
+          name: codecov-suve-e2e-azure-tui
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
