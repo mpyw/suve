@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"testing"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,11 +18,13 @@ func withHooks(t *testing.T, fn func()) {
 	origLookup := lookupEnvFunc
 	origGet := keyringGetFunc
 	origSet := keyringSetFunc
+	origRand := randReader
 
 	t.Cleanup(func() {
 		lookupEnvFunc = origLookup
 		keyringGetFunc = origGet
 		keyringSetFunc = origSet
+		randReader = origRand
 	})
 
 	fn()
@@ -213,4 +216,55 @@ func TestResolve_CorruptStoredKey_Surfaced(t *testing.T) {
 		var kcErr *KeychainUnavailableError
 		require.ErrorAs(t, err, &kcErr)
 	})
+}
+
+// TestResolve_StoredKeyWrongLength_Surfaced: a stored key that decodes cleanly
+// but is not exactly 32 bytes is a hard error, never a silent plaintext
+// downgrade — a wrong-length key could not decrypt existing working state.
+//
+//nolint:paralleltest // overrides package-level hook vars.
+func TestResolve_StoredKeyWrongLength_Surfaced(t *testing.T) {
+	withHooks(t, func() {
+		lookupEnvFunc = func(string) (string, bool) { return "", false }
+		// Valid base64 that decodes to 31 bytes, one short of keyLen.
+		keyringGetFunc = func(string, string) (string, error) {
+			return base64.StdEncoding.EncodeToString(make([]byte, keyLen-1)), nil
+		}
+
+		_, _, _, err := Resolve()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "wrong length")
+
+		var kcErr *KeychainUnavailableError
+		require.ErrorAs(t, err, &kcErr)
+	})
+}
+
+// TestMint_RandReaderError: a failure of the random source surfaces from Mint
+// as an error rather than producing a short or predictable key.
+//
+//nolint:paralleltest // overrides package-level hook vars.
+func TestMint_RandReaderError(t *testing.T) {
+	withHooks(t, func() {
+		randReader = iotest.ErrReader(errors.New("random source unavailable"))
+
+		_, err := Mint()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to generate data key")
+	})
+}
+
+// TestKeychainUnavailableError_UnwrapAndError verifies the wrapped cause is
+// retrievable via errors.Unwrap/errors.Is and that Error names both the
+// wrapper and the underlying cause.
+func TestKeychainUnavailableError_UnwrapAndError(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("dbus unreachable")
+	err := &KeychainUnavailableError{Err: cause}
+
+	assert.Equal(t, cause, err.Unwrap())
+	require.ErrorIs(t, err, cause)
+	assert.Contains(t, err.Error(), "OS keychain unavailable")
+	assert.Contains(t, err.Error(), "dbus unreachable")
 }

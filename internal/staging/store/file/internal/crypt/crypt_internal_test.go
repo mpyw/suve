@@ -189,6 +189,72 @@ func TestDecrypt_GCMError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to create GCM")
 }
 
+//nolint:paralleltest // Test modifies global randReader and newCipherFunc state.
+func TestEncryptWithKey_CipherError(t *testing.T) {
+	// Save originals and restore after test
+	originalRand := randReader
+	originalCipher := newCipherFunc
+
+	defer func() {
+		randReader = originalRand
+		newCipherFunc = originalCipher
+	}()
+
+	// Use real random for the nonce so the failure is attributable to the cipher.
+	randReader = rand.Reader
+
+	// Inject cipher error
+	newCipherFunc = func(_ []byte) (cipher.Block, error) {
+		return nil, errors.New("cipher creation failed")
+	}
+
+	_, err := EncryptWithKey([]byte("test data"), make([]byte, RawKeyLen))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create cipher")
+}
+
+//nolint:paralleltest // Test modifies global randReader state.
+func TestEncryptWithKey_NonceError(t *testing.T) {
+	// Save original and restore after test
+	original := randReader
+
+	defer func() { randReader = original }()
+
+	// Inject an error reader that fails immediately (no salt is read in the
+	// raw-key path, so the first read is the nonce).
+	randReader = &errorReader{
+		bytesToRead: 0,
+		err:         errors.New("random source unavailable"),
+	}
+
+	_, err := EncryptWithKey([]byte("test data"), make([]byte, RawKeyLen))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to generate nonce")
+}
+
+//nolint:paralleltest // Test modifies global newCipherFunc state.
+func TestDecryptWithKey_CipherError(t *testing.T) {
+	// First encrypt some data normally with a valid key.
+	key := make([]byte, RawKeyLen)
+
+	encrypted, err := EncryptWithKey([]byte("test data"), key)
+	require.NoError(t, err)
+
+	// Save original and restore after test
+	originalCipher := newCipherFunc
+
+	defer func() { newCipherFunc = originalCipher }()
+
+	// Inject cipher error
+	newCipherFunc = func(_ []byte) (cipher.Block, error) {
+		return nil, errors.New("cipher creation failed")
+	}
+
+	_, err = DecryptWithKey(encrypted, key)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create cipher")
+}
+
 //nolint:paralleltest // Test modifies global newCipherFunc and newGCMFunc state.
 func TestSetCipherFuncs_AndReset(t *testing.T) {
 	// Test that SetCipherFuncs and ResetCipherFuncs work correctly

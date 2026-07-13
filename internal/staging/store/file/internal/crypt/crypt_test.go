@@ -304,6 +304,19 @@ func TestDecryptWithKey_InvalidKeyLength(t *testing.T) {
 	assert.ErrorIs(t, err, crypt.ErrInvalidKeyLength)
 }
 
+func TestDecryptWithKey_TruncatedData(t *testing.T) {
+	t.Parallel()
+
+	// A valid raw-key (v2) header followed by fewer than the minimum
+	// nonce(12) + authTag(16) trailing bytes must be rejected as ErrInvalidFormat
+	// before any decryption is attempted.
+	data := append([]byte(crypt.MagicHeader), crypt.VersionRawKey)
+	data = append(data, make([]byte, 5)...) // far below header + nonce + tag
+
+	_, err := crypt.DecryptWithKey(data, make([]byte, crypt.RawKeyLen))
+	assert.ErrorIs(t, err, crypt.ErrInvalidFormat)
+}
+
 func TestDecryptWithKey_WrongKey(t *testing.T) {
 	t.Parallel()
 
