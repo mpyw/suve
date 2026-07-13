@@ -464,17 +464,24 @@ func TestAzureAppConfig_TUI_Namespaces(t *testing.T) {
 	})
 
 	t.Run("dev-namespace-view-shows-dev-entries", func(t *testing.T) {
-		tm := teatest.NewTestModel(t, newAzureTUIModel(t, azureAppConfigTUIScope(), string(staging.ServiceParam)),
-			teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
+		// The dev entries are read by the TUI's own client, which the emulator may
+		// not immediately show a just-seeded namespace to (a CI-only cross-client
+		// race, #796). Retry with a fresh launch until the dev view renders: wait for
+		// the launch (null) view, advance the namespace filter one step (space) — the
+		// next option always includes the dev entries (either "dev" or the
+		// all-namespaces "*") — then wait for the dev-only setting.
+		screen := retryTUIScreen(t,
+			func() tea.Model {
+				return newAzureTUIModel(t, azureAppConfigTUIScope(), string(staging.ServiceParam))
+			},
+			func(tm *teatest.TestModel) bool {
+				if !awaitScreen(t, tm, shared, tuiAttemptWait) {
+					return false
+				}
+				tm.Send(keyRune(' '))
 
-		// Wait for the launch (null) view, then advance the namespace filter one
-		// step (space). The next option always includes the dev entries (it is
-		// either "dev" or the all-namespaces "*"), so the dev-only setting appears.
-		waitForScreen(t, tm, shared)
-		tm.Send(keyRune(' '))
-		waitForScreen(t, tm, devOnly)
-
-		screen := finalScreen(t, tm)
+				return awaitScreen(t, tm, devOnly, tuiAttemptWait)
+			})
 
 		assert.Contains(t, screen, devOnly, "advancing the namespace filter reveals the dev-only setting")
 		assert.Contains(t, screen, "[dev]",
