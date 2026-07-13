@@ -718,23 +718,28 @@ Keymap (the in-app `?` toggles full help, which is the source of truth):
 | Browser | `p` / `/` | edit prefix / filter |
 | Browser | `v` | toggle value display |
 | Browser | `r` | recursive toggle / refresh |
+| Browser | `[` / `]` | narrow / widen the list pane |
 | Browser | `L` | load more (paged secrets) |
 | Browser | `x` | reveal a masked value |
-| Browser / Diff | `J` | pretty-print a JSON value (parity with `--parse-json`) |
 | Browser | `c`, `space`, `enter` | compare mode: toggle, pick a version, open diff |
 | Browser | `space` | pick namespace (App Configuration) |
-| Browser | `S` | jump to the Staging tab |
 | Browser | `n` / `e` / `d` / `t` / `R` | new / edit / delete / tag / restore |
+| Compare / Diff | `↑`/`↓` | scroll the diff |
+| Compare / Diff | `s` | toggle side-by-side / unified layout |
+| Compare / Diff | `x` | hide / show a secret diff's values |
 | Staging | `v` | toggle diff / value view |
-| Staging | `e` / `u` / `t` | edit staged / unstage (entry + tags) / add staged tag |
-| Staging | `x` | reveal the selected row's masked value |
+| Staging | `e` / `u` / `t` | edit staged / unstage (entry + tags) / add or remove staged tags |
+| Staging | `x` | reveal / hide the selected row's value |
 | Staging | `enter` | open the full-diff detail |
 | Staging | `a` / `A` | apply this section / apply all |
 | Staging | `r` / `R` | reset this section / reset all |
 | Staging | `ctrl+r` | refresh |
-| Dialogs | `ctrl+e` | open the value in `$EDITOR` (create/edit) |
+| Dialogs (create / edit) | `tab` / `shift+tab` | move between fields |
+| Dialogs (create / edit) | `enter` | next field; inserts a newline in the multi-line Value / Description; submits on the `[ OK ]` button |
+| Dialogs (create / edit) | `ctrl+o` | open the Value or Description in `$EDITOR` |
+| Dialogs | `esc` | cancel (press twice to discard an edited form) |
 
-Mutations are **staged by default** (an "Apply immediately" toggle is offered where the backend supports staging); operation markers and unsupported controls follow each backend's capabilities. Rendering honors `NO_COLOR` and degrades gracefully on narrow terminals.
+JSON values are always pretty-printed automatically (parity with `--parse-json`), so there is no format toggle. Mutations are **staged by default** where the backend supports staging: completing a create, edit, or delete opens a **Stage / Apply** confirmation popup (`←`/`→` choose, `enter` confirms, `esc` returns to the form); on a backend without staging the write is always immediate. Operation markers and unsupported controls follow each backend's capabilities. Rendering honors `NO_COLOR` and degrades gracefully on narrow terminals.
 
 ### Feature support
 
