@@ -5,6 +5,7 @@ package e2e_test
 
 import (
 	"encoding/base64"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,6 +74,29 @@ func resetGoogleCloudTUISecrets(t *testing.T) {
 	}
 }
 
+// waitGcloudSecretReadable polls the CLI read path until the secret reads back the
+// expected value. The TUI builds its OWN gcloud client, and the Secret Manager
+// emulator does not guarantee a write committed by one client is immediately
+// visible to another (nor a create immediately listable/versioned): launching the
+// TUI straight after seeding can therefore race the emulator and surface a spurious
+// "entry not found" under CI load. Gating on a fresh CLI read makes the seeded
+// state visible before the TUI ever lists or reads it.
+func waitGcloudSecretReadable(t *testing.T, name, want string) {
+	t.Helper()
+
+	deadline := time.Now().Add(tuiWaitTimeout)
+	for time.Now().Before(deadline) {
+		out, err := runGcloud(t, "secret", "show", "--raw", name)
+		if err == nil && strings.TrimSpace(out) == want {
+			return
+		}
+
+		time.Sleep(50 * time.Millisecond) //nolint:mnd // poll interval
+	}
+
+	t.Fatalf("gcloud secret %q never became readable as %q within %s", name, want, tuiWaitTimeout)
+}
+
 // newGoogleCloudTUIModel builds the real TUI model launched on the Secret Manager
 // tab (Google Cloud's only service), wired to registry-backed stores pointed at
 // the emulator (via the EmulatorEnvVar endpoint set by the CI job / mise task).
@@ -109,6 +133,11 @@ func TestGoogleCloudTUI_SecretBrowse(t *testing.T) {
 	require.NoError(t, err)
 	_, err = runGcloud(t, "secret", "create", bravoName, bravoValue)
 	require.NoError(t, err)
+
+	// Ensure both seeded secrets are visible to a fresh client before the TUI (its
+	// own client) launches and lists them.
+	waitGcloudSecretReadable(t, alphaName, alphaValue)
+	waitGcloudSecretReadable(t, bravoName, bravoValue)
 
 	tm := teatest.NewTestModel(t, newGoogleCloudTUIModel(t),
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
@@ -157,6 +186,10 @@ func TestGoogleCloudTUI_SecretHistory(t *testing.T) {
 	require.NoError(t, err)
 	_, err = runGcloud(t, "secret", "update", "--yes", name, v3Val)
 	require.NoError(t, err)
+
+	// Ensure the final seeded version is visible to a fresh client before the TUI
+	// (its own client) launches and lists the secret's versions.
+	waitGcloudSecretReadable(t, name, v3Val)
 
 	// Masked capture: drive to the loaded detail/history (the current marker only
 	// renders once the history lands), then read the settled screen without any
