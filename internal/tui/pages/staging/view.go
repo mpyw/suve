@@ -18,6 +18,13 @@ const (
 	operationDelete = "delete"
 )
 
+// stagingGutter is the blank left margin the staging page indents its content by,
+// so its rows are not jammed against the terminal's left edge — the borderless
+// counterpart to the panes' interior padding (#698). Every rendered line is
+// prefixed with it and every hit region's column is shifted by it, so the mouse
+// map stays aligned with what is drawn.
+const stagingGutter = 1
+
 // lineDesc maps one rendered body line to what a mouse click on it acts on. It
 // is intermediate layout state: View turns the visible descriptors into hit
 // regions once per frame.
@@ -43,20 +50,25 @@ type headerRanges struct {
 }
 
 // View renders the staging page into the content area and rebuilds the hit map.
+// Content is laid out at the gutter-reduced width, then indented by stagingGutter
+// (with every hit region's column shifted to match) so the body reads with a
+// little left margin rather than jammed against the terminal edge (#698).
 func (m *Model) View(width, height int) string {
 	m.width, m.height = width, height
 	if width <= 0 || height <= 0 {
 		return ""
 	}
 
-	header, hRanges := m.headerLine(width)
+	cw := max(width-stagingGutter, 0)
+
+	header, hRanges := m.headerLine(cw)
 	head := []string{header}
 
 	noticeRow := -1
 
 	if m.noticeVisible() {
 		noticeRow = len(head)
-		head = append(head, m.noticeLine(width))
+		head = append(head, m.noticeLine(cw))
 	}
 
 	// The page's bindings (e/u/t/x/enter/v, apply/reset) are now rendered by the
@@ -64,22 +76,46 @@ func (m *Model) View(width, height int) string {
 	// hint line. The last row is still reserved unconditionally — it renders a
 	// pending invalid-action status message (#684) or a blank line — so the body
 	// height stays fixed and an appearing/clearing status never reflows the list.
-	footer := m.footerLine(width)
+	footer := m.footerLine(cw)
 
 	bodyTop := len(head)
 	bodyH := max(height-bodyTop-1, 0)
 
-	lines, descs, rowFirst := m.bodyLines(width)
+	lines, descs, rowFirst := m.bodyLines(cw)
 	m.clampScroll(len(lines), bodyH, rowFirst)
 
 	visible, visDescs := window(lines, descs, m.scroll, bodyH)
 
-	m.hits = m.buildHits(width, bodyTop, noticeRow, hRanges, visDescs)
+	m.hits = m.buildHits(cw, bodyTop, noticeRow, stagingGutter, hRanges, visDescs)
 
 	out := append(head, visible...) //nolint:gocritic // head is a fresh slice; the status/blank footer row is always appended
 	out = append(out, footer)
 
-	return strings.Join(out, "\n")
+	return indentLines(out, stagingGutter)
+}
+
+// indentLines joins body lines with newlines, prefixing each with the left gutter
+// so the whole page reads with a small left margin (#698). The golden harness
+// trims trailing spaces, so an indented blank line stays blank.
+func indentLines(lines []string, gutter int) string {
+	if gutter <= 0 {
+		return strings.Join(lines, "\n")
+	}
+
+	pad := strings.Repeat(" ", gutter)
+
+	var b strings.Builder
+
+	for i, line := range lines {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+
+		b.WriteString(pad)
+		b.WriteString(line)
+	}
+
+	return b.String()
 }
 
 // buildHits assembles the frame's hit regions in page-local coordinates: the
@@ -88,16 +124,16 @@ func (m *Model) View(width, height int) string {
 // selectable row (spanning its consecutive lines). Rows fill the full width so a
 // click anywhere on a row selects it; the section buttons sit above (higher Z) on
 // their header line.
-func (m *Model) buildHits(width, bodyTop, noticeRow int, h headerRanges, visDescs []lineDesc) *hit.Map {
+func (m *Model) buildHits(width, bodyTop, noticeRow, gutter int, h headerRanges, visDescs []lineDesc) *hit.Map {
 	regions := []*lipgloss.Layer{
-		rangeRegion(regionViewToggle, h.view, 0),
-		rangeRegion(regionApplyAll, h.applyAll, 0),
-		rangeRegion(regionResetAll, h.resetAll, 0),
-		rangeRegion(regionRefresh, h.refresh, 0),
+		rangeRegion(regionViewToggle, h.view, 0, gutter),
+		rangeRegion(regionApplyAll, h.applyAll, 0, gutter),
+		rangeRegion(regionResetAll, h.resetAll, 0, gutter),
+		rangeRegion(regionRefresh, h.refresh, 0, gutter),
 	}
 
 	if noticeRow >= 0 {
-		regions = append(regions, hit.Region(regionNotice, 0, noticeRow, width, 1))
+		regions = append(regions, hit.Region(regionNotice, gutter, noticeRow, width, 1))
 	}
 
 	for i := 0; i < len(visDescs); {
@@ -107,8 +143,8 @@ func (m *Model) buildHits(width, bodyTop, noticeRow int, h headerRanges, visDesc
 		switch {
 		case d.section >= 0:
 			regions = append(regions,
-				rangeRegion(secApplyID(d.section), d.apply, y).Z(1),
-				rangeRegion(secResetID(d.section), d.reset, y).Z(1),
+				rangeRegion(secApplyID(d.section), d.apply, y, gutter).Z(1),
+				rangeRegion(secResetID(d.section), d.reset, y, gutter).Z(1),
 			)
 			i++
 		case d.row >= 0:
@@ -117,7 +153,7 @@ func (m *Model) buildHits(width, bodyTop, noticeRow int, h headerRanges, visDesc
 				i++
 			}
 
-			regions = append(regions, hit.Region(rowID(d.row), 0, bodyTop+start, width, i-start))
+			regions = append(regions, hit.Region(rowID(d.row), gutter, bodyTop+start, width, i-start))
 		default:
 			i++
 		}
@@ -126,9 +162,10 @@ func (m *Model) buildHits(width, bodyTop, noticeRow int, h headerRanges, visDesc
 	return hit.New(regions...)
 }
 
-// rangeRegion builds a 1-row region for a [start,end) column range at row y.
-func rangeRegion(id string, r [2]int, y int) *lipgloss.Layer {
-	return hit.Region(id, r[0], y, r[1]-r[0], 1)
+// rangeRegion builds a 1-row region for a [start,end) column range at row y,
+// shifted right by the page's left gutter so the map matches the indented render.
+func rangeRegion(id string, r [2]int, y, gutter int) *lipgloss.Layer {
+	return hit.Region(id, r[0]+gutter, y, r[1]-r[0], 1)
 }
 
 // footerLine renders the reserved bottom row: a pending invalid-action status

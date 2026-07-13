@@ -1,14 +1,14 @@
-╭──────────────────────────────────────────────────────╮
-│Tag — /app/api/DATABASE_URL                           │
-│                                                      │
-│┃ Action                                              │
-│┃ ← Remove tag →                                      │
-│                                                      │
-│  Tag                                                 │
-│  > env=prod                                          │
-│    team=api                                          │
-│                                                      │
-│  Mode                                                │
-│  (•) Stage    ( ) Apply immediately                  │
-│tab/↑↓: fields · enter: submit · esc: cancel          │
-╰──────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────╮
+│  Tag — /app/api/DATABASE_URL                             │
+│                                                          │
+│  ┃ Action                                                │
+│  ┃ ← Remove tag →                                        │
+│                                                          │
+│    Tag                                                   │
+│    > env=prod                                            │
+│      team=api                                            │
+│                                                          │
+│    Mode                                                  │
+│    (•) Stage    ( ) Apply immediately                    │
+│  tab/↑↓: fields · enter: submit · esc: cancel            │
+╰──────────────────────────────────────────────────────────╯

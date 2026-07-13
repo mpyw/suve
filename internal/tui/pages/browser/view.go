@@ -131,15 +131,33 @@ func (m *Model) renderBody(width, height, yOffset int) string {
 	return m.renderStacked(width, height, yOffset)
 }
 
-// renderTwoPane lays the list on the left and the detail on the right.
+// renderTwoPane lays the list on the left and the detail on the right, with a
+// blank gutter column between them so the two borders never fuse (#698).
 func (m *Model) renderTwoPane(width, height, yOffset int) string {
 	listW := min(listPaneMaxWidth, width*listWidthNum/listWidthDen)
-	detailW := width - listW
+	detailW := width - listW - paneGutter
 
 	listPane := m.renderListPane(listW, height, yOffset, 0)
-	detailPane := m.renderDetailPane(detailW, height, yOffset, listW)
+	detailPane := m.renderDetailPane(detailW, height, yOffset, listW+paneGutter)
+	gutter := gutterColumn(paneGutter, lipgloss.Height(listPane))
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
+	return lipgloss.JoinHorizontal(lipgloss.Top, listPane, gutter, detailPane)
+}
+
+// gutterColumn builds a blank w×h spacer used as the between-pane gutter.
+func gutterColumn(width, height int) string {
+	if width <= 0 || height <= 0 {
+		return ""
+	}
+
+	row := strings.Repeat(" ", width)
+	rows := make([]string, height)
+
+	for i := range rows {
+		rows[i] = row
+	}
+
+	return strings.Join(rows, "\n")
 }
 
 // renderStacked lays the list above the detail.
@@ -163,8 +181,8 @@ func (m *Model) renderListPane(width, height, paneTop, paneLeft int) string {
 	focused := m.focus == focusList
 	m.list.SetFocused(focused)
 
-	listTop := paneTop + paneContentTop
-	listLeft := paneLeft + paneBorderLeft
+	listTop := paneTop + components.PaneContentTop()
+	listLeft := paneLeft + components.PaneContentLeft()
 	// The list region stops at its content's right edge so it never swallows a
 	// click/wheel aimed at the detail pane, which shares its vertical band in the
 	// two-pane layout.
@@ -189,8 +207,8 @@ func (m *Model) renderDetailPane(width, height, paneTop, paneLeft int) string {
 
 	body, valueLabelLocalTop, historyLocalTop, historyRows := m.renderDetail(innerW, innerH)
 
-	detailTop := paneTop + paneContentTop
-	detailLeft := paneLeft + paneBorderLeft
+	detailTop := paneTop + components.PaneContentTop()
+	detailLeft := paneLeft + components.PaneContentLeft()
 
 	// The whole detail content is one region so a wheel anywhere in it scrolls the
 	// value pane; the value-label row and the history band sit above it (higher Z)

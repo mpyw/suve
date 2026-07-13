@@ -40,11 +40,9 @@ const (
 	listWidthDen = 5
 	// stackedMinPaneHeight is the smallest a stacked pane may shrink to.
 	stackedMinPaneHeight = 3
-	// paneContentTop is the page-local row a pane's content starts on relative to
-	// the pane top: one border row plus one title row.
-	paneContentTop = 2
-	// paneBorderLeft is the pane's left border column.
-	paneBorderLeft = 1
+	// paneGutter is the blank column between the side-by-side list and detail
+	// panes, so their borders never fuse at the ╮╭ seam (#698).
+	paneGutter = 1
 	// valuePaneHeight is the detail value pane's fixed line count.
 	valuePaneHeight = 3
 	// debounceDelay is how long a prefix/filter edit waits before reloading, so a
