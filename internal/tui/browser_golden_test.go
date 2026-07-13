@@ -267,9 +267,10 @@ func TestBrowser_CopyKeepsMaskGolden(t *testing.T) { //nolint:paralleltest // go
 	golden.RequireEqual(t, screen)
 }
 
-// TestBrowser_ParseJSONGolden pins #690: `J` pretty-prints a JSON value in the
-// browser detail value pane (parity with the diff page and the GUI).
-func TestBrowser_ParseJSONGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
+// TestBrowser_JSONFormattedGolden pins #732: a JSON value in the browser detail
+// value pane is pretty-printed BY DEFAULT (parity with the GUI, which formats
+// every JSON value) — no manual toggle needed.
+func TestBrowser_JSONFormattedGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
 	goldenEnv(t)
 
 	m := newApp(config{
@@ -278,9 +279,9 @@ func TestBrowser_ParseJSONGolden(t *testing.T) { //nolint:paralleltest // golden
 		sourceFor: sourceForShape("param", awsParamJSONSource(), nil),
 	})
 
-	screen := captureBrowserKeys(t, m, "db.internal", 'J')
+	screen := captureUntil(t, m, "db.internal", browserTermWidth, browserTermHeight)
 
-	assert.Contains(t, screen, `"host": "db.internal"`, "J pretty-prints the JSON value onto indented lines")
+	assert.Contains(t, screen, `"host": "db.internal"`, "the JSON value is pretty-printed onto indented lines by default")
 	golden.RequireEqual(t, screen)
 }
 

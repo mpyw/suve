@@ -31,4 +31,4 @@ enter history           / filter               e edit                    shift+t
 esc   back              v values               d delete                  1/2/3     jump to tab
 space pick/namespace    r recursive/refresh    t tag                     ?         help
                         x reveal               R restore                 q         quit
-                        J parse-json           y copy
+                                               y copy

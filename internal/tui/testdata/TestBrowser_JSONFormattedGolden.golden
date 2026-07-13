@@ -4,7 +4,7 @@ suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
 prefix: —   filter: —   values:off  recursive:on  ⟳
 ╭────────────────────────────────────────────╮╭────────────────────────────────────────────────────────────────────────╮
 │entries (1)                                 ││/app/web/CONFIG                                                         │
-│▸ /app/web/CONFIG                           ││Value   (J to unformat)                                                 │
+│▸ /app/web/CONFIG                           ││Value                                                                   │
 │                                            ││{                                                                       │
 │                                            ││  "host": "db.internal",                                                │
 │                                            ││  "port": 5432,                                                         │

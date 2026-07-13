@@ -103,10 +103,11 @@ func TestSecretDiffHiddenEqualLengthsMaskToNoDifference(t *testing.T) {
 	assert.Contains(t, out, "(no differences)", "equal-length masked values diff as identical")
 }
 
-// TestParamDiffShownAndParseJSONToggle pins the non-secret path: a param diff
-// renders the real content (not masked), and the J toggle re-diffs with
-// jsonutil.TryFormat normalization (parity with the CLI's --parse-json).
-func TestParamDiffShownAndParseJSONToggle(t *testing.T) {
+// TestParamDiffAlwaysFormatsJSON pins the non-secret path: a param diff renders
+// the real content (not masked), and a JSON value is ALWAYS pretty-printed
+// before diffing (GUI parity, #732) — no manual toggle. The compact single-line
+// objects never reach the screen; the expanded, indented JSON does.
+func TestParamDiffAlwaysFormatsJSON(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 
 	m := newDiff(t)
@@ -118,20 +119,36 @@ func TestParamDiffShownAndParseJSONToggle(t *testing.T) {
 		Secret:   false,
 	}})
 
-	before := m.View(100, 40)
-	assert.Contains(t, before, `{"a":1}`, "a non-secret param value is shown verbatim, never masked")
-	assert.Contains(t, before, `{"a":2}`)
-	assert.NotContains(t, before, "•", "a non-secret diff has no mask bullets")
+	out := m.View(100, 40)
+	assert.Contains(t, out, `"a": 1`, "the JSON old value is pretty-printed by default")
+	assert.Contains(t, out, `"a": 2`, "the JSON new value is pretty-printed by default")
+	assert.NotContains(t, out, `{"a":1}`, "the compact single-line form is never shown")
+	assert.NotContains(t, out, "•", "a non-secret diff has no mask bullets")
+}
 
-	// Toggle parse-json: both sides reformat, so the diff now shows the expanded,
-	// indented JSON (the "a": N lines) rather than the compact objects.
-	m, _ = m.Update(keyPress('J'))
-	require.True(t, m.parseJSON, "J enables parse-json")
+// TestDiffReflowsOnResize pins #732's repaint fix: a WindowSizeMsg re-syncs the
+// viewport content so formatted JSON reflows to the new width and never clips.
+func TestDiffReflowsOnResize(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
 
-	after := m.View(100, 40)
-	assert.Contains(t, after, `"a": 1`, "parse-json expands the old value")
-	assert.Contains(t, after, `"a": 2`, "parse-json expands the new value")
-	assert.NotContains(t, after, `{"a":1}`, "the compact form is gone after formatting")
+	m := newDiff(t)
+	m, _ = m.Update(loadedMsg{content: data.DiffContent{
+		OldLabel: "cfg#1",
+		NewLabel: "cfg#2",
+		OldValue: `{"host":"a.internal","port":1}`,
+		NewValue: `{"host":"b.internal","port":2}`,
+		Secret:   false,
+	}})
+
+	wide := m.vp.View()
+
+	// A height/width change must re-render the viewport content (not leave a stale,
+	// clipped frame from the old size).
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 60, Height: 12})
+	narrow := m.vp.View()
+
+	require.NotEqual(t, wide, narrow, "a resize re-syncs the viewport content")
+	assert.Contains(t, narrow, `"host": "a.internal"`, "the formatted JSON is still present after the resize")
 }
 
 // diffShortDescs flattens the diff page's short-help descriptions.
@@ -157,7 +174,7 @@ func TestHelpKeyMap_MaskGatedOnSecret(t *testing.T) {
 		OldLabel: "a#1", NewLabel: "a#2", OldValue: "1", NewValue: "2", Secret: false,
 	}})
 	assert.NotContains(t, diffShortDescs(nonSecret), "hide/show", "a non-secret diff has no mask toggle")
-	assert.Contains(t, diffShortDescs(nonSecret), "parse-json", "parse-json is always available")
+	assert.NotContains(t, diffShortDescs(nonSecret), "parse-json", "the parse-json toggle is gone (JSON is always formatted, #732)")
 	assert.Contains(t, diffShortDescs(nonSecret), "back", "esc back is always available")
 
 	secret := newDiff(t)
