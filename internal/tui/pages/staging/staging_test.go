@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -717,4 +718,93 @@ func TestUpdate_MouseClickHeaderMatchesKeys(t *testing.T) {
 	fx, fy := regionOrigin(t, m, regionRefresh)
 	_, cmd = m.Update(tea.MouseClickMsg{X: fx, Y: fy, Button: tea.MouseLeft})
 	require.NotNil(t, cmd, "clicking refresh reloads the sections")
+}
+
+// helpDescs flattens a set of help bindings to their visible descriptions, so a
+// test asserts on the labels the bar shows without depending on key glyphs.
+func helpDescs(bindings []key.Binding) []string {
+	descs := make([]string, 0, len(bindings))
+	for _, b := range bindings {
+		descs = append(descs, b.Help().Desc)
+	}
+
+	return descs
+}
+
+// fullHelpDescs flattens every full-help column to its descriptions.
+func fullHelpDescs(cols [][]key.Binding) []string {
+	descs := make([]string, 0, len(cols))
+	for _, col := range cols {
+		descs = append(descs, helpDescs(col)...)
+	}
+
+	return descs
+}
+
+// rowKindHelpReview holds one section with all three help-relevant row kinds: a
+// staged update entry, a staged delete entry, and a staged tag add — so a test
+// can move the selection across kinds and assert the help adapts (#683). Row
+// order is entries then tags: 0=update, 1=delete, 2=tag add.
+func rowKindHelpReview() data.StagingReview {
+	return data.StagingReview{
+		Entries: []data.StagedDiffRow{
+			{Name: "/app/UPD", Type: data.StagedDiffNormal, Operation: "update", RemoteValue: "a", StagedValue: "b"},
+			{Name: "/app/GONE", Type: data.StagedDiffNormal, Operation: "delete", RemoteValue: "c"},
+		},
+		Tags: []data.StagedTagRow{{
+			Name: "/app/ITEM",
+			Adds: []data.Tag{{Key: "owner", Value: "team"}},
+		}},
+	}
+}
+
+// TestHelp_AdaptsToSelectedRowKind pins #683: the staging help bar lists exactly
+// the actions the SELECTED row supports, so it never advertises a no-op. `e` edit
+// and `enter` detail are silent no-ops on a tag row (editSelected/onEnter return
+// early), `e` edit and `t` tags are no-ops on a delete-staged entry
+// (editSelected/tagSelected gate them), and `x` reveal/hide has no row value on a
+// tag row — the bar drops each where it would do nothing while keeping `u`
+// unstage on every row.
+func TestHelp_AdaptsToSelectedRowKind(t *testing.T) {
+	t.Parallel()
+
+	sec := &stubService{
+		service: "param", label: "Param", svcCap: capFor("aws", "param"),
+		review: rowKindHelpReview(),
+	}
+	m := newModel(t, sec)
+	require.Len(t, m.rows, 3, "one update, one delete, one tag-add row")
+
+	short := func() []string { return helpDescs(m.HelpKeyMap().ShortHelp()) }
+	full := func() []string { return fullHelpDescs(m.HelpKeyMap().FullHelp()) }
+
+	// Entry row (update): every row action is applicable.
+	m.selected = 0
+
+	assert.Contains(t, short(), "edit", "an entry row advertises edit")
+	assert.Contains(t, short(), "detail", "an entry row advertises enter/detail")
+	assert.Contains(t, short(), "unstage", "an entry row advertises unstage")
+	assert.Contains(t, full(), "edit", "the full help lists edit on an entry row")
+	assert.Contains(t, full(), "tags", "the full help lists tags on an entry row")
+
+	// Delete-staged entry: edit and tag are gated no-ops; detail still opens.
+	m.selected = 1
+
+	assert.NotContains(t, short(), "edit", "a delete-staged entry hides edit (editSelected no-ops)")
+	assert.Contains(t, short(), "detail", "detail still opens on a delete-staged entry (onEnter acts)")
+	assert.Contains(t, short(), "unstage", "a delete-staged entry keeps unstage")
+	assert.NotContains(t, full(), "edit", "the full help drops edit on a delete-staged entry")
+	assert.NotContains(t, full(), "tags", "a delete-staged entry cannot be tagged (#684)")
+
+	// Tag row: edit and enter/detail are no-ops; unstage/move/view remain.
+	m.selected = 2
+
+	assert.NotContains(t, short(), "edit", "a tag row hides edit (not an entry)")
+	assert.NotContains(t, short(), "detail", "a tag row hides enter/detail (onEnter no-ops)")
+	assert.Contains(t, short(), "unstage", "a tag row keeps unstage (u removes the staged tag change)")
+	assert.Contains(t, short(), "move", "a tag row keeps move")
+	assert.Contains(t, short(), "view", "a tag row keeps view")
+	assert.NotContains(t, full(), "edit", "the full help drops edit on a tag row")
+	assert.NotContains(t, full(), "detail", "the full help drops detail on a tag row")
+	assert.Contains(t, full(), "unstage", "the full help keeps unstage on a tag row")
 }
