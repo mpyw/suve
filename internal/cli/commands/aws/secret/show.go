@@ -19,13 +19,14 @@ import (
 
 // showJSONOutput represents the JSON output structure for the show command.
 type showJSONOutput struct {
-	Name      string            `json:"name"`
-	ARN       string            `json:"arn"`
-	VersionID string            `json:"versionId,omitempty"`
-	Stages    []string          `json:"stages,omitempty"`
-	Created   string            `json:"created,omitempty"`
-	Tags      map[string]string `json:"tags"`
-	Value     string            `json:"value"`
+	Name        string            `json:"name"`
+	ARN         string            `json:"arn"`
+	VersionID   string            `json:"versionId,omitempty"`
+	Stages      []string          `json:"stages,omitempty"`
+	Created     string            `json:"created,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Tags        map[string]string `json:"tags"`
+	Value       string            `json:"value"`
 }
 
 // showPresenter renders Secrets Manager show output byte-for-byte as before.
@@ -82,6 +83,10 @@ func (p *showPresenter) RenderText(stdout io.Writer, value string) {
 		out.Field("Created", timeutil.FormatRFC3339(*result.CreatedDate))
 	}
 
+	if result.Description != "" {
+		out.Field("Description", result.Description)
+	}
+
 	if len(result.Tags) > 0 {
 		out.Field("Tags", fmt.Sprintf("%d tag(s)", len(result.Tags)))
 
@@ -112,6 +117,10 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 	if result.CreatedDate != nil {
 		jsonOut.Created = timeutil.FormatRFC3339(*result.CreatedDate)
+	}
+
+	if result.Description != "" {
+		jsonOut.Description = result.Description
 	}
 
 	jsonOut.Tags = make(map[string]string)

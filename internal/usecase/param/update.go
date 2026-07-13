@@ -15,6 +15,12 @@ type UpdateInput struct {
 	Value       string
 	Type        domain.ValueType
 	Description string
+	// PreserveType, when true, keeps the existing parameter's type instead of
+	// applying Type. `aws param update` sets it when neither --type nor --secure
+	// is given, so a value-only update never downgrades an existing SecureString
+	// (dropping KMS encryption) or StringList to String. Callers that pass an
+	// explicit type (GUI, TUI) leave it false and Type is applied as-is.
+	PreserveType bool
 	// Options carries provider-specific write options (e.g. AWS param Tier,
 	// DataType). They are passed through to the provider unchanged.
 	Options []provider.WriteOption
@@ -51,7 +57,7 @@ func (u *UpdateUseCase) GetCurrentValue(ctx context.Context, name string) (strin
 // parameter doesn't exist it returns ErrParameterNotFound. A read failure other
 // than not-found is propagated unchanged (never treated as "does not exist").
 func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*UpdateOutput, error) {
-	_, err := u.Store.Get(ctx, input.Name, provider.VersionRef{})
+	entry, err := u.Store.Get(ctx, input.Name, provider.VersionRef{})
 
 	switch {
 	case errors.Is(err, provider.ErrNotFound):
@@ -60,7 +66,15 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 		return nil, err
 	}
 
-	version, err := u.Store.Put(ctx, input.Name, input.Value, input.Type, input.Description, input.Options...)
+	// A value-only update must not change the type. When the caller did not
+	// specify one, reuse the existing entry's type (already fetched above) so a
+	// SecureString/StringList is never silently rewritten as String.
+	valueType := input.Type
+	if input.PreserveType {
+		valueType = entry.Type
+	}
+
+	version, err := u.Store.Put(ctx, input.Name, input.Value, valueType, input.Description, input.Options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update parameter: %w", err)
 	}
