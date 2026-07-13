@@ -20,6 +20,10 @@ A **Git-like CLI/TUI/GUI** for AWS Parameter Store / Secrets Manager, Google Clo
 </p>
 
 <p align="center">
+  <img src="demo/tui-demo.gif" alt="TUI Demo" width="800">
+</p>
+
+<p align="center">
   <img src="demo/gui-demo.gif" alt="GUI Demo" width="800">
 </p>
 
