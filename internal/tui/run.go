@@ -37,8 +37,27 @@ var registry = func() *provider.Registry {
 // initial tab ("param"/"secret", or "" for the group default). It mirrors the
 // GUI's Run entry shape (internal/gui/run.go) adapted to the terminal.
 func Run(ctx context.Context, scope provider.Scope, service string) error {
-	if err := ensureResolvable(ctx, scope); err != nil {
+	model, err := newModel(ctx, scope, service)
+	if err != nil {
 		return err
+	}
+
+	// Alt-screen and mouse capture are requested through the model's returned
+	// tea.View (Bubble Tea v2 reads them there each frame), so the program needs
+	// only the context here.
+	_, err = tea.NewProgram(model, tea.WithContext(ctx)).Run()
+
+	return err
+}
+
+// newModel builds the root app model for a launched scope and initial service,
+// wiring the registry-backed sourceFactory as the read/write/staging seams. It
+// is the shared construction point for the interactive Run entry above and the
+// e2e harness (NewE2EModel), which drives the very same model through teatest
+// against emulator-backed provider stores instead of a live terminal.
+func newModel(ctx context.Context, scope provider.Scope, service string) (*App, error) {
+	if err := ensureResolvable(ctx, scope); err != nil {
+		return nil, err
 	}
 
 	factory := newSourceFactory(ctx, scope)
@@ -57,12 +76,7 @@ func Run(ctx context.Context, scope provider.Scope, service string) error {
 		runCtx:        ctx,
 	})
 
-	// Alt-screen and mouse capture are requested through the model's returned
-	// tea.View (Bubble Tea v2 reads them there each frame), so the program needs
-	// only the context here.
-	_, err := tea.NewProgram(model, tea.WithContext(ctx)).Run()
-
-	return err
+	return model, nil
 }
 
 // ensureResolvable verifies the launched scope can resolve at least one store
