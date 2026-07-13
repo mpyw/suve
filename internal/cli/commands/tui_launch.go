@@ -34,7 +34,10 @@ func RegisterTUIFlag() {
 
 	inner := App.Before
 	App.Before = func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-		if cmd.Bool(tuiFlagName) {
+		// Skip the launch during shell completion: urfave/cli runs Before hooks
+		// before the completion handler, so honoring --tui here would enter the TUI
+		// (which errors on the non-TTY completion pipe) instead of completing (#749).
+		if !isShellCompletionInvocation() && cmd.Bool(tuiFlagName) {
 			return launchTUIBare(ctx)
 		}
 
@@ -86,7 +89,8 @@ func attachTUIFlag(cmd *cli.Command, p provider.Provider, service string) {
 
 	inner := cmd.Before
 	cmd.Before = func(ctx context.Context, c *cli.Command) (context.Context, error) {
-		if c.Bool(tuiFlagName) {
+		// Skip the launch during shell completion (see the root wrapper, #749).
+		if !isShellCompletionInvocation() && c.Bool(tuiFlagName) {
 			return launchTUI(ctx, tuiScope(c, p), service)
 		}
 
@@ -301,11 +305,16 @@ func tuiGroupProvider(name string) provider.Provider {
 	}
 }
 
+// nounParam is the param service subgroup name. It is a named constant so the
+// literal is not repeated across this package (goconst); tuiService and the
+// completion test both reference it.
+const nounParam = "param"
+
 // tuiService maps a provider subgroup's canonical name to the launch service
 // ("param"/"secret"), or "" when the command is not a service subgroup.
 func tuiService(name string) string {
 	switch name {
-	case "param", "secret":
+	case nounParam, "secret":
 		return name
 	default:
 		return ""
