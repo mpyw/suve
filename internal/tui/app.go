@@ -157,6 +157,12 @@ type App struct {
 	// stagedCounts holds the last staged-item count each service's browser
 	// reported, totalled into the Staging tab's count badge.
 	stagedCounts map[string]int
+
+	// pageGen is a monotonic page-generation counter. Each browser page built by
+	// pageForTab is stamped with the next value so a superseded prior page's
+	// in-flight response — whose per-Model seq resets and can collide with the new
+	// page's — is dropped rather than spliced into the new tab (#746).
+	pageGen int
 }
 
 // newApp builds the root model from a launch config: it derives the tab set
@@ -801,7 +807,8 @@ func (m *App) pageForTab(i int) (page, tea.Cmd) {
 
 	if m.sourceFor != nil {
 		if source, staging := m.sourceFor(tab.Service); source != nil {
-			p := newBrowserPage(m.runCtx, source, staging, m.styles, m.keys)
+			m.pageGen++
+			p := newBrowserPage(m.runCtx, m.pageGen, source, staging, m.styles, m.keys)
 
 			return p, p.Init()
 		}

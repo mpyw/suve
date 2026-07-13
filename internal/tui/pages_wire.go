@@ -85,11 +85,13 @@ func newStaticDiffPage(content data.DiffContent, st styles.Styles, km keys.Map) 
 	return diffPage{m: diff.NewStatic(content, st, km)}
 }
 
-// newBrowserPage builds the browser page adapter for a service source.
+// newBrowserPage builds the browser page adapter for a service source. token is
+// the page-generation identity the app bumps per page creation so a superseded
+// prior page's in-flight response is dropped rather than spliced in (#746).
 func newBrowserPage(
-	ctx context.Context, source data.Source, staging data.StagingProbe, st styles.Styles, km keys.Map,
+	ctx context.Context, token int, source data.Source, staging data.StagingProbe, st styles.Styles, km keys.Map,
 ) browserPage {
-	return browserPage{m: browser.New(ctx, source, staging, st, km)}
+	return browserPage{m: browser.New(ctx, token, source, staging, st, km)}
 }
 
 // newDiffPage builds the diff page adapter from a navigation request.

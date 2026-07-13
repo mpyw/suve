@@ -65,8 +65,10 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 // onListLoaded applies a list response when it is not stale, rebuilds the rows,
 // and (re)loads the selection's detail/history.
 func (m *Model) onListLoaded(msg listLoadedMsg) tea.Cmd {
-	if msg.seq != m.listSeq {
-		return nil // stale response — a newer list load supersedes it
+	if msg.token != m.token || msg.seq != m.listSeq {
+		// Stale response: a newer list load supersedes it (seq), or it belongs to a
+		// prior page whose seq collides with this one after a tab switch (token, #746).
+		return nil
 	}
 
 	m.loading = false
@@ -107,8 +109,8 @@ func (m *Model) onListLoaded(msg listLoadedMsg) tea.Cmd {
 // successful load clears the detail error so a prior transient failure never
 // lingers over the freshly-loaded value.
 func (m *Model) onDetailLoaded(msg detailLoadedMsg) {
-	if msg.seq != m.detailSeq {
-		return
+	if msg.token != m.token || msg.seq != m.detailSeq {
+		return // stale seq, or a prior page's response after a tab switch (#746)
 	}
 
 	if msg.err != nil {
@@ -128,8 +130,8 @@ func (m *Model) onDetailLoaded(msg detailLoadedMsg) {
 // own error line (never clearing the already-loaded value); a successful load
 // clears it so a prior transient failure never lingers over good history.
 func (m *Model) onHistoryLoaded(msg historyLoadedMsg) {
-	if msg.seq != m.historySeq {
-		return
+	if msg.token != m.token || msg.seq != m.historySeq {
+		return // stale seq, or a prior page's response after a tab switch (#746)
 	}
 
 	if msg.err != nil {
@@ -154,8 +156,8 @@ func (m *Model) onHistoryLoaded(msg historyLoadedMsg) {
 // — so the two surfaces share one count rather than oscillating between a
 // deduplicated-key count and entries+tags (#693).
 func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
-	if msg.seq != m.stagedSeq {
-		return nil
+	if msg.token != m.token || msg.seq != m.stagedSeq {
+		return nil // stale seq, or a prior page's response after a tab switch (#746)
 	}
 
 	if msg.err != nil {
@@ -213,8 +215,8 @@ func (m *Model) reload() tea.Cmd {
 // onNamespacesLoaded merges discovered namespaces into the header filter,
 // preserving the null option first and the all-namespaces option last.
 func (m *Model) onNamespacesLoaded(msg namespacesLoadedMsg) {
-	if msg.seq != m.nsSeq || msg.err != nil {
-		return
+	if msg.token != m.token || msg.seq != m.nsSeq || msg.err != nil {
+		return // stale seq, or a prior page's response after a tab switch (#746)
 	}
 
 	// Preserve the currently-selected namespace VALUE across the rebuild, so an

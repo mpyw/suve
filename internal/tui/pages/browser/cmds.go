@@ -7,30 +7,38 @@ import (
 )
 
 // Async result messages. Each carries the sequence its fetch was issued with, so
-// the reducer can drop a stale response (a fetch that a newer one superseded).
+// the reducer can drop a stale response (a fetch that a newer one superseded),
+// plus the page-generation token so a superseded PRIOR page's response (whose seq
+// can collide with the new page's reset seq after a tab switch) is dropped too
+// (#746).
 type (
 	listLoadedMsg struct {
+		token  int
 		seq    int
 		append bool
 		res    data.ListResult
 		err    error
 	}
 	detailLoadedMsg struct {
-		seq int
-		d   data.Detail
-		err error
+		token int
+		seq   int
+		d     data.Detail
+		err   error
 	}
 	historyLoadedMsg struct {
-		seq  int
-		rows []data.HistoryRow
-		err  error
+		token int
+		seq   int
+		rows  []data.HistoryRow
+		err   error
 	}
 	stagedLoadedMsg struct {
-		seq  int
-		snap data.StagingSnapshot
-		err  error
+		token int
+		seq   int
+		snap  data.StagingSnapshot
+		err   error
 	}
 	namespacesLoadedMsg struct {
+		token int
 		seq   int
 		names []string
 		err   error
@@ -56,6 +64,7 @@ func (m *Model) listParams() data.ListParams {
 func (m *Model) loadListCmd(appendPage bool) tea.Cmd {
 	m.listSeq++
 	m.loading = true
+	token := m.token
 	seq := m.listSeq
 	ctx := m.ctx
 	source := m.source
@@ -64,13 +73,14 @@ func (m *Model) loadListCmd(appendPage bool) tea.Cmd {
 	return func() tea.Msg {
 		res, err := source.List(ctx, params)
 
-		return listLoadedMsg{seq: seq, append: appendPage, res: res, err: err}
+		return listLoadedMsg{token: token, seq: seq, append: appendPage, res: res, err: err}
 	}
 }
 
 // loadDetailCmd issues a detail (Show) fetch for name/namespace.
 func (m *Model) loadDetailCmd(name, namespace string) tea.Cmd {
 	m.detailSeq++
+	token := m.token
 	seq := m.detailSeq
 	ctx := m.ctx
 	source := m.source
@@ -78,7 +88,7 @@ func (m *Model) loadDetailCmd(name, namespace string) tea.Cmd {
 	return func() tea.Msg {
 		d, err := source.Show(ctx, name, namespace)
 
-		return detailLoadedMsg{seq: seq, d: d, err: err}
+		return detailLoadedMsg{token: token, seq: seq, d: d, err: err}
 	}
 }
 
@@ -86,6 +96,7 @@ func (m *Model) loadDetailCmd(name, namespace string) tea.Cmd {
 // so a history failure never blanks the value (GUI Promise.allSettled parity).
 func (m *Model) loadHistoryCmd(name, namespace string) tea.Cmd {
 	m.historySeq++
+	token := m.token
 	seq := m.historySeq
 	ctx := m.ctx
 	source := m.source
@@ -93,13 +104,14 @@ func (m *Model) loadHistoryCmd(name, namespace string) tea.Cmd {
 	return func() tea.Msg {
 		rows, err := source.History(ctx, name, namespace)
 
-		return historyLoadedMsg{seq: seq, rows: rows, err: err}
+		return historyLoadedMsg{token: token, seq: seq, rows: rows, err: err}
 	}
 }
 
 // loadStagedCmd probes which items have staged changes.
 func (m *Model) loadStagedCmd() tea.Cmd {
 	m.stagedSeq++
+	token := m.token
 	seq := m.stagedSeq
 	ctx := m.ctx
 	probe := m.staging
@@ -107,13 +119,14 @@ func (m *Model) loadStagedCmd() tea.Cmd {
 	return func() tea.Msg {
 		snap, err := probe.Staged(ctx)
 
-		return stagedLoadedMsg{seq: seq, snap: snap, err: err}
+		return stagedLoadedMsg{token: token, seq: seq, snap: snap, err: err}
 	}
 }
 
 // loadNamespacesCmd discovers App Configuration namespaces for the header filter.
 func (m *Model) loadNamespacesCmd() tea.Cmd {
 	m.nsSeq++
+	token := m.token
 	seq := m.nsSeq
 	ctx := m.ctx
 	source := m.source
@@ -121,7 +134,7 @@ func (m *Model) loadNamespacesCmd() tea.Cmd {
 	return func() tea.Msg {
 		names, err := source.Namespaces(ctx)
 
-		return namespacesLoadedMsg{seq: seq, names: names, err: err}
+		return namespacesLoadedMsg{token: token, seq: seq, names: names, err: err}
 	}
 }
 
@@ -141,10 +154,27 @@ func (m *Model) selectionCmd() tea.Cmd {
 		return nil
 	}
 
+	// m.detail still describes whatever entry it was last loaded for. When the
+	// selection moves to a DIFFERENT entry, that loaded detail is now stale, so
+	// mark it not-OK until the fresh detail lands: openEdit/openTag gate on
+	// detailOK, so this keeps them from seeding a dialog for the PREVIOUS entry
+	// during the load window — matching openDelete, which reads the live selection
+	// (#748). A reload of the SAME entry keeps detailOK, so its value pane never
+	// flickers.
+	if m.detailKey() != dataStagedKey(item) {
+		m.detailOK = false
+	}
+
 	return tea.Batch(
 		m.loadDetailCmd(item.Name, item.Namespace),
 		m.loadHistoryCmd(item.Name, item.Namespace),
 	)
+}
+
+// detailKey is the identity of the entry m.detail currently holds (name +
+// namespace), used to tell a same-entry reload from a real selection move.
+func (m *Model) detailKey() data.StagedKey {
+	return data.StagedKey{Name: m.detail.Name, Namespace: m.detail.Namespace}
 }
 
 // selectedItem returns the item under the list's selection by INDEX, not name:
