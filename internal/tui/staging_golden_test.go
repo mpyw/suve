@@ -401,9 +401,22 @@ func waitFor(t *testing.T, tm *teatest.TestModel, marker string) {
 
 	var buf bytes.Buffer
 
+	waitForInBuf(t, tm, &buf, marker)
+}
+
+// waitForInBuf is waitFor against a caller-owned buffer, so an interaction test
+// that gates on several successive markers (initial render → rebuild → popup)
+// keeps the full accumulated stream across gates. The vt replay must see the whole
+// stream from the capability-handshake preamble on; a fresh buffer per gate would
+// replay only the tail (cursor-positioned incremental cell-updates) onto a blank
+// grid and miss content drawn earlier. Draining into the SAME buffer keeps every
+// gate rendering the true current screen.
+func waitForInBuf(t *testing.T, tm *teatest.TestModel, buf *bytes.Buffer, marker string) {
+	t.Helper()
+
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		_, _ = io.Copy(&buf, tm.Output())
+		_, _ = io.Copy(buf, tm.Output())
 		if buf.Len() > 0 && strings.Contains(renderVisibleScreenSize(t, buf.Bytes(), waitRenderWidth, waitRenderHeight), marker) {
 			return
 		}
