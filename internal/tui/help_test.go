@@ -143,8 +143,7 @@ func TestBrowser_FullHelpGolden(t *testing.T) { //nolint:paralleltest // goldenE
 		sourceFor: sourceForShape("secret", awsSecretSource(), nil),
 	})
 
-	raw := captureBrowserKeys(t, m, "Version ID", '?')
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureBrowserKeys(t, m, "Version ID", '?')
 
 	require.Contains(t, screen, "edit", "the full help lists the edit key")
 	require.Contains(t, screen, "restore", "the full help lists the restore key (AWS secret)")
