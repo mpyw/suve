@@ -285,6 +285,7 @@ export namespace gui {
 	    hasNamespaces: boolean;
 	    hasForceDelete: boolean;
 	    hasRecoveryWindow: boolean;
+	    hasDescription: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ServiceCapability(source);
@@ -303,6 +304,7 @@ export namespace gui {
 	        this.hasNamespaces = source["hasNamespaces"];
 	        this.hasForceDelete = source["hasForceDelete"];
 	        this.hasRecoveryWindow = source["hasRecoveryWindow"];
+	        this.hasDescription = source["hasDescription"];
 	    }
 	}
 	export class ProviderCapability {

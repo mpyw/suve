@@ -227,18 +227,25 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 	return &SecretLogResult{Name: result.Name, Entries: entries}, nil
 }
 
-// SecretCreate creates a new secret.
-func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
+// SecretCreate creates a new secret. description is a human-readable description
+// persisted by providers that support it (AWS Secrets Manager, Google Cloud
+// Secret Manager); Azure Key Vault drops it server-side (#767).
+func (a *App) SecretCreate(name, value, description string) (*SecretCreateResult, error) {
 	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
+	if !a.descriptionSupported() {
+		description = ""
+	}
+
 	uc := &secret.CreateUseCase{Writer: store}
 
 	result, err := uc.Execute(a.ctx, secret.CreateInput{
-		Name:  name,
-		Value: value,
+		Name:        name,
+		Value:       value,
+		Description: description,
 	})
 	if err != nil {
 		return nil, err
@@ -250,18 +257,25 @@ func (a *App) SecretCreate(name, value string) (*SecretCreateResult, error) {
 	}, nil
 }
 
-// SecretUpdate updates an existing secret.
-func (a *App) SecretUpdate(name, value string) (*SecretUpdateResult, error) {
+// SecretUpdate updates an existing secret. An empty description preserves the
+// existing one (a no-op), matching the CLI/adapter contract; Azure Key Vault
+// drops it server-side (#767).
+func (a *App) SecretUpdate(name, value, description string) (*SecretUpdateResult, error) {
 	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
 	}
 
+	if !a.descriptionSupported() {
+		description = ""
+	}
+
 	uc := &secret.UpdateUseCase{Store: store}
 
 	result, err := uc.Execute(a.ctx, secret.UpdateInput{
-		Name:  name,
-		Value: value,
+		Name:        name,
+		Value:       value,
+		Description: description,
 	})
 	if err != nil {
 		return nil, err

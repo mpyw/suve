@@ -93,6 +93,37 @@ func TestApp_Capabilities_ForceDeleteAndRecoveryWindowAWSOnly(t *testing.T) {
 	}
 }
 
+// TestApp_Capabilities_HasDescription pins the HasDescription capability that
+// gates the create/edit Description input (#767): AWS Param + Secret and Google
+// Cloud Secret persist a description; Azure App Configuration and Key Vault
+// ignore it, so their inputs stay hidden.
+func TestApp_Capabilities_HasDescription(t *testing.T) {
+	t.Parallel()
+
+	caps := (&App{}).Capabilities()
+
+	tests := []struct {
+		provider       string
+		service        string
+		hasDescription bool
+	}{
+		{string(provider.ProviderAWS), "param", true},
+		{string(provider.ProviderAWS), "secret", true},
+		{string(provider.ProviderGoogleCloud), "secret", true},
+		{string(provider.ProviderAzure), "param", false},
+		{string(provider.ProviderAzure), "secret", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.provider+"/"+tt.service, func(t *testing.T) {
+			t.Parallel()
+
+			svc := findService(t, caps, tt.provider, tt.service)
+			assert.Equal(t, tt.hasDescription, svc.HasDescription, "HasDescription")
+		})
+	}
+}
+
 func TestApp_ParamTypeOptions_ScopeAware(t *testing.T) {
 	t.Parallel()
 

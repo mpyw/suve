@@ -34,6 +34,10 @@
   const stagingEnabled = $derived(capability?.hasStaging ?? true);
   const tagsEnabled = $derived(capability?.hasTags ?? true);
   const historyEnabled = $derived(capability?.hasVersionHistory ?? true);
+  // The Description input is shown only where the provider persists it (AWS
+  // param); Azure App Configuration ignores it, so it stays hidden there.
+  // Default false so a capability object missing the field hides the input.
+  const descriptionEnabled = $derived(capability?.hasDescription ?? false);
 
   // The namespace axis (Azure calls it a "label") exists only for Azure App
   // Configuration; ParamView under the Azure provider is always App Config
@@ -127,7 +131,7 @@
   // Parameter type options are provider-driven (fetched from the backend), so
   // the UI never hardcodes SSM type strings.
   let paramTypeOptions: string[] = $state([]);
-  let setForm = $state({ name: '', value: '', type: '', namespace: '' });
+  let setForm = $state({ name: '', value: '', type: '', namespace: '', description: '' });
   let isEditMode = $state(false);
   let deleteTarget = $state('');
   let modalLoading = $state(false);
@@ -302,10 +306,11 @@
   function openSetModal(name?: string) {
     if (name && paramDetail) {
       // Edit targets the selected entry's own namespace (read-only in the form).
-      setForm = { name, value: paramDetail.value, type: paramDetail.type, namespace: selectedEntryNamespace };
+      // Pre-fill the current description so an unchanged edit round-trips it.
+      setForm = { name, value: paramDetail.value, type: paramDetail.type, namespace: selectedEntryNamespace, description: paramDetail.description ?? '' };
       isEditMode = true;
     } else {
-      setForm = { name: prefix || '', value: '', type: paramTypeOptions[0] ?? '', namespace: defaultCreateNamespace() };
+      setForm = { name: prefix || '', value: '', type: paramTypeOptions[0] ?? '', namespace: defaultCreateNamespace(), description: '' };
       isEditMode = false;
     }
     modalError = '';
@@ -325,8 +330,11 @@
       // App Config: create targets the form's namespace; edit targets the
       // existing entry's namespace. Other providers ignore this argument.
       const targetNamespace = isEdit ? selectedEntryNamespace : setForm.namespace;
+      // Only send a description where the provider supports it; the binding also
+      // drops it server-side for providers that ignore it (#767).
+      const description = descriptionEnabled ? setForm.description : '';
       if (immediate) {
-        await ParamSet(setForm.name, setForm.value, setForm.type, targetNamespace);
+        await ParamSet(setForm.name, setForm.value, setForm.type, targetNamespace, description);
         await loadParams({ prefix, filter, recursive, withValue });
         if (isEdit) {
           await selectParam(setForm.name, selectedEntryNamespace);
@@ -742,6 +750,19 @@
         rows="5"
       ></textarea>
     </div>
+    {#if descriptionEnabled}
+      <div class="form-group">
+        <label for="param-description">Description</label>
+        <input
+          id="param-description"
+          type="text"
+          class="form-input"
+          data-testid="param-description-input"
+          bind:value={setForm.description}
+          placeholder="Optional description"
+        />
+      </div>
+    {/if}
     {#if stagingEnabled}
       <label class="checkbox-label immediate-checkbox">
         <input type="checkbox" bind:checked={immediateMode} />

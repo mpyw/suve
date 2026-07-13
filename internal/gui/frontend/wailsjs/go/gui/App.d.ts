@@ -30,7 +30,7 @@ export function ParamLog(arg1:string,arg2:number,arg3:string):Promise<gui.ParamL
 
 export function ParamRemoveTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
-export function ParamSet(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.ParamSetResult>;
+export function ParamSet(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<gui.ParamSetResult>;
 
 export function ParamShow(arg1:string,arg2:string):Promise<gui.ParamShowResult>;
 
@@ -42,7 +42,7 @@ export function PickImportPath():Promise<string>;
 
 export function SecretAddTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
-export function SecretCreate(arg1:string,arg2:string):Promise<gui.SecretCreateResult>;
+export function SecretCreate(arg1:string,arg2:string,arg3:string):Promise<gui.SecretCreateResult>;
 
 export function SecretDelete(arg1:string,arg2:boolean):Promise<gui.SecretDeleteResult>;
 
@@ -58,7 +58,7 @@ export function SecretRestore(arg1:string):Promise<gui.SecretRestoreResult>;
 
 export function SecretShow(arg1:string):Promise<gui.SecretShowResult>;
 
-export function SecretUpdate(arg1:string,arg2:string):Promise<gui.SecretUpdateResult>;
+export function SecretUpdate(arg1:string,arg2:string,arg3:string):Promise<gui.SecretUpdateResult>;
 
 export function SelectScope(arg1:gui.ScopeSelection):Promise<void>;
 

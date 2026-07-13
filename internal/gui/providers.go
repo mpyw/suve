@@ -131,6 +131,21 @@ type ServiceCapability struct {
 	// delete immediately or govern retention by policy, so no "recoverable until"
 	// date is shown.
 	HasRecoveryWindow bool `json:"hasRecoveryWindow"`
+	// HasDescription is true when a create/update may carry a human-readable
+	// description that the provider persists (AWS Param + Secret, Google Cloud
+	// Secret). Azure App Configuration and Key Vault writers ignore it, so the
+	// frontend hides the Description input there and the binding drops any value.
+	HasDescription bool `json:"hasDescription"`
+}
+
+// descriptionSupported reports whether the current provider persists a
+// create/update description. It is the server-side backstop for the capability-
+// gated Description input: AWS (Param + Secret) and Google Cloud (Secret) honor
+// it; Azure App Configuration and Key Vault writers ignore it, so the binding
+// drops any description a stale/forged frontend might send (defense in depth,
+// #767). Mirrors ServiceCapability.HasDescription.
+func (a *App) descriptionSupported() bool {
+	return a.currentScope().Provider != provider.ProviderAzure
 }
 
 // ProviderCapability describes a provider and the services it offers.
@@ -163,12 +178,12 @@ func (a *App) Capabilities() []ProviderCapability {
 				{
 					Service: serviceParam, DisplayName: "Param",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
-					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
 				},
 				{
 					Service: serviceSecret, DisplayName: displayNameSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: true,
-					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: true,
+					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: true, HasDescription: true,
 				},
 			},
 		},
@@ -180,7 +195,7 @@ func (a *App) Capabilities() []ProviderCapability {
 				{
 					Service: serviceSecret, DisplayName: displayNameSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
-					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
+					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
 				},
 			},
 		},
