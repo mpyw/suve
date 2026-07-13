@@ -218,8 +218,7 @@ func secureStringCreateStagingApp() *App {
 func TestStaging_SecureStringParamCreateDiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureStaging(t, secureStringCreateStagingApp(), "SECURE_CREATE", false)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureStaging(t, secureStringCreateStagingApp(), "SECURE_CREATE", false)
 
 	assert.NotContains(t, screen, secureStringCreateValue, "no revealed SecureString param create value in the diff-view golden")
 	assert.Contains(t, screen, "•", "the SecureString param create row is masked with bullets, proving it renders (not just absent)")
@@ -232,8 +231,7 @@ func TestStaging_SecureStringParamCreateDiffViewGolden(t *testing.T) { //nolint:
 func TestStaging_SecureStringParamCreateValueViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureStaging(t, secureStringCreateStagingApp(), "SECURE_CREATE", true)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureStaging(t, secureStringCreateStagingApp(), "SECURE_CREATE", true)
 
 	assert.NotContains(t, screen, secureStringCreateValue, "no revealed SecureString param create value in the value-view golden")
 	assert.Contains(t, screen, "•", "the SecureString param create row is masked with bullets, proving it renders (not just absent)")
@@ -247,8 +245,7 @@ func TestStaging_SecureStringParamCreateValueViewGolden(t *testing.T) { //nolint
 func TestStaging_SecureStringParamDiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", false)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", false)
 
 	assert.Contains(t, screen, secureStringParamValue, "the SecureString param diff is revealed by default (#677/#735)")
 	assert.Contains(t, screen, "https://cdn-new.example.com", "a plaintext param row is shown too")
@@ -260,8 +257,7 @@ func TestStaging_SecureStringParamDiffViewGolden(t *testing.T) { //nolint:parall
 func TestStaging_SecureStringParamValueViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", true)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureStaging(t, secureStringStagingApp(), "SECURE_TOKEN", true)
 
 	assert.NotContains(t, screen, secureStringParamValue, "no revealed SecureString param value in the value-view golden")
 	assert.Contains(t, screen, "•", "the SecureString param row is masked with bullets, proving it renders (not just absent)")
@@ -274,8 +270,7 @@ func TestStaging_SecureStringParamValueViewGolden(t *testing.T) { //nolint:paral
 func TestStaging_DiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureStaging(t, stagingApp(), "prod/api/session", false)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureStaging(t, stagingApp(), "prod/api/session", false)
 
 	assert.Contains(t, screen, secretStagedValue, "the secret remote-vs-staged diff is revealed by default (#735)")
 	golden.RequireEqual(t, screen)
@@ -287,8 +282,7 @@ func TestStaging_DiffViewGolden(t *testing.T) { //nolint:paralleltest // goldenE
 func TestStaging_DiffViewHiddenGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureStagingKeys(t, stagingApp(), "prod/api/session", keyPress('x'))
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureStagingKeys(t, stagingApp(), "prod/api/session", keyPress('x'))
 
 	assert.NotContains(t, screen, secretStagedValue, "x hides the revealed secret diff")
 	assert.Contains(t, screen, "•", "the hidden diff still renders as masked bullets")
@@ -300,8 +294,7 @@ func TestStaging_DiffViewHiddenGolden(t *testing.T) { //nolint:paralleltest // g
 func TestStaging_ValueViewGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureStaging(t, stagingApp(), "prod/api/session", true)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureStaging(t, stagingApp(), "prod/api/session", true)
 
 	assert.NotContains(t, screen, secretStagedValue, "no revealed secret value in the value-view golden")
 	golden.RequireEqual(t, screen)
@@ -313,84 +306,95 @@ func TestStaging_ValueViewGolden(t *testing.T) { //nolint:paralleltest // golden
 func TestStaging_TagGateStatusGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureStagingKeys(t, stagingApp(), "prod/api/old-key",
+	screen := captureStagingKeys(t, stagingApp(), "prod/api/old-key",
 		// Move to the delete-staged secret row (prod/api/old-key), then press `t`.
 		keyPress('j'), keyPress('j'), keyPress('j'), keyPress('j'), keyPress('t'))
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
 
 	assert.Contains(t, screen, "cannot tag: staged for deletion", "the gate surfaces a status message")
 	golden.RequireEqual(t, screen)
 }
 
 // captureStagingKeys drives a staging app to its loaded state, sends the given
-// keys, and returns the captured byte stream (for asserting a post-key frame).
-func captureStagingKeys(t *testing.T, m *App, marker string, presses ...tea.KeyPressMsg) []byte {
+// keys, quits, and renders the SETTLED final model's screen.
+//
+// The golden is taken from tm.FinalModel().View().Content — the full, coherent
+// screen of the settled model after every sent message and the quit are
+// processed — not from the live teatest frame stream. Bubble Tea emits diff
+// frames, and under CI's parallel -race the async load + WindowSizeMsg settle at
+// timing-dependent points, so replaying the raw frame stream through the vt
+// intermittently corrupts the final screen (dropped separators, uneven padding,
+// #764). Rendering the final View().Content is deterministic: one full-width
+// paint of the settled state, independent of frame timing.
+func captureStagingKeys(t *testing.T, m *App, marker string, presses ...tea.KeyPressMsg) string {
 	t.Helper()
 
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
 
-	var buf bytes.Buffer
-
-	waitFor(t, tm, &buf, marker)
+	// Wait for the async staged review to land (the marker row rendered) before
+	// sending interaction keys, so the keys act on a loaded page.
+	waitFor(t, tm, marker)
 
 	for _, k := range presses {
 		tm.Send(k)
-		time.Sleep(50 * time.Millisecond)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	_, _ = io.Copy(&buf, tm.Output())
-
 	tm.Send(keyPress('q'))
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
-	_, _ = io.Copy(&buf, tm.Output())
-
-	return buf.Bytes()
+	return settledAppScreen(t, tm)
 }
 
 // captureStaging drives a staging app to its loaded state (optionally toggling to
-// value view with `v`) and returns the captured byte stream.
-func captureStaging(t *testing.T, m *App, marker string, valueView bool) []byte {
+// value view with `v`), quits, and renders the settled final model's screen.
+func captureStaging(t *testing.T, m *App, marker string, valueView bool) string {
 	t.Helper()
 
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
 
-	var buf bytes.Buffer
-
-	waitFor(t, tm, &buf, marker)
+	waitFor(t, tm, marker)
 
 	if valueView {
 		tm.Send(keyPress('v'))
-		time.Sleep(100 * time.Millisecond)
-
-		_, _ = io.Copy(&buf, tm.Output())
 	}
 
 	tm.Send(keyPress('q'))
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
-	_, _ = io.Copy(&buf, tm.Output())
-
-	return buf.Bytes()
+	return settledAppScreen(t, tm)
 }
 
-// waitFor accumulates output until marker appears (or the deadline).
-func waitFor(t *testing.T, tm *teatest.TestModel, buf *bytes.Buffer, marker string) {
+// settledAppScreen waits for the program to finish, then renders the settled
+// *App final model's full-screen View().Content through the vt. Rendering the
+// settled View — not the live frame stream — is what makes the golden
+// deterministic under CI's parallel -race (#764).
+func settledAppScreen(t *testing.T, tm *teatest.TestModel) string {
 	t.Helper()
+
+	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
+
+	app, ok := fm.(*App)
+	require.True(t, ok, "final model must be *App")
+
+	return renderVisibleScreenSize(t, []byte(app.View().Content), browserTermWidth, browserTermHeight)
+}
+
+// waitFor drains the live output until marker appears (or the deadline). It only
+// gates on the async load having rendered; the golden is taken from the settled
+// FinalModel, not from this stream.
+func waitFor(t *testing.T, tm *teatest.TestModel, marker string) {
+	t.Helper()
+
+	var buf bytes.Buffer
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		_, _ = io.Copy(buf, tm.Output())
+		_, _ = io.Copy(&buf, tm.Output())
 		if bytes.Contains(buf.Bytes(), []byte(marker)) {
-			break
+			return
 		}
 
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	require.Contains(t, buf.String(), marker, "staging content never rendered")
+	require.Contains(t, buf.String(), marker, "content never rendered")
 }
 
 // TestStaging_ApplyConfirmGolden renders the apply confirmation dialog (target
@@ -431,9 +435,8 @@ func TestStaging_ApplyResultsGolden(t *testing.T) { //nolint:paralleltest // gol
 	})
 
 	// Focus Apply (row 1) and confirm to reach the results view.
-	raw := captureDialogWithKeys(t, newDialogHost(d, nil), "Apply results",
-		keyDownMsg(), keyEnterMsg())
-	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(d, nil), "Apply results",
+		keyDownMsg(), keyEnterMsg()))
 }
 
 // TestStaging_ApplyResultsScrollableGolden pins the #687 fix: an apply result set
@@ -462,9 +465,8 @@ func TestStaging_ApplyResultsScrollableGolden(t *testing.T) { //nolint:parallelt
 	})
 
 	// Focus Apply (row 1) and confirm to reach the results view.
-	raw := captureDialogWithKeys(t, newDialogHost(d, nil), "enter/esc: close",
-		keyDownMsg(), keyEnterMsg())
-	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(d, nil), "enter/esc: close",
+		keyDownMsg(), keyEnterMsg()))
 }
 
 // TestStaging_RoundTrip stages a secret create through the Step-4 mutator, then
