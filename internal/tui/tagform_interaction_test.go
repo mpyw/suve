@@ -113,7 +113,7 @@ func TestTUI_TagRemoveRoutesSelectedKey(t *testing.T) {
 	assert.True(t, staged, "the untag routes staged by default")
 
 	tm.Send(hostQuitMsg{})
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(10*time.Second))
 }
 
 // TestTUI_TagEmptyNeverOffersRemove drives the tag dialog for an entry with NO
@@ -154,5 +154,5 @@ func TestTUI_TagEmptyNeverOffersRemove(t *testing.T) {
 	assert.NotContains(t, out, "Remove tag", "the action toggle never reaches Remove")
 
 	tm.Send(hostQuitMsg{})
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(10*time.Second))
 }

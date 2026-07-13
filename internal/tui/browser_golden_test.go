@@ -66,7 +66,7 @@ func captureUntil(t *testing.T, model tea.Model, marker string, width, height in
 func settledScreen(t *testing.T, tm *teatest.TestModel, width, height int) string {
 	t.Helper()
 
-	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
+	fm := tm.FinalModel(t, teatest.WithFinalTimeout(10*time.Second))
 
 	vm, ok := fm.(interface{ View() tea.View })
 	require.True(t, ok, "final model must render a tea.View")

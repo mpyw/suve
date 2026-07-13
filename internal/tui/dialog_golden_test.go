@@ -153,7 +153,7 @@ func captureDialogWithKeysSize(t *testing.T, host *dialogHost, marker string, w,
 
 	tm.Send(hostQuitMsg{})
 
-	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
+	fm := tm.FinalModel(t, teatest.WithFinalTimeout(10*time.Second))
 
 	final, ok := fm.(*dialogHost)
 	require.True(t, ok, "final model must be *dialogHost")

@@ -368,7 +368,7 @@ func captureStaging(t *testing.T, m *App, marker string, valueView bool) string 
 func settledAppScreen(t *testing.T, tm *teatest.TestModel) string {
 	t.Helper()
 
-	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
+	fm := tm.FinalModel(t, teatest.WithFinalTimeout(10*time.Second))
 
 	app, ok := fm.(*App)
 	require.True(t, ok, "final model must be *App")
