@@ -189,12 +189,11 @@ mise build-cli
 # Binary: bin/suve
 ```
 
-**CLI/TUI + GUI** (requires [Wails CLI](https://wails.io/) and [Node.js](https://nodejs.org/)):
+**CLI/TUI + GUI** (requires [Node.js](https://nodejs.org/) for the frontend build):
 
 ```bash
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
-cd gui && wails build -tags production -skipbindings
-# Binary: gui/build/bin/gui
+mise build-gui
+# Binary: bin/suve  (run `suve --gui`)
 ```
 
 **Build dependencies for GUI:**
@@ -218,10 +217,10 @@ Linux requires GTK3 and WebKit2GTK:
 | Fedora 40+ | `sudo dnf install gtk3-devel webkit2gtk4.1-devel` |
 | Arch Linux | `sudo pacman -S gtk3 webkit2gtk-4.1` |
 
-For **webkit2gtk-4.1** (Ubuntu 24.04+, Fedora 40+, Arch Linux), use the `webkit2_41` build tag:
+For **webkit2gtk-4.1** (Ubuntu 24.04+, Fedora 40+, Arch Linux), add the `webkit2_41` build tag via `SUVE_GUI_TAGS`:
 
 ```bash
-cd gui && wails build -tags production,webkit2_41 -skipbindings
+SUVE_GUI_TAGS=production,webkit2_41 mise build-gui
 ```
 
 </details>
