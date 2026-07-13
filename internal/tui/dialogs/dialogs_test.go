@@ -777,21 +777,35 @@ func TestEntryForm_NameValidatorRequired(t *testing.T) {
 	require.NoError(t, d.nameValidator()("/app/X"), "a non-empty name passes")
 }
 
-// TestFormKeyMap_ValueDoneBindings pins the Value textarea's key contract: Enter
-// inserts a newline (so it cannot double as next/submit), while ctrl+s ("done")
-// confirms the value — advancing to the next field (Next) and, on the last field,
-// completing the form (Submit). This is what stops ctrl+s from skipping the field
-// below the value (e.g. Description).
-func TestFormKeyMap_ValueDoneBindings(t *testing.T) {
+// TestEntryFormTheme_OKButtonInvertsOnFocus pins that the "[ OK ]" button is
+// reverse-video only while focused: huh's single-affirmative Confirm always renders
+// the affirmative with the group's FocusedButton, so the focus cue must live in the
+// focused-vs-blurred button styles. Reverse (no hard-coded colors) reads in both
+// light and dark terminals.
+func TestEntryFormTheme_OKButtonInvertsOnFocus(t *testing.T) {
+	t.Parallel()
+
+	for _, dark := range []bool{true, false} {
+		s := entryFormTheme().Theme(dark)
+		assert.True(t, s.Focused.FocusedButton.GetReverse(), "the focused OK button inverts (dark=%v)", dark)
+		assert.False(t, s.Blurred.FocusedButton.GetReverse(), "the blurred OK button is plain (dark=%v)", dark)
+	}
+}
+
+// TestFormKeyMap_MultilineBindings pins the multi-line field key contract: Enter
+// inserts a newline (never next/submit), Tab advances to the next field, and the
+// field never submits on its own — the form is completed from the "[ OK ]" button,
+// so a multi-line field is never the last field and its Submit is disabled.
+func TestFormKeyMap_MultilineBindings(t *testing.T) {
 	t.Parallel()
 
 	km := formKeyMap()
-	ctrlS := tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
+	tab := tea.KeyPressMsg{Code: tea.KeyTab}
 
 	assert.True(t, key.Matches(keyEnter(), km.Text.NewLine), "enter inserts a newline")
-	assert.False(t, key.Matches(keyEnter(), km.Text.Submit), "enter never submits the textarea")
-	assert.True(t, key.Matches(ctrlS, km.Text.Next), "ctrl+s advances to the next field")
-	assert.True(t, key.Matches(ctrlS, km.Text.Submit), "ctrl+s completes the form from the last field")
+	assert.True(t, key.Matches(tab, km.Text.Next), "tab advances to the next field")
+	assert.False(t, key.Matches(keyEnter(), km.Text.Next), "enter does not advance (it inserts a newline)")
+	assert.False(t, key.Matches(keyEnter(), km.Text.Submit), "a multi-line field never submits on enter")
 }
 
 // TestDeleteConfirm_ForceRecoveryGating pins that force/recovery rows appear only

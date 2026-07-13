@@ -19,9 +19,9 @@ import (
 
 // recordingEntryMutator records the create the entry dialog routes, so an
 // interaction test can assert the value AND the field below it (Description) both
-// reach the mutator — i.e. ctrl+s ("done") on the Value textarea advances to
-// Description instead of skipping it. Concurrency-safe: the tea program calls it
-// from its own goroutine while the test polls from another.
+// reach the mutator — i.e. Tab off the Value textarea reaches Description instead of
+// skipping it. Concurrency-safe: the tea program calls it from its own goroutine
+// while the test polls from another.
 type recordingEntryMutator struct {
 	cap capability.ServiceCapability
 
@@ -70,12 +70,12 @@ func (m *recordingEntryMutator) snapshot() (created bool, value, description str
 	return m.created, m.value, m.description, m.staged
 }
 
-// TestTUI_EntryCtrlSAdvancesToDescription drives a create through the real event
-// loop: on the Value textarea ctrl+s ("done") confirms the value and advances to
-// Description (rather than submitting the form and skipping it), so a Description
-// typed after ctrl+s reaches the write. The final Enter on Description completes the
-// form, and Enter in the Stage/Apply popup commits with the default (staged) mode.
-func TestTUI_EntryCtrlSAdvancesToDescription(t *testing.T) {
+// TestTUI_EntryTabToOKSubmits drives a create through the real event loop with the
+// Tab/OK model: Enter in the multi-line Value/Description inserts newlines, Tab walks
+// Value → Description → the "[ OK ]" button, Enter on OK completes the form, and
+// Enter in the Stage/Apply popup commits with the default (staged) mode. It proves a
+// multi-line Description typed after the Value is NOT skipped.
+func TestTUI_EntryTabToOKSubmits(t *testing.T) {
 	t.Parallel()
 
 	mut := &recordingEntryMutator{cap: capability.ServiceCapability{
@@ -96,14 +96,17 @@ func TestTUI_EntryCtrlSAdvancesToDescription(t *testing.T) {
 			send(tea.KeyPressMsg{Code: r, Text: string(r)})
 		}
 	}
+	tab := func() { send(tea.KeyPressMsg{Code: tea.KeyTab}) }
+	enter := func() { send(tea.KeyPressMsg{Code: tea.KeyEnter}) }
 
 	typeStr("myname")
-	send(tea.KeyPressMsg{Code: tea.KeyEnter}) // Name -> Value
-	typeStr("myvalue")
-	send(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}) // Value: confirm + advance -> Description
+	enter()            // Name (single-line) -> Value
+	typeStr("myvalue") // Enter here would be a newline, so Tab advances instead
+	tab()              // Value -> Description
 	typeStr("mydesc")
-	send(tea.KeyPressMsg{Code: tea.KeyEnter}) // Description (last) -> complete -> popup
-	send(tea.KeyPressMsg{Code: tea.KeyEnter}) // popup: commit (staged default)
+	tab()   // Description -> [ OK ]
+	enter() // OK -> complete -> Stage/Apply popup
+	enter() // popup: commit (staged default)
 
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
@@ -117,7 +120,7 @@ func TestTUI_EntryCtrlSAdvancesToDescription(t *testing.T) {
 	created, value, description, staged := mut.snapshot()
 	assert.True(t, created, "the create reaches the mutator")
 	assert.Equal(t, "myvalue", value, "the value is written")
-	assert.Equal(t, "mydesc", description, "the Description typed after ctrl+s is NOT skipped")
+	assert.Equal(t, "mydesc", description, "the multi-line Description is NOT skipped")
 	assert.True(t, staged, "the default popup choice stages the write")
 
 	tm.Send(hostQuitMsg{})

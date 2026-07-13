@@ -8,7 +8,11 @@
 │  ┃                                                       │
 │                                                          │
 │    Description                                           │
-│    > (optional)                                          │
-│  tab/↑↓: fields · enter: newline · ctrl+s: done ·        │
-│  ctrl+e: $EDITOR · esc: cancel                           │
+│    (optional)                                            │
+│                                                          │
+│                                                          │
+│                                                          │
+│     OK                                                   │
+│  tab/shift+tab: fields · enter: newline · ctrl+o:        │
+│  $EDITOR · esc: cancel                                   │
 ╰──────────────────────────────────────────────────────────╯
