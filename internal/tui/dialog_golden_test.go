@@ -2,9 +2,7 @@
 package tui
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"testing"
 	"time"
 
@@ -91,69 +89,32 @@ func (h *dialogHost) View() tea.View {
 }
 
 // captureDialog drives a hosted dialog to its rendered state (until marker
-// appears) and returns the byte stream, quitting via the host sentinel so no key
-// is typed into the embedded form.
-func captureDialog(t *testing.T, host *dialogHost, marker string) []byte {
+// appears), quits via the host sentinel (so no key is typed into the embedded
+// form), and renders the SETTLED final model's screen.
+//
+// Like the staging helpers, the golden is taken from the final
+// dialogHost.View().Content — a single coherent full render of the settled
+// dialog after the WindowSizeMsg and every sent message are processed — not from
+// the live teatest frame stream, which emits timing-dependent diff frames that
+// the vt replay intermittently corrupts under CI's parallel -race (#764).
+func captureDialog(t *testing.T, host *dialogHost, marker string) string {
 	t.Helper()
 
-	tm := teatest.NewTestModel(t, host, teatest.WithInitialTermSize(goldenTermWidth, goldenTermHeight))
-
-	var buf bytes.Buffer
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		_, _ = io.Copy(&buf, tm.Output())
-		if bytes.Contains(buf.Bytes(), []byte(marker)) {
-			break
-		}
-
-		time.Sleep(20 * time.Millisecond)
-	}
-
-	require.Contains(t, buf.String(), marker, "dialog content never rendered")
-
-	tm.Send(hostQuitMsg{})
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
-
-	_, _ = io.Copy(&buf, tm.Output())
-
-	return buf.Bytes()
+	return captureDialogSize(t, host, marker, goldenTermWidth, goldenTermHeight)
 }
 
 func dialogGolden(t *testing.T, host *dialogHost, marker string) {
 	t.Helper()
 
-	raw := captureDialog(t, host, marker)
-	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+	golden.RequireEqual(t, captureDialog(t, host, marker))
 }
 
 // captureDialogSize is captureDialog at an explicit terminal size, so a dialog
 // can be goldened at the minimum supported 60×16 (the #686 clip/wrap fix).
-func captureDialogSize(t *testing.T, host *dialogHost, marker string, w, h int) []byte {
+func captureDialogSize(t *testing.T, host *dialogHost, marker string, w, h int) string {
 	t.Helper()
 
-	tm := teatest.NewTestModel(t, host, teatest.WithInitialTermSize(w, h))
-
-	var buf bytes.Buffer
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		_, _ = io.Copy(&buf, tm.Output())
-		if bytes.Contains(buf.Bytes(), []byte(marker)) {
-			break
-		}
-
-		time.Sleep(20 * time.Millisecond)
-	}
-
-	require.Contains(t, buf.String(), marker, "dialog content never rendered")
-
-	tm.Send(hostQuitMsg{})
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
-
-	_, _ = io.Copy(&buf, tm.Output())
-
-	return buf.Bytes()
+	return captureDialogWithKeysSize(t, host, marker, w, h)
 }
 
 // dialogGoldenSize goldens a hosted dialog rendered at an explicit terminal size
@@ -162,44 +123,42 @@ func captureDialogSize(t *testing.T, host *dialogHost, marker string, w, h int) 
 func dialogGoldenSize(t *testing.T, host *dialogHost, marker string, w, h int) {
 	t.Helper()
 
-	raw := captureDialogSize(t, host, marker, w, h)
-	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, w, h))
+	golden.RequireEqual(t, captureDialogSize(t, host, marker, w, h))
 }
 
 // captureDialogWithKeys drives a hosted dialog, first replaying the given key
 // presses (so a golden can capture a post-interaction state — e.g. an immediate
-// delete after the mode toggle), then captures once the marker appears. The final
-// rendered screen reflects the last frame, so the pre-toggle frame in the stream
-// is harmless.
-func captureDialogWithKeys(t *testing.T, host *dialogHost, marker string, keys ...tea.KeyPressMsg) []byte {
+// delete after the mode toggle), waits for the marker to render, quits, and
+// renders the settled final model's screen at the default golden size.
+func captureDialogWithKeys(t *testing.T, host *dialogHost, marker string, keys ...tea.KeyPressMsg) string {
 	t.Helper()
 
-	tm := teatest.NewTestModel(t, host, teatest.WithInitialTermSize(goldenTermWidth, goldenTermHeight))
+	return captureDialogWithKeysSize(t, host, marker, goldenTermWidth, goldenTermHeight, keys...)
+}
+
+// captureDialogWithKeysSize is the shared dialog driver: at the given terminal
+// size it replays the keys, waits for the marker (so any async rebuild has
+// rendered), quits via the host sentinel, and renders the settled final model's
+// View().Content through the vt.
+func captureDialogWithKeysSize(t *testing.T, host *dialogHost, marker string, w, h int, keys ...tea.KeyPressMsg) string {
+	t.Helper()
+
+	tm := teatest.NewTestModel(t, host, teatest.WithInitialTermSize(w, h))
 
 	for _, k := range keys {
 		tm.Send(k)
 	}
 
-	var buf bytes.Buffer
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		_, _ = io.Copy(&buf, tm.Output())
-		if bytes.Contains(buf.Bytes(), []byte(marker)) {
-			break
-		}
-
-		time.Sleep(20 * time.Millisecond)
-	}
-
-	require.Contains(t, buf.String(), marker, "dialog content never rendered")
+	waitFor(t, tm, marker)
 
 	tm.Send(hostQuitMsg{})
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
-	_, _ = io.Copy(&buf, tm.Output())
+	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
 
-	return buf.Bytes()
+	final, ok := fm.(*dialogHost)
+	require.True(t, ok, "final model must be *dialogHost")
+
+	return renderVisibleScreenSize(t, []byte(final.View().Content), w, h)
 }
 
 // keyDownMsg / keyEnterMsg are the golden-driver key presses for navigating a
@@ -297,9 +256,8 @@ func TestDialog_DeleteAWSSecretImmediateGolden(t *testing.T) { //nolint:parallel
 
 	// From the default (staged) focus on Force, move down to the Mode row and
 	// toggle to immediate.
-	raw := captureDialogWithKeys(t, newDialogHost(m, nil), "(•) Apply immediately",
-		keyDownMsg(), keyDownMsg(), keyEnterMsg())
-	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(m, nil), "(•) Apply immediately",
+		keyDownMsg(), keyDownMsg(), keyEnterMsg()))
 }
 
 // TestDialog_DeleteGCloudSecretGolden renders the delete confirm for Google
@@ -342,8 +300,7 @@ func TestDialog_TagRemoveSelectGolden(t *testing.T) { //nolint:paralleltest // g
 
 	// Right toggles the inline action select from Add to Remove; the form rebuilds
 	// onto the Remove branch and shows the existing-tags select.
-	raw := captureDialogWithKeys(t, newDialogHost(m, cmd), "env=prod", keyRightMsg())
-	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(m, cmd), "env=prod", keyRightMsg()))
 }
 
 // TestDialog_TagAddOnlyWhenNoTagsGolden renders the tag form for an entry with NO
@@ -360,8 +317,7 @@ func TestDialog_TagAddOnlyWhenNoTagsGolden(t *testing.T) { //nolint:paralleltest
 
 	// Right cannot toggle to Remove (it is not offered); the form stays on the Add
 	// branch with the free-text key input.
-	raw := captureDialogWithKeys(t, newDialogHost(m, cmd), "Action", keyRightMsg())
-	golden.RequireEqual(t, renderVisibleScreen(t, raw))
+	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(m, cmd), "Action", keyRightMsg()))
 }
 
 // TestDialog_EntryFormStagedOnlyGolden renders the edit form as launched from the

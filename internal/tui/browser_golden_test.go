@@ -486,7 +486,17 @@ func captureBrowserAfterKeys(t *testing.T, m *App, marker string, keys ...tea.Ke
 
 	var buf bytes.Buffer
 
-	waitFor(t, tm, &buf, marker)
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		_, _ = io.Copy(&buf, tm.Output())
+		if bytes.Contains(buf.Bytes(), []byte(marker)) {
+			break
+		}
+
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	require.Contains(t, buf.String(), marker, "loaded content never rendered")
 
 	for _, k := range keys {
 		tm.Send(k)
