@@ -274,6 +274,74 @@ func TestUpdate_DiffViewRevealedByDefault(t *testing.T) {
 	assert.Contains(t, m.View(100, 30), staged1, "toggling back shows the values again")
 }
 
+// TestUpdate_CreateRevealInDiffView pins #760: in the DEFAULT diff view a
+// create-staged secret is masked by default (a create is a lone new value, not a
+// remote-vs-staged comparison, #719) but MUST be revealable in place with `x`.
+// The create-in-diff branch renders through the per-row reveal (maskValue /
+// m.reveal), so `x` on a create row toggles that per-row reveal even in diff
+// view — while an update row keeps the reveal-by-default page-level hide (#735)
+// untouched. Before the fix `x` on a create flipped only m.diffHidden, which the
+// create branch never reads, so the create value was permanently masked.
+func TestUpdate_CreateRevealInDiffView(t *testing.T) {
+	t.Parallel()
+
+	const (
+		createStaged = "CREATE-SECRET-VALUE"
+		updateRemote = "UPDATE-REMOTE-VALUE"
+		updateStaged = "UPDATE-STAGED-VALUE"
+	)
+
+	sec := &stubService{
+		service: "secret", label: "Secret", svcCap: capFor("aws", "secret"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{
+			{Name: "prod/api/new", Type: data.StagedDiffNormal, Operation: "create", StagedValue: createStaged},
+			{Name: "prod/api/old", Type: data.StagedDiffNormal, Operation: "update", RemoteValue: updateRemote, StagedValue: updateStaged},
+		}},
+	}
+	m := newModel(t, sec)
+	require.True(t, m.diffView, "diff is the default view")
+	require.Len(t, m.rows, 2, "one create row and one update row")
+
+	// Default diff view: the create is MASKED (masked-by-default per #719) while
+	// the update's remote-vs-staged comparison is REVEALED (reveal-by-default,
+	// #735).
+	screen := m.View(100, 30)
+	assert.NotContains(t, screen, createStaged, "a create is masked by default in diff view (#719)")
+	assert.Contains(t, screen, updateRemote, "an update reveals its remote by default (#735)")
+	assert.Contains(t, screen, updateStaged, "an update reveals its staged value by default (#735)")
+
+	// Select the create row and press `x`: the create value is now REVEALED in
+	// place (per-row reveal), and the update rows are untouched.
+	m.selected = 0
+	m, cmd := m.Update(keyPress('x'))
+	assert.Nil(t, cmd, "x dispatches no command on a create row")
+	require.True(t, m.reveal, "x on a create row toggles the per-row reveal, not the page-level hide")
+	require.False(t, m.diffHidden, "x on a create row must not touch the page-level diff hide")
+
+	screen = m.View(100, 30)
+	assert.Contains(t, screen, createStaged, "x reveals the create-staged secret in diff view (#760)")
+	assert.Contains(t, screen, updateStaged, "revealing a create leaves the update reveal untouched")
+
+	// The `x` help label reads "reveal" (not "hide") while a create row is
+	// selected, since for a create `x` reveals.
+	assert.Equal(t, "reveal", m.xKey().Help().Desc, "x reads 'reveal' on a selected create row")
+
+	// Select the update row: `x` still toggles the page-level hide (#735) — it
+	// masks the update comparison, unchanged by the fix.
+	m.selected = 1
+	m, _ = m.Update(keyPress('x'))
+	require.True(t, m.diffHidden, "x on an update row hides the diff view (page-level, #735)")
+
+	screen = m.View(100, 30)
+	assert.NotContains(t, screen, updateRemote, "x hides the update's remote comparison (#735)")
+	assert.NotContains(t, screen, updateStaged, "x hides the update's staged comparison (#735)")
+
+	// `x` again reveals the update comparison: the page-level hide toggles back.
+	m, _ = m.Update(keyPress('x'))
+	require.False(t, m.diffHidden, "x toggles the page-level hide back to revealed")
+	assert.Contains(t, m.View(100, 30), updateStaged, "toggling back shows the update comparison again")
+}
+
 // tagOpsReview is a param section with one staged tag add and one staged tag
 // removal (no entry rows), used to exercise the tag-row key handling.
 func tagOpsReview() data.StagingReview {
