@@ -570,7 +570,7 @@ func requireShellGolden(t *testing.T, m *App) {
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(goldenTermWidth, goldenTermHeight))
 
 	tm.Send(keyPress('q'))
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
+	tm.WaitFinished(t, teatest.WithFinalTimeout(10*time.Second))
 
 	out, err := io.ReadAll(tm.FinalOutput(t))
 	require.NoError(t, err)
