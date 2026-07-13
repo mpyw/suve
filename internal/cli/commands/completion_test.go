@@ -20,15 +20,15 @@ func TestIsShellCompletion(t *testing.T) {
 		want bool
 	}{
 		"present": {
-			args: []string{"suve", "param", "show", "--generate-shell-completion"},
+			args: []string{appName, nounParam, "show", "--generate-shell-completion"},
 			want: true,
 		},
 		"present as only arg after program": {
-			args: []string{"suve", "--generate-shell-completion"},
+			args: []string{appName, "--generate-shell-completion"},
 			want: true,
 		},
 		"absent": {
-			args: []string{"suve", "param", "show", "/my/param"},
+			args: []string{appName, nounParam, "show", "/my/param"},
 			want: false,
 		},
 		"empty": {
@@ -73,7 +73,7 @@ func TestTUILaunch_ShellCompletion(t *testing.T) {
 	RegisterTUIFlag()
 
 	t.Run("completion falls through and does not launch the TUI", func(t *testing.T) {
-		args := []string{"suve", "--tui", completionFlag}
+		args := []string{appName, "--tui", completionFlag}
 		os.Args = args
 
 		var out bytes.Buffer
@@ -87,7 +87,7 @@ func TestTUILaunch_ShellCompletion(t *testing.T) {
 	})
 
 	t.Run("without completion the wrapper still honors --tui", func(t *testing.T) {
-		args := []string{"suve", "--tui"}
+		args := []string{appName, "--tui"}
 		os.Args = args
 
 		var out bytes.Buffer

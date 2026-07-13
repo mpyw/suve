@@ -305,11 +305,16 @@ func tuiGroupProvider(name string) provider.Provider {
 	}
 }
 
+// nounParam is the param service subgroup name. It is a named constant so the
+// literal is not repeated across this package (goconst); tuiService and the
+// completion test both reference it.
+const nounParam = "param"
+
 // tuiService maps a provider subgroup's canonical name to the launch service
 // ("param"/"secret"), or "" when the command is not a service subgroup.
 func tuiService(name string) string {
 	switch name {
-	case "param", "secret":
+	case nounParam, "secret":
 		return name
 	default:
 		return ""
