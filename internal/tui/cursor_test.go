@@ -191,10 +191,76 @@ func TestAppCursor_RestoreName(t *testing.T) {
 func TestAppCursor_TagKey(t *testing.T) {
 	t.Parallel()
 
-	// The tag form opens on the Action select (no caret); tab to the Key input.
+	// With no removable tags the Action select is dropped, so the tag form opens
+	// straight on the Key text input — a caret is drawn immediately.
 	m := openTextDialog(t, "param", nav.OpenTag{Service: "param", Name: "/app/api/DB"},
-		tea.KeyPressMsg{Code: tea.KeyTab}, typeKey('k'))
+		typeKey('k'))
 	requireCaretOnScreen(t, m)
+}
+
+// TestAppCursor_BrowserFilter pins that a page's own text input — not just a
+// dialog field — gets the real terminal cursor: focusing the browser's filter and
+// typing draws the caret at the insertion point (#765 parity for page inputs).
+func TestAppCursor_BrowserFilter(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
+
+	m = updateApp(t, m, typeKey('/')) // browser: focus the filter input
+	require.True(t, m.activePageCapturesInput(), "the filter input is focused")
+
+	m = updateApp(t, m, typeKey('a'))
+	requireCaretOnScreen(t, m)
+}
+
+// TestAppCursor_BrowserPrefix pins the same for the browser's prefix input.
+func TestAppCursor_BrowserPrefix(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
+
+	m = updateApp(t, m, typeKey('p')) // browser: focus the prefix input
+	require.True(t, m.activePageCapturesInput(), "the prefix input is focused")
+
+	m = updateApp(t, m, typeKey('x'))
+	requireCaretOnScreen(t, m)
+}
+
+// TestAppCursor_BrowserFilterTracksArrows pins that the caret follows the input's
+// cursor position: after typing, ← moves the drawn caret (and the real terminal
+// cursor) one cell left instead of leaving it pinned to the end.
+func TestAppCursor_BrowserFilterTracksArrows(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
+
+	m = updateApp(t, m, typeKey('/'))
+	for _, r := range "abc" {
+		m = updateApp(t, m, typeKey(r))
+	}
+
+	end := requireCaretOnScreen(t, m)
+
+	m = updateApp(t, m, tea.KeyPressMsg{Code: tea.KeyLeft})
+	left := requireCaretOnScreen(t, m)
+
+	assert.Equal(t, end.Y, left.Y, "← keeps the caret on the same row")
+	assert.Equal(t, end.X-1, left.X, "← moves the caret one cell left of the end")
 }
 
 func TestAppCursor_NoneWhenNoTextField(t *testing.T) {
@@ -203,10 +269,6 @@ func TestAppCursor_NoneWhenNoTextField(t *testing.T) {
 	// The delete-confirm dialog has only selects/confirm rows — no text caret.
 	m := openTextDialog(t, "secret", nav.OpenDelete{Service: "secret", Name: "prod/api/old"})
 	assert.Nil(t, m.View().Cursor, "a dialog with no focused text field draws no cursor")
-
-	// The tag form opens focused on the Action select — also no caret yet.
-	m2 := openTextDialog(t, "param", nav.OpenTag{Service: "param", Name: "/app/api/DB"})
-	assert.Nil(t, m2.View().Cursor, "a select-focused dialog draws no cursor")
 }
 
 func TestAppCursor_NoneWhenNoDialog(t *testing.T) {

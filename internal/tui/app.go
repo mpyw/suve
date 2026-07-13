@@ -279,7 +279,7 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case cursor.BlinkMsg:
 		// Swallow the embedded text inputs' virtual-cursor blink so the focused
 		// field's caret stays steadily rendered: the app draws the real terminal
-		// cursor at that caret (see App.View / dialogCursor), which it locates by the
+		// cursor at that caret (see App.View / screenCursor), which it locates by the
 		// field's steady virtual-cursor cell. Dropping the blink keeps that cell —
 		// and thus the caret position — present every frame instead of flickering
 		// off, and the real cursor still blinks natively (#765).
@@ -1077,10 +1077,12 @@ func (m *App) View() tea.View {
 	screen := m.render()
 	view.SetContent(screen)
 	// Set the real terminal cursor at the focused text field's caret so a visible
-	// caret is drawn there — the embedded huh form's virtual cursor alone does not
+	// caret is drawn there — a bubbles text input's virtual cursor alone does not
 	// surface one under AltScreen (#765). The caret is read from the composited
-	// screen we just built, so it tracks the field wherever the dialog is drawn.
-	view.Cursor = m.dialogCursor(screen)
+	// screen we just built, so it tracks the focused field wherever it is drawn: a
+	// dialog's input (create/edit/tag/restore) or a page's own (the browser's
+	// prefix/filter).
+	view.Cursor = m.screenCursor(screen)
 
 	return view
 }

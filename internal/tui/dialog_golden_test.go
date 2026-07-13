@@ -269,7 +269,10 @@ func TestDialog_DeleteGCloudSecretGolden(t *testing.T) { //nolint:paralleltest /
 	dialogGolden(t, newDialogHost(m, nil), "Delete")
 }
 
-// TestDialog_TagAWSParamGolden renders the tag add/remove form.
+// TestDialog_TagAWSParamGolden renders the tag form for an entry with no loaded
+// tags: Add is the only action, so the Action select is dropped and the form opens
+// straight on the Key field. The Add/Remove choice is covered by
+// TestDialog_TagRemoveSelectGolden (an entry that has tags).
 func TestDialog_TagAWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
@@ -278,7 +281,7 @@ func TestDialog_TagAWSParamGolden(t *testing.T) { //nolint:paralleltest // golde
 		Service: "param", Styles: styles.New(), Name: "/app/api/DATABASE_URL",
 	})
 
-	dialogGolden(t, newDialogHost(m, cmd), "Action")
+	dialogGolden(t, newDialogHost(m, cmd), "Key")
 }
 
 // TestDialog_TagRemoveSelectGolden renders the tag form after toggling to the
@@ -299,10 +302,9 @@ func TestDialog_TagRemoveSelectGolden(t *testing.T) { //nolint:paralleltest // g
 	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(m, cmd), "env=prod", keyRightMsg()))
 }
 
-// TestDialog_TagAddOnlyWhenNoTagsGolden renders the tag form for an entry with NO
-// loaded tags: the Action toggle offers Add only — Remove is not offered, since
-// there is nothing to remove, so the user is never lured into an unusable Remove
-// (#761). Toggling right stays on Add.
+// TestDialog_TagAddOnlyWhenNoTagsGolden pins that for an entry with NO loaded tags
+// the user can never reach Remove (#761): with nothing to remove, Add is the only
+// action, so the Action select is dropped and a stray Right cannot toggle anything.
 func TestDialog_TagAddOnlyWhenNoTagsGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
@@ -311,9 +313,10 @@ func TestDialog_TagAddOnlyWhenNoTagsGolden(t *testing.T) { //nolint:paralleltest
 		Service: "param", Styles: styles.New(), Name: "/app/api/DATABASE_URL",
 	})
 
-	// Right cannot toggle to Remove (it is not offered); the form stays on the Add
-	// branch with the free-text key input.
-	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(m, cmd), "Action", keyRightMsg()))
+	// With no removable tags, Add is the only action, so the Action select is
+	// dropped entirely and the form opens on the free-text Key input; a stray Right
+	// there is a harmless cursor move, not an action toggle.
+	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(m, cmd), "Key", keyRightMsg()))
 }
 
 // TestDialog_EntryFormStagedOnlyGolden renders the edit form as launched from the
@@ -332,7 +335,8 @@ func TestDialog_EntryFormStagedOnlyGolden(t *testing.T) { //nolint:paralleltest 
 }
 
 // TestDialog_TagStagedOnlyGolden renders the tag form as launched from the staging
-// review page (StagedOnly): the mode toggle is gone (#679).
+// review page (StagedOnly): the mode toggle is gone (#679) and, with Add the only
+// action, the Action select is dropped — the form opens on the Key field.
 func TestDialog_TagStagedOnlyGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
@@ -341,7 +345,7 @@ func TestDialog_TagStagedOnlyGolden(t *testing.T) { //nolint:paralleltest // gol
 		Service: "param", Styles: styles.New(), Name: "/app/api/DATABASE_URL", StagedOnly: true,
 	})
 
-	dialogGolden(t, newDialogHost(m, cmd), "Action")
+	dialogGolden(t, newDialogHost(m, cmd), "Key")
 }
 
 // TestDialog_ErrorGolden renders the plain error dialog (a blocked operation the

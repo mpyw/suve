@@ -137,9 +137,19 @@ func (d *tagForm) rebuildForm() tea.Cmd {
 		actionOpts = append(actionOpts, huh.NewOption("Remove tag", true))
 	}
 
-	fields := []huh.Field{
-		huh.NewSelect[bool]().Key("action").Title("Action").Inline(true).
-			Options(actionOpts...).Value(&d.remove),
+	var fields []huh.Field
+
+	// Offer the Action select only when there is a genuine choice (Add vs Remove).
+	// When Remove is not available — a staged-only surface, or an entry with no
+	// removable tags — Add is the only action, and a one-option inline select that
+	// still demands an Enter to move past is pure friction (it cannot be changed and
+	// the user cannot tell it is inert). Drop it and open straight on the Key field
+	// with remove forced false; the header already says this is the tag dialog.
+	if len(actionOpts) > 1 {
+		fields = append(fields, huh.NewSelect[bool]().Key("action").Title("Action").Inline(true).
+			Options(actionOpts...).Value(&d.remove))
+	} else {
+		d.remove = false
 	}
 
 	// The key field morphs with the action: Add takes a free-text key + value (a

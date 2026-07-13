@@ -68,7 +68,7 @@ Load the matching skill under `.claude/skills/` before non-trivial work; each ho
 - **add-provider-adapter** — adding a cloud adapter (or a new service under one): the `Store` interface, SDK confinement, error mapping, version parsing, CLI/registry wiring, staging.
 - **add-e2e-emulator** — wiring an emulator-backed e2e seam: env gate, `compose.test.yaml` service, `mise e2e-<provider>` task, closed-network CI job, coverage upload.
 - **gui-change** — changing `internal/gui/**`: bindings-regenerate-then-rebuild rule, capability-driven UI, server-side guards, async-load checklist.
-- **refresh-demo-gifs** — re-recording CLI/GUI demo GIFs: record scripts, robust selectors, output-drift triggers, frame verification, Git LFS.
+- **refresh-demo-gifs** — re-recording CLI/TUI/GUI demo GIFs: record scripts, robust selectors, output-drift triggers, frame verification, Git LFS.
 - **bug-audit-epic** — running a codebase- or subsystem-wide bug audit: parallel investigators, adversarial verification, severity-grouped epic with linked sub-issues.
 - **bug-fix-pr** — turning one filed bug into a fix PR: reproduce, fix at the cited site, add regression tests at every layer, run gates.
 - **feature-epic-breakdown** — planning a multi-PR feature or cross-cutting refactor as a layer-ordered epic with standalone sub-issues.

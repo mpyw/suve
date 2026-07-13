@@ -7,28 +7,26 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// dialogCursor returns the real terminal cursor for the focused text field of an
-// open dialog, or nil when no dialog is open or none of its fields is a text
-// input. It takes the already-composited screen so the caret is read from the
-// exact frame the terminal will draw.
+// screenCursor returns the real terminal cursor for the focused text field
+// anywhere in the composited frame — an open dialog's field (create/edit/tag/
+// restore) OR a page's own input (the browser's prefix/filter) — or nil when no
+// text input is focused. It takes the already-composited screen so the caret is
+// read from the exact frame the terminal will draw.
 //
-// Why the app must drive the real cursor: the dialogs embed huh forms, whose
-// bubbles text inputs draw a *virtual* cursor (a reverse-video cell) into their
-// View string rather than exposing a caret position. That virtual cell does not
-// reliably surface a visible caret — it blinks itself off, and the app renders
-// under AltScreen with view.Cursor unset, which hides the real terminal cursor
-// entirely — so the user cannot see where they are typing (#765). huh v2 exposes
-// neither the caret position nor a real-cursor toggle, so the app instead locates
-// the caret directly in the composited screen: the focused text input paints a
-// steady reverse-video cell there (the app keeps it steady by swallowing the
-// blink; see App.Update), and nothing else in the TUI uses reverse video, so that
-// cell's screen position is the caret. Reading the final frame keeps the caret
-// correct regardless of where the dialog overlay is composited.
-func (m *App) dialogCursor(screen string) *tea.Cursor {
-	if len(m.dialogs) == 0 {
-		return nil
-	}
-
+// Why the app must drive the real cursor: the text fields are bubbles text inputs
+// (directly on a page, or embedded in a dialog's huh form), which draw a *virtual*
+// cursor (a reverse-video cell) into their View string rather than exposing a caret
+// position. That virtual cell does not reliably surface a visible caret — it blinks
+// itself off, and the app renders under AltScreen with view.Cursor unset, which
+// hides the real terminal cursor entirely — so the user cannot see where they are
+// typing (#765). Neither bubbles nor huh v2 exposes the caret position or a
+// real-cursor toggle, so the app instead locates the caret directly in the
+// composited screen: the focused text input paints a steady reverse-video cell
+// there (the app keeps it steady by swallowing the blink; see App.Update), and
+// nothing else in the TUI uses reverse video, so that cell's screen position is the
+// caret. Only one text input is ever focused at once (a dialog is modal, so the
+// page underneath is not in an edit field), so a single scan is unambiguous.
+func (m *App) screenCursor(screen string) *tea.Cursor {
 	col, row, ok := cursorCellPos(screen)
 	if !ok {
 		return nil

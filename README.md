@@ -31,7 +31,7 @@ A **Git-like CLI/TUI/GUI** for AWS Parameter Store / Secrets Manager, Google Clo
 - **Colored diff output**: Easy-to-read unified diff format
 - **Multi-cloud**: [AWS SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) / [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html), [Google Cloud Secret Manager](https://cloud.google.com/secret-manager/docs), and [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/) / [App Configuration](https://learn.microsoft.com/en-us/azure/azure-app-configuration/)
 - **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`). When no key is available (no keychain backend and no `SUVE_STAGING_KEY`), an interactive session falls back to plaintext with a warning, while a non-interactive one refuses to write unencrypted unless `SUVE_STAGING_ALLOW_PLAINTEXT` is set. Exported snapshot files carry a separately passphrase-encrypted payload ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode); an empty passphrase writes plaintext).
-- **TUI mode**: Keyboard-driven terminal UI via `--tui` flag (built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)); ships in every build, including the dependency-free CLI-only one
+- **TUI mode**: Keyboard-driven terminal UI via `--tui` flag (built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)); ships in every build, including the dependency-free CLI/TUI-only one
 - **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
 
 ### Metadata terminology
@@ -51,17 +51,17 @@ All key=value metadata is unified as **tags**; suve adds no per-provider command
 ## Installation
 
 > [!NOTE]
-> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI-only version if you only need CLI functionality. The keyboard-driven **TUI (`--tui`) is pure Go and ships in every build**, including the CLI-only one — only the desktop **GUI (`--gui`)** needs the GTK3/WebKit2GTK dependencies.
+> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI/TUI-only version if you don't need the desktop GUI. The keyboard-driven **TUI (`--tui`) is pure Go and ships in every build**, including the CLI/TUI-only one — only the desktop **GUI (`--gui`)** needs the GTK3/WebKit2GTK dependencies.
 
 ### Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
 
 suve is installable directly from GitHub Releases via mise's `github` backend — no extra registry required:
 
 ```bash
-# Full version (CLI + GUI)
+# Full version (CLI/TUI + GUI)
 mise use -g "github:mpyw/suve"
 
-# CLI-only version (no GUI dependencies, recommended for Linux. Not available on macOS/Windows)
+# CLI/TUI-only version (no GUI dependencies, recommended for Linux. Not available on macOS/Windows)
 mise use -g "github:mpyw/suve[matching=cli]"
 ```
 
@@ -80,15 +80,15 @@ suve is available in the [standard aqua registry](https://github.com/aquaproj/aq
 aqua g -i mpyw/suve
 ```
 
-The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI-only static build on Linux (supported from v1.6.1).
+The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (supported from v1.6.1).
 
 ### Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
 ```bash
-# Full version (CLI + GUI)
+# Full version (CLI/TUI + GUI)
 brew install mpyw/tap/suve
 
-# CLI-only version (no GUI dependencies, recommended for Linux)
+# CLI/TUI-only version (no GUI dependencies, recommended for Linux)
 brew install mpyw/tap/suve-cli
 ```
 
@@ -111,11 +111,11 @@ export VERSION=0.0.0
 export ARCH=amd64  # or arm64
 export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Ubuntu 24.04+
 
-# CLI-only (recommended, no GUI dependencies)
+# CLI/TUI-only (recommended, no GUI dependencies)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli_${VERSION}-1_${ARCH}.deb"
 sudo dpkg -i "suve-cli_${VERSION}-1_${ARCH}.deb"
 
-# Full version (CLI + GUI, requires GTK3 and WebKit2GTK)
+# Full version (CLI/TUI + GUI, requires GTK3 and WebKit2GTK)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
 sudo dpkg -i "suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
 ```
@@ -129,11 +129,11 @@ export VERSION=0.0.0
 export ARCH=x86_64  # or aarch64
 export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Fedora 40+
 
-# CLI-only (recommended, no GUI dependencies)
+# CLI/TUI-only (recommended, no GUI dependencies)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli-${VERSION}-1.${ARCH}.rpm"
 sudo rpm -i "suve-cli-${VERSION}-1.${ARCH}.rpm"
 
-# Full version (CLI + GUI, requires GTK3 and WebKit2GTK)
+# Full version (CLI/TUI + GUI, requires GTK3 and WebKit2GTK)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 sudo rpm -i "suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 ```
@@ -143,18 +143,18 @@ sudo rpm -i "suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 </details>
 
 <details>
-<summary>Using <code>go install</code> (CLI only)</summary>
+<summary>Using <code>go install</code> (CLI/TUI only)</summary>
 
 ```bash
 go install github.com/mpyw/suve/cmd/suve@latest
 ```
 
-**Note:** `go install` builds CLI only. GUI requires pre-built assets that are not included in the Go module. For GUI support, use a [package manager](#installation) or [build from source](#building-from-source).
+**Note:** `go install` builds the CLI/TUI only. The desktop GUI requires pre-built assets that are not included in the Go module. For GUI support, use a [package manager](#installation) or [build from source](#building-from-source).
 
 </details>
 
 <details>
-<summary>Using <code>go tool</code> (CLI only, Go 1.25+)</summary>
+<summary>Using <code>go tool</code> (CLI/TUI only, Go 1.25+)</summary>
 
 ```bash
 # Add to go.mod as a tool dependency
@@ -178,14 +178,14 @@ git clone https://github.com/mpyw/suve.git
 cd suve
 ```
 
-**CLI only:**
+**CLI/TUI only:**
 
 ```bash
 mise build-cli
 # Binary: bin/suve
 ```
 
-**CLI + GUI** (requires [Wails CLI](https://wails.io/) and [Node.js](https://nodejs.org/)):
+**CLI/TUI + GUI** (requires [Wails CLI](https://wails.io/) and [Node.js](https://nodejs.org/)):
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
