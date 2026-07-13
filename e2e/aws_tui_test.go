@@ -260,3 +260,11 @@ func TestTUIAWS_StageApply(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, stagedVal, stdout, "the TUI apply wrote the staged value to the emulator")
 }
+
+// NOTE: the entry-form Ctrl+E / Ctrl+A key fix is covered at the unit layer
+// (internal/tui/dialogs: TestFormKeyMap_MultilineBindings and
+// TestEntryForm_ValueReadlineMotions), where the huh form's Update is synchronous.
+// A teatest e2e cannot drive it reliably: teatest.Send is asynchronous, so a Tab
+// that changes field focus races the keystrokes typed immediately after it (the
+// first char lands in the previous field), which is why the TUI e2e suite drives
+// browser navigation and pre-seeded staging — never multi-field form typing.

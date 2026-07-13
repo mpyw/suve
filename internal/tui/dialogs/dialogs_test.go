@@ -666,6 +666,41 @@ func TestEntryForm_ValueEnterInsertsNewline(t *testing.T) {
 	assert.False(t, d.busy, "Enter in Value does not submit")
 }
 
+// TestEntryForm_ValueReadlineMotions pins the entry-form key fix at the layer the
+// bug lived: driving the real huh form + bubbles textarea, Ctrl+A and Ctrl+E are
+// readline start/end-of-line motions owned by the textarea — Ctrl+E is NOT huh's
+// built-in "open editor" binding (which would launch its default nano). From the
+// seeded "old" value, Ctrl+A then "X" prepends and Ctrl+E then "Y" appends,
+// yielding "XoldY"; Ctrl+E also leaves the form editable rather than busy on an
+// editor handoff. Before the fix, Ctrl+E did not move the caret (it opened the
+// editor), so "Y" landed after "X" as "XYold" — a clean regression signal.
+func TestEntryForm_ValueReadlineMotions(t *testing.T) {
+	t.Parallel()
+
+	d, _ := newEntry(t, awsSecretCap(), true) // edit: Value ("old") is the first field
+	m, _ := d.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+	require.Equal(t, "value", focusedFieldKey(d), "the edit form focuses the Value field first")
+	require.Equal(t, "old", d.value)
+
+	// Ctrl+A → line start, prepend "X"; Ctrl+E → line end, append "Y".
+	for _, msg := range []tea.KeyPressMsg{
+		{Code: 'a', Mod: tea.ModCtrl},
+		keyMsg('X'),
+		{Code: 'e', Mod: tea.ModCtrl},
+		keyMsg('Y'),
+	} {
+		m, _ = d.Update(msg)
+		d, ok = m.(*entryForm)
+		require.True(t, ok)
+	}
+
+	assert.Equal(t, "XoldY", d.value,
+		"Ctrl+A moved to line start and Ctrl+E to line end (not huh's editor)")
+	assert.False(t, d.busy, "Ctrl+E did not hand off to an external editor")
+}
+
 // TestEntryForm_SingleLineEnterAdvances pins that Enter on a single-line field
 // (name) neither inserts a newline nor submits — it stays huh's advance key.
 func TestEntryForm_SingleLineEnterAdvances(t *testing.T) {
@@ -802,10 +837,17 @@ func TestFormKeyMap_MultilineBindings(t *testing.T) {
 	km := formKeyMap()
 	tab := tea.KeyPressMsg{Code: tea.KeyTab}
 
+	ctrlJ := tea.KeyPressMsg{Code: 'j', Mod: tea.ModCtrl}
+	ctrlE := tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl}
+
 	assert.True(t, key.Matches(keyEnter(), km.Text.NewLine), "enter inserts a newline")
+	assert.True(t, key.Matches(ctrlJ, km.Text.NewLine), "ctrl+j inserts a newline")
 	assert.True(t, key.Matches(tab, km.Text.Next), "tab advances to the next field")
 	assert.False(t, key.Matches(keyEnter(), km.Text.Next), "enter does not advance (it inserts a newline)")
 	assert.False(t, key.Matches(keyEnter(), km.Text.Submit), "a multi-line field never submits on enter")
+	// ctrl+e must NOT trigger huh's built-in editor: the binding is disabled so the
+	// key falls through to the textarea as readline end-of-line (not launch nano).
+	assert.False(t, key.Matches(ctrlE, km.Text.Editor), "ctrl+e does not open huh's built-in editor")
 }
 
 // TestDeleteConfirm_ForceRecoveryGating pins that force/recovery rows appear only
