@@ -26,6 +26,14 @@ func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
 	}
 
 	switch id {
+	case regionDivider:
+		// Press on the gutter divider begins a resize drag; the list follows the
+		// cursor on subsequent motion messages until button-up (handleMouseMotion /
+		// the MouseReleaseMsg case). The width is not changed on the initial press,
+		// so a bare click-and-release on the divider is a no-op.
+		m.draggingDivider = true
+
+		return m, nil
 	case regionList:
 		if idx, rowOK := m.list.RowAtLine(dy); rowOK {
 			m.focus = focusList
@@ -74,6 +82,22 @@ func (m *Model) clickHistoryRow(idx int) tea.Cmd {
 	}
 
 	return nil
+}
+
+// handleMouseMotion resizes the list while a divider drag is in progress: the
+// list outer width follows the cursor's X (clamped), so the split tracks the
+// pointer until button-up ends the drag. Motion outside a drag is ignored. The
+// coordinate is page-local (the app translates the screen Y before forwarding),
+// and the width derives from the cursor X the same way the layout places the
+// divider, so the render and the hit map stay in sync after the resize (#784).
+func (m *Model) handleMouseMotion(msg tea.MouseMotionMsg) (*Model, tea.Cmd) {
+	if !m.draggingDivider {
+		return m, nil
+	}
+
+	m.setListWidth(msg.X)
+
+	return m, nil
 }
 
 // handleMouseWheel routes a wheel to the region under the pointer: the list, the

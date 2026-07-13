@@ -97,6 +97,20 @@ func (p *ValuePane) View() string {
 	return p.vp.View()
 }
 
+// ContentHeight returns the display-line count of the current (masked-or-
+// revealed, formatted) content, so the owning page can size the value pane to
+// its content instead of a fixed height (adaptive value height, #783). It counts
+// the same string display() feeds the viewport, so it tracks the mask/reveal and
+// JSON-formatting state exactly.
+func (p *ValuePane) ContentHeight() int {
+	content := p.display()
+	if content == "" {
+		return 0
+	}
+
+	return strings.Count(content, "\n") + 1
+}
+
 // syncContent recomputes the viewport content for the current mask state.
 func (p *ValuePane) syncContent() {
 	p.vp.SetContent(p.display())

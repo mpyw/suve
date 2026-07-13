@@ -14,11 +14,13 @@ import (
 // rebuildRows recomputes the list rows from the loaded items, the staged-key
 // set, and the values/namespace modes.
 func (m *Model) rebuildRows() {
+	previewW := m.previewWidth()
+
 	rows := lo.Map(m.items, func(it data.Item, _ int) components.ListRow {
 		row := components.ListRow{Name: it.Name}
 
 		if m.valuesOn && it.Value != nil {
-			row.Preview = previewValue(*it.Value)
+			row.Preview = previewValue(*it.Value, previewW)
 		}
 
 		var badges []string
@@ -41,19 +43,40 @@ func (m *Model) rebuildRows() {
 	m.list.SetRows(rows, m.nextToken != "")
 }
 
-// previewValue renders a list value preview: a single, truncated, newline-
-// flattened line. It is only ever called under values:on — an EXPLICIT reveal, so
-// it SHOWS the real value like the GUI, including secrets (mirroring the
-// Compare/diff reveal policy), rather than masking it (#734). The detail value
-// pane keeps its own separate mask/reveal.
-func previewValue(value string) string {
-	const maxPreview = 40
+// previewWidth is the column budget a list value preview may occupy: the list
+// pane's inner width (two-pane uses the resizable list width; stacked uses the
+// full width) minus the value-line indent EntryList draws. It follows the (now
+// variable) list width so a wider list shows a longer preview (#783/#784).
+func (m *Model) previewWidth() int {
+	listOuter := m.width
+	if m.width >= twoPaneMinWidth {
+		listOuter = m.listOuterWidth(m.width)
+	}
 
+	innerW, _ := components.PaneInner(listOuter, m.height)
+
+	return max(innerW-listPreviewIndent, minPreviewWidth)
+}
+
+// minPreviewWidth is the smallest a value preview is truncated to, so a very
+// narrow list still shows a few characters rather than an empty line.
+const minPreviewWidth = 8
+
+// previewValue renders a list value preview: a single, truncated, newline-
+// flattened line fitted to maxWidth columns. It is only ever called under
+// values:on — an EXPLICIT reveal, so it SHOWS the real value like the GUI,
+// including secrets (mirroring the Compare/diff reveal policy), rather than
+// masking it (#734). The detail value pane keeps its own separate mask/reveal.
+func previewValue(value string, maxWidth int) string {
 	replacer := strings.NewReplacer("\n", " ", "\r", " ", "\t", " ")
 	value = replacer.Replace(value)
 
-	if len([]rune(value)) > maxPreview {
-		return string([]rune(value)[:maxPreview]) + "…"
+	if maxWidth < 1 {
+		maxWidth = 1
+	}
+
+	if len([]rune(value)) > maxWidth {
+		return string([]rune(value)[:maxWidth-1]) + "…"
 	}
 
 	return value

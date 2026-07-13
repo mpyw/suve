@@ -48,8 +48,8 @@ func (m *Model) shortHelp() []key.Binding {
 }
 
 // fullHelp is the expanded, column-grouped reference: navigate / filter+view /
-// mutate / compare+staging, each column gated on the service's capability and
-// the current load state so it lists only keys that act here.
+// mutate / compare, each column gated on the service's capability and the
+// current load state so it lists only keys that act here.
 func (m *Model) fullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		m.navigateColumn(),
@@ -86,6 +86,12 @@ func (m *Model) viewColumn() []key.Binding {
 		col = append(col, revealKey)
 	}
 
+	// The list/detail split is only resizable in the two-pane layout; below the
+	// stacked threshold the panes fill the width, so the keys would do nothing.
+	if m.width >= twoPaneMinWidth {
+		col = append(col, narrowKey, widenKey)
+	}
+
 	// Load-more only applies while a next page is pending (secret pagination).
 	if m.nextToken != "" {
 		col = append(col, loadMoreKey)
@@ -114,17 +120,12 @@ func (m *Model) mutateColumn() []key.Binding {
 	return col
 }
 
-// compareColumn is the compare/staging-jump group.
+// compareColumn is the compare group.
 func (m *Model) compareColumn() []key.Binding {
 	var col []key.Binding
 
 	if m.svcCap.HasVersionHistory {
 		col = append(col, compareKey)
-	}
-
-	// The `S` jump only reaches a Staging tab when a staging seam is wired.
-	if m.staging != nil {
-		col = append(col, stagingKey)
 	}
 
 	return col

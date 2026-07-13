@@ -281,10 +281,10 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouseClick(msg)
 	case tea.MouseWheelMsg:
 		return m.handleMouseWheel(msg)
-	case nav.OpenStaging:
-		m.openStaging()
-
-		return m, nil
+	case tea.MouseMotionMsg:
+		return m.handleMouseMotion(msg)
+	case tea.MouseReleaseMsg:
+		return m.handleMouseRelease(msg)
 	case nav.OpenDiff:
 		return m, m.pushDiff(msg)
 	case nav.OpenEntryForm:
@@ -480,18 +480,6 @@ func (m *App) refreshStagingTab() {
 	}
 }
 
-// openStaging switches to the Staging tab (the browser's `S` jump); setTab
-// builds and loads the real staging page.
-func (m *App) openStaging() {
-	for i, t := range m.tabs {
-		if t.Service == stagingService {
-			m.setTab(i)
-
-			return
-		}
-	}
-}
-
 // pushDiff pushes a diff page onto the stack for a browser compare request and
 // returns its Init command.
 func (m *App) pushDiff(req nav.OpenDiff) tea.Cmd {
@@ -681,6 +669,32 @@ func (m *App) pageBodyTop() int {
 func (m *App) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	if len(m.dialogs) > 0 {
 		return m.updateTopDialog(msg)
+	}
+
+	msg.Y -= m.pageBodyTop()
+
+	return m.updateActivePage(msg)
+}
+
+// handleMouseMotion routes a mouse-motion event (reported with a button held in
+// CellMotion mode) to the active page in page-local coordinates, so a page can
+// follow a drag (the browser's divider resize). It is swallowed while a dialog is
+// modal — a drag never leaks to the page beneath an overlay.
+func (m *App) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
+	if len(m.dialogs) > 0 {
+		return m, nil
+	}
+
+	msg.Y -= m.pageBodyTop()
+
+	return m.updateActivePage(msg)
+}
+
+// handleMouseRelease routes a mouse button-up to the active page in page-local
+// coordinates, so a page can end a drag. It is swallowed while a dialog is modal.
+func (m *App) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
+	if len(m.dialogs) > 0 {
+		return m, nil
 	}
 
 	msg.Y -= m.pageBodyTop()

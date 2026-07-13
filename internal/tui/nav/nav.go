@@ -13,9 +13,6 @@ import (
 // diff page returns to the browser).
 type PopPage struct{}
 
-// OpenStaging asks the app to switch to the Staging tab (the browser's `S` jump).
-type OpenStaging struct{}
-
 // Reload asks the app to reload the active page after a mutation or staging
 // action applied through a dialog (both the browser and the staging page react
 // to it, refreshing their data and staged-count badges).
