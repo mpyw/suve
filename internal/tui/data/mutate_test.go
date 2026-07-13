@@ -415,3 +415,63 @@ func TestParamMutator_ImmediateCreateUpserts(t *testing.T) {
 		require.ErrorIs(t, err, sentinel, "a non-already-exists error is returned, not treated as an upsert")
 	})
 }
+
+// TestParamMutator_Capability pins the capability passthrough: the AWS SSM param
+// service has neither force-delete nor restore (a dialog hides those controls).
+//
+//nolint:paralleltest // symmetrical with the other mutator tests
+func TestParamMutator_Capability(t *testing.T) {
+	mut, _ := newParamMutator(t, &providermock.Store{})
+
+	svcCap := mut.Capability()
+	assert.Equal(t, "param", svcCap.Service)
+	assert.False(t, svcCap.HasForceDelete, "AWS param has no force-delete")
+	assert.False(t, svcCap.HasRestore, "AWS param is not restorable")
+}
+
+// TestParamMutator_RemoveTag covers the param remove-tag path both immediately
+// (Untag hits the provider) and staged (the removal lands in the staging store
+// via the shared stageRemoveTag helper).
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv
+func TestParamMutator_RemoveTag(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("immediate hits the provider", func(t *testing.T) {
+		var removed []string
+
+		mut, _ := newParamMutator(t, &providermock.Store{
+			UntagFunc: func(_ context.Context, _ string, keys []string) error {
+				removed = keys
+
+				return nil
+			},
+		})
+
+		_, err := mut.RemoveTag(ctx, data.StagedKey{Name: existingParamName}, "owner", false)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"owner"}, removed, "immediate param remove-tag calls Untag on the provider")
+	})
+
+	t.Run("staged lands in the staging store", func(t *testing.T) {
+		mut, st := newParamMutator(t, existingParamStore("v"))
+
+		_, err := mut.RemoveTag(ctx, data.StagedKey{Name: existingParamName}, "owner", true)
+		require.NoError(t, err)
+
+		tagEntry, err := st.GetTag(ctx, staging.ServiceParam, staging.EntryKey{Name: existingParamName})
+		require.NoError(t, err)
+		assert.Contains(t, tagEntry.Remove, "owner", "a staged param untag records the removed key")
+	})
+}
+
+// TestParamMutator_RestoreUnsupported pins that the param mutator never restores:
+// SSM has no soft-delete/restore, so Restore always reports ErrRestoreUnsupported.
+//
+//nolint:paralleltest // symmetrical with the other mutator tests
+func TestParamMutator_RestoreUnsupported(t *testing.T) {
+	mut, _ := newParamMutator(t, &providermock.Store{})
+
+	_, err := mut.Restore(context.Background(), existingParamName)
+	require.ErrorIs(t, err, data.ErrRestoreUnsupported, "param restore is always unsupported")
+}
