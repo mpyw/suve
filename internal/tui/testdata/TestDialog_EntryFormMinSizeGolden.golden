@@ -11,6 +11,6 @@
 │                                                          │
 │                                                          │
 │    Description                                           │
-│    > (optional)                                          │
-│  tab/↑↓: fields · enter: next · esc: cancel              │
+│    (optional)                                            │
+│  tab: fields · enter: next · [OK]: submit · esc: cancel  │
 ╰──────────────────────────────────────────────────────────╯
