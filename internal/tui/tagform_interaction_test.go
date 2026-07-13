@@ -92,8 +92,12 @@ func TestTUI_TagRemoveRoutesSelectedKey(t *testing.T) {
 
 	tm.Send(keyRightMsg()) // Add -> Remove
 
+	// advance action -> select -> complete (opens the Stage/Apply popup) -> commit.
+	// A small pace between keys lets the async form rebuild (after the Add->Remove
+	// toggle) settle so a rapid Enter is not swallowed against a half-built form.
 	for range 4 {
-		tm.Send(keyEnterMsg()) // advance action -> select -> mode -> complete
+		tm.Send(keyEnterMsg())
+		time.Sleep(30 * time.Millisecond)
 	}
 
 	// Wait for the submit to reach the mutator.

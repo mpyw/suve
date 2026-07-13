@@ -99,6 +99,12 @@ type entryForm struct {
 
 	form *huh.Form
 
+	// confirming/confirm drive the Stage/Apply popup shown before the write
+	// commits (replacing the old inline Mode toggle). While confirming is true the
+	// dialog routes keys to confirm and renders it in place of the form.
+	confirming bool
+	confirm    modeConfirm
+
 	busy   bool
 	err    string
 	notice string
@@ -222,12 +228,10 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 			Placeholder("(optional)").Value(&d.description))
 	}
 
-	// The mode toggle is offered only when staging is supported AND the dialog was
-	// not launched from a staged-only surface (the staging review page), which has
-	// no legitimate immediate-write escape hatch.
-	if d.svcCap.HasStaging && !d.stagedOnly {
-		fields = append(fields, newModeField(&d.staged))
-	}
+	// The Stage/Apply choice is no longer an inline field: it is the mode-confirm
+	// popup opened on submit (see beginSubmit), so the choice is always an explicit,
+	// visible step. The popup is skipped when there is no genuine choice (a service
+	// without staging, or a staged-only surface — both submit directly).
 
 	d.form = huh.NewForm(huh.NewGroup(fields...)).
 		WithWidth(dialogContentWidth).
@@ -243,16 +247,18 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 
 // formKeyMap is the huh keymap the create/edit form uses so the multi-line Value
 // textarea can hold newlines (#791): in a huh Text field Enter inserts a newline
-// (NewLine) instead of advancing or submitting, and Tab advances. Every other
-// (single-line) field keeps huh's defaults, so Enter still advances — and submits
-// from the last field. Form submit from ANY field is driven by the dialog itself
-// (ctrl+s / shift+enter, see submitKey), which is why the textarea never needs to
-// submit on Enter.
+// (NewLine), so it cannot double as "next field". Instead ctrl+s (and Tab) confirm
+// the value and advance to the next field — or, on the last field, complete the
+// form — via huh's own field navigation (Next fires on a non-last field, Submit on
+// the last one; ctrl+s is bound to both). This is why ctrl+s no longer needs to be
+// a dialog-level force-submit: confirming the value simply advances to the field
+// below (e.g. Description) instead of skipping it. Every single-line field keeps
+// huh's defaults, so Enter advances there and completes the form from the last one.
 func formKeyMap() *huh.KeyMap {
 	km := huh.NewDefaultKeyMap()
 	km.Text.NewLine = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "new line"))
-	km.Text.Next = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next"))
-	km.Text.Submit = key.NewBinding(key.WithKeys("shift+enter"), key.WithHelp("shift+enter", "submit"))
+	km.Text.Next = key.NewBinding(key.WithKeys("tab", "ctrl+s"), key.WithHelp("ctrl+s", "done"))
+	km.Text.Submit = key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("ctrl+s", "done"))
 
 	return km
 }
@@ -318,6 +324,12 @@ func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return d, nil // double-submit guard: swallow input mid-operation
 		}
 
+		// The Stage/Apply popup owns every key while it is open (esc there goes back
+		// to the form, not the discard guard).
+		if d.confirming {
+			return d.updateConfirm(msg)
+		}
+
 		if key.Matches(msg, escKey) {
 			return d.handleEsc()
 		}
@@ -326,13 +338,12 @@ func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// re-arms (a stray Esc after typing does not silently discard).
 		d.disarm()
 
-		if key.Matches(msg, submitKey) {
-			return d.forceSubmit()
-		}
-
 		if key.Matches(msg, ctrlEKey) && d.valueFieldFocused() {
 			return d, d.openEditor()
 		}
+		// ctrl+s is not handled here: it is a huh keymap binding on the Value field
+		// (confirm the value and advance/complete), so it flows through to the form
+		// below like any other field key.
 	}
 
 	if d.busy {
@@ -378,27 +389,61 @@ func (d *entryForm) disarm() {
 	}
 }
 
-// forceSubmit submits the form from any field (ctrl+s / shift+enter), so a
-// multi-line value — where Enter now inserts a newline instead of advancing —
-// can be submitted without tabbing to the last field. It re-runs the create name
-// validation huh would enforce inline, so an empty required name still stops the
-// submit (with a footer error) instead of dead-ending on the provider write. The
-// other bound values are already live (huh syncs each field's accessor on every
-// keystroke), so no field needs to be blurred first.
-func (d *entryForm) forceSubmit() (Model, tea.Cmd) {
-	if !d.edit {
-		if err := d.nameValidator()(d.name); err != nil {
-			d.err = err.Error()
-
-			return d, d.syncFormSize()
-		}
-	}
-
+// beginSubmit is the submit path, reached when the huh form completes (Enter on the
+// last single-line field, or ctrl+s on the last field / the Value textarea when it
+// is last). It opens the Stage/Apply popup when the service offers a genuine choice,
+// otherwise runs the write directly (a service without staging, or a staged-only
+// surface — both have a single fixed mode). huh has already validated every field
+// by the time the form completes, so no re-validation is needed here.
+func (d *entryForm) beginSubmit() (Model, tea.Cmd) {
 	d.err = ""
 	d.notice = ""
+
+	if d.svcCap.HasStaging && !d.stagedOnly {
+		d.confirm = newModeConfirm(d.confirmTitle(), d.staged)
+		d.confirming = true
+
+		return d, nil
+	}
+
 	d.busy = true
 
 	return d, d.submit()
+}
+
+// updateConfirm folds a key press into the open Stage/Apply popup: enter commits
+// with the chosen mode, esc returns to the form (rebuilding it when a huh
+// StateCompleted got us here, so the form is editable again rather than instantly
+// re-completing). Selection keys just repaint.
+func (d *entryForm) updateConfirm(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch d.confirm.Update(msg) {
+	case confirmExecute:
+		d.staged = d.confirm.staged
+		d.confirming = false
+		d.busy = true
+
+		return d, d.submit()
+	case confirmBack:
+		d.confirming = false
+		if d.form.State == huh.StateCompleted {
+			return d, d.rebuildForm()
+		}
+
+		return d, d.syncFormSize()
+	case confirmNone:
+	}
+
+	return d, nil
+}
+
+// confirmTitle is the popup's title: the same "New …"/"Edit …" line the form
+// header shows, so the popup keeps the create/edit context.
+func (d *entryForm) confirmTitle() string {
+	if d.edit {
+		return "Edit " + d.name
+	}
+
+	return "New " + entryNoun(d.svcCap)
 }
 
 // forwardToForm drives the embedded huh form and reacts to its completion.
@@ -410,10 +455,9 @@ func (d *entryForm) forwardToForm(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch d.form.State {
 	case huh.StateCompleted:
-		d.notice = ""
-		d.busy = true
-
-		return d, d.submit()
+		// Reaching the last single-line field and pressing Enter completes the huh
+		// form; route that through the same Stage/Apply popup as ctrl+s.
+		return d.beginSubmit()
 	case huh.StateAborted:
 		return d, canceledCmd
 	case huh.StateNormal:
@@ -555,6 +599,12 @@ func (d *entryForm) onEditorFinished(msg editorFinishedMsg) (Model, tea.Cmd) {
 }
 
 func (d *entryForm) View() string {
+	// The Stage/Apply popup replaces the whole form body while it is open (the app
+	// shell frames and centers it as a compact box).
+	if d.confirming {
+		return d.confirm.View(d.styles)
+	}
+
 	var b strings.Builder
 
 	b.WriteString(d.header())
@@ -577,12 +627,7 @@ func (d *entryForm) View() string {
 // entry name does not overflow the box (its height is budgeted into the form
 // body so the whole dialog stays on-screen).
 func (d *entryForm) header() string {
-	title := "Edit " + d.name
-	if !d.edit {
-		title = "New " + entryNoun(d.svcCap)
-	}
-
-	return d.fit(d.styles.PaneTitle.Render(title))
+	return d.fit(d.styles.PaneTitle.Render(d.confirmTitle()))
 }
 
 // footer renders the pinned rows below the form: any active error and notice
@@ -618,16 +663,16 @@ func (d *entryForm) footer() string {
 	return strings.Join(parts, "\n")
 }
 
-// entryHint is the bottom hint line. While the Value textarea is focused it
-// voices Enter = newline and the ctrl+e editor handoff; on the single-line
-// fields Enter advances. Submit is always ctrl+s (portable) or shift+enter
-// (needs an enhanced-keyboard terminal).
+// entryHint is the bottom hint line. While the Value textarea is focused Enter
+// inserts a newline, so ctrl+s ("done") confirms the value and advances to the next
+// field (or completes the form on the last field); ctrl+e hands off to $EDITOR. On
+// the single-line fields Enter advances and completes the form from the last one.
 func entryHint(onValue bool) string {
 	if onValue {
-		return "tab/↑↓: fields · enter: newline · ctrl+s / shift+enter: submit · ctrl+e: $EDITOR · esc: cancel"
+		return "tab/↑↓: fields · enter: newline · ctrl+s: done · ctrl+e: $EDITOR · esc: cancel"
 	}
 
-	return "tab/↑↓: fields · enter: next · ctrl+s / shift+enter: submit · esc: cancel"
+	return "tab/↑↓: fields · enter: next · esc: cancel"
 }
 
 // namespaceDisplay renders a namespace for the read-only edit note, showing the

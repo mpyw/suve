@@ -7,9 +7,5 @@
 │    Tag                                                   │
 │    > env=prod                                            │
 │      team=api                                            │
-│                                                          │
-│    Mode                                                  │
-│    (•) Stage    ( ) Apply immediately                    │
-│  tab/↑↓: fields · enter: next · ctrl+s / shift+enter:    │
-│  submit · esc: cancel                                    │
+│  tab/↑↓: fields · enter: next · esc: cancel              │
 ╰──────────────────────────────────────────────────────────╯

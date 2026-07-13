@@ -87,7 +87,9 @@ var (
 	loadMoreKey  = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "load more"))
 	revealKey    = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal"))
 	compareKey   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "compare"))
-	spaceKey     = key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "pick/namespace"))
+	// spaceKey is only for key matching; its help is built per-service by spaceHelp
+	// so the "namespace" label shows only on App Configuration.
+	spaceKey = key.NewBinding(key.WithKeys("space"))
 
 	// List-width resize keys (the keyboard counterpart to dragging the divider):
 	// ] widens the list, [ narrows it, each stepping within the clamps (#784).

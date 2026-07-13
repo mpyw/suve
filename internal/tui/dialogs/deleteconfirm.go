@@ -36,18 +36,19 @@ type deleteControl int
 const (
 	ctrlForce deleteControl = iota
 	ctrlRecovery
-	ctrlMode
 	ctrlDelete
 	ctrlCancel
 )
 
 // deleteConfirm is the delete dialog. The force row appears per HasForceDelete
-// (AWS secret); the recovery-window row appears per HasRecoveryWindow but ONLY in
-// staged mode — an immediate delete cannot pass a custom window (there is no
-// SDK-neutral recovery-window DeleteOption, so immediate always applies AWS's
-// 30-day default, matching the GUI's SecretDelete(name, force)). Force and
-// recovery are also mutually exclusive (forcing hides the recovery row — CLI
-// parity). The mode toggle appears only when the service supports staging.
+// (AWS secret); the recovery-window row appears per HasRecoveryWindow (AWS secret)
+// and applies only to a staged delete — an immediate delete cannot pass a custom
+// window (there is no SDK-neutral recovery-window DeleteOption, so immediate always
+// applies AWS's 30-day default, matching the GUI's SecretDelete(name, force)), so
+// its value is simply ignored when Apply immediately is chosen. Force and recovery
+// are mutually exclusive (forcing hides the recovery row — CLI parity). The
+// Stage/Apply choice is the mode-confirm popup the Delete button opens (when the
+// service supports staging), not an inline row.
 type deleteConfirm struct {
 	dialogLayout
 
@@ -63,6 +64,11 @@ type deleteConfirm struct {
 	force          bool
 	recoveryWindow int
 	staged         bool
+
+	// confirming/confirm drive the Stage/Apply popup shown after the Delete button,
+	// replacing the old inline Mode row so the choice is always an explicit step.
+	confirming bool
+	confirm    modeConfirm
 
 	focus int
 	busy  bool
@@ -115,10 +121,11 @@ func NewDeleteConfirm(in DeleteInput) Model {
 
 func (d *deleteConfirm) Busy() bool { return d.busy }
 
-// controls returns the focusable rows in order, gated by capability. The
-// recovery row shows only for a staged delete (an immediate delete cannot carry a
-// custom window — GUI parity) and is hidden while forcing (mutual exclusion), so
-// navigation and hit-testing follow what is drawn.
+// controls returns the focusable rows in order, gated by capability. The recovery
+// row shows whenever the service has a recovery window and force is off (it applies
+// to a staged delete and is ignored for an immediate one — GUI parity); it is
+// hidden while forcing (mutual exclusion), so navigation and hit-testing follow
+// what is drawn.
 func (d *deleteConfirm) controls() []deleteControl {
 	var out []deleteControl
 
@@ -126,12 +133,8 @@ func (d *deleteConfirm) controls() []deleteControl {
 		out = append(out, ctrlForce)
 	}
 
-	if d.svcCap.HasRecoveryWindow && !d.force && d.staged {
+	if d.svcCap.HasRecoveryWindow && !d.force {
 		out = append(out, ctrlRecovery)
-	}
-
-	if d.svcCap.HasStaging {
-		out = append(out, ctrlMode)
 	}
 
 	return append(out, ctrlDelete, ctrlCancel)
@@ -155,8 +158,8 @@ func (d *deleteConfirm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case mutationResultMsg:
 		return d.onResult(msg)
 	case tea.MouseClickMsg:
-		if d.busy {
-			return d, nil // double-submit guard
+		if d.busy || d.confirming {
+			return d, nil // double-submit guard / popup is keyboard-only
 		}
 
 		return d.handleClick(msg)
@@ -165,7 +168,36 @@ func (d *deleteConfirm) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return d, nil // double-submit guard
 		}
 
+		if d.confirming {
+			return d.updateConfirm(msg)
+		}
+
 		return d.handleKey(msg)
+	}
+
+	return d, nil
+}
+
+// InterceptEsc opts the delete dialog into the shell's Esc forwarding so it owns
+// Esc: while the Stage/Apply popup is open, Esc returns to the delete controls; on
+// the controls it cancels the dialog (the same bare-dismiss the shell did before).
+func (*deleteConfirm) InterceptEsc() bool { return true }
+
+// updateConfirm folds a key press into the open Stage/Apply popup: enter runs the
+// delete with the chosen mode, esc returns to the controls.
+func (d *deleteConfirm) updateConfirm(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch d.confirm.Update(msg) {
+	case confirmExecute:
+		d.staged = d.confirm.staged
+		d.confirming = false
+		d.busy = true
+
+		return d, d.submit()
+	case confirmBack:
+		d.confirming = false
+
+		return d, tea.ClearScreen
+	case confirmNone:
 	}
 
 	return d, nil
@@ -197,6 +229,8 @@ func (d *deleteConfirm) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 
 func (d *deleteConfirm) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
+	case key.Matches(msg, escKey):
+		return d, canceledCmd
 	case key.Matches(msg, navUp):
 		d.move(-1)
 	case key.Matches(msg, navDown):
@@ -242,16 +276,17 @@ func (d *deleteConfirm) adjust(delta int) {
 	d.recoveryWindow = clampRecovery(d.recoveryWindow + delta)
 }
 
-// activate acts on the focused control: toggles force/mode, submits, or cancels.
+// activate acts on the focused control: toggles force, opens the Stage/Apply popup
+// (or submits directly when there is no staging), or cancels.
 //
-// Toggling force/mode adds or removes the recovery-window row, reshaping the
-// dialog's height. Bubble Tea would service that shrink/grow with a partial
-// cell-update optimization whose exact bytes depend on the terminal's
-// synchronized-output negotiation, so under CI (which negotiates differently
-// than a local run) a byte-stream assertion on the post-toggle frame can miss a
-// string split across the partial writes. Forcing a full repaint on the reshape
-// makes the toggle frame environment-independent — the same fix the staging
-// page's view toggle applies.
+// Toggling force adds or removes the recovery-window row — and opening the popup
+// swaps the whole body — reshaping the dialog's height. Bubble Tea would service
+// that shrink/grow with a partial cell-update optimization whose exact bytes depend
+// on the terminal's synchronized-output negotiation, so under CI (which negotiates
+// differently than a local run) a byte-stream assertion on the post-toggle frame
+// can miss a string split across the partial writes. Forcing a full repaint on the
+// reshape makes the frame environment-independent — the same fix the staging page's
+// view toggle applies.
 func (d *deleteConfirm) activate() (Model, tea.Cmd) {
 	switch d.focused() {
 	case ctrlForce:
@@ -260,14 +295,16 @@ func (d *deleteConfirm) activate() (Model, tea.Cmd) {
 		d.focusControl(ctrlForce)
 
 		return d, tea.ClearScreen
-	case ctrlMode:
-		d.staged = !d.staged
-		// Toggling mode changes the control set (staged shows the recovery row);
-		// keep focus on the mode row rather than letting the index drift.
-		d.focusControl(ctrlMode)
-
-		return d, tea.ClearScreen
 	case ctrlDelete:
+		// When the service supports staging, the Delete button opens the Stage/Apply
+		// popup; otherwise the delete is always immediate and runs directly.
+		if d.svcCap.HasStaging {
+			d.confirm = newModeConfirm("Delete "+entryNoun(d.svcCap), d.staged)
+			d.confirming = true
+
+			return d, tea.ClearScreen
+		}
+
 		d.busy = true
 
 		return d, d.submit()
@@ -318,6 +355,14 @@ func (d *deleteConfirm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 }
 
 func (d *deleteConfirm) View() string {
+	// The Stage/Apply popup replaces the whole dialog body while it is open; disable
+	// hit-testing so a stray click cannot activate a control drawn on the last frame.
+	if d.confirming {
+		d.hits = hit.New()
+
+		return d.confirm.View(d.styles)
+	}
+
 	var b strings.Builder
 
 	// Header + wrapped target name. Wrapping the name to the dialog width keeps an
@@ -404,10 +449,8 @@ func (d *deleteConfirm) renderControl(c deleteControl) string {
 		hint := "  Recoverable until " + timeutil.FormatDate(NowFunc().AddDate(0, 0, d.recoveryWindow)) + " unless forced."
 
 		return line + "\n" + d.styles.PageHint.Render(hint)
-	case ctrlMode:
-		return marker + "Mode   " + modeLabel(d.staged)
 	case ctrlDelete:
-		return marker + d.styles.ErrorText.Render("[ "+deleteButtonLabel(d.staged)+" ]")
+		return marker + d.styles.ErrorText.Render("[ Delete ]")
 	case ctrlCancel:
 		return marker + "[ Cancel ]"
 	default:
@@ -426,15 +469,6 @@ func deleteStatus(staged bool, o data.WriteOutcome) string {
 	}
 
 	return "Deleted."
-}
-
-// deleteButtonLabel follows the mode (Stage vs Delete).
-func deleteButtonLabel(staged bool) string {
-	if staged {
-		return "Stage"
-	}
-
-	return "Delete"
 }
 
 // clampRecovery keeps a recovery-window value within the AWS 7–30 bounds.

@@ -219,8 +219,9 @@ func TestDialog_EntryFormAWSSecretGolden(t *testing.T) { //nolint:paralleltest /
 }
 
 // TestDialog_DeleteAWSSecretGolden renders the delete confirm for AWS secret
-// (force + recovery-window rows + mode). The clock is pinned so the
-// recoverable-until date is deterministic.
+// (force + recovery-window rows + Delete/Cancel; the Stage/Apply choice is a popup
+// the Delete button opens). The clock is pinned so the recoverable-until date is
+// deterministic.
 func TestDialog_DeleteAWSSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ + pins the clock
 	goldenEnv(t)
 
@@ -237,31 +238,26 @@ func TestDialog_DeleteAWSSecretGolden(t *testing.T) { //nolint:paralleltest // g
 	dialogGolden(t, newDialogHost(m, nil), "Force delete")
 }
 
-// TestDialog_DeleteAWSSecretImmediateGolden renders the delete confirm for AWS
-// secret AFTER toggling the mode to immediate: the recovery-window row and its
-// "recoverable until" line are gone, since an immediate delete cannot carry a
-// custom window (GUI parity — SecretDelete(name, force) exposes only force).
-func TestDialog_DeleteAWSSecretImmediateGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ + pins the clock
+// TestDialog_DeleteConfirmModePopupGolden renders the Stage/Apply confirmation the
+// Delete button opens, with Apply immediately selected (→). This is where the
+// staged-vs-immediate choice now lives (it was an inline Mode row before).
+func TestDialog_DeleteConfirmModePopupGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
-
-	orig := dialogs.NowFunc
-	dialogs.NowFunc = func() time.Time { return time.Date(2026, 7, 12, 0, 0, 0, 0, time.UTC) }
-
-	t.Cleanup(func() { dialogs.NowFunc = orig })
 
 	m := dialogs.NewDeleteConfirm(dialogs.DeleteInput{
 		Ctx: context.Background(), Mutator: capMutator{cap: goldenCap("aws", "secret")},
 		Service: "secret", Styles: styles.New(), Name: "prod/api/old-key",
 	})
 
-	// From the default (staged) focus on Force, move down to the Mode row and
-	// toggle to immediate.
+	// Controls are [Force, Recovery, Delete, Cancel]: move down to Delete, open the
+	// popup, then pick Apply immediately.
 	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(m, nil), "(•) Apply immediately",
-		keyDownMsg(), keyDownMsg(), keyEnterMsg()))
+		keyDownMsg(), keyDownMsg(), keyEnterMsg(), keyRightMsg()))
 }
 
 // TestDialog_DeleteGCloudSecretGolden renders the delete confirm for Google
-// Cloud secret (no force/recovery rows; mode only).
+// Cloud secret (no force/recovery rows; just Delete/Cancel, with the Stage/Apply
+// choice in the popup the Delete button opens).
 func TestDialog_DeleteGCloudSecretGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	huh "charm.land/huh/v2"
 	"github.com/stretchr/testify/assert"
@@ -162,12 +163,12 @@ func TestEntryForm_StagedByDefault(t *testing.T) {
 	assert.False(t, immediate.staged, "without staging the write is always immediate")
 }
 
-// TestEntryForm_StagedOnlyHidesModeToggle pins the #679 fix: a dialog launched
-// from a staged-only surface (the staging review page) hides the Stage/Apply-
-// immediately mode toggle and forces a staged write, so the review screen offers
-// no immediate-write escape hatch that would bypass the staging store. A default
-// (browser) launch still shows the toggle.
-func TestEntryForm_StagedOnlyHidesModeToggle(t *testing.T) {
+// TestEntryForm_StagedOnlySkipsConfirm pins the #679 fix: a dialog launched from a
+// staged-only surface (the staging review page) offers no Stage/Apply choice and
+// forces a staged write, so the review screen has no immediate-write escape hatch
+// that would bypass the staging store. A default (browser) launch instead opens the
+// Stage/Apply popup on submit.
+func TestEntryForm_StagedOnlySkipsConfirm(t *testing.T) {
 	t.Parallel()
 
 	mut := &fakeMutator{svcCap: awsParamCap()}
@@ -179,7 +180,12 @@ func TestEntryForm_StagedOnlyHidesModeToggle(t *testing.T) {
 	b, ok := browser.(*entryForm)
 	require.True(t, ok)
 	assert.True(t, b.staged, "browser launch defaults to staged")
-	assert.Contains(t, b.View(), "Apply immediately", "browser launch keeps the mode toggle")
+
+	m, _ := b.beginSubmit()
+	b, ok = m.(*entryForm)
+	require.True(t, ok)
+	assert.True(t, b.confirming, "a browser submit opens the Stage/Apply popup")
+	assert.Contains(t, b.View(), "Apply immediately", "the popup offers the mode choice")
 
 	staged, _ := NewEntryForm(EntryFormInput{
 		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
@@ -188,17 +194,21 @@ func TestEntryForm_StagedOnlyHidesModeToggle(t *testing.T) {
 	s, ok := staged.(*entryForm)
 	require.True(t, ok)
 	assert.True(t, s.staged, "a staged-only launch forces staged")
-	assert.NotContains(t, s.View(), "Apply immediately", "a staged-only launch hides the mode toggle")
 
-	// The forced-staged write still routes through the staging path.
-	execCmd(t, s.submit())
+	m, cmd := s.beginSubmit()
+	s, ok = m.(*entryForm)
+	require.True(t, ok)
+	assert.False(t, s.confirming, "a staged-only submit shows no popup")
+	require.NotNil(t, cmd, "a staged-only submit writes directly")
+
+	execCmd(t, cmd)
 	assert.True(t, mut.staged, "a staged-only submit writes staged, never immediate")
 }
 
-// TestTagForm_StagedOnlyHidesModeToggle pins the #679 fix for the tag dialog: a
-// staged-only launch hides the mode toggle and forces a staged tag write; a
-// browser launch keeps the toggle.
-func TestTagForm_StagedOnlyHidesModeToggle(t *testing.T) {
+// TestTagForm_StagedOnlySkipsConfirm pins the #679 fix for the tag dialog: a
+// staged-only launch offers no Stage/Apply choice and forces a staged tag write; a
+// browser launch opens the popup on submit.
+func TestTagForm_StagedOnlySkipsConfirm(t *testing.T) {
 	t.Parallel()
 
 	mut := &fakeMutator{svcCap: awsParamCap()}
@@ -209,7 +219,13 @@ func TestTagForm_StagedOnlyHidesModeToggle(t *testing.T) {
 	b, ok := browser.(*tagForm)
 	require.True(t, ok)
 	assert.True(t, b.staged, "browser launch defaults to staged")
-	assert.Contains(t, b.View(), "Apply immediately", "browser launch keeps the mode toggle")
+
+	b.tagKey = "owner"
+	m, _ := b.beginSubmit()
+	b, ok = m.(*tagForm)
+	require.True(t, ok)
+	assert.True(t, b.confirming, "a browser submit opens the Stage/Apply popup")
+	assert.Contains(t, b.View(), "Apply immediately", "the popup offers the mode choice")
 
 	staged, _ := NewTagForm(TagInput{
 		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(),
@@ -218,10 +234,15 @@ func TestTagForm_StagedOnlyHidesModeToggle(t *testing.T) {
 	s, ok := staged.(*tagForm)
 	require.True(t, ok)
 	assert.True(t, s.staged, "a staged-only launch forces staged")
-	assert.NotContains(t, s.View(), "Apply immediately", "a staged-only launch hides the mode toggle")
 
 	s.tagKey = "owner"
-	execCmd(t, s.submit())
+	m, cmd := s.beginSubmit()
+	s, ok = m.(*tagForm)
+	require.True(t, ok)
+	assert.False(t, s.confirming, "a staged-only submit shows no popup")
+	require.NotNil(t, cmd, "a staged-only submit writes directly")
+
+	execCmd(t, cmd)
 	assert.True(t, mut.staged, "a staged-only submit writes staged, never immediate")
 }
 
@@ -583,13 +604,13 @@ func TestEntryForm_EscDiscardGuard(t *testing.T) {
 	t.Parallel()
 
 	// Clean create form: the first Esc cancels immediately.
-	clean, _ := newCreateEntry(t, awsSecretCap())
+	clean := newCreateEntry(t, awsSecretCap())
 	_, cmd := clean.Update(keyEsc())
 	assert.True(t, isCanceled(cmd), "esc on a clean form cancels immediately")
 	assert.False(t, clean.armed)
 
 	// Dirty form: a typed value diverges from the empty seed.
-	dirty, _ := newCreateEntry(t, awsSecretCap())
+	dirty := newCreateEntry(t, awsSecretCap())
 	dirty.value = "half-typed value"
 
 	// First Esc arms — no cancel, notice shown, stays open.
@@ -608,7 +629,7 @@ func TestEntryForm_EscDiscardGuard(t *testing.T) {
 func TestEntryForm_EscArmResetsOnKeystroke(t *testing.T) {
 	t.Parallel()
 
-	d, _ := newCreateEntry(t, awsSecretCap())
+	d := newCreateEntry(t, awsSecretCap())
 	d.value = "half-typed value"
 
 	_, _ = d.Update(keyEsc())
@@ -667,56 +688,110 @@ func TestEntryForm_SingleLineEnterAdvances(t *testing.T) {
 	assert.False(t, mut.createCalled, "Enter on a single-line field does not write")
 }
 
-// TestEntryForm_SubmitKeys pins the #791 submit bindings: both ctrl+s (portable)
-// and shift+enter (enhanced-keyboard) submit the form from any field — here the
-// Value textarea, where Enter now inserts a newline instead.
-func TestEntryForm_SubmitKeys(t *testing.T) {
+// TestEntryForm_ConfirmCommitStaged pins that completing the form opens the
+// Stage/Apply popup (rather than writing directly), and Enter there commits with
+// the default (staged) mode. The full ctrl+s → advance → complete flow through the
+// live huh form is covered by the teatest interaction test in the tui package; here
+// the completion path is driven directly via beginSubmit.
+func TestEntryForm_ConfirmCommitStaged(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name string
-		key  tea.KeyPressMsg
-	}{
-		{"ctrl+s", keyCtrlS()},
-		{"shift+enter", keyShiftEnter()},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+	d, mut := newEntry(t, awsSecretCap(), true) // edit
+	d.value = "some value"
 
-			d, mut := newEntry(t, awsSecretCap(), true) // edit, value focused
-			d.value = "some value"
-
-			m, cmd := d.Update(tc.key)
-			d, ok := m.(*entryForm)
-			require.True(t, ok)
-
-			require.NotNil(t, cmd, "the submit key emits the mutation command")
-			assert.True(t, d.busy, "the submit key sets the busy guard")
-
-			_ = cmd() // run the mutation against the recording mutator
-
-			assert.True(t, mut.updateCalled, "the submit key routes through the mutator")
-		})
-	}
-}
-
-// TestEntryForm_CtrlSValidatesRequiredName pins that a forced submit (ctrl+s /
-// shift+enter) still enforces the create name validation huh would show inline:
-// an empty required name blocks the submit with a footer error rather than
-// dead-ending on the provider write.
-func TestEntryForm_CtrlSValidatesRequiredName(t *testing.T) {
-	t.Parallel()
-
-	d, mut := newCreateEntry(t, awsSecretCap())
-	d.value = "some value" // name left empty
-
-	m, _ := d.Update(keyCtrlS())
+	m, _ := d.beginSubmit()
 	d, ok := m.(*entryForm)
 	require.True(t, ok)
 
-	assert.False(t, d.busy, "an empty required name blocks the forced submit")
-	assert.False(t, mut.createCalled, "no write is attempted with an invalid name")
-	assert.Contains(t, d.err, "name is required")
+	require.True(t, d.confirming, "completing the form opens the Stage/Apply confirmation")
+	assert.False(t, d.busy, "opening the popup does not yet write")
+	assert.Contains(t, d.View(), "Apply immediately", "the popup offers the mode choice")
+
+	m, cmd := d.Update(keyEnter())
+	d, ok = m.(*entryForm)
+	require.True(t, ok)
+
+	require.NotNil(t, cmd, "enter in the popup emits the mutation command")
+	assert.True(t, d.busy, "committing sets the busy guard")
+
+	_ = cmd() // run the mutation against the recording mutator
+
+	assert.True(t, mut.updateCalled, "committing routes through the mutator")
+	assert.True(t, mut.staged, "the default choice stages the write")
+}
+
+// TestEntryForm_ConfirmApplyImmediately pins that choosing Apply immediately in
+// the popup (→) writes immediately rather than staged.
+func TestEntryForm_ConfirmApplyImmediately(t *testing.T) {
+	t.Parallel()
+
+	d, mut := newEntry(t, awsSecretCap(), true)
+	d.value = "some value"
+
+	m, _ := d.beginSubmit()
+	d, _ = m.(*entryForm)
+	m, _ = d.Update(keyRight()) // move selection to Apply immediately
+	d, _ = m.(*entryForm)
+
+	_, cmd := d.Update(keyEnter())
+	require.NotNil(t, cmd)
+
+	_ = cmd()
+
+	assert.True(t, mut.updateCalled, "committing routes through the mutator")
+	assert.False(t, mut.staged, "Apply immediately writes without staging")
+}
+
+// TestEntryForm_ConfirmBackReturnsToForm pins that esc in the Stage/Apply popup
+// returns to the editable form without writing.
+func TestEntryForm_ConfirmBackReturnsToForm(t *testing.T) {
+	t.Parallel()
+
+	d, mut := newEntry(t, awsSecretCap(), true)
+	d.value = "some value"
+
+	m, _ := d.beginSubmit()
+	d, _ = m.(*entryForm)
+	require.True(t, d.confirming)
+
+	m, _ = d.Update(keyEsc())
+	d, ok := m.(*entryForm)
+	require.True(t, ok)
+
+	assert.False(t, d.confirming, "esc dismisses the popup")
+	assert.False(t, d.busy, "esc does not write")
+	assert.False(t, mut.updateCalled, "esc attempts no mutation")
+	assert.Contains(t, d.View(), "Value", "the editable form is shown again")
+}
+
+// TestEntryForm_NameValidatorRequired pins that the create name validator (which
+// huh runs inline as the form advances) rejects an empty name, so an empty required
+// name can never complete the form and reach the write.
+func TestEntryForm_NameValidatorRequired(t *testing.T) {
+	t.Parallel()
+
+	d := newCreateEntry(t, awsSecretCap())
+
+	require.Error(t, d.nameValidator()(""), "an empty name is rejected")
+	require.ErrorContains(t, d.nameValidator()(""), "name is required")
+	require.NoError(t, d.nameValidator()("/app/X"), "a non-empty name passes")
+}
+
+// TestFormKeyMap_ValueDoneBindings pins the Value textarea's key contract: Enter
+// inserts a newline (so it cannot double as next/submit), while ctrl+s ("done")
+// confirms the value — advancing to the next field (Next) and, on the last field,
+// completing the form (Submit). This is what stops ctrl+s from skipping the field
+// below the value (e.g. Description).
+func TestFormKeyMap_ValueDoneBindings(t *testing.T) {
+	t.Parallel()
+
+	km := formKeyMap()
+	ctrlS := tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
+
+	assert.True(t, key.Matches(keyEnter(), km.Text.NewLine), "enter inserts a newline")
+	assert.False(t, key.Matches(keyEnter(), km.Text.Submit), "enter never submits the textarea")
+	assert.True(t, key.Matches(ctrlS, km.Text.Next), "ctrl+s advances to the next field")
+	assert.True(t, key.Matches(ctrlS, km.Text.Submit), "ctrl+s completes the form from the last field")
 }
 
 // TestDeleteConfirm_ForceRecoveryGating pins that force/recovery rows appear only
@@ -738,45 +813,80 @@ func TestDeleteConfirm_ForceRecoveryGating(t *testing.T) {
 	assert.NotContains(t, gcloud.controls(), ctrlRecovery)
 }
 
-// TestDeleteConfirm_RecoveryStagedOnly pins that the recovery-window row (and its
-// "recoverable until" line) shows only for a STAGED delete. An immediate delete
-// cannot carry a custom window — the SDK-neutral seam has no recovery-window
-// DeleteOption, so AWS applies its 30-day default — so the dialog must not offer
-// an adjustable window it would silently drop (GUI parity: SecretDelete(name,
-// force) exposes only force for immediate).
-func TestDeleteConfirm_RecoveryStagedOnly(t *testing.T) {
+// TestDeleteConfirm_RecoveryVisibleAppliesStagedOnly pins that the recovery-window
+// row shows whenever the service has a recovery window and force is off — the
+// Stage/Apply choice moved to the popup, so the row no longer depends on it — while
+// its VALUE still applies only to a staged delete: an immediate delete cannot carry
+// a custom window (the SDK-neutral seam has no recovery-window DeleteOption, so AWS
+// applies its 30-day default), so effectiveRecoveryWindow is 0 when immediate is
+// chosen. Forcing hides the row (mutual exclusion).
+func TestDeleteConfirm_RecoveryVisibleAppliesStagedOnly(t *testing.T) {
 	t.Parallel()
 
 	d := newDelete(t, awsSecretCap())
 	require.True(t, d.staged, "AWS secret delete defaults to staged")
-	assert.Contains(t, d.controls(), ctrlRecovery, "staged mode offers the recovery window")
-	assert.Contains(t, d.View(), "Recovery window", "staged mode draws the adjustable window")
+	assert.Contains(t, d.controls(), ctrlRecovery, "the recovery window is offered")
+	assert.Contains(t, d.View(), "Recovery window", "the adjustable window is drawn")
+	assert.Equal(t, defaultRecoveryWindow, d.effectiveRecoveryWindow(), "staged records the chosen window")
 
 	d.staged = false
-	assert.NotContains(t, d.controls(), ctrlRecovery, "immediate mode hides the recovery window")
-	assert.NotContains(t, d.View(), "Recovery window", "immediate mode shows no adjustable window")
-	assert.NotContains(t, d.View(), "Recoverable until", "immediate mode makes no recoverable-until claim")
+	assert.Contains(t, d.controls(), ctrlRecovery, "the recovery window stays visible (the choice is in the popup)")
 	assert.Equal(t, 0, d.effectiveRecoveryWindow(), "immediate mode records no custom window")
+
+	d.force = true
+	assert.NotContains(t, d.controls(), ctrlRecovery, "forcing hides the recovery window (mutual exclusion)")
+	assert.Equal(t, 0, d.effectiveRecoveryWindow(), "a forced delete records no recovery window")
 }
 
-// TestDeleteConfirm_ModeToggleKeepsFocusAndDropsRecovery drives the mode toggle
-// through activate() and pins that toggling to immediate keeps focus on the Mode
-// row (rather than drifting onto a neighbour as the recovery row disappears) and
-// removes the recovery control.
-func TestDeleteConfirm_ModeToggleKeepsFocusAndDropsRecovery(t *testing.T) {
+// TestDeleteConfirm_DeleteOpensConfirm pins that the Delete button opens the
+// Stage/Apply popup (rather than an inline mode row), and Enter there runs the
+// delete with the chosen mode — here Apply immediately (→), which writes unstaged.
+func TestDeleteConfirm_DeleteOpensConfirm(t *testing.T) {
 	t.Parallel()
 
 	d := newDelete(t, awsSecretCap())
+	d.name = "prod/key"
 
-	// Focus the Mode row: [force, recovery, mode, delete, cancel] -> index 2.
-	d.focus = 2
-	require.Equal(t, ctrlMode, d.focused())
+	d.focusControl(ctrlDelete)
+	_, _ = d.activate()
 
-	_, _ = d.activate() // toggle staged -> immediate
+	require.True(t, d.confirming, "the Delete button opens the Stage/Apply popup")
+	assert.False(t, d.busy, "opening the popup does not yet delete")
+	assert.Contains(t, d.View(), "Apply immediately", "the popup offers the mode choice")
 
-	assert.False(t, d.staged, "activate toggles the mode to immediate")
-	assert.Equal(t, ctrlMode, d.focused(), "focus stays on the Mode row after the control set shrinks")
-	assert.NotContains(t, d.controls(), ctrlRecovery, "immediate mode drops the recovery row")
+	_, _ = d.Update(keyRight()) // choose Apply immediately
+
+	m, cmd := d.Update(keyEnter())
+	d, ok := m.(*deleteConfirm)
+	require.True(t, ok)
+	require.NotNil(t, cmd, "enter in the popup emits the delete command")
+	assert.True(t, d.busy)
+
+	execCmd(t, cmd)
+
+	got, ok := d.mutator.(*fakeMutator)
+	require.True(t, ok)
+	assert.True(t, got.deleteCalled)
+	assert.False(t, got.staged, "Apply immediately deletes without staging")
+}
+
+// TestDeleteConfirm_ConfirmBackReturnsToControls pins that esc in the popup returns
+// to the delete controls without deleting.
+func TestDeleteConfirm_ConfirmBackReturnsToControls(t *testing.T) {
+	t.Parallel()
+
+	d := newDelete(t, awsSecretCap())
+	d.focusControl(ctrlDelete)
+	_, _ = d.activate()
+	require.True(t, d.confirming)
+
+	_, _ = d.Update(keyEsc())
+	assert.False(t, d.confirming, "esc dismisses the popup")
+	assert.False(t, d.busy, "esc does not delete")
+
+	got, ok := d.mutator.(*fakeMutator)
+	require.True(t, ok)
+	assert.False(t, got.deleteCalled, "esc attempts no delete")
 }
 
 // TestDeleteConfirm_SubmitRouting pins the delete routing (force/window/staged).
@@ -797,18 +907,26 @@ func TestDeleteConfirm_SubmitRouting(t *testing.T) {
 	assert.Equal(t, "prod/key", got.key.Name)
 }
 
-// TestDeleteConfirm_ModeGating pins that the mode toggle is present only when the
-// service supports staging.
-func TestDeleteConfirm_ModeGating(t *testing.T) {
+// TestDeleteConfirm_ConfirmGating pins that the Delete button opens the Stage/Apply
+// popup only when the service supports staging; without staging the delete is
+// immediate and runs directly (no choice to confirm).
+func TestDeleteConfirm_ConfirmGating(t *testing.T) {
 	t.Parallel()
 
 	staged := newDelete(t, awsSecretCap())
-	assert.Contains(t, staged.controls(), ctrlMode)
-	assert.True(t, staged.staged)
+	require.True(t, staged.staged)
+	staged.focusControl(ctrlDelete)
+	_, _ = staged.activate()
+	assert.True(t, staged.confirming, "a staging service opens the popup")
+	assert.False(t, staged.busy, "opening the popup does not yet delete")
 
 	noStaging := newDelete(t, capability.ServiceCapability{Service: "secret"})
-	assert.NotContains(t, noStaging.controls(), ctrlMode)
-	assert.False(t, noStaging.staged)
+	require.False(t, noStaging.staged)
+	noStaging.focusControl(ctrlDelete)
+	_, cmd := noStaging.activate()
+	assert.False(t, noStaging.confirming, "without staging there is no choice to confirm")
+	assert.True(t, noStaging.busy, "without staging the delete runs directly")
+	require.NotNil(t, cmd, "without staging the delete command is dispatched")
 }
 
 // TestDeleteConfirm_BusySuppression pins the double-submit guard.
@@ -1031,46 +1149,13 @@ func TestTagForm_EscDiscardGuard(t *testing.T) {
 	assert.True(t, isCanceled(cmd), "a second consecutive esc discards")
 }
 
-// TestTagForm_SubmitKeys pins the #791 submit bindings on the tag form: ctrl+s
-// and shift+enter submit from any field, and a forced submit still enforces the
-// Add key-required validation.
-func TestTagForm_SubmitKeys(t *testing.T) {
+// TestTagForm_ConfirmCommit pins that completing the tag form opens the Stage/Apply
+// popup and Enter there commits through AddTag. The required Add-key validation is
+// huh's (run inline as the form advances); the empty-key case is pinned separately
+// on the validator.
+func TestTagForm_ConfirmCommit(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name string
-		key  tea.KeyPressMsg
-	}{
-		{"ctrl+s", keyCtrlS()},
-		{"shift+enter", keyShiftEnter()},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			mut := &fakeMutator{svcCap: awsParamCap()}
-			m, _ := NewTagForm(TagInput{
-				Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
-			})
-			d, ok := m.(*tagForm)
-			require.True(t, ok)
-
-			d.tagKey, d.tagValue = "env", "prod"
-
-			m, cmd := d.Update(tc.key)
-			d, ok = m.(*tagForm)
-			require.True(t, ok)
-
-			require.NotNil(t, cmd, "the submit key emits the mutation command")
-			assert.True(t, d.busy)
-
-			_ = cmd()
-
-			assert.True(t, mut.addTagCalled, "the submit key routes through AddTag")
-			assert.Equal(t, "env", mut.tagKey)
-		})
-	}
-
-	// A forced submit with an empty Add key is blocked with a footer error.
 	mut := &fakeMutator{svcCap: awsParamCap()}
 	m, _ := NewTagForm(TagInput{
 		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
@@ -1078,13 +1163,24 @@ func TestTagForm_SubmitKeys(t *testing.T) {
 	d, ok := m.(*tagForm)
 	require.True(t, ok)
 
-	m, _ = d.Update(keyCtrlS())
+	d.tagKey, d.tagValue = "env", "prod"
+
+	m, _ = d.beginSubmit()
 	d, ok = m.(*tagForm)
 	require.True(t, ok)
+	require.True(t, d.confirming, "completing the tag form opens the Stage/Apply popup")
+	assert.False(t, d.busy, "opening the popup does not yet write")
 
-	assert.False(t, d.busy, "an empty required key blocks the forced submit")
-	assert.False(t, mut.addTagCalled, "no write is attempted with an empty key")
-	assert.Contains(t, d.err, "key is required")
+	m, cmd := d.Update(keyEnter())
+	d, ok = m.(*tagForm)
+	require.True(t, ok)
+	require.NotNil(t, cmd, "enter in the popup emits the mutation command")
+	assert.True(t, d.busy)
+
+	_ = cmd()
+
+	assert.True(t, mut.addTagCalled, "committing routes through AddTag")
+	assert.Equal(t, "env", mut.tagKey)
 }
 
 // TestDeleteConfirm_ResultVoicing pins the delete status voicing, including the
@@ -1177,17 +1273,11 @@ func TestDeleteConfirm_MouseClickControls(t *testing.T) {
 	_, _ = d.Update(clickAt(t, d.hits, deleteControlID(ctrlForce)))
 	assert.True(t, d.force, "clicking the force checkbox toggles it")
 
-	// Mode radio click toggles the staged/immediate mode.
+	// Delete button click opens the Stage/Apply popup (staging service).
 	d = sized()
-	require.True(t, d.staged)
-	_, _ = d.Update(clickAt(t, d.hits, deleteControlID(ctrlMode)))
-	assert.False(t, d.staged, "clicking the mode radio toggles the mode")
-
-	// Delete button click submits: busy + mutation command.
-	d = sized()
-	_, cmd = d.Update(clickAt(t, d.hits, deleteControlID(ctrlDelete)))
-	assert.True(t, d.busy, "clicking Delete starts the mutation")
-	require.NotNil(t, cmd, "clicking Delete dispatches the delete command")
+	_, _ = d.Update(clickAt(t, d.hits, deleteControlID(ctrlDelete)))
+	assert.True(t, d.confirming, "clicking Delete opens the Stage/Apply popup")
+	assert.False(t, d.busy, "clicking Delete does not yet delete")
 }
 
 // TestErrorDialog_MouseClickCloses pins that clicking the error dialog's close
@@ -1227,14 +1317,14 @@ func keyMsg(r rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: r, Text: string(r)}
 }
 
-// keyEnter / keyShiftEnter / keyCtrlS / keyEsc build the newline/submit/discard
-// key presses the #790/#791 guards react to. shift+enter carries ModShift so its
-// String() is "shift+enter" (distinct from a plain Enter), mirroring what an
-// enhanced-keyboard terminal reports.
-func keyEnter() tea.KeyPressMsg      { return tea.KeyPressMsg{Code: tea.KeyEnter} }
-func keyShiftEnter() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift} }
-func keyCtrlS() tea.KeyPressMsg      { return tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl} }
-func keyEsc() tea.KeyPressMsg        { return tea.KeyPressMsg{Code: tea.KeyEscape} }
+// keyEnter / keyEsc / keyLeft / keyRight build the newline/discard/choose key
+// presses the #790 discard guard and the Stage/Apply popup react to. The Value
+// field's ctrl+s ("done") is a huh keymap binding exercised end-to-end by the
+// teatest interaction test in the tui package.
+func keyEnter() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyEnter} }
+func keyEsc() tea.KeyPressMsg   { return tea.KeyPressMsg{Code: tea.KeyEscape} }
+func keyLeft() tea.KeyPressMsg  { return tea.KeyPressMsg{Code: tea.KeyLeft} }
+func keyRight() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyRight} }
 
 // focusedFieldKey reports the huh key of the currently focused field.
 func focusedFieldKey(d *entryForm) string {
@@ -1247,20 +1337,18 @@ func focusedFieldKey(d *entryForm) string {
 }
 
 // newCreateEntry builds a create form with no seeded fields, so it starts clean
-// (every field empty) for the discard-guard tests.
-func newCreateEntry(t *testing.T, svcCap capability.ServiceCapability) (*entryForm, *fakeMutator) {
+// (every field empty) for the discard-guard and validation tests.
+func newCreateEntry(t *testing.T, svcCap capability.ServiceCapability) *entryForm {
 	t.Helper()
 
-	mut := &fakeMutator{svcCap: svcCap}
-
 	m, _ := NewEntryForm(EntryFormInput{
-		Ctx: context.Background(), Mutator: mut, Service: svcCap.Service, Styles: styles.New(),
+		Ctx: context.Background(), Mutator: &fakeMutator{svcCap: svcCap}, Service: svcCap.Service, Styles: styles.New(),
 	})
 
 	d, ok := m.(*entryForm)
 	require.True(t, ok)
 
-	return d, mut
+	return d
 }
 
 // isCanceled reports whether running cmd yields a CanceledMsg (a nil cmd is not).

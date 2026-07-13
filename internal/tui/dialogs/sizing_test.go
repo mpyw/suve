@@ -71,24 +71,25 @@ func TestEntryForm_TallFormFitsMinSize(t *testing.T) {
 		"the dialog body fits inside the frame, so the shell never clips it")
 	assert.LessOrEqual(t, maxLineWidth(view), minWidth-dialogChrome,
 		"no line overflows the dialog width at the minimum size")
-	// The longer #791 hint folds across two lines at the minimum size, so match the
-	// wrap-safe affordance tokens rather than a phrase that may straddle the break.
-	assert.Contains(t, flatten(view), "ctrl+s", "the submit hint stays on-screen")
-	assert.Contains(t, flatten(view), "submit", "the submit hint stays on-screen")
+	// The hint may fold across two lines at the minimum size, so match wrap-safe
+	// affordance tokens rather than a phrase that could straddle the break.
+	assert.Contains(t, flatten(view), "fields", "the field-nav hint stays on-screen")
 	assert.Contains(t, flatten(view), "cancel", "the cancel hint stays on-screen")
 }
 
 // TestEntryForm_CompressesWhenTallerThanScreen pins that the min-size form is
 // actually compressed (its body scrolled), not merely short: the same form at a
-// tall terminal renders more rows and reveals the Mode toggle that scrolls out of
-// view at 60×16.
+// tall terminal renders more rows and shows the full form down to the Description
+// field, part of which scrolls out of view at 60×16.
 func TestEntryForm_CompressesWhenTallerThanScreen(t *testing.T) {
 	t.Parallel()
 
 	build := func() Model {
+		// The AWS param form is the tallest (Name + Type select with three options +
+		// Value textarea + Description), so its body must scroll at the minimum size.
 		m, _ := NewEntryForm(EntryFormInput{
-			Ctx: context.Background(), Mutator: &fakeMutator{svcCap: awsSecretCap()},
-			Service: "secret", Styles: styles.New(),
+			Ctx: context.Background(), Mutator: &fakeMutator{svcCap: awsParamCap()},
+			Service: "param", Styles: styles.New(),
 		})
 
 		return m
@@ -102,8 +103,8 @@ func TestEntryForm_CompressesWhenTallerThanScreen(t *testing.T) {
 
 	assert.Less(t, lipgloss.Height(small.View()), lipgloss.Height(tall.View()),
 		"the min-size form is compressed relative to a tall terminal")
-	assert.Contains(t, stripANSI(tall.View()), "Apply immediately",
-		"a tall terminal shows the full form, including the Mode toggle")
+	assert.Contains(t, stripANSI(tall.View()), "Description",
+		"a tall terminal shows the full form, down to the Description field")
 }
 
 // TestDeleteConfirm_LongNameWrapsMinSize pins the safety fix: a long delete
