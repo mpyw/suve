@@ -479,11 +479,21 @@ func fieldLine(st styles.Styles, label, value string, width int) string {
 	return clip(st.FieldLabel.Render(padded)+" "+value, width)
 }
 
-// fieldValue renders a header input's value, showing a placeholder and a cursor
-// when focused.
+// caretCell is the focused header input's caret: a single reverse-video cell. The
+// app's screenCursor locates the caret by the sole reverse-video cell in the
+// composited frame and draws the REAL terminal cursor there (the #765 caret the
+// dialogs already get), so the caret must be reverse video — a plain glyph would
+// render no real cursor. It is always painted while focused (no blink dependency),
+// so the cursor never flickers off.
+//
+//nolint:gochecknoglobals // immutable rendered caret cell
+var caretCell = lipgloss.NewStyle().Reverse(true).Render(" ")
+
+// fieldValue renders a header input's value, showing a placeholder when empty and
+// the reverse-video caret when focused.
 func fieldValue(value string, focused bool) string {
 	if focused {
-		return value + "▎"
+		return value + caretCell
 	}
 
 	if value == "" {

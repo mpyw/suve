@@ -198,6 +198,44 @@ func TestAppCursor_TagKey(t *testing.T) {
 	requireCaretOnScreen(t, m)
 }
 
+// TestAppCursor_BrowserFilter pins that a page's own text input — not just a
+// dialog field — gets the real terminal cursor: focusing the browser's filter and
+// typing draws the caret at the insertion point (#765 parity for page inputs).
+func TestAppCursor_BrowserFilter(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
+
+	m = updateApp(t, m, typeKey('/')) // browser: focus the filter input
+	require.True(t, m.activePageCapturesInput(), "the filter input is focused")
+
+	m = updateApp(t, m, typeKey('a'))
+	requireCaretOnScreen(t, m)
+}
+
+// TestAppCursor_BrowserPrefix pins the same for the browser's prefix input.
+func TestAppCursor_BrowserPrefix(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
+
+	m = updateApp(t, m, typeKey('p')) // browser: focus the prefix input
+	require.True(t, m.activePageCapturesInput(), "the prefix input is focused")
+
+	m = updateApp(t, m, typeKey('x'))
+	requireCaretOnScreen(t, m)
+}
+
 func TestAppCursor_NoneWhenNoTextField(t *testing.T) {
 	t.Parallel()
 
