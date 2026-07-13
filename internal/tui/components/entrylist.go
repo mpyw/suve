@@ -1,6 +1,7 @@
 package components
 
 import (
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -9,13 +10,14 @@ import (
 )
 
 // ListRow is one presentation-ready entry row. The owning page precomputes the
-// value preview (masked when appropriate) and badges, so the list widget stays
-// dumb — it never sees a raw secret value.
+// value preview and badges, so the list widget stays dumb.
 type ListRow struct {
 	// Name is the entry name (the primary column).
 	Name string
-	// Preview is an optional value preview shown after the name in values-mode
-	// (already masked by the caller for secrets); empty hides it.
+	// Preview is an optional value preview rendered on an indented SECOND line
+	// beneath the name (values-mode); empty draws no value line, so the row is a
+	// single line. The caller flattens/truncates it — an explicit values:on is a
+	// reveal, so a secret value is shown, mirroring the GUI (#734).
 	Preview string
 	// Badges are trailing chips (e.g. "staged", "(NULL)") shown right of the row.
 	Badges []string
@@ -119,19 +121,20 @@ func (l *EntryList) Scroll(delta int) {
 
 // RowAtLine maps a 0-based content line (relative to the list body, i.e. below
 // its title/border) to a row index, or (0, false) when the line is the footer
-// or past the last visible row. Clicks derive their target through this, never
-// a hard-coded coordinate.
+// or past the last visible row. A row's name line and its value line both map
+// back to that row, so a click anywhere in a row selects it. Clicks derive their
+// target through this, never a hard-coded coordinate.
 func (l *EntryList) RowAtLine(line int) (int, bool) {
 	if line < 0 || len(l.rows) == 0 {
 		return 0, false
 	}
 
-	idx := l.offset + line
-	if idx >= len(l.rows) || line >= l.visibleRows() {
+	_, rowOf := l.window()
+	if line >= len(rowOf) {
 		return 0, false
 	}
 
-	return idx, true
+	return rowOf[line], true
 }
 
 // View renders the list body (without a title/border; the page frames it) into
@@ -142,17 +145,7 @@ func (l *EntryList) View() string {
 		return ""
 	}
 
-	visible := l.visibleRows()
-	lines := make([]string, 0, l.height)
-
-	for i := range visible {
-		idx := l.offset + i
-		if idx >= len(l.rows) {
-			break
-		}
-
-		lines = append(lines, l.renderRow(idx))
-	}
+	lines, _ := l.window()
 
 	if l.hasMore {
 		lines = append(lines, l.styles.PageHint.Render(truncate("  … load more (L)", l.width)))
@@ -163,11 +156,47 @@ func (l *EntryList) View() string {
 		lines = append(lines, "")
 	}
 
-	return strings.Join(lines, "\n")
+	return strings.Join(lines[:l.height], "\n")
 }
 
-// renderRow renders one row: a cursor for the selection, the name, an optional
-// value preview, and trailing badges, all clamped to width.
+// window renders the visible content lines for the current offset (capped at the
+// visible line budget) and, parallel to them, the row index each line belongs
+// to — so View draws them and RowAtLine maps a clicked line back to its row
+// without the two drifting apart (mirrors HistoryTable.window).
+func (l *EntryList) window() (lines []string, rowOf []int) {
+	visible := l.visibleRows()
+
+	for row := l.offset; row < len(l.rows) && len(lines) < visible; row++ {
+		for _, line := range l.rowLines(row) {
+			if len(lines) >= visible {
+				break
+			}
+
+			lines = append(lines, line)
+			rowOf = append(rowOf, row)
+		}
+	}
+
+	return lines, rowOf
+}
+
+// rowLines returns one row's rendered lines: the name header line (cursor + name
+// + right-aligned badges) and, when a value preview is present, an indented value
+// line beneath it (values-mode). The value line shares the history table's indent
+// so it reads as a detail of the name above it (#734).
+func (l *EntryList) rowLines(idx int) []string {
+	lines := []string{l.renderRow(idx)}
+
+	if preview := l.rows[idx].Preview; preview != "" {
+		lines = append(lines, l.styles.PageHint.Render(truncate("     "+preview, l.width)))
+	}
+
+	return lines
+}
+
+// renderRow renders one row's header line: a cursor for the selection, the name,
+// and trailing right-aligned badges, all clamped to width. The value preview is
+// drawn separately on the next line by rowLines.
 func (l *EntryList) renderRow(idx int) string {
 	row := l.rows[idx]
 
@@ -187,9 +216,6 @@ func (l *EntryList) renderRow(idx int) string {
 	}
 
 	left := cursor + name
-	if row.Preview != "" {
-		left += l.styles.PageHint.Render("  " + row.Preview)
-	}
 
 	badges := renderBadges(l.styles, row.Badges)
 	if badges == "" {
@@ -205,8 +231,10 @@ func (l *EntryList) renderRow(idx int) string {
 	return truncate(left+strings.Repeat(" ", gap)+badges, l.width)
 }
 
-// visibleRows is how many entry rows fit, reserving one line for the load-more
-// footer when there is a next page.
+// visibleRows is the window's height in rendered lines, reserving one line for
+// the load-more footer when there is a next page. It is the per-View line budget
+// window() fills, not a row count: a values-mode row renders as two lines, so the
+// offset math below converts between the two by summing per-row line counts.
 func (l *EntryList) visibleRows() int {
 	if l.hasMore {
 		return max(l.height-1, 0)
@@ -215,15 +243,45 @@ func (l *EntryList) visibleRows() int {
 	return l.height
 }
 
-// maxOffset is the furthest the list can scroll so the last row stays visible.
+// maxOffset caps scrolling so the last row's final line stays reachable at the
+// bottom of the window. Because a values-mode row renders as two lines, this is
+// not len(rows)-visible: it is the smallest row offset whose rows [offset..end]
+// fill (without exceeding) the line budget, found by walking rows from the end
+// and accumulating their rendered line counts until the next row would overflow.
 func (l *EntryList) maxOffset() int {
-	return max(len(l.rows)-l.visibleRows(), 0)
+	budget := l.visibleRows()
+	if budget <= 0 || len(l.rows) == 0 {
+		return 0
+	}
+
+	total := 0
+	offset := len(l.rows)
+
+	for i := range slices.Backward(l.rows) {
+		h := len(l.rowLines(i))
+		if total+h > budget {
+			break
+		}
+
+		total += h
+		offset = i
+	}
+
+	// When even the last row alone overflows the budget, it can still be scrolled
+	// to (its top line at the pane top), so cap the offset at the last row.
+	return min(offset, len(l.rows)-1)
 }
 
-// ensureVisible scrolls the viewport so the selection is on-screen.
+// ensureVisible keeps the selected row's rendered lines fully inside the
+// line-budget window. It scrolls up when the selection starts above the window,
+// and down when the selection's lines extend past the window bottom — walking up
+// from the selected row accumulating line counts to find the smallest offset that
+// still shows the selected row's final line — then clamps to the valid range.
+// Line counts come from rowLines, the same source window() uses, so the scroll
+// math and the mouse hit-map never disagree.
 func (l *EntryList) ensureVisible() {
-	visible := l.visibleRows()
-	if visible <= 0 {
+	budget := l.visibleRows()
+	if budget <= 0 || len(l.rows) == 0 {
 		l.offset = 0
 
 		return
@@ -233,8 +291,23 @@ func (l *EntryList) ensureVisible() {
 		l.offset = l.selected
 	}
 
-	if l.selected >= l.offset+visible {
-		l.offset = l.selected - visible + 1
+	// Find the smallest offset whose rows [offset..selected] fit the budget, so
+	// the selected row's last line lands at or above the window bottom.
+	total := 0
+	minOffset := l.selected
+
+	for i := l.selected; i >= 0; i-- {
+		h := len(l.rowLines(i))
+		if total+h > budget {
+			break
+		}
+
+		total += h
+		minOffset = i
+	}
+
+	if l.offset < minOffset {
+		l.offset = minOffset
 	}
 
 	l.offset = clamp(l.offset, 0, l.maxOffset())

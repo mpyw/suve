@@ -2,9 +2,7 @@
 package tui
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"testing"
 	"time"
 
@@ -33,11 +31,6 @@ func goldenEnv(t *testing.T) {
 	timeutil.ResetLocationCache()
 }
 
-// captureUntil runs a model through teatest, accumulating ALL output into a
-// private buffer until marker appears (so it never races FinalOutput's shared
-// reader, per the harness note), then quits and returns the full stream. The
-// final visible screen is the last frame — the loaded state — because the quit
-// is sent only after the marker proves the async loads landed.
 // browser goldens render at a two-pane size (≥110 columns) with enough height
 // for the version history; diff goldens use the default shell size.
 const (
@@ -45,31 +38,40 @@ const (
 	browserTermHeight = 34
 )
 
-func captureUntil(t *testing.T, model tea.Model, marker string, width, height int) []byte {
+// captureUntil drives a model to its loaded state (waiting for marker to render),
+// quits via `q`, and renders the SETTLED final model's screen at the given size.
+//
+// Like the staging/dialog helpers (#766), the golden is taken from the final
+// View().Content — a single coherent full render of the settled model after the
+// async load, the WindowSizeMsg, and the quit are all processed — not from the
+// live teatest frame stream. Bubble Tea emits diff frames, and under CI's
+// parallel -race those settle at timing-dependent points, so replaying the raw
+// stream through the vt intermittently corrupts the final screen (#764).
+func captureUntil(t *testing.T, model tea.Model, marker string, width, height int) string {
 	t.Helper()
 
 	tm := teatest.NewTestModel(t, model, teatest.WithInitialTermSize(width, height))
 
-	var buf bytes.Buffer
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		_, _ = io.Copy(&buf, tm.Output())
-		if bytes.Contains(buf.Bytes(), []byte(marker)) {
-			break
-		}
-
-		time.Sleep(20 * time.Millisecond)
-	}
-
-	require.Contains(t, buf.String(), marker, "loaded content never rendered")
+	waitFor(t, tm, marker)
 
 	tm.Send(keyPress('q'))
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
-	_, _ = io.Copy(&buf, tm.Output())
+	return settledScreen(t, tm, width, height)
+}
 
-	return buf.Bytes()
+// settledScreen waits for the program to finish, then renders the settled final
+// model's full-screen View().Content through the vt at the given size. It works
+// for any host that renders a tea.View (the browser *App and the diff/dialog
+// hosts alike), so the browser and diff goldens share one deterministic settle.
+func settledScreen(t *testing.T, tm *teatest.TestModel, width, height int) string {
+	t.Helper()
+
+	fm := tm.FinalModel(t, teatest.WithFinalTimeout(3*time.Second))
+
+	vm, ok := fm.(interface{ View() tea.View })
+	require.True(t, ok, "final model must render a tea.View")
+
+	return renderVisibleScreenSize(t, []byte(vm.View().Content), width, height)
 }
 
 // TestBrowser_AWSParamGolden renders the AWS param browser (masked SecureString
@@ -88,6 +90,32 @@ func TestBrowser_AWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenE
 	browserGolden(t, m, "SecureString")
 }
 
+// TestBrowser_AWSParamValuesOnGolden pins #734: with values:on the list renders
+// each entry's value on its OWN indented second line (mirroring the version
+// history layout), so the value never collides with the right-aligned [staged]
+// badge on the name line. And because values:on is an EXPLICIT reveal (GUI
+// parity, the same policy as Compare/diff), a SecureString (secret) value is
+// SHOWN in the preview rather than masked.
+func TestBrowser_AWSParamValuesOnGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	probe := staticProbe{keys: map[data.StagedKey]struct{}{{Name: "/app/web/BASE_URL"}: {}}}
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), probe),
+	})
+
+	// Press `v` to turn values on; the list reloads with the value under each name.
+	screen := captureBrowserKeys(t, m, "SecureString", 'v')
+
+	require.Contains(t, screen, "postgres://db.internal:5432/app",
+		"values:on reveals the SecureString value in the list preview (explicit reveal, GUI parity)")
+	require.Contains(t, screen, "[staged]", "the staged badge still renders on the name line")
+	golden.RequireEqual(t, screen)
+}
+
 // TestBrowser_AWSParamHistoryFocusGolden renders the AWS param browser after
 // pressing enter to move focus into the version history (#685): the history pane
 // carries the active selection cursor (▸) and the `esc: list` hint, while the
@@ -104,8 +132,7 @@ func TestBrowser_AWSParamHistoryFocusGolden(t *testing.T) { //nolint:paralleltes
 	})
 
 	// Drive to the loaded state, then press enter to focus the history pane.
-	raw := captureBrowserAfterKeys(t, m, "SecureString", keyEnterMsg())
-	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight))
+	golden.RequireEqual(t, captureBrowserAfterKeys(t, m, "SecureString", keyEnterMsg()))
 }
 
 // TestBrowser_AWSParamHistoryValueRevealGolden pins #733: each version row shows
@@ -123,8 +150,7 @@ func TestBrowser_AWSParamHistoryValueRevealGolden(t *testing.T) { //nolint:paral
 	})
 
 	// The default masked screen shows bullets in the history; press `x` to reveal.
-	raw := captureBrowserKeys(t, m, "SecureString", 'x')
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureBrowserKeys(t, m, "SecureString", 'x')
 
 	require.Contains(t, screen, "postgres://db.internal:5432/app", "x reveals the current and history values")
 	golden.RequireEqual(t, screen)
@@ -152,8 +178,7 @@ func TestBrowser_DeleteStagedGateStatusGolden(t *testing.T) { //nolint:parallelt
 		sourceFor: sourceForShape("secret", awsSecretSource(), probe),
 	})
 
-	raw := captureBrowserAfterKeys(t, m, "Version ID", keyPress('t'))
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureBrowserAfterKeys(t, m, "Version ID", keyPress('t'))
 
 	require.Contains(t, screen, "cannot tag: staged for deletion", "the gate surfaces a status message rather than the tag dialog")
 	golden.RequireEqual(t, screen)
@@ -192,8 +217,7 @@ func awsParamStagedBannerApp(entry, tags bool) *App {
 func TestBrowser_StagedValueBannerGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureUntil(t, awsParamStagedBannerApp(true, false), "staged value changes", browserTermWidth, browserTermHeight)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureUntil(t, awsParamStagedBannerApp(true, false), "staged value changes", browserTermWidth, browserTermHeight)
 
 	require.Contains(t, screen, "⚠ staged value changes — S: staging", "value-only shows the value-change banner")
 	require.NotContains(t, screen, "tag changes", "value-only must not mention tag changes")
@@ -205,8 +229,7 @@ func TestBrowser_StagedValueBannerGolden(t *testing.T) { //nolint:paralleltest /
 func TestBrowser_StagedTagBannerGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureUntil(t, awsParamStagedBannerApp(false, true), "staged tag changes", browserTermWidth, browserTermHeight)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureUntil(t, awsParamStagedBannerApp(false, true), "staged tag changes", browserTermWidth, browserTermHeight)
 
 	require.Contains(t, screen, "⚠ staged tag changes — S: staging", "tag-only shows the tag-change banner")
 	require.NotContains(t, screen, "value and tag", "tag-only must not use the combined wording")
@@ -218,8 +241,7 @@ func TestBrowser_StagedTagBannerGolden(t *testing.T) { //nolint:paralleltest // 
 func TestBrowser_StagedValueAndTagBannerGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
-	raw := captureUntil(t, awsParamStagedBannerApp(true, true), "staged value and tag changes", browserTermWidth, browserTermHeight)
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureUntil(t, awsParamStagedBannerApp(true, true), "staged value and tag changes", browserTermWidth, browserTermHeight)
 
 	require.Contains(t, screen, "⚠ staged value and tag changes — S: staging", "both shows the combined banner")
 	golden.RequireEqual(t, screen)
@@ -238,8 +260,7 @@ func TestBrowser_CopyKeepsMaskGolden(t *testing.T) { //nolint:paralleltest // go
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 
-	raw := captureBrowserKeys(t, m, "SecureString", 'y')
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureBrowserKeys(t, m, "SecureString", 'y')
 
 	assert.Contains(t, screen, "copied (value stays masked)", "the copy status shows")
 	assert.NotContains(t, screen, "postgres://db.internal:5432/app", "the copied secret is NOT revealed on screen")
@@ -257,8 +278,7 @@ func TestBrowser_ParseJSONGolden(t *testing.T) { //nolint:paralleltest // golden
 		sourceFor: sourceForShape("param", awsParamJSONSource(), nil),
 	})
 
-	raw := captureBrowserKeys(t, m, "db.internal", 'J')
-	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+	screen := captureBrowserKeys(t, m, "db.internal", 'J')
 
 	assert.Contains(t, screen, `"host": "db.internal"`, "J pretty-prints the JSON value onto indented lines")
 	golden.RequireEqual(t, screen)
@@ -394,8 +414,7 @@ func TestDiff_AWSParamSecureStringGolden(t *testing.T) { //nolint:paralleltest /
 
 	host := newDiffHost(diffReq(awsParamSecureStringDiffSource(), "/app/api/DATABASE_URL", "13", "14"))
 
-	raw := captureUntil(t, host, "diff:", goldenTermWidth, goldenTermHeight)
-	screen := renderVisibleScreenSize(t, raw, goldenTermWidth, goldenTermHeight)
+	screen := captureUntil(t, host, "diff:", goldenTermWidth, goldenTermHeight)
 
 	require.Contains(t, screen, secureStringDiffValue, "the SecureString diff is revealed by default (#702/#735)")
 	require.Contains(t, screen, secureStringDiffOldValue, "both SecureString versions are shown")
@@ -435,82 +454,40 @@ func TestDiff_AzureKVGolden(t *testing.T) { //nolint:paralleltest // goldenEnv c
 func browserGolden(t *testing.T, m *App, marker string) {
 	t.Helper()
 
-	raw := captureUntil(t, m, marker, browserTermWidth, browserTermHeight)
-	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight))
+	golden.RequireEqual(t, captureUntil(t, m, marker, browserTermWidth, browserTermHeight))
 }
 
-// captureBrowserKeys drives a browser app to its loaded state (marker), then
-// sends keys (each followed by a short settle) before quitting — so a golden can
-// capture the screen after a key toggle (copy, parse-json).
-func captureBrowserKeys(t *testing.T, m *App, marker string, keys ...rune) []byte {
+// captureBrowserKeys drives a browser app to its loaded state (marker), sends the
+// given rune keys, quits, and renders the SETTLED final model's screen — so a
+// golden can capture the screen after a key toggle (copy, parse-json, values).
+func captureBrowserKeys(t *testing.T, m *App, marker string, keys ...rune) string {
 	t.Helper()
 
-	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
-
-	var buf bytes.Buffer
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		_, _ = io.Copy(&buf, tm.Output())
-		if bytes.Contains(buf.Bytes(), []byte(marker)) {
-			break
-		}
-
-		time.Sleep(20 * time.Millisecond)
+	presses := make([]tea.KeyPressMsg, len(keys))
+	for i, k := range keys {
+		presses[i] = keyPress(k)
 	}
 
-	require.Contains(t, buf.String(), marker, "loaded content never rendered")
-
-	for _, k := range keys {
-		tm.Send(keyPress(k))
-		time.Sleep(100 * time.Millisecond)
-
-		_, _ = io.Copy(&buf, tm.Output())
-	}
-
-	tm.Send(keyPress('q'))
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
-
-	_, _ = io.Copy(&buf, tm.Output())
-
-	return buf.Bytes()
+	return captureBrowserAfterKeys(t, m, marker, presses...)
 }
 
 // captureBrowserAfterKeys drives a browser app to its loaded state (waiting for
-// marker), sends follow-up key presses (e.g. enter to focus the history), lets
-// the frame settle, then quits and returns the full captured stream.
-func captureBrowserAfterKeys(t *testing.T, m *App, marker string, keys ...tea.KeyPressMsg) []byte {
+// marker), sends follow-up key presses (e.g. enter to focus the history or `v` to
+// toggle values), quits, and renders the settled final model's screen.
+func captureBrowserAfterKeys(t *testing.T, m *App, marker string, keys ...tea.KeyPressMsg) string {
 	t.Helper()
 
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
 
-	var buf bytes.Buffer
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		_, _ = io.Copy(&buf, tm.Output())
-		if bytes.Contains(buf.Bytes(), []byte(marker)) {
-			break
-		}
-
-		time.Sleep(20 * time.Millisecond)
-	}
-
-	require.Contains(t, buf.String(), marker, "loaded content never rendered")
+	waitFor(t, tm, marker)
 
 	for _, k := range keys {
 		tm.Send(k)
-		time.Sleep(100 * time.Millisecond)
-
-		_, _ = io.Copy(&buf, tm.Output())
 	}
 
 	tm.Send(keyPress('q'))
-	tm.WaitFinished(t, teatest.WithFinalTimeout(3*time.Second))
 
-	_, _ = io.Copy(&buf, tm.Output())
-
-	return buf.Bytes()
+	return settledScreen(t, tm, browserTermWidth, browserTermHeight)
 }
 
 // diffGolden drives a diff host to its loaded state at the shell size and
@@ -518,6 +495,5 @@ func captureBrowserAfterKeys(t *testing.T, m *App, marker string, keys ...tea.Ke
 func diffGolden(t *testing.T, host *diffHost, marker string) {
 	t.Helper()
 
-	raw := captureUntil(t, host, marker, goldenTermWidth, goldenTermHeight)
-	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, goldenTermWidth, goldenTermHeight))
+	golden.RequireEqual(t, captureUntil(t, host, marker, goldenTermWidth, goldenTermHeight))
 }

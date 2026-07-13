@@ -11,10 +11,6 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// previewMask is the fixed masked preview shown for a secret value in the list,
-// so a golden never carries a real value.
-const previewMask = "••••••"
-
 // rebuildRows recomputes the list rows from the loaded items, the staged-key
 // set, and the values/namespace modes.
 func (m *Model) rebuildRows() {
@@ -22,7 +18,7 @@ func (m *Model) rebuildRows() {
 		row := components.ListRow{Name: it.Name}
 
 		if m.valuesOn && it.Value != nil {
-			row.Preview = previewValue(*it.Value, it.Secret)
+			row.Preview = previewValue(*it.Value)
 		}
 
 		var badges []string
@@ -45,15 +41,16 @@ func (m *Model) rebuildRows() {
 	m.list.SetRows(rows, m.nextToken != "")
 }
 
-// previewValue renders a list value preview, masking secrets.
-func previewValue(value string, secret bool) string {
-	if secret {
-		return previewMask
-	}
-
+// previewValue renders a list value preview: a single, truncated, newline-
+// flattened line. It is only ever called under values:on — an EXPLICIT reveal, so
+// it SHOWS the real value like the GUI, including secrets (mirroring the
+// Compare/diff reveal policy), rather than masking it (#734). The detail value
+// pane keeps its own separate mask/reveal.
+func previewValue(value string) string {
 	const maxPreview = 40
 
-	value = strings.ReplaceAll(value, "\n", " ")
+	replacer := strings.NewReplacer("\n", " ", "\r", " ", "\t", " ")
+	value = replacer.Replace(value)
 
 	if len([]rune(value)) > maxPreview {
 		return string([]rune(value)[:maxPreview]) + "…"
