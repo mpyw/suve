@@ -76,9 +76,9 @@ func (m *Model) renderHeader(width int) (string, []headerSeg) {
 	}
 
 	pieces = append(pieces,
-		piece{m.styles.FieldLabel.Render("prefix: ") + fieldValue(m.prefix.Value(), m.focus == focusPrefix), regionPrefix},
+		piece{m.styles.FieldLabel.Render("prefix: ") + fieldValue(m.prefix.Value(), m.prefix.Position(), m.focus == focusPrefix), regionPrefix},
 		piece{headerSep, ""},
-		piece{m.styles.FieldLabel.Render("filter: ") + fieldValue(m.filter.Value(), m.focus == focusFilter), regionFilter},
+		piece{m.styles.FieldLabel.Render("filter: ") + fieldValue(m.filter.Value(), m.filter.Position(), m.focus == focusFilter), regionFilter},
 		piece{headerSep, ""},
 		piece{toggle(m.styles, "values", m.valuesOn), regionValues},
 	)
@@ -479,28 +479,39 @@ func fieldLine(st styles.Styles, label, value string, width int) string {
 	return clip(st.FieldLabel.Render(padded)+" "+value, width)
 }
 
-// caretCell is the focused header input's caret: a single reverse-video cell. The
+// caretStyle draws the focused header input's caret as a reverse-video cell. The
 // app's screenCursor locates the caret by the sole reverse-video cell in the
 // composited frame and draws the REAL terminal cursor there (the #765 caret the
 // dialogs already get), so the caret must be reverse video — a plain glyph would
 // render no real cursor. It is always painted while focused (no blink dependency),
 // so the cursor never flickers off.
 //
-//nolint:gochecknoglobals // immutable rendered caret cell
-var caretCell = lipgloss.NewStyle().Reverse(true).Render(" ")
+//nolint:gochecknoglobals // immutable caret style
+var caretStyle = lipgloss.NewStyle().Reverse(true)
 
-// fieldValue renders a header input's value, showing a placeholder when empty and
-// the reverse-video caret when focused.
-func fieldValue(value string, focused bool) string {
-	if focused {
-		return value + caretCell
+// fieldValue renders a header input's value, showing a placeholder when empty and,
+// when focused, the reverse-video caret AT the input's cursor position (pos, a rune
+// index) — reversing the character under the caret, or a trailing space when the
+// caret is past the end — so ←/→ movement within the text is reflected instead of
+// the caret being pinned to the end.
+func fieldValue(value string, pos int, focused bool) string {
+	if !focused {
+		if value == "" {
+			return "—"
+		}
+
+		return value
 	}
 
-	if value == "" {
-		return "—"
+	runes := []rune(value)
+	pos = max(0, min(pos, len(runes)))
+
+	before := string(runes[:pos])
+	if pos == len(runes) {
+		return before + caretStyle.Render(" ")
 	}
 
-	return value
+	return before + caretStyle.Render(string(runes[pos])) + string(runes[pos+1:])
 }
 
 // toggle renders an "name:on/off" toggle chip.
