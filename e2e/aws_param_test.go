@@ -2065,6 +2065,21 @@ func TestAWSParam_CreateWithDescription(t *testing.T) {
 	stdout, _, err := runCommand(t, paramcreate.Command(), "--description", "Test parameter description", paramName, "value")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Created")
+
+	// #753: the description must round-trip back through `show` (adapter Get
+	// reads it best-effort via DescribeParameters; the show presenter renders it).
+	t.Run("show-renders-description", func(t *testing.T) {
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Description")
+		assert.Contains(t, stdout, "Test parameter description")
+	})
+
+	t.Run("show-json-includes-description", func(t *testing.T) {
+		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--output=json", paramName)
+		require.NoError(t, err)
+		assert.Contains(t, stdout, `"description": "Test parameter description"`)
+	})
 }
 
 // TestAWSParam_CreateDuplicate tests creating a duplicate parameter.

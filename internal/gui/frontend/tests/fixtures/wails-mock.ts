@@ -12,6 +12,9 @@ export interface Parameter {
   // omitted is the null/default namespace. Populated into ParamListEntry.namespace
   // by ParamList so the GUI can filter by namespace client-side (#425).
   namespace?: string;
+  // Optional human-readable description surfaced by ParamShow. Empty / omitted
+  // renders nothing (the detail pane gates on a non-empty value).
+  description?: string;
 }
 
 export interface Secret {
@@ -29,6 +32,9 @@ export interface Secret {
   stagingLabels?: string[];
   state?: string;
   versionId?: string;
+  // Optional human-readable description surfaced by SecretShow. Empty / omitted
+  // renders nothing (the detail pane gates on a non-empty value).
+  description?: string;
 }
 
 export interface Tag {
@@ -957,7 +963,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           version: currentVersion?.version || 1,
           type: showType,
           secret: showType === 'SecureString',
-          description: '',
+          description: param?.description ?? '',
           lastModified: currentVersion?.lastModified || new Date().toISOString(),
           tags,
         };
@@ -1093,7 +1099,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           stagingLabels: secret?.stagingLabels !== undefined ? secret.stagingLabels : ['AWSCURRENT'],
           state: secret?.state ?? '',
           value: secret?.value || 'mock-secret',
-          description: '',
+          description: secret?.description ?? '',
           createdDate: new Date().toISOString(),
           tags,
         };

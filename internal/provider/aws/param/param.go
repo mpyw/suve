@@ -156,6 +156,26 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		})
 	}
 
+	// Description is best-effort too: GetParameter's output carries no description,
+	// so it lives in the parameter metadata returned by DescribeParameters. A
+	// metadata-read failure must not fail the value read (same discipline as tags).
+	descOutput, err := s.client.DescribeParameters(ctx, &ssm.DescribeParametersInput{
+		ParameterFilters: []types.ParameterStringFilter{{
+			Key:    aws.String("Name"),
+			Option: aws.String("Equals"),
+			Values: []string{aws.ToString(p.Name)},
+		}},
+	})
+	if err == nil && descOutput != nil {
+		// Equals filters to the exact name, but match defensively in case an
+		// emulator treats it as a prefix filter.
+		if meta, ok := lo.Find(descOutput.Parameters, func(m types.ParameterMetadata) bool {
+			return aws.ToString(m.Name) == aws.ToString(p.Name)
+		}); ok {
+			entry.Description = aws.ToString(meta.Description)
+		}
+	}
+
 	return entry, nil
 }
 
