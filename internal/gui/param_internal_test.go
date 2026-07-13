@@ -79,6 +79,96 @@ func TestParamList_PopulatesSecretAndType(t *testing.T) {
 	assert.Equal(t, paramtype.SecureString, byName["/my/secure"].Type)
 }
 
+// TestParamSet_ThreadsDescription asserts the GUI ParamSet binding forwards the
+// description argument into the create use case (and, on the already-exists
+// fallback, into the update use case), so a description set in the GUI form
+// reaches the provider writer (#767).
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamSet_ThreadsDescription(t *testing.T) {
+	var gotCreateDescription, gotPutDescription string
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			// The update path Gets the current entry before Put; return one so the
+			// fallback reaches Put rather than a not-found error.
+			return &domain.Entry{Name: name, Value: "old", Type: domain.ValueTypePlaintext}, nil
+		},
+		CreateFunc: func(
+			_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption,
+		) (domain.Version, error) {
+			gotCreateDescription = description
+
+			return domain.Version{ID: "1"}, nil
+		},
+		PutFunc: func(
+			_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption,
+		) (domain.Version, error) {
+			gotPutDescription = description
+
+			return domain.Version{ID: "2"}, nil
+		},
+	}
+
+	orig := registry
+	registry = provider.NewRegistry()
+	registry.Register(provider.ProviderAWS, fakeFactory{store: store})
+
+	t.Cleanup(func() { registry = orig })
+
+	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+	// Create path: a fresh key routes to Create and carries the description.
+	res, err := app.ParamSet("/my/param", "v", "String", "", "my description")
+	require.NoError(t, err)
+	assert.True(t, res.IsCreated)
+	assert.Equal(t, "my description", gotCreateDescription)
+
+	// Update path: when the key already exists, ParamSet falls back to Put and
+	// must forward the description there too.
+	store.CreateFunc = func(
+		context.Context, string, string, domain.ValueType, string, ...provider.WriteOption,
+	) (domain.Version, error) {
+		return domain.Version{}, provider.ErrAlreadyExists
+	}
+
+	res, err = app.ParamSet("/my/param", "v2", "String", "", "updated description")
+	require.NoError(t, err)
+	assert.False(t, res.IsCreated)
+	assert.Equal(t, "updated description", gotPutDescription)
+}
+
+// TestParamSet_DropsDescriptionForAzure asserts the server-side guard: Azure App
+// Configuration ignores descriptions, so the binding must drop any value even if
+// the frontend (which hides the input) is bypassed — defense in depth (#767).
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamSet_DropsDescriptionForAzure(t *testing.T) {
+	var gotDescription string
+
+	store := &providermock.Store{
+		CreateFunc: func(
+			_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption,
+		) (domain.Version, error) {
+			gotDescription = description
+
+			return domain.Version{ID: "1"}, nil
+		},
+	}
+
+	orig := registry
+	registry = provider.NewRegistry()
+	registry.Register(provider.ProviderAzure, fakeFactory{store: store})
+
+	t.Cleanup(func() { registry = orig })
+
+	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAzure, StoreName: "store"}}
+
+	_, err := app.ParamSet("app/config", "v", "", "", "should-be-dropped")
+	require.NoError(t, err)
+	assert.Empty(t, gotDescription, "Azure App Configuration must not receive a description")
+}
+
 // TestParamListWithNamespaces_PopulatesSecretAndType covers the App
 // Configuration list path: its values are always plaintext, so Secret stays
 // false and Type is the plaintext display, matching the detail path (#491).

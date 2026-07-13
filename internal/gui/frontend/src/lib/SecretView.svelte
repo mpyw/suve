@@ -31,6 +31,10 @@
   const tagsPerVersion = $derived(capability?.tagsPerVersion ?? false);
   const historyEnabled = $derived(capability?.hasVersionHistory ?? true);
   const restoreEnabled = $derived(capability?.hasRestore ?? true);
+  // The Description input is shown only where the provider persists it (AWS
+  // Secrets Manager, Google Cloud Secret Manager); Azure Key Vault ignores it,
+  // so it stays hidden. Default false so a capability missing the field hides it.
+  const descriptionEnabled = $derived(capability?.hasDescription ?? false);
   const forceDeleteEnabled = $derived(capability?.hasForceDelete ?? true);
   const recoveryWindowEnabled = $derived(capability?.hasRecoveryWindow ?? true);
 
@@ -107,8 +111,8 @@
   let showDeleteModal = $state(false);
   let showDiffModal = $state(false);
   let showRestoreModal = $state(false);
-  let createForm = $state({ name: '', value: '' });
-  let editForm = $state({ name: '', value: '' });
+  let createForm = $state({ name: '', value: '', description: '' });
+  let editForm = $state({ name: '', value: '', description: '' });
   let deleteTarget = $state('');
   let forceDelete = $state(false);
   let modalLoading = $state(false);
@@ -249,7 +253,7 @@
 
   // Create modal
   function openCreateModal() {
-    createForm = { name: prefix || '', value: '' };
+    createForm = { name: prefix || '', value: '', description: '' };
     modalError = '';
     showCreateModal = true;
   }
@@ -263,8 +267,11 @@
     modalLoading = true;
     modalError = '';
     try {
+      // Only send a description where the provider supports it; the binding also
+      // drops it server-side for providers that ignore it (#767).
+      const description = descriptionEnabled ? createForm.description : '';
       if (immediate) {
-        await SecretCreate(createForm.name, createForm.value);
+        await SecretCreate(createForm.name, createForm.value, description);
         await loadSecrets({ prefix, filter, withValue });
       } else {
         await StagingAdd('secret', createForm.name, createForm.value, '');
@@ -281,7 +288,8 @@
   // Edit modal
   function openEditModal() {
     if (secretDetail) {
-      editForm = { name: secretDetail.name, value: secretDetail.value };
+      // Pre-fill the current description so an unchanged edit round-trips it.
+      editForm = { name: secretDetail.name, value: secretDetail.value, description: secretDetail.description ?? '' };
     }
     modalError = '';
     showEditModal = true;
@@ -296,8 +304,11 @@
     modalLoading = true;
     modalError = '';
     try {
+      // Only send a description where the provider supports it; the binding also
+      // drops it server-side for providers that ignore it (#767).
+      const description = descriptionEnabled ? editForm.description : '';
       if (immediate) {
-        await SecretUpdate(editForm.name, editForm.value);
+        await SecretUpdate(editForm.name, editForm.value, description);
         await Promise.all([
           loadSecrets({ prefix, filter, withValue }),
           selectSecret(editForm.name)
@@ -727,6 +738,19 @@
         rows="5"
       ></textarea>
     </div>
+    {#if descriptionEnabled}
+      <div class="form-group">
+        <label for="secret-description">Description</label>
+        <input
+          id="secret-description"
+          type="text"
+          class="form-input"
+          data-testid="secret-description-input"
+          bind:value={createForm.description}
+          placeholder="Optional description"
+        />
+      </div>
+    {/if}
     {#if stagingEnabled}
       <label class="checkbox-label immediate-checkbox">
         <input type="checkbox" bind:checked={immediateMode} />
@@ -767,6 +791,19 @@
         rows="8"
       ></textarea>
     </div>
+    {#if descriptionEnabled}
+      <div class="form-group">
+        <label for="edit-secret-description">Description</label>
+        <input
+          id="edit-secret-description"
+          type="text"
+          class="form-input"
+          data-testid="edit-secret-description-input"
+          bind:value={editForm.description}
+          placeholder="Optional description"
+        />
+      </div>
+    {/if}
     {#if stagingEnabled}
       <label class="checkbox-label immediate-checkbox">
         <input type="checkbox" bind:checked={immediateMode} />
