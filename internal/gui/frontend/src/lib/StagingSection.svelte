@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { gui } from '../../wailsjs/go/models';
   import DiffDisplay from './DiffDisplay.svelte';
+  import { maskValue } from './viewUtils';
   import './common.css';
 
   interface Props {
@@ -16,6 +17,12 @@
     // Whether to show each entry's namespace as a badge (Azure App Configuration
     // only). "(NULL)" is the null/default namespace.
     showNamespace?: boolean;
+    // Whether this whole section renders secret material (the Secret service).
+    // OR'd with each entry's own value-type flag so both a secret-service entry
+    // and a SecureString param are masked. Mirrors the TUI's `sec.secret ||
+    // e.Secret` (staging/view.go) — the section flag also covers a secret-service
+    // create, whose per-entry flag the usecase leaves unset (#715).
+    secret?: boolean;
     onapply: () => void;
     onreset: () => void;
     onedit: (entry: gui.StagingDiffEntry) => void;
@@ -37,6 +44,7 @@
     viewMode,
     hasTags = true,
     showNamespace = false,
+    secret = false,
     onapply,
     onreset,
     onedit,
@@ -119,6 +127,7 @@
     <ul class="entry-list">
       {#each entries as entry}
         {@const tagEntry = findTagEntry(entry.name)}
+        {@const rowSecret = secret || entry.secret}
         <li class="entry-item">
           <div class="entry-header">
             <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
@@ -167,9 +176,15 @@
           {#if entry.operation === 'delete'}
             {#if viewMode === 'diff'}
               <div class="entry-diff">
+                <!-- The remote-vs-staged comparison is revealed by default (the
+                     user explicitly opened this diff, #735); the DiffDisplay
+                     Hide/Show toggle can mask it. Only the remote side is secret
+                     — the staged side is the literal "(deleted)" sentinel — so
+                     pass oldSecret rather than secret (which would mask both). -->
                 <DiffDisplay
                   oldValue={entry.remoteValue || ''}
                   newValue="(deleted)"
+                  oldSecret={rowSecret}
                   oldLabel="Remote"
                   newLabel="Staged"
                   oldSubLabel={entry.remoteIdentifier || ''}
@@ -184,13 +199,14 @@
                 <DiffDisplay
                   oldValue={entry.remoteValue || ''}
                   newValue={entry.stagedValue}
+                  secret={rowSecret}
                   oldLabel="Remote"
                   newLabel="Staged"
                   oldSubLabel={entry.remoteIdentifier || ''}
                 />
               </div>
             {:else}
-              <pre class="entry-value">{entry.stagedValue}</pre>
+              <pre class="entry-value">{rowSecret ? maskValue(entry.stagedValue) : entry.stagedValue}</pre>
             {/if}
           {/if}
         </li>

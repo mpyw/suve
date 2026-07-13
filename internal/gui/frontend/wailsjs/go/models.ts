@@ -77,17 +77,19 @@ export namespace gui {
 	    newName: string;
 	    oldValue: string;
 	    newValue: string;
-	
+	    secret: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new ParamDiffResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.oldName = source["oldName"];
 	        this.newName = source["newName"];
 	        this.oldValue = source["oldValue"];
 	        this.newValue = source["newValue"];
+	        this.secret = source["secret"];
 	    }
 	}
 	export class ParamListEntry {
@@ -796,11 +798,12 @@ export namespace gui {
 	    stagedValue?: string;
 	    description?: string;
 	    warning?: string;
-	
+	    secret: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new StagingDiffEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -812,6 +815,7 @@ export namespace gui {
 	        this.stagedValue = source["stagedValue"];
 	        this.description = source["description"];
 	        this.warning = source["warning"];
+	        this.secret = source["secret"];
 	    }
 	}
 	export class StagingDiffTagEntry {

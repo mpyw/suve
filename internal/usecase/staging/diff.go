@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
@@ -42,6 +43,11 @@ type DiffEntry struct {
 	StagedValue   string
 	Description   *string
 	Warning       string // For warnings like "already deleted in AWS"
+	// Secret reports whether the entry's values are secret material (a secret
+	// service, or a SecureString param), so a consumer masks both the remote and
+	// staged values in the review. Keyed off the value type, not the service, so
+	// a SecureString param is masked too (#677).
+	Secret bool
 }
 
 // DiffTagEntry represents a single diff result for tag changes.
@@ -252,6 +258,7 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 		AWSIdentifier: fetchResult.Identifier,
 		StagedValue:   stagedValue,
 		Description:   entry.Description,
+		Secret:        fetchResult.Secret,
 	}, nil
 }
 
@@ -287,6 +294,10 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 			Operation:   entry.Operation,
 			StagedValue: lo.FromPtr(entry.Value),
 			Description: entry.Description,
+			// A create has no remote to fetch, so derive Secret from the staged
+			// value type: a SecureString param (or any secret-typed staged value)
+			// is masked in the review like every other secret value (#719).
+			Secret: entry.ValueType == domain.ValueTypeSecret,
 		}, nil
 
 	case staging.OperationUpdate:
