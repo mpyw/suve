@@ -1011,9 +1011,10 @@ func TestTagForm_RemoveConstrainedToExistingTags(t *testing.T) {
 }
 
 // TestTagForm_StagedOnlyIsAddOnly pins the staged-only surface (the staging
-// review page) is Add-only: it never has the remote tag set to constrain a
-// Remove, so it offers no Remove action rather than a guaranteed empty-state
-// dead-end. Removing a remote tag is done from the browser.
+// review page) is Add-only: it never has the remote tag set to constrain a Remove,
+// so with only one possible action the Action select is dropped entirely — the form
+// opens straight on the Key field (no inert one-option select that still demands an
+// Enter). Removing a remote tag is done from the browser.
 func TestTagForm_StagedOnlyIsAddOnly(t *testing.T) {
 	t.Parallel()
 
@@ -1026,16 +1027,21 @@ func TestTagForm_StagedOnlyIsAddOnly(t *testing.T) {
 	require.True(t, ok)
 
 	view := stripANSI(d.View())
-	assert.Contains(t, view, "Add tag", "the staged-only tag form offers Add")
+	assert.NotContains(t, view, "Action", "a single-action tag form drops the Action select")
 	assert.NotContains(t, view, "Remove tag", "the staged-only tag form offers no Remove action")
+	assert.Contains(t, view, "Key", "the form opens straight on the Key field")
+	assert.False(t, d.remove, "a staged-only tag write is always an Add")
 
-	// A browser launch (not staged-only) with removable tags still offers Remove.
+	// A browser launch (not staged-only) with removable tags keeps the Action
+	// select and can toggle to Remove.
 	bm, _ := NewTagForm(TagInput{
 		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
 		Tags: []data.Tag{{Key: "env", Value: "prod"}},
 	})
 	b, ok := bm.(*tagForm)
 	require.True(t, ok)
+
+	assert.Contains(t, stripANSI(b.View()), "Action", "a genuine Add/Remove choice keeps the Action select")
 
 	_, _ = b.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	assert.True(t, b.remove, "a browser launch with tags can toggle to Remove")
