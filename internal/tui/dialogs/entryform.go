@@ -284,11 +284,18 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 // the caret motions ctrl+a/ctrl+e now stay with the text input.)
 func formKeyMap() *huh.KeyMap {
 	km := huh.NewDefaultKeyMap()
-	km.Text.NewLine = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "new line"))
+	km.Text.NewLine = key.NewBinding(key.WithKeys("enter", "ctrl+j"), key.WithHelp("enter", "new line"))
 	km.Text.Next = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next"))
 	// A multi-line field is never the last field (the OK button is), so its Submit
 	// never fires; disable it so Enter there only ever inserts a newline.
 	km.Text.Submit = key.NewBinding(key.WithDisabled())
+	// Disable huh's built-in ctrl+e "open editor" binding. huh only disables it via
+	// Text.KeyBinds() (the help path), which never runs while WithShowHelp(false),
+	// so ExternalEditor(false) alone leaves ctrl+e live — it would launch huh's
+	// default "nano" and shadow the textarea's ctrl+e (readline end-of-line). We own
+	// the $EDITOR handoff on ctrl+o (see editorKey), so ctrl+e is freed to reach the
+	// textarea as end-of-line.
+	km.Text.Editor = key.NewBinding(key.WithDisabled())
 
 	return km
 }
