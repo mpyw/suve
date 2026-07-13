@@ -533,6 +533,49 @@ func TestDelete_RecoveryWindow(t *testing.T) {
 	assert.Nil(t, in.ForceDeleteWithoutRecovery)
 }
 
+// TestDelete_NotFoundMapsSentinel guards the ResourceNotFound→ErrNotFound
+// mapping on the delete path so callers can treat a missing secret idempotently.
+func TestDelete_NotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := secret.New(&mockClient{
+		deleteSec: func(*secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
+			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
+		},
+	})
+
+	err := store.Delete(t.Context(), "missing-secret")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrNotFound)
+}
+
+// TestPut_UpdatesWhenExistsAppliesKMSKey covers applyUpdateOptions: a KMSKeyID
+// WriteOption must fold onto the UpdateSecretInput when Put updates an existing
+// secret (the create path already covers applyCreateOptions).
+func TestPut_UpdatesWhenExistsAppliesKMSKey(t *testing.T) {
+	t.Parallel()
+
+	var updateIn *secretsmanager.UpdateSecretInput
+
+	store := secret.New(&mockClient{
+		create: func(*secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+			return nil, &types.ResourceExistsException{Message: aws.String("exists")}
+		},
+		updateSec: func(in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
+			updateIn = in
+
+			return &secretsmanager.UpdateSecretOutput{VersionId: aws.String("ver-2")}, nil
+		},
+	})
+
+	_, err := store.Put(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "",
+		secret.KMSKeyID{Value: "alias/my-key"},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, updateIn)
+	assert.Equal(t, "alias/my-key", aws.ToString(updateIn.KmsKeyId))
+}
+
 func TestGet_PopulatesExtraARN(t *testing.T) {
 	t.Parallel()
 
