@@ -42,13 +42,13 @@ A **Git-like CLI/TUI/GUI** for AWS Parameter Store / Secrets Manager, Google Clo
 
 suve uses AWS-friendly terms and maps each backend's native concept onto three axes. Mind two naming traps: Google Cloud "labels" are suve **tags** (key=value metadata), and Azure App Configuration's "label" is suve's **namespace** (an identity axis, `--namespace`/`--ns`) — neither is the other.
 
-| Backend | suve **tag** (`tag`/`untag`) | suve **`:LABEL`** (version selector) | suve **namespace** (`--namespace`) |
-|---|---|---|---|
-| AWS Parameter Store | resource tags | — | — |
-| AWS Secrets Manager | resource tags | version staging labels (`AWSCURRENT` / `AWSPREVIOUS` / custom) | — |
-| Google Cloud Secret Manager | resource **labels** | — | — |
-| Azure Key Vault | tags on a specific version | — | — |
-| Azure App Configuration | tags on a specific version | — | **label** — the `(key, label)` composite address (unset = empty string, or `dev` / `prd` / …) |
+| Backend | suve **tag**<br>(`tag`/`untag`) | suve **`:LABEL`**<br>(version selector) | suve **description**<br>(`--description`) | suve **namespace**<br>(`--namespace`) |
+|---|---|---|---|---|
+| AWS Parameter Store | resource tags | — | resource description | — |
+| AWS Secrets Manager | resource tags | version staging labels (`AWSCURRENT` / `AWSPREVIOUS` / custom) | resource description | — |
+| Google Cloud Secret Manager | resource **labels** | — | resource **annotation: `description=...`** | — |
+| Azure Key Vault | tags on a specific version | — | — | — |
+| Azure App Configuration | tags on a specific version | — | — | **label** — the `(key, label)` composite address (unset = empty string, or `dev` / `prd` / …) |
 
 All key=value metadata is unified as **tags**; suve adds no per-provider command or flag aliases. For the App Configuration label axis, see [Namespaces](#namespaces).
 
