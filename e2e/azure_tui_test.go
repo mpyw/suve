@@ -397,6 +397,29 @@ func TestAzureKeyVault_TUI_StageApply(t *testing.T) {
 //
 // Together these prove both the "(NULL)" and "dev" badges render and that the null
 // view partitions out the dev-only key.
+// waitAzureParamReadable polls the CLI read path until the App Configuration
+// setting reads back the expected value. The TUI builds its OWN App Config client,
+// and the emulator does not guarantee a write committed by one client is
+// immediately visible to another, so launching the TUI straight after seeding can
+// race and surface an empty/still-loading list under CI load. Gating on a fresh CLI
+// read makes the seed visible before the TUI lists it. The trailing args address
+// the setting (name, plus --namespace when the setting is namespaced).
+func waitAzureParamReadable(t *testing.T, want string, args ...string) {
+	t.Helper()
+
+	deadline := time.Now().Add(tuiWaitTimeout)
+	for time.Now().Before(deadline) {
+		out, err := runAzureParam(t, append([]string{"show", "--raw"}, args...)...)
+		if err == nil && strings.TrimSpace(out) == want {
+			return
+		}
+
+		time.Sleep(50 * time.Millisecond) //nolint:mnd // poll interval
+	}
+
+	t.Fatalf("azure app config setting %v never became readable as %q within %s", args, want, tuiWaitTimeout)
+}
+
 func TestAzureAppConfig_TUI_Namespaces(t *testing.T) {
 	setupAzureAppConfig(t)
 
@@ -419,6 +442,11 @@ func TestAzureAppConfig_TUI_Namespaces(t *testing.T) {
 	require.NoError(t, err)
 	_, err = runAzureParam(t, "create", "--namespace", "dev", devOnly, "dev-only-value")
 	require.NoError(t, err)
+
+	// Ensure all three seeds are visible to a fresh client before the TUI launches.
+	waitAzureParamReadable(t, "null-value", shared)
+	waitAzureParamReadable(t, "dev-value", "--namespace", "dev", shared)
+	waitAzureParamReadable(t, "dev-only-value", "--namespace", "dev", devOnly)
 
 	t.Run("null-namespace-view-partitions", func(t *testing.T) {
 		tm := teatest.NewTestModel(t, newAzureTUIModel(t, azureAppConfigTUIScope(), string(staging.ServiceParam)),
@@ -474,6 +502,9 @@ func TestAzureAppConfig_TUI_DetailNoHistory(t *testing.T) {
 
 	_, err := runAzureParam(t, "create", "--namespace", "dev", name, value)
 	require.NoError(t, err)
+
+	// Ensure the seed is visible to a fresh client before the TUI launches.
+	waitAzureParamReadable(t, value, "--namespace", "dev", name)
 
 	tm := teatest.NewTestModel(t, newAzureTUIModel(t, azureAppConfigTUIScope(), string(staging.ServiceParam)),
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
