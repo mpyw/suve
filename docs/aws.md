@@ -6,6 +6,10 @@
 > AWS is invoked as `suve aws param` (`ssm`, `ps`), `suve aws secret` (`sm`, `secretsmanager`), and `suve aws stage` (`stg`).
 > You can drop the `aws` prefix — `suve param`, `suve secret`, `suve stage` — when AWS is the only provider active in your environment. The exact rules are in [Provider selection](../README.md#provider-selection).
 
+## TUI
+
+Launch the terminal UI for AWS with `suve aws --tui` (or bare `suve --tui` when AWS is the only active provider). A service subgroup preselects the tab: `suve aws param --tui` opens on Param, `suve aws secret --tui` on Secret. Scope comes from the ambient shared config/credentials (profile, account, region) — the same resolution as the CLI — and the status bar shows `profile · account · region`. See [TUI mode](../README.md#tui-mode) for the keymap.
+
 ## suve aws param show
 
 Display parameter value with metadata.

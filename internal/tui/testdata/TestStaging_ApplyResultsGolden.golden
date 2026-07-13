@@ -1,0 +1,13 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  Apply results                                                                                   │
+│                                                                                                  │
+│  ✓ updated  /app/web/CDN_URL                                                                     │
+│  ✓ created  /app/web/NEW_FLAG                                                                    │
+│  ✗ tags  /app/api/DATABASE_URL   AccessDenied                                                    │
+│  ⚠ conflict: /app/api/REDIS_URL was modified remotely after staging — re-apply with "Ignore      │
+│  conflicts" to overwrite.                                                                        │
+│  ⚠ /app/web/NEW_FLAG applied but could not be unstaged: keychain write failed — clear it         │
+│  manually.                                                                                       │
+│                                                                                                  │
+│  enter/esc: close                                                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

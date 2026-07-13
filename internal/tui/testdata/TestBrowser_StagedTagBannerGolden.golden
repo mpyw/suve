@@ -1,0 +1,34 @@
+suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
+ Param Secret Staging(1)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+prefix: —   filter: —   values:off  recursive:on  ⟳
+╭──────────────────────────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
+│ entries (3)                                  │ │ /app/api/DATABASE_URL                                               │
+│ ▸ /app/api/DATABASE_URL             [staged] │ │ ⚠ staged tag changes — S: staging                                   │
+│   /app/api/REDIS_URL                         │ │                                                                     │
+│   /app/web/BASE_URL                          │ │ Value   (x to reveal)                                               │
+│                                              │ │ ••••••••••••••••••••••••                                            │
+│                                              │ │                                                                     │
+│                                              │ │                                                                     │
+│                                              │ │                                                                     │
+│                                              │ │ Version     14 (current)                                            │
+│                                              │ │ Type        SecureString                                            │
+│                                              │ │ Modified    2026-07-01 09:30:00                                     │
+│                                              │ │ Tags        env=prod · team=api                                     │
+│                                              │ │                                                                     │
+│                                              │ │ History   enter: history · c: compare mode                          │
+│                                              │ │ ▹ #14  2026-07-01  current                                          │
+│                                              │ │      ••••••••••••••••••••••••                                       │
+│                                              │ │   #13  2026-06-24                                                   │
+│                                              │ │      ••••••••••••••••••••••••                                       │
+│                                              │ │   #12  2026-06-02                                                   │
+│                                              │ │      ••••••••••••••••••••••••                                       │
+│                                              │ │                                                                     │
+│                                              │ │                                                                     │
+│                                              │ │                                                                     │
+│                                              │ │                                                                     │
+│                                              │ │                                                                     │
+│                                              │ │                                                                     │
+│                                              │ │                                                                     │
+╰──────────────────────────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────╯
+ ↑/↓ move • / filter • e edit • n new • enter history • tab next tab • 1/2/3 jump to tab • ? help • q quit

@@ -1,0 +1,15 @@
+╭──────────────────────────────────────────────────────────╮
+│  Tag — /app/api/DATABASE_URL                             │
+│                                                          │
+│  ┃ Action                                                │
+│  ┃ ← Remove tag →                                        │
+│                                                          │
+│    Tag                                                   │
+│    > env=prod                                            │
+│      team=api                                            │
+│                                                          │
+│    Mode                                                  │
+│    (•) Stage    ( ) Apply immediately                    │
+│  tab/↑↓: fields · enter: next · ctrl+s / shift+enter:    │
+│  submit · esc: cancel                                    │
+╰──────────────────────────────────────────────────────────╯

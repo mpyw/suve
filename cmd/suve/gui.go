@@ -81,7 +81,10 @@ func registerGUIFlag() {
 	// the GUI build. Chain to it on the non-GUI path, mirroring attachGUIFlag.
 	inner := commands.App.Before
 	commands.App.Before = func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-		if cmd.Bool(guiFlagName) {
+		// Skip the launch during shell completion: urfave/cli runs Before hooks
+		// before the completion handler, so honoring --gui here would launch the GUI
+		// instead of completing (#749). Fall through to the inner Before.
+		if !commands.IsShellCompletion(os.Args) && cmd.Bool(guiFlagName) {
 			// Launch with the uniquely-active provider when the environment
 			// resolves one; otherwise (0 or 2+ active) InitialProviderFromEnv
 			// returns "", and the GUI opens at its in-app provider picker rather
@@ -157,7 +160,8 @@ func attachGUIFlag(cmd *cli.Command, p provider.Provider, service string) {
 
 	inner := cmd.Before
 	cmd.Before = func(ctx context.Context, c *cli.Command) (context.Context, error) {
-		if c.Bool(guiFlagName) {
+		// Skip the launch during shell completion (see registerGUIFlag, #749).
+		if !commands.IsShellCompletion(os.Args) && c.Bool(guiFlagName) {
 			return launchGUI(ctx, guiScope(c, p), service)
 		}
 

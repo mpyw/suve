@@ -1,0 +1,14 @@
+╭──────────────────────────────────────────────────────────╮
+│  Tag — /app/api/DATABASE_URL                             │
+│                                                          │
+│  ┃ Action                                                │
+│  ┃ ← Add tag →                                           │
+│                                                          │
+│    Key                                                   │
+│    >                                                     │
+│                                                          │
+│    Value                                                 │
+│    > (add only)                                          │
+│  tab/↑↓: fields · enter: next · ctrl+s / shift+enter:    │
+│  submit · esc: cancel                                    │
+╰──────────────────────────────────────────────────────────╯

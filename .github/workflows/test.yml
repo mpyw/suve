@@ -135,6 +135,55 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
 
+  e2e-aws-tui:
+    # TUI e2e: drives the real TUI App (teatest) against localstack, exercising
+    # the browse → stage → apply loop over the real data path. Separate from
+    # e2e-aws (which filters `^TestAWS`) because the TUI tests use the
+    # `^TestTUIAWS` prefix; this job runs exactly those and uploads coverage.
+    name: E2E Test (AWS TUI)
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack:4
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: ssm,secretsmanager,events
+          DEBUG: 0
+        options: >-
+          --health-cmd "curl -f http://localhost:4566/_localstack/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
+        with:
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for localstack
+        run: |
+          timeout 60 bash -c 'until curl -sf http://localhost:4566/_localstack/health; do sleep 2; done'
+
+      - name: Run TUI e2e tests with coverage
+        run: |
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          go test -v -race -tags e2e -run '^TestTUIAWS' -coverprofile=coverage-e2e-tui.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: ./coverage-e2e-tui.txt
+          flags: e2e
+          name: codecov-suve-e2e-aws-tui
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
   e2e-gcloud:
     name: E2E Test (Google Cloud)
     runs-on: ubuntu-latest

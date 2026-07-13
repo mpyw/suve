@@ -109,6 +109,29 @@ $compose run --rm --no-deps -e SUVE_LOCALSTACK_ENDPOINT=http://localstack:4566 t
 '
 '''
 
+# TUI e2e: drives the real TUI App (teatest) against localstack over the same
+# closed compose network as e2e-aws. Split into its own task/CI job (the TUI
+# tests use the TestTUIAWS prefix so the plain e2e-aws CI filter `^TestAWS`
+# skips them) so the interactive-model path has a dedicated, coverage-uploading
+# lane. `mise e2e-aws` (no -run filter) still runs these too.
+[tasks.e2e-aws-tui]
+description = "Run TUI E2E tests (teatest) against localstack, fully inside Docker (no host ports)"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+project="suve-test-$$"
+compose="docker compose -f compose.test.yaml -p $project"
+cleanup() { $compose --profile "*" down -v >/dev/null 2>&1 || true; }
+trap cleanup EXIT INT TERM
+docker volume create suve-test-go-cache >/dev/null
+docker volume create suve-test-go-build-cache >/dev/null
+$compose --profile aws up -d localstack
+$compose run --rm --no-deps -e SUVE_LOCALSTACK_ENDPOINT=http://localstack:4566 test-runner bash -c '
+  n=0; until curl -sf "$SUVE_LOCALSTACK_ENDPOINT/_localstack/health" >/dev/null 2>&1; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "localstack not ready after 120s" >&2; exit 1; }; sleep 1; done
+  go test -tags=e2e -v -run "^TestTUIAWS" ./e2e/...
+'
+'''
+
 [tasks.e2e-gcloud]
 description = "Run Google Cloud Secret Manager E2E tests, fully inside Docker (no host ports)"
 shell = "bash -c"

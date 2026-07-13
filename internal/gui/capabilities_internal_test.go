@@ -8,11 +8,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
 )
 
+// TestApp_Capabilities_DelegatesToCapabilityPackage pins the Wails binding
+// contract: the (*App).Capabilities binding returns the neutral matrix from
+// internal/capability unchanged. The matrix-content invariants themselves are
+// asserted in internal/capability's own tests.
+func TestApp_Capabilities_DelegatesToCapabilityPackage(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, capability.All(), (&App{}).Capabilities())
+}
+
 // findService returns the ServiceCapability for (provider, service) from the
-// capability descriptor, failing the test when absent.
+// capability descriptor, failing the test when absent. (The capability matrix
+// now lives in internal/capability; this small lookup helper is kept local to
+// the HasDescription gating test below.)
 func findService(t *testing.T, caps []ProviderCapability, prov, service string) ServiceCapability {
 	t.Helper()
 
@@ -31,66 +44,6 @@ func findService(t *testing.T, caps []ProviderCapability, prov, service string) 
 	t.Fatalf("no capability for provider %q service %q", prov, service)
 
 	return ServiceCapability{}
-}
-
-// TestApp_Capabilities_StagingAndDeleteFlags pins the staging/delete capability
-// values that drive control visibility, so a stray edit to providers.go is
-// caught. Staging is available for every provider service;
-// force-delete/recovery-window are AWS Secrets Manager only.
-func TestApp_Capabilities_StagingAndDeleteFlags(t *testing.T) {
-	t.Parallel()
-
-	caps := (&App{}).Capabilities()
-
-	tests := []struct {
-		provider          string
-		service           string
-		hasStaging        bool
-		hasForceDelete    bool
-		hasRecoveryWindow bool
-		hasRestore        bool
-	}{
-		// Staging is available for every provider service. Restore belongs to the
-		// soft-delete providers — AWS Secrets Manager AND Azure Key Vault — but
-		// force-delete and the per-delete recovery window are AWS SM only: Key Vault
-		// retention is a vault property and force-delete/purge is unsupported there.
-		{string(provider.ProviderAWS), "param", true, false, false, false},
-		{string(provider.ProviderAWS), "secret", true, true, true, true},
-		{string(provider.ProviderGoogleCloud), "secret", true, false, false, false},
-		{string(provider.ProviderAzure), "param", true, false, false, false},
-		{string(provider.ProviderAzure), "secret", true, false, false, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.provider+"/"+tt.service, func(t *testing.T) {
-			t.Parallel()
-
-			svc := findService(t, caps, tt.provider, tt.service)
-			assert.Equal(t, tt.hasStaging, svc.HasStaging, "HasStaging")
-			assert.Equal(t, tt.hasForceDelete, svc.HasForceDelete, "HasForceDelete")
-			assert.Equal(t, tt.hasRecoveryWindow, svc.HasRecoveryWindow, "HasRecoveryWindow")
-			assert.Equal(t, tt.hasRestore, svc.HasRestore, "HasRestore")
-		})
-	}
-}
-
-// TestApp_Capabilities_ForceDeleteAndRecoveryWindowAWSOnly pins the AWS-only
-// invariant: both force-delete and the per-delete recovery window are Secrets
-// Manager features. Azure Key Vault soft-deletes (Restore recovers) but neither
-// purges on force nor exposes a per-delete recovery window (retention is a vault
-// property), so no other provider/service may report these.
-func TestApp_Capabilities_ForceDeleteAndRecoveryWindowAWSOnly(t *testing.T) {
-	t.Parallel()
-
-	for _, p := range (&App{}).Capabilities() {
-		for _, s := range p.Services {
-			isAWSSecret := p.Provider == string(provider.ProviderAWS) && s.Service == "secret"
-			if !isAWSSecret {
-				assert.False(t, s.HasForceDelete, "%s/%s must not offer force-delete", p.Provider, s.Service)
-				assert.False(t, s.HasRecoveryWindow, "%s/%s must not have a recovery window", p.Provider, s.Service)
-			}
-		}
-	}
 }
 
 // TestApp_Capabilities_HasDescription pins the HasDescription capability that

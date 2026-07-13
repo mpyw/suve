@@ -286,7 +286,7 @@ export namespace gui {
 	    hasForceDelete: boolean;
 	    hasRecoveryWindow: boolean;
 	    hasDescription: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ServiceCapability(source);
 	    }
