@@ -299,7 +299,11 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case key.Matches(msg, loadMoreKey):
 		return true, m.loadMore()
 	case key.Matches(msg, revealKey):
+		// One reveal governs both the current value and the history values (GUI
+		// parity: a single Show toggle). Flip the value pane, then mirror its mask
+		// state onto the history so both surfaces reveal/hide together.
 		m.valuePane.ToggleMask()
+		m.history.SetReveal(!m.valuePane.Masked())
 
 		return true, nil
 	case key.Matches(msg, parseJSONKey):

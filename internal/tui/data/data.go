@@ -118,6 +118,13 @@ type HistoryRow struct {
 	IsCurrent     bool
 	State         string
 	StagingLabels []string
+	// Value is this version's raw value, fetched alongside the metadata so the
+	// history can show what the value was at each revision (GUI parity). Empty when
+	// the value could not be fetched. It is masked in the UI when Secret is set.
+	Value string
+	// Secret reports whether Value is secret material and must be masked by default
+	// (a secret-service value, or a SecureString param value).
+	Secret bool
 	// Tags are this version's tags (Azure Key Vault per-version tags only).
 	Tags []Tag
 }
@@ -335,6 +342,10 @@ func (s *paramSource) History(ctx context.Context, name, namespace string) ([]Hi
 			Label:     "#" + v,
 			Date:      formatDate(e.LastModified),
 			IsCurrent: e.IsCurrent,
+			Value:     e.Value,
+			// A SecureString param value is secret material on the value-type axis, so
+			// it is masked by default even though this is the param service (#733).
+			Secret: e.Type == domain.ValueTypeSecret,
 		}
 	}), nil
 }
@@ -495,6 +506,9 @@ func (s *secretSource) History(ctx context.Context, name, _ string) ([]HistoryRo
 			IsCurrent:     e.IsCurrent,
 			State:         e.State,
 			StagingLabels: e.VersionStage,
+			Value:         e.Value,
+			// Every secret-service value is secret material and masked by default.
+			Secret: true,
 			Tags: lo.Map(e.Tags, func(t domain.Tag, _ int) Tag {
 				return Tag{Key: t.Key, Value: t.Value}
 			}),

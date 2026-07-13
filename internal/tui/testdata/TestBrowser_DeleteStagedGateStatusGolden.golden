@@ -20,9 +20,9 @@ cannot tag: staged for deletion — reset first
 │                                            ││                                                                        │
 │                                            ││History   enter: history · c: compare mode                              │
 │                                            ││▹ a1b2c3d4…  2026-07-01  current  [AWSCURRENT]                          │
+│                                            ││     ••••••••••••                                                       │
 │                                            ││  e5f6a7b8…  2026-06-24  [AWSPREVIOUS]                                  │
-│                                            ││                                                                        │
-│                                            ││                                                                        │
+│                                            ││     ••••••••••••                                                       │
 │                                            ││                                                                        │
 │                                            ││                                                                        │
 │                                            ││                                                                        │

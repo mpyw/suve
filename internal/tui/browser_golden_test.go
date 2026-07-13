@@ -108,6 +108,28 @@ func TestBrowser_AWSParamHistoryFocusGolden(t *testing.T) { //nolint:paralleltes
 	golden.RequireEqual(t, renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight))
 }
 
+// TestBrowser_AWSParamHistoryValueRevealGolden pins #733: each version row shows
+// its value, masked by default; pressing `x` reveals the current value AND the
+// history values together (one shared Show toggle, GUI parity). The fixture's
+// SecureString value is a secret on the value-type axis, so it is masked until
+// revealed.
+func TestBrowser_AWSParamHistoryValueRevealGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+	goldenEnv(t)
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		identity:  awsIdentityFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), nil),
+	})
+
+	// The default masked screen shows bullets in the history; press `x` to reveal.
+	raw := captureBrowserKeys(t, m, "SecureString", 'x')
+	screen := renderVisibleScreenSize(t, raw, browserTermWidth, browserTermHeight)
+
+	require.Contains(t, screen, "postgres://db.internal:5432/app", "x reveals the current and history values")
+	golden.RequireEqual(t, screen)
+}
+
 // TestBrowser_DeleteStagedGateStatusGolden pins #692: on an entry staged for
 // deletion, pressing `t` (edit/delete/tag are all dead-end transitions there)
 // does not open the tag dialog but surfaces a one-line status message instead —
