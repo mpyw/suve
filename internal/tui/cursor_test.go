@@ -191,9 +191,10 @@ func TestAppCursor_RestoreName(t *testing.T) {
 func TestAppCursor_TagKey(t *testing.T) {
 	t.Parallel()
 
-	// The tag form opens on the Action select (no caret); tab to the Key input.
+	// With no removable tags the Action select is dropped, so the tag form opens
+	// straight on the Key text input — a caret is drawn immediately.
 	m := openTextDialog(t, "param", nav.OpenTag{Service: "param", Name: "/app/api/DB"},
-		tea.KeyPressMsg{Code: tea.KeyTab}, typeKey('k'))
+		typeKey('k'))
 	requireCaretOnScreen(t, m)
 }
 
@@ -203,10 +204,6 @@ func TestAppCursor_NoneWhenNoTextField(t *testing.T) {
 	// The delete-confirm dialog has only selects/confirm rows — no text caret.
 	m := openTextDialog(t, "secret", nav.OpenDelete{Service: "secret", Name: "prod/api/old"})
 	assert.Nil(t, m.View().Cursor, "a dialog with no focused text field draws no cursor")
-
-	// The tag form opens focused on the Action select — also no caret yet.
-	m2 := openTextDialog(t, "param", nav.OpenTag{Service: "param", Name: "/app/api/DB"})
-	assert.Nil(t, m2.View().Cursor, "a select-focused dialog draws no cursor")
 }
 
 func TestAppCursor_NoneWhenNoDialog(t *testing.T) {
