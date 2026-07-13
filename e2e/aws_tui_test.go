@@ -4,7 +4,7 @@
 package e2e_test
 
 import (
-	"bytes"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,21 +73,26 @@ func newTUIModel(t *testing.T, service string) tea.Model {
 // keyRune builds a printable key press (matches the tui package's own helper).
 func keyRune(r rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Text: string(r)} }
 
-// waitForScreen gates on marker appearing in the live output stream since the
-// last read, so navigation keys are only sent once the awaited async frame has
-// rendered.
+// waitForScreen gates on marker appearing in the RENDERED visible screen, so
+// navigation keys are only sent once the awaited async frame has rendered. It
+// renders the accumulated output through a cell-grid emulator rather than matching
+// the raw stream: CI emits incremental cell-updates that can split a marker across
+// cursor-positioned writes, so a raw bytes.Contains misses text the user plainly
+// sees (the same flake the internal/tui waitFor fixes).
 func waitForScreen(t *testing.T, tm *teatest.TestModel, marker string) {
 	t.Helper()
 
 	teatest.WaitFor(t, tm.Output(), func(b []byte) bool {
-		return bytes.Contains(b, []byte(marker))
+		return strings.Contains(renderTUIScreen(t, b), marker)
 	}, teatest.WithDuration(tuiWaitTimeout), teatest.WithCheckInterval(50*time.Millisecond))
 }
 
-// finalScreen quits the program and returns the settled final model's full
-// screen content. Rendering the settled View — not the live diff-frame stream —
-// is what makes the assertion deterministic (the tui package's golden harness
-// uses the same discipline for the same reason).
+// finalScreen quits the program and returns the settled final model's screen,
+// rendered through the cell-grid emulator so the returned string is the plain
+// visible screen (no interspersed styling that could split a marker mid-phrase).
+// Rendering the settled View — not the live diff-frame stream — is what makes the
+// assertion deterministic (the tui package's golden harness uses the same
+// discipline for the same reason).
 func finalScreen(t *testing.T, tm *teatest.TestModel) string {
 	t.Helper()
 
@@ -98,7 +103,7 @@ func finalScreen(t *testing.T, tm *teatest.TestModel) string {
 	vm, ok := fm.(interface{ View() tea.View })
 	require.True(t, ok, "final model must render a tea.View")
 
-	return vm.View().Content
+	return renderTUIScreen(t, []byte(vm.View().Content))
 }
 
 // TestTUIAWS_ParamBrowse seeds two SSM parameters and drives the TUI param
