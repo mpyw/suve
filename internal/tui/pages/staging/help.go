@@ -19,9 +19,11 @@ func (m *Model) HelpKeyMap() help.KeyMap {
 	return keys.Bindings{Short: m.shortHelp(), Full: m.fullHelp()}
 }
 
-// xKey is the view-aware `x` binding: "hide" in diff view, "reveal" in value view.
+// xKey is the view-aware `x` binding: "hide" in diff view, "reveal" in value
+// view. A create row is the exception in diff view — it renders as a lone
+// masked value that `x` reveals per-row (#760), so its label reads "reveal".
 func (m *Model) xKey() key.Binding {
-	if m.diffView {
+	if m.diffView && !m.selectedIsCreate() {
 		return hideKey
 	}
 

@@ -177,7 +177,11 @@ func (m *Model) moveSelection(delta int) {
 //
 //   - In DIFF view the remote-vs-staged comparison is revealed by default (the
 //     surface the user explicitly opened to inspect the change, #735); `x`
-//     toggles a page-level HIDE so the diff can still be masked.
+//     toggles a page-level HIDE so the diff can still be masked. A CREATE row is
+//     the exception: it has no remote to compare against, so the diff renders it
+//     as a lone masked value via the per-row reveal (#719), not the page-level
+//     hide. On a create row `x` therefore toggles that per-row reveal so the
+//     create value is revealable in place, masked-by-default (#760).
 //   - In VALUE view the raw staged value is masked by default; `x` unmasks only
 //     the SELECTED row's value (never page-global), and moving the selection
 //     resets it (#694).
@@ -186,13 +190,23 @@ func (m *Model) moveSelection(delta int) {
 // (including tag rows) — so a user who learned `x` never destroys a staged
 // change by peeking (#682).
 func (m *Model) onReveal() {
-	if m.diffView {
+	if m.diffView && !m.selectedIsCreate() {
 		m.diffHidden = !m.diffHidden
 
 		return
 	}
 
 	m.reveal = !m.reveal
+}
+
+// selectedIsCreate reports whether the selected row is a create-staged entry.
+// The diff view renders a create as a lone masked value through the per-row
+// reveal (m.reveal), not the page-level diff hide, so `x` on a create must
+// toggle that per-row reveal even in diff view (#760).
+func (m *Model) selectedIsCreate() bool {
+	row, ok := m.selectedRow()
+
+	return ok && row.kind == rowEntry && row.entry.Operation == operationCreate
 }
 
 // onEnter opens the full-diff detail for an entry row. On a tag row it is a
