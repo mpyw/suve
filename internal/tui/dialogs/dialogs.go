@@ -27,17 +27,6 @@ const (
 // on a dirty form (#790); a second consecutive Esc then discards.
 const discardNotice = "unsaved changes — press esc again to discard"
 
-// submitKey submits a create/edit/tag form from any field (#791): ctrl+s is the
-// portable fallback that works in every terminal, while shift+enter is the
-// enhanced-keyboard binding (indistinguishable from a plain Enter unless the
-// terminal's Kitty keyboard protocol is active). It is handled by the dialog
-// itself — not the embedded huh form, which can only submit from its last field —
-// so a multi-line Value textarea (where Enter now inserts a newline) can still be
-// submitted while focused.
-//
-//nolint:gochecknoglobals // immutable dialog-local binding
-var submitKey = key.NewBinding(key.WithKeys("ctrl+s", "shift+enter"))
-
 // escKey is the discard/cancel binding the shell forwards into a discard-guarded
 // form (see EscInterceptor) so the form itself decides whether to arm a discard
 // confirmation (dirty) or close immediately (clean).

@@ -60,7 +60,13 @@ type tagForm struct {
 	// a second consecutive Esc then discards. Any other key resets it.
 	armed bool
 
-	form   *huh.Form
+	form *huh.Form
+
+	// confirming/confirm drive the Stage/Apply popup shown before the tag write
+	// commits (replacing the old inline Mode toggle).
+	confirming bool
+	confirm    modeConfirm
+
 	busy   bool
 	err    string
 	notice string
@@ -152,12 +158,10 @@ func (d *tagForm) rebuildForm() tea.Cmd {
 
 	d.builtRemove = d.remove
 
-	// The mode toggle is offered only when staging is supported AND the dialog was
-	// not launched from a staged-only surface (the staging review page), which has
-	// no legitimate immediate-write escape hatch.
-	if d.svcCap.HasStaging && !d.stagedOnly {
-		fields = append(fields, newModeField(&d.staged))
-	}
+	// The Stage/Apply choice is the mode-confirm popup opened on submit (see
+	// beginSubmit), not an inline field — so it is always an explicit step and is
+	// skipped only when there is no genuine choice (no staging, or a staged-only
+	// surface).
 
 	d.form = huh.NewForm(huh.NewGroup(fields...)).
 		WithWidth(dialogContentWidth).
@@ -224,6 +228,11 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return d, nil // double-submit guard
 		}
 
+		// The Stage/Apply popup owns every key while it is open.
+		if d.confirming {
+			return d.updateConfirm(msg)
+		}
+
 		if key.Matches(msg, escKey) {
 			return d.handleEsc()
 		}
@@ -231,10 +240,6 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Any other key resets the discard-armed state so a later single Esc
 		// re-arms (a stray Esc after typing does not silently discard).
 		d.disarm()
-
-		if key.Matches(msg, submitKey) {
-			return d.forceSubmit()
-		}
 	}
 
 	if d.busy {
@@ -256,9 +261,9 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch d.form.State {
 	case huh.StateCompleted:
-		d.busy = true
-
-		return d, d.submit()
+		// Completing the huh form (Enter on the last field) opens the Stage/Apply
+		// popup (the tag form is all single-line fields, so Enter drives it).
+		return d.beginSubmit()
 	case huh.StateAborted:
 		return d, canceledCmd
 	case huh.StateNormal:
@@ -300,24 +305,48 @@ func (d *tagForm) disarm() {
 	}
 }
 
-// forceSubmit submits the tag form from any field (ctrl+s / shift+enter). It
-// re-runs the Add key validation huh would enforce inline, so an empty required
-// key still stops the submit (with a footer error). Remove targets a key chosen
-// from the existing-tags select, which is always seeded, so it needs no check.
-func (d *tagForm) forceSubmit() (Model, tea.Cmd) {
-	if !d.remove {
-		if err := requiredField("key")(d.tagKey); err != nil {
-			d.err = err.Error()
-
-			return d, d.syncFormSize()
-		}
-	}
-
+// beginSubmit is the submit path, reached when the huh form completes (Enter on the
+// last field). It opens the Stage/Apply popup when the service offers a genuine
+// choice, otherwise runs the tag write directly. huh has validated every field
+// (including the required Add key) by the time the form completes.
+func (d *tagForm) beginSubmit() (Model, tea.Cmd) {
 	d.err = ""
 	d.notice = ""
+
+	if d.svcCap.HasStaging && !d.stagedOnly {
+		d.confirm = newModeConfirm("Tag — "+clipName(d.name, d.namespace), d.staged)
+		d.confirming = true
+
+		return d, nil
+	}
+
 	d.busy = true
 
 	return d, d.submit()
+}
+
+// updateConfirm folds a key press into the open Stage/Apply popup: enter commits
+// with the chosen mode, esc returns to the form (rebuilding it when a huh
+// StateCompleted got us here).
+func (d *tagForm) updateConfirm(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch d.confirm.Update(msg) {
+	case confirmExecute:
+		d.staged = d.confirm.staged
+		d.confirming = false
+		d.busy = true
+
+		return d, d.submit()
+	case confirmBack:
+		d.confirming = false
+		if d.form.State == huh.StateCompleted {
+			return d, d.rebuildForm()
+		}
+
+		return d, d.syncFormSize()
+	case confirmNone:
+	}
+
+	return d, nil
 }
 
 func (d *tagForm) submit() tea.Cmd {
@@ -352,6 +381,11 @@ func (d *tagForm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 }
 
 func (d *tagForm) View() string {
+	// The Stage/Apply popup replaces the whole form body while it is open.
+	if d.confirming {
+		return d.confirm.View(d.styles)
+	}
+
 	var b strings.Builder
 
 	b.WriteString(d.header())
@@ -386,7 +420,7 @@ func (d *tagForm) footer() string {
 	// hint folds to a second line at the minimum size instead of overflowing the
 	// border, and the box keeps the form's width.
 	hint := d.styles.PageHint.Width(dialogContentWidth).
-		Render("tab/↑↓: fields · enter: next · ctrl+s / shift+enter: submit · esc: cancel")
+		Render("tab/↑↓: fields · enter: next · esc: cancel")
 	reserved := lipgloss.Height(d.header()) + titleSpacerRows + minFormBody + lipgloss.Height(hint)
 
 	if d.err != "" {

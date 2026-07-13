@@ -102,6 +102,29 @@ func TestHelpKeyMap_FullHelpGatesOnCapability(t *testing.T) {
 	assert.Contains(t, secretFull, "restore", "AWS secret supports restore")
 }
 
+// TestHelpKeyMap_SpaceLabelNamespaceOnlyOnAzure pins that the space key's help
+// names "namespace" only on a service that has namespaces (Azure App Config); on a
+// service without namespaces (AWS secret, which uses space to pick a compare row)
+// the label is "pick" and never mentions namespaces.
+func TestHelpKeyMap_SpaceLabelNamespaceOnlyOnAzure(t *testing.T) {
+	t.Parallel()
+
+	appConfig := newModel(t, &stubSource{svcCap: appConfigCap()})
+	appConfig, _ = update(t, appConfig, listLoadedMsg{
+		seq: appConfig.listSeq, res: data.ListResult{Items: []data.Item{{Name: "k"}}},
+	})
+
+	secret := newModel(t, &stubSource{svcCap: awsSecretCap()})
+	secret, _ = update(t, secret, listLoadedMsg{
+		seq: secret.listSeq, res: data.ListResult{Items: []data.Item{{Name: "k"}}},
+	})
+
+	assert.Contains(t, fullHelpDescs(appConfig.HelpKeyMap()), "namespace",
+		"App Configuration advertises the namespace cycle on space")
+	assert.NotContains(t, fullHelpDescs(secret.HelpKeyMap()), "namespace",
+		"a service without namespaces never advertises namespace help")
+}
+
 // TestHelpKeyMap_ResizeKeysGatedOnTwoPane pins #784's help: the list resize keys
 // (widen/narrow) are advertised in the two-pane layout and dropped once the panes
 // stack (where they would do nothing).

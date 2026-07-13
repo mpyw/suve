@@ -27,13 +27,27 @@ func (m *Model) HelpKeyMap() help.KeyMap {
 	return keys.Bindings{Short: m.shortHelp(), Full: m.fullHelp()}
 }
 
+// spaceHelp builds the space-key help with a label that matches what space
+// actually does for this service (see handleSpace): it cycles the namespace filter
+// on App Configuration (the only service with namespaces) and picks a compare row
+// everywhere else. The "namespace" wording is therefore shown only on Azure App
+// Configuration, never on a service without namespaces.
+func (m *Model) spaceHelp() key.Binding {
+	label := "pick"
+	if m.svcCap.HasNamespaces {
+		label = "namespace"
+	}
+
+	return key.NewBinding(key.WithKeys("space"), key.WithHelp("space", label))
+}
+
 // shortHelp is the one-line hint: focus-aware so the pane the arrow keys drive
 // advertises its own transitions (the history pane's compare/diff/list, the
 // list's edit/new/filter).
 func (m *Model) shortHelp() []key.Binding {
 	if m.focus == focusHistory {
 		if m.history.Compare() {
-			return []key.Binding{moveKey, spaceKey, diffPickKey, backListKey}
+			return []key.Binding{moveKey, m.spaceHelp(), diffPickKey, backListKey}
 		}
 
 		return []key.Binding{moveKey, backListKey, compareKey}
@@ -70,9 +84,10 @@ func (m *Model) navigateColumn() []key.Binding {
 	col = append(col, m.keys.Back)
 
 	// Space picks a compare row (with history) or cycles the namespace filter
-	// (App Config); it does nothing on a service with neither.
+	// (App Config); it does nothing on a service with neither. Its help label
+	// names only what the service actually supports (see spaceHelp).
 	if m.svcCap.HasNamespaces || m.svcCap.HasVersionHistory {
-		col = append(col, spaceKey)
+		col = append(col, m.spaceHelp())
 	}
 
 	return col
