@@ -346,11 +346,11 @@ func TestDialog_TagRemoveSelectGolden(t *testing.T) { //nolint:paralleltest // g
 	golden.RequireEqual(t, renderVisibleScreen(t, raw))
 }
 
-// TestDialog_TagRemoveEmptyGolden renders the tag form after toggling to Remove
-// on an entry with NO tags: instead of a free-text key, Remove shows a
-// "(no tags to remove)" note, the empty state that keeps an untag from being
-// invited when there is nothing to remove (#705).
-func TestDialog_TagRemoveEmptyGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
+// TestDialog_TagAddOnlyWhenNoTagsGolden renders the tag form for an entry with NO
+// loaded tags: the Action toggle offers Add only — Remove is not offered, since
+// there is nothing to remove, so the user is never lured into an unusable Remove
+// (#761). Toggling right stays on Add.
+func TestDialog_TagAddOnlyWhenNoTagsGolden(t *testing.T) { //nolint:paralleltest // goldenEnv sets NO_COLOR/TZ
 	goldenEnv(t)
 
 	m, cmd := dialogs.NewTagForm(dialogs.TagInput{
@@ -358,7 +358,9 @@ func TestDialog_TagRemoveEmptyGolden(t *testing.T) { //nolint:paralleltest // go
 		Service: "param", Styles: styles.New(), Name: "/app/api/DATABASE_URL",
 	})
 
-	raw := captureDialogWithKeys(t, newDialogHost(m, cmd), "(no tags to remove)", keyRightMsg())
+	// Right cannot toggle to Remove (it is not offered); the form stays on the Add
+	// branch with the free-text key input.
+	raw := captureDialogWithKeys(t, newDialogHost(m, cmd), "Action", keyRightMsg())
 	golden.RequireEqual(t, renderVisibleScreen(t, raw))
 }
 

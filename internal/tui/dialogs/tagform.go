@@ -29,8 +29,9 @@ type tagForm struct {
 	namespace string
 	// tags is the entry's current tag set, seeding the Remove action's choices so
 	// an untag can only target a tag that is actually present (#705). Empty when the
-	// caller has none to offer (e.g. the staging review page), in which case Remove
-	// shows an empty state rather than a blind free-text key.
+	// caller has none to offer (e.g. the staging review page, or an entry with no
+	// loaded tags), in which case the Remove action is not offered at all (#761)
+	// rather than luring the user into a select with nothing to pick.
 	tags []data.Tag
 
 	remove   bool
@@ -38,7 +39,7 @@ type tagForm struct {
 	tagValue string // Add: the value to add
 	// removeKey is the key chosen for removal, bound to the Remove action's select
 	// (seeded from tags). It is distinct from the Add key so a typed Add key never
-	// masquerades as a removable one, keeping the empty-tags guard honest.
+	// masquerades as a removable one.
 	removeKey string
 	staged    bool
 	// stagedOnly hides the mode toggle and forces a staged tag write (the staging
@@ -63,7 +64,8 @@ type TagInput struct {
 	Name      string
 	Namespace string
 	// Tags is the entry's current tag set, offered as the Remove action's choices
-	// (#705). Empty when the caller has none to offer.
+	// (#705). Empty when the caller has none to offer, in which case the Remove
+	// action is not offered (#761).
 	Tags []data.Tag
 	// StagedOnly opens the dialog from a staged-only surface (the staging review
 	// page): the mode toggle is hidden and the tag write is forced staged.
@@ -95,14 +97,26 @@ func NewTagForm(in TagInput) (Model, tea.Cmd) {
 }
 
 func (d *tagForm) rebuildForm() tea.Cmd {
-	// Remove is offered only on a surface that can supply the entry's current tag
-	// set to constrain it (the browser). A staged-only surface (the staging review
-	// page) knows only the staged deltas, never the remote tag set, so it offers
-	// Add only — removing a remote tag is done from the browser, where the tag set
-	// is visible; this keeps Remove from becoming a guaranteed empty-state dead-end
-	// there (#705), mirroring how the mode toggle is hidden on that surface.
+	// Defensive: Remove is only ever offered when there are removable tags (below),
+	// so d.remove cannot be true with an empty tag set — but if it somehow is (e.g.
+	// a stale toggle), fall back to Add rather than rendering a dead-end. This keeps
+	// removeField's select honest: it is only built over a non-empty tag set.
+	if d.remove && len(d.tags) == 0 {
+		d.remove = false
+	}
+
+	// Remove is offered only when the entry has a current tag set to constrain it
+	// (#705 made Remove a select over existing tags, dropping the free-text
+	// fallback). Two surfaces have no removable tags and so offer Add only:
+	//   - a staged-only surface (the staging review page) knows only the staged
+	//     deltas, never the remote tag set — removing a remote tag is done from the
+	//     browser, where the tag set is visible;
+	//   - an entry with no loaded tags has nothing to untag at all.
+	// Offering Remove in either state is a dead-end: the user picks it and then
+	// cannot select anything (#761). Gating it here mirrors how the mode toggle is
+	// hidden on the staged-only surface.
 	actionOpts := []huh.Option[bool]{huh.NewOption("Add tag", false)}
-	if !d.stagedOnly {
+	if !d.stagedOnly && len(d.tags) > 0 {
 		actionOpts = append(actionOpts, huh.NewOption("Remove tag", true))
 	}
 
@@ -146,15 +160,11 @@ func (d *tagForm) rebuildForm() tea.Cmd {
 
 // removeField builds the Remove action's key field: a select of the entry's
 // current tags (labelled "key=value", valued by key so it routes straight to
-// RemoveTag), or a read-only note when the entry has no tags. The select binds
-// removeKey, which huh seeds to the first tag on build, so a Remove always has a
-// valid target; the note path is blocked from submitting by the empty-tags guard
-// in Update.
+// RemoveTag). The select binds removeKey, which huh seeds to the first tag on
+// build, so a Remove always has a valid target. It is only reached with a
+// non-empty tag set — Remove is not offered otherwise (#761) — so there is no
+// empty-state branch to guard.
 func (d *tagForm) removeField() huh.Field {
-	if len(d.tags) == 0 {
-		return huh.NewNote().Title("Tag").Description("(no tags to remove)")
-	}
-
 	opts := lo.Map(d.tags, func(t data.Tag, _ int) huh.Option[string] {
 		return huh.NewOption(t.Key+"="+t.Value, t.Key)
 	})
@@ -223,14 +233,6 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch d.form.State {
 	case huh.StateCompleted:
-		// A Remove on an entry with no tags has nothing to target: reopen with a
-		// note rather than dead-ending on a guaranteed-failing untag (#705).
-		if d.remove && len(d.tags) == 0 {
-			d.err = "no tags to remove"
-
-			return d, d.rebuildForm()
-		}
-
 		d.busy = true
 
 		return d, d.submit()

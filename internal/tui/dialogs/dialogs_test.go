@@ -767,23 +767,23 @@ func TestTagForm_StagedOnlyIsAddOnly(t *testing.T) {
 	assert.Contains(t, view, "Add tag", "the staged-only tag form offers Add")
 	assert.NotContains(t, view, "Remove tag", "the staged-only tag form offers no Remove action")
 
-	// A browser launch (not staged-only) still offers Remove.
+	// A browser launch (not staged-only) with removable tags still offers Remove.
 	bm, _ := NewTagForm(TagInput{
 		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+		Tags: []data.Tag{{Key: "env", Value: "prod"}},
 	})
 	b, ok := bm.(*tagForm)
 	require.True(t, ok)
 
 	_, _ = b.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	assert.True(t, b.remove, "a browser launch can toggle to Remove")
+	assert.True(t, b.remove, "a browser launch with tags can toggle to Remove")
 }
 
-// TestTagForm_RemoveEmptyState pins the #705 empty state: an entry with no tags
-// has nothing to untag, so Remove shows a "(no tags to remove)" note instead of a
-// free-text key, and completing the Remove action is blocked — the guard reopens
-// with the note rather than dead-ending on a guaranteed-failing untag, and no
-// untag is ever submitted.
-func TestTagForm_RemoveEmptyState(t *testing.T) {
+// TestTagForm_EmptyTagsFallbackToAdd pins the #761 defensive fallback: if the
+// Remove action is somehow active with an empty tag set (it should never be
+// offered), rebuilding the form falls back to Add rather than building a select
+// with nothing to pick.
+func TestTagForm_EmptyTagsFallbackToAdd(t *testing.T) {
 	t.Parallel()
 
 	mut := &fakeMutator{svcCap: awsParamCap()}
@@ -793,18 +793,10 @@ func TestTagForm_RemoveEmptyState(t *testing.T) {
 	d, ok := m.(*tagForm)
 	require.True(t, ok)
 
-	_, isNote := d.removeField().(*huh.Note)
-	assert.True(t, isNote, "with no tags, Remove shows a note, not a free-text key")
-
 	d.remove = true
 	require.NotNil(t, d.rebuildForm())
-	assert.Contains(t, stripANSI(d.View()), "(no tags to remove)", "the empty state names why nothing can be removed")
-
-	// The empty Remove has no key to route, and the completion guard blocks it (see
-	// the teatest TestTUI_TagRemoveEmptyBlocksSubmit for the end-to-end proof that
-	// no untag is submitted). Here we pin that nothing has been routed yet.
-	assert.Empty(t, mut.tagKey, "no untag key is set for an entry with no tags")
-	assert.False(t, d.busy)
+	assert.False(t, d.remove, "an empty tag set falls back to Add rather than a dead-end Remove")
+	assert.NotContains(t, stripANSI(d.View()), "(no tags to remove)", "no dead-end note is rendered")
 }
 
 // TestTagForm_ActionToggleMorphsKeyField pins that toggling the action select
@@ -831,6 +823,33 @@ func TestTagForm_ActionToggleMorphsKeyField(t *testing.T) {
 	assert.True(t, d.remove, "right toggles the action to Remove")
 	assert.True(t, d.builtRemove, "the form rebuilt onto the Remove branch")
 	assert.Contains(t, stripANSI(d.View()), "env=prod", "the Remove select is now shown")
+}
+
+// TestTagForm_EmptyTagsHidesRemove pins the #761 fix: an entry with no loaded
+// tags has nothing to untag, so the Action toggle offers Add only — the user is
+// never lured into a Remove that cannot select anything. Toggling the action can
+// never reach Remove, and the "(no tags to remove)" dead-end is never rendered.
+func TestTagForm_EmptyTagsHidesRemove(t *testing.T) {
+	t.Parallel()
+
+	mut := &fakeMutator{svcCap: awsParamCap()}
+	m, _ := NewTagForm(TagInput{
+		Ctx: context.Background(), Mutator: mut, Service: "param", Styles: styles.New(), Name: "/app/X",
+		// No Tags: an empty tag set must not offer Remove.
+	})
+	d, ok := m.(*tagForm)
+	require.True(t, ok)
+
+	require.False(t, d.remove, "the form starts on Add")
+
+	// Toggling the inline action select right cannot reach Remove: it is not
+	// offered when there is nothing to remove.
+	_, _ = d.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	assert.False(t, d.remove, "an entry with no tags never offers Remove, so the action stays on Add")
+
+	// The empty-state dead-end note is never rendered.
+	assert.NotContains(t, stripANSI(d.View()), "(no tags to remove)", "no dead-end note is ever shown")
+	assert.Empty(t, mut.tagKey, "no tag write is routed")
 }
 
 // TestDeleteConfirm_ResultVoicing pins the delete status voicing, including the
