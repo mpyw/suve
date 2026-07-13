@@ -257,7 +257,9 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 	// single-affirmative Confirm renders just the button; Esc still cancels. The
 	// Stage/Apply choice is the mode-confirm popup opened after completion (see
 	// beginSubmit), not an inline field.
-	fields = append(fields, huh.NewConfirm().Key("ok").Affirmative("OK").Negative("").Value(&d.confirmOK))
+	// Label the button "[ OK ]" (bracketed, like the custom dialogs' [ Delete ]/
+	// [ Cancel ]) so it reads as a button, not bare text.
+	fields = append(fields, huh.NewConfirm().Key("ok").Affirmative("[ OK ]").Negative("").Value(&d.confirmOK))
 
 	d.form = huh.NewForm(huh.NewGroup(fields...)).
 		WithWidth(dialogContentWidth).
