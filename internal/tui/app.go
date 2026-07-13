@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/cursor"
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -259,6 +260,14 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case awsIdentityErrMsg:
 		m.identityLoading = false
 
+		return m, nil
+	case cursor.BlinkMsg:
+		// Swallow the embedded text inputs' virtual-cursor blink so the focused
+		// field's caret stays steadily rendered: the app draws the real terminal
+		// cursor at that caret (see App.View / dialogCursor), which it locates by the
+		// field's steady virtual-cursor cell. Dropping the blink keeps that cell —
+		// and thus the caret position — present every frame instead of flickering
+		// off, and the real cursor still blinks natively (#765).
 		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -1018,7 +1027,13 @@ func (m *App) View() tea.View {
 		return view
 	}
 
-	view.SetContent(m.render())
+	screen := m.render()
+	view.SetContent(screen)
+	// Set the real terminal cursor at the focused text field's caret so a visible
+	// caret is drawn there — the embedded huh form's virtual cursor alone does not
+	// surface one under AltScreen (#765). The caret is read from the composited
+	// screen we just built, so it tracks the field wherever the dialog is drawn.
+	view.Cursor = m.dialogCursor(screen)
 
 	return view
 }
