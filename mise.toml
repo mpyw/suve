@@ -198,14 +198,15 @@ trap cleanup EXIT INT TERM
 docker volume create suve-test-go-cache >/dev/null
 docker volume create suve-test-go-build-cache >/dev/null
 # The TUI e2e file drives BOTH Azure services, so both emulators must be up (the
-# same shape as the coverage-uploaded CI e2e-azure job, which runs both services).
+# same shape as the coverage-uploaded CI e2e-azure-tui job, which runs both
+# services against a fresh emulator pair, disjoint from the CLI e2e-azure job).
 $compose --profile azure up -d azure-appconfig azure-keyvault
 $compose run --rm --no-deps \
   -e "SUVE_AZURE_APPCONFIG_CONNECTION_STRING=Endpoint=http://azure-appconfig:8080;Id=abcd;Secret=c2VjcmV0" \
   -e SUVE_AZURE_KEYVAULT_ENDPOINT=https://azure-keyvault:8443 test-runner bash -c '
   n=0; until (echo > /dev/tcp/azure-appconfig/8080) 2>/dev/null; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "azure-appconfig not ready after 120s" >&2; exit 1; }; sleep 1; done
   n=0; until curl -sk -o /dev/null "$SUVE_AZURE_KEYVAULT_ENDPOINT/ping" 2>/dev/null; do n=$((n+1)); [ "$n" -ge 120 ] && { echo "azure-keyvault not ready after 120s" >&2; exit 1; }; sleep 1; done
-  go test -tags=e2e -v -run "TestAzureKeyVault_TUI|TestAzureAppConfig_TUI" ./e2e/...
+  go test -tags=e2e -v -run "^TestTUIAzure" ./e2e/...
 '
 '''
 

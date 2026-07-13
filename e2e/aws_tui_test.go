@@ -4,8 +4,6 @@
 package e2e_test
 
 import (
-	"bytes"
-	"io"
 	"strings"
 	"testing"
 	"time"
@@ -106,64 +104,6 @@ func finalScreen(t *testing.T, tm *teatest.TestModel) string {
 	require.True(t, ok, "final model must render a tea.View")
 
 	return renderTUIScreen(t, []byte(vm.View().Content))
-}
-
-// tuiRetryBudget/tuiAttemptWait bound the fresh-client retry: the overall time a
-// retried TUI interaction may take, and how long each attempt waits for a marker.
-const (
-	tuiRetryBudget = 30 * time.Second
-	tuiAttemptWait = 5 * time.Second
-)
-
-// awaitScreen is a non-fatal waitForScreen for retry loops: it drains the live
-// output and reports whether marker rendered within timeout (false on timeout,
-// never t.Fatal), matching against the vt-rendered screen like waitForScreen.
-func awaitScreen(t *testing.T, tm *teatest.TestModel, marker string, timeout time.Duration) bool {
-	t.Helper()
-
-	deadline := time.Now().Add(timeout)
-
-	var buf bytes.Buffer
-
-	for time.Now().Before(deadline) {
-		_, _ = io.Copy(&buf, tm.Output())
-		if strings.Contains(renderTUIScreen(t, buf.Bytes()), marker) {
-			return true
-		}
-
-		time.Sleep(50 * time.Millisecond) //nolint:mnd // poll interval
-	}
-
-	return false
-}
-
-// retryTUIScreen builds a fresh TUI model and drives it, rebuilding (a fresh
-// provider client) until drive reports the awaited content rendered — then returns
-// the settled final screen. The emulators do not guarantee a write from one client
-// is visible to a brand-new client immediately, so the first launch can read
-// stale/empty state ("entry not found") under CI load; relaunching with a fresh
-// client eventually sees it. drive must use awaitScreen (non-fatal) and do its own
-// key sends; it must not quit the model.
-func retryTUIScreen(t *testing.T, build func() tea.Model, drive func(tm *teatest.TestModel) bool) string {
-	t.Helper()
-
-	deadline := time.Now().Add(tuiRetryBudget)
-
-	for attempt := 1; ; attempt++ {
-		tm := teatest.NewTestModel(t, build(), teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
-		if drive(tm) {
-			return finalScreen(t, tm)
-		}
-
-		tm.Send(keyRune('q'))
-		tm.WaitFinished(t, teatest.WithFinalTimeout(5*time.Second)) //nolint:mnd // teardown wait
-
-		if time.Now().After(deadline) {
-			t.Fatalf("TUI content never rendered after %d attempt(s) within %s", attempt, tuiRetryBudget)
-		}
-
-		time.Sleep(200 * time.Millisecond) //nolint:mnd // brief backoff before a fresh client
-	}
 }
 
 // TestTUIAWS_ParamBrowse seeds two SSM parameters and drives the TUI param

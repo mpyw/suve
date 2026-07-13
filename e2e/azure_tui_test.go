@@ -52,11 +52,14 @@ import (
 // keychain (the CI e2e-azure job does not run inside the compose test-runner that
 // otherwise injects it).
 //
-// Naming: every test is prefixed TestAzureKeyVault* / TestAzureAppConfig* so it
-// runs under the existing coverage-uploaded e2e-azure CI job, whose filter is
-// `-run 'TestAzureAppConfig|TestAzureKeyVault'` (both emulators up as services);
-// the split mise e2e-azure-keyvault / e2e-azure-appconfig tasks pick them up too,
-// and `mise e2e-azure-tui` runs exactly this file against both emulators.
+// Naming: every test is prefixed TestTUIAzure* (TestTUIAzureKeyVault* /
+// TestTUIAzureAppConfig*), so it runs under the dedicated coverage-uploaded
+// e2e-azure-tui CI job (its own fresh emulator pair), whose filter is
+// `-run '^TestTUIAzure'`, and NOT under the CLI e2e-azure job (filter
+// `^TestAzure(AppConfig|KeyVault)`). Sharing one emulator pair with the CLI
+// Azure suite is what these tests must avoid: the CLI tests' leftover settings
+// would otherwise contaminate the namespace-partitioning assertions here.
+// `mise e2e-azure-tui` runs exactly this file against a fresh emulator pair.
 // =============================================================================
 
 // azureKeyVaultTUIScope is the Key Vault scope every secret-service TUI e2e
@@ -128,7 +131,7 @@ func settleReload() { time.Sleep(1500 * time.Millisecond) }
 // browser: it lists the real secret, shows the value MASKED by default in the
 // detail pane, and only reveals it over the explicit-reveal surface (the `x` key,
 // GUI parity), fetching the value from the emulator.
-func TestAzureKeyVault_TUI_Browse(t *testing.T) {
+func TestTUIAzureKeyVault_Browse(t *testing.T) {
 	setupAzureKeyVault(t)
 
 	const (
@@ -173,7 +176,7 @@ func TestAzureKeyVault_TUI_Browse(t *testing.T) {
 // per-version tag line (`tags: …`, only emitted when the capability's
 // TagsPerVersion is set). The history value lines are masked until the shared `x`
 // reveal, after which each version's value shows, proving both versions rendered.
-func TestAzureKeyVault_TUI_VersionHistoryPerVersionTags(t *testing.T) {
+func TestTUIAzureKeyVault_VersionHistoryPerVersionTags(t *testing.T) {
 	setupAzureKeyVault(t)
 
 	const (
@@ -238,7 +241,7 @@ func TestAzureKeyVault_TUI_VersionHistoryPerVersionTags(t *testing.T) {
 // enter compare mode (`c`), pick the two history rows (`space` on each), and open
 // the diff (`enter`). The diff page is an explicit-reveal surface, so a secret
 // diff shows both versions' values (revealed by default) rather than masking them.
-func TestAzureKeyVault_TUI_Diff(t *testing.T) {
+func TestTUIAzureKeyVault_Diff(t *testing.T) {
 	setupAzureKeyVault(t)
 
 	const (
@@ -300,7 +303,7 @@ func TestAzureKeyVault_TUI_Diff(t *testing.T) {
 // via the Staging tab's apply-all dialog. Both writes are verified through the CLI
 // show/tag read path, proving they reached the emulator through the real TUI apply
 // path.
-func TestAzureKeyVault_TUI_StageApply(t *testing.T) {
+func TestTUIAzureKeyVault_StageApply(t *testing.T) {
 	setupAzureKeyVault(t)
 	setAzureKeyVaultStagingKey(t)
 	setupTempHome(t)
@@ -414,13 +417,13 @@ func waitAzureParamReadable(t *testing.T, want string, args ...string) {
 			return
 		}
 
-		time.Sleep(50 * time.Millisecond) //nolint:mnd // poll interval
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	t.Fatalf("azure app config setting %v never became readable as %q within %s", args, want, tuiWaitTimeout)
 }
 
-func TestAzureAppConfig_TUI_Namespaces(t *testing.T) {
+func TestTUIAzureAppConfig_Namespaces(t *testing.T) {
 	setupAzureAppConfig(t)
 
 	const (
@@ -464,24 +467,17 @@ func TestAzureAppConfig_TUI_Namespaces(t *testing.T) {
 	})
 
 	t.Run("dev-namespace-view-shows-dev-entries", func(t *testing.T) {
-		// The dev entries are read by the TUI's own client, which the emulator may
-		// not immediately show a just-seeded namespace to (a CI-only cross-client
-		// race, #796). Retry with a fresh launch until the dev view renders: wait for
-		// the launch (null) view, advance the namespace filter one step (space) — the
-		// next option always includes the dev entries (either "dev" or the
-		// all-namespaces "*") — then wait for the dev-only setting.
-		screen := retryTUIScreen(t,
-			func() tea.Model {
-				return newAzureTUIModel(t, azureAppConfigTUIScope(), string(staging.ServiceParam))
-			},
-			func(tm *teatest.TestModel) bool {
-				if !awaitScreen(t, tm, shared, tuiAttemptWait) {
-					return false
-				}
-				tm.Send(keyRune(' '))
+		tm := teatest.NewTestModel(t, newAzureTUIModel(t, azureAppConfigTUIScope(), string(staging.ServiceParam)),
+			teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 
-				return awaitScreen(t, tm, devOnly, tuiAttemptWait)
-			})
+		// Wait for the launch (null) view, then advance the namespace filter one
+		// step (space). The next option always includes the dev entries (it is
+		// either "dev" or the all-namespaces "*"), so the dev-only setting appears.
+		waitForScreen(t, tm, shared)
+		tm.Send(keyRune(' '))
+		waitForScreen(t, tm, devOnly)
+
+		screen := finalScreen(t, tm)
 
 		assert.Contains(t, screen, devOnly, "advancing the namespace filter reveals the dev-only setting")
 		assert.Contains(t, screen, "[dev]",
@@ -495,7 +491,7 @@ func TestAzureAppConfig_TUI_Namespaces(t *testing.T) {
 // surfaced — and (b) the version-history controls are HIDDEN, because App
 // Configuration is unversioned and the browser gates the history section on the
 // capability (HasVersionHistory=false).
-func TestAzureAppConfig_TUI_DetailNoHistory(t *testing.T) {
+func TestTUIAzureAppConfig_DetailNoHistory(t *testing.T) {
 	setupAzureAppConfig(t)
 
 	const (
@@ -542,7 +538,7 @@ func TestAzureAppConfig_TUI_DetailNoHistory(t *testing.T) {
 // applies it, and the CLI confirms the write landed under "dev" — and NOT under
 // the null namespace. This is the end-to-end guard for the namespace axis
 // surviving stage → apply through the TUI (a historically bug-prone area).
-func TestAzureAppConfig_TUI_StageNamespace(t *testing.T) {
+func TestTUIAzureAppConfig_StageNamespace(t *testing.T) {
 	setupAzureAppConfig(t)
 	setAzureKeyVaultStagingKey(t)
 	setupTempHome(t)
