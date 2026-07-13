@@ -4,14 +4,48 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 )
+
+// errReader fails on the first Read, standing in for a stdin whose read errors.
+type errReader struct{ err error }
+
+func (r errReader) Read([]byte) (int, error) { return 0, r.err }
+
+func TestStdin(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns the reader injected via cmd.Root().Reader", func(t *testing.T) {
+		t.Parallel()
+
+		r := strings.NewReader("injected")
+		cmd := &cli.Command{Reader: r}
+		assert.Same(t, r, cliinternal.Stdin(cmd))
+	})
+
+	t.Run("falls back to os.Stdin when no reader is set", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Same(t, os.Stdin, cliinternal.Stdin(&cli.Command{}))
+	})
+}
+
+func TestValueStdinFlag(t *testing.T) {
+	t.Parallel()
+
+	f, ok := cliinternal.ValueStdinFlag().(*cli.BoolFlag)
+	require.True(t, ok)
+	assert.Equal(t, cliinternal.FlagValueStdin, f.Name)
+	assert.NotEmpty(t, f.Usage)
+}
 
 func TestResolveValue_FromStdin(t *testing.T) {
 	t.Parallel()
@@ -81,6 +115,20 @@ func TestResolveValue_FromStdin(t *testing.T) {
 		rest, rerr := io.ReadAll(reader)
 		require.NoError(t, rerr)
 		assert.Equal(t, "sk-12345\n", string(rest))
+	})
+
+	t.Run("surfaces a stdin read error", func(t *testing.T) {
+		t.Parallel()
+
+		sentinel := errors.New("read boom")
+
+		_, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+			FromStdin: true,
+			Stdin:     errReader{err: sentinel},
+		})
+		require.ErrorIs(t, err, sentinel)
+		assert.False(t, proceed)
+		assert.Contains(t, err.Error(), "failed to read value from stdin")
 	})
 
 	t.Run("reads stdin when confirmation is skipped via --yes", func(t *testing.T) {
