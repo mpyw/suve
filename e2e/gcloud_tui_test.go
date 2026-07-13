@@ -37,9 +37,12 @@ import (
 //
 // The tests share the TUI helpers from aws_tui_test.go (tuiTermWidth/Height,
 // keyRune, waitForScreen, finalScreen) and the gcloud harness from the CLI e2e
-// (setupGoogleCloud, runGcloud, newGoogleCloudStore, setupTempHome). Naming them
-// TestGoogleCloudTUI_* folds them into the existing e2e-gcloud CI job, whose
-// filter is `-run TestGoogleCloud` — no new job is needed.
+// (setupGoogleCloud, runGcloud, newGoogleCloudStore, setupTempHome). They use the
+// TestTUIGoogleCloud_* prefix (mirroring AWS's TestTUIAWS_*) so the dedicated
+// e2e-gcloud-tui CI job (filter `-run '^TestTUIGoogleCloud'`) runs them against a
+// FRESH, isolated emulator — disjoint from the e2e-gcloud job (filter
+// `-run '^TestGoogleCloud'`), whose CLI tests would otherwise leave deleted
+// secrets in a shared emulator that contaminate the TUI browser's list.
 // =============================================================================
 
 // gcloudTUIProject is the project id setupGoogleCloud pins (GOOGLE_CLOUD_PROJECT)
@@ -115,12 +118,12 @@ func newGoogleCloudTUIModel(t *testing.T) tea.Model {
 	return model
 }
 
-// TestGoogleCloudTUI_SecretBrowse seeds two Secret Manager secrets and drives the
+// TestTUIGoogleCloud_SecretBrowse seeds two Secret Manager secrets and drives the
 // TUI secret browser: it lists both real secrets and, on the explicit-reveal
 // surface (the `x` key, GUI parity), fetches and shows the selected secret's value
 // from the emulator. The value is masked until that explicit reveal, and the
 // unselected secret's value is never fetched (so it stays absent from the screen).
-func TestGoogleCloudTUI_SecretBrowse(t *testing.T) {
+func TestTUIGoogleCloud_SecretBrowse(t *testing.T) {
 	setupGoogleCloud(t)
 
 	// alpha sorts before bravo, so alpha is the default selection whose value the
@@ -166,13 +169,13 @@ func TestGoogleCloudTUI_SecretBrowse(t *testing.T) {
 		"the unselected secret's value is never fetched, so it stays masked/absent")
 }
 
-// TestGoogleCloudTUI_SecretHistory seeds one secret with three versions and drives
+// TestTUIGoogleCloud_SecretHistory seeds one secret with three versions and drives
 // the TUI secret browser's detail history: it asserts the version history renders
 // (the current-version marker plus the Version ID meta), that every per-version
 // value is masked by default, and that pressing `x` reveals the current value and
 // all history values together (one shared Show toggle, GUI parity, #733). The
 // history fetch is capped at 10 rows (#747); three versions render in full.
-func TestGoogleCloudTUI_SecretHistory(t *testing.T) {
+func TestTUIGoogleCloud_SecretHistory(t *testing.T) {
 	setupGoogleCloud(t)
 
 	const (
@@ -235,12 +238,12 @@ func TestGoogleCloudTUI_SecretHistory(t *testing.T) {
 	assert.Contains(t, revealed, v1Val, "x reveals the first version's value in the history")
 }
 
-// TestGoogleCloudTUI_StageApply exercises the browse → stage → apply loop
+// TestTUIGoogleCloud_StageApply exercises the browse → stage → apply loop
 // end-to-end: a secret is pre-staged for update through the shared staging store,
 // then the TUI applies it via the Staging tab's apply-all dialog. The applied
 // value is verified through the CLI `secret show` path, proving the write reached
 // the emulator through the real TUI apply path.
-func TestGoogleCloudTUI_StageApply(t *testing.T) {
+func TestTUIGoogleCloud_StageApply(t *testing.T) {
 	setupGoogleCloud(t)
 	setupTempHome(t)
 
