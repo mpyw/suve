@@ -1,6 +1,7 @@
 package components
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/mpyw/suve/internal/tui/styles"
@@ -309,17 +310,50 @@ func (t *HistoryTable) renderRow(idx int) string {
 	return truncate(strings.Join(parts, "  "), t.width)
 }
 
+// visibleRows returns the window's height in rendered lines. It is the per-View
+// line budget window() fills, not a row count: a row renders as 1–3 lines, so
+// the offset math below converts between the two by summing per-row line counts.
 func (t *HistoryTable) visibleRows() int { return t.height }
 
-// maxOffset caps scrolling so the last row stays reachable.
+// maxOffset caps scrolling so the last row's final line stays reachable at the
+// bottom of the window. Because rows render as 1–3 lines, this is not
+// len(rows)-height: it is the smallest row offset whose rows [offset..end] fill
+// (without exceeding) the line budget, found by walking rows from the end and
+// accumulating their rendered line counts until the next row would overflow.
 func (t *HistoryTable) maxOffset() int {
-	return max(len(t.rows)-t.visibleRows(), 0)
+	budget := t.visibleRows()
+	if budget <= 0 || len(t.rows) == 0 {
+		return 0
+	}
+
+	total := 0
+	offset := len(t.rows)
+
+	for i := range slices.Backward(t.rows) {
+		h := len(t.rowLines(i))
+		if total+h > budget {
+			break
+		}
+
+		total += h
+		offset = i
+	}
+
+	// When even the last row alone overflows the budget, it can still be scrolled
+	// to (its top line at the pane top), so cap the offset at the last row.
+	return min(offset, len(t.rows)-1)
 }
 
-// ensureVisible keeps the selection on-screen.
+// ensureVisible keeps the selected row's rendered lines fully inside the
+// line-budget window. It scrolls up when the selection starts above the window,
+// and down when the selection's lines extend past the window bottom — walking up
+// from the selected row accumulating line counts to find the smallest offset
+// that still shows the selected row's final line — then clamps to the valid
+// range. Line counts come from rowLines, the same source window() uses, so the
+// scroll math and the mouse hit-map never disagree.
 func (t *HistoryTable) ensureVisible() {
-	visible := t.visibleRows()
-	if visible <= 0 {
+	budget := t.visibleRows()
+	if budget <= 0 || len(t.rows) == 0 {
 		t.offset = 0
 
 		return
@@ -329,8 +363,23 @@ func (t *HistoryTable) ensureVisible() {
 		t.offset = t.selected
 	}
 
-	if t.selected >= t.offset+visible {
-		t.offset = t.selected - visible + 1
+	// Find the smallest offset whose rows [offset..selected] fit the budget, so
+	// the selected row's last line lands at or above the window bottom.
+	total := 0
+	minOffset := t.selected
+
+	for i := t.selected; i >= 0; i-- {
+		h := len(t.rowLines(i))
+		if total+h > budget {
+			break
+		}
+
+		total += h
+		minOffset = i
+	}
+
+	if t.offset < minOffset {
+		t.offset = minOffset
 	}
 
 	t.offset = clamp(t.offset, 0, t.maxOffset())
