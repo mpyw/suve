@@ -1,5 +1,5 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ diff: /app/api/DATABASE_URL#13 → /app/api/DATABASE_URL#14  ·  x: hide                            │
+│ diff: /app/api/DATABASE_URL#13 → /app/api/DATABASE_URL#14  ·  s: side-by-side  ·  x: hide        │
 │ --- /app/api/DATABASE_URL#13                                                                     │
 │ +++ /app/api/DATABASE_URL#14                                                                     │
 │ @@ -1 +1 @@                                                                                      │

@@ -3,6 +3,7 @@ package diff
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -151,6 +152,161 @@ func TestDiffReflowsOnResize(t *testing.T) {
 	assert.Contains(t, narrow, `"host": "a.internal"`, "the formatted JSON is still present after the resize")
 }
 
+// sbsLineWith reports whether any line of s contains every one of subs — used to
+// assert the side-by-side layout colocates the old and new content on one row
+// (the unified layout never does).
+func sbsLineWith(s string, subs ...string) bool {
+	for line := range strings.SplitSeq(s, "\n") {
+		ok := true
+
+		for _, sub := range subs {
+			if !strings.Contains(line, sub) {
+				ok = false
+
+				break
+			}
+		}
+
+		if ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+// TestSideBySideToggle pins #674: `s` switches the diff page to the two-column
+// (old | new) layout, colocating a changed line's old and new text on one row
+// with the column gutter between them; `s` again restores the unified layout,
+// where the two sides live on separate -/+ lines.
+func TestSideBySideToggle(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	m := newDiff(t)
+	m, _ = m.Update(loadedMsg{content: data.DiffContent{
+		OldLabel: "cfg#1",
+		NewLabel: "cfg#2",
+		OldValue: `{"host":"a.internal","port":1}`,
+		NewValue: `{"host":"b.internal","port":2}`,
+		Secret:   false,
+	}})
+
+	// Unified by default: the old and new values are on different lines, never one.
+	unified := m.vp.View()
+	assert.False(t, sbsLineWith(unified, `"host": "a.internal"`, `"host": "b.internal"`),
+		"the unified layout keeps the two sides on separate lines")
+
+	// Toggle to side-by-side: a changed line's old and new text share one row,
+	// separated by the gutter.
+	m, _ = m.Update(keyPress('s'))
+	require.True(t, m.sideBySide, "s enables the side-by-side layout")
+
+	sbs := m.vp.View()
+	assert.True(t, sbsLineWith(sbs, `"host": "a.internal"`, "│", `"host": "b.internal"`),
+		"the side-by-side layout colocates old and new across the gutter")
+	assert.Contains(t, sbs, "cfg#1", "the old column is headed by its label")
+	assert.Contains(t, sbs, "cfg#2", "the new column is headed by its label")
+
+	// Toggle back: unified again.
+	m, _ = m.Update(keyPress('s'))
+	require.False(t, m.sideBySide, "s toggles back to unified")
+	assert.False(t, sbsLineWith(m.vp.View(), `"host": "a.internal"`, `"host": "b.internal"`),
+		"toggling back restores the unified layout")
+}
+
+// TestSideBySideReflowsOnResize pins that a WindowSizeMsg re-renders the
+// side-by-side columns to the new width (post-#732 repaint discipline): the two
+// column cells narrow with the terminal rather than leaving a stale wide frame.
+func TestSideBySideReflowsOnResize(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	m := newDiff(t)
+	m, _ = m.Update(loadedMsg{content: data.DiffContent{
+		OldLabel: "cfg#1",
+		NewLabel: "cfg#2",
+		OldValue: `{"host":"a.internal","port":1}`,
+		NewValue: `{"host":"b.internal","port":2}`,
+		Secret:   false,
+	}})
+	m, _ = m.Update(keyPress('s'))
+
+	wide := m.vp.View()
+
+	// A narrower (but still splittable) size must re-render the columns.
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	narrow := m.vp.View()
+
+	require.NotEqual(t, wide, narrow, "a resize re-syncs the side-by-side content")
+	assert.True(t, m.sideBySide, "the layout stays side-by-side across a splittable resize")
+	assert.True(t, sbsLineWith(narrow, `"host": "a.internal"`, "│", `"host": "b.internal"`),
+		"the two columns still render after the resize")
+}
+
+// TestSideBySideFallsBackBelowMinWidth pins the min-width fallback (#674): when
+// the terminal is too narrow to split two readable columns, side-by-side degrades
+// to the unified layout even though the toggle stays on (so widening restores it).
+func TestSideBySideFallsBackBelowMinWidth(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	m := newDiff(t)
+	m, _ = m.Update(loadedMsg{content: data.DiffContent{
+		OldLabel: "cfg#1",
+		NewLabel: "cfg#2",
+		OldValue: `{"host":"a.internal","port":1}`,
+		NewValue: `{"host":"b.internal","port":2}`,
+		Secret:   false,
+	}})
+	m, _ = m.Update(keyPress('s'))
+
+	// Too narrow to split: falls back to unified (the two sides no longer colocate).
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 40, Height: 40})
+	require.True(t, m.sideBySide, "the toggle stays on while narrow")
+
+	narrow := m.vp.View()
+	assert.False(t, sbsLineWith(narrow, `"host": "a.internal"`, `"host": "b.internal"`),
+		"below the min split width the layout degrades to unified")
+
+	// Widening restores the two-column layout without a second keypress.
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
+	assert.True(t, sbsLineWith(m.vp.View(), `"host": "a.internal"`, "│", `"host": "b.internal"`),
+		"widening past the min width restores side-by-side")
+}
+
+// TestSideBySideHonorsMask pins that the side-by-side layout obeys the same
+// reveal/hide policy as unified: a revealed secret shows both values across the
+// gutter, and `x` masks BOTH columns into bullet runs — no cleartext leaks in
+// either column (#674, #702/#735).
+func TestSideBySideHonorsMask(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	const (
+		oldSecret = "googlecloud-secret-2"
+		newSecret = "googlecloud-secret-value-three"
+	)
+
+	m := newDiff(t)
+	m, _ = m.Update(loadedMsg{content: data.DiffContent{
+		OldLabel: "api-key#2",
+		NewLabel: "api-key#3",
+		OldValue: oldSecret,
+		NewValue: newSecret,
+		Secret:   true,
+	}})
+	m, _ = m.Update(keyPress('s'))
+
+	revealed := m.vp.View()
+	assert.Contains(t, revealed, oldSecret, "side-by-side reveals the old secret by default")
+	assert.Contains(t, revealed, newSecret, "side-by-side reveals the new secret by default")
+
+	// `x` masks both columns: no cleartext, bullet runs on both sides.
+	m, _ = m.Update(keyPress('x'))
+	masked := m.vp.View()
+	assert.NotContains(t, masked, oldSecret, "the old secret must not leak in side-by-side while masked")
+	assert.NotContains(t, masked, newSecret, "the new secret must not leak in side-by-side while masked")
+	assert.NotContains(t, masked, "secret", "no fragment of a secret leaks in side-by-side while masked")
+	assert.Contains(t, masked, "•", "the masked side-by-side diff renders bullet runs")
+}
+
 // diffShortDescs flattens the diff page's short-help descriptions.
 func diffShortDescs(m *Model) []string {
 	km := m.HelpKeyMap()
@@ -175,6 +331,7 @@ func TestHelpKeyMap_MaskGatedOnSecret(t *testing.T) {
 	}})
 	assert.NotContains(t, diffShortDescs(nonSecret), "hide/show", "a non-secret diff has no mask toggle")
 	assert.NotContains(t, diffShortDescs(nonSecret), "parse-json", "the parse-json toggle is gone (JSON is always formatted, #732)")
+	assert.Contains(t, diffShortDescs(nonSecret), "side-by-side", "a loaded diff advertises the layout toggle (#674)")
 	assert.Contains(t, diffShortDescs(nonSecret), "back", "esc back is always available")
 
 	secret := newDiff(t)

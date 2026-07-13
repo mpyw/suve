@@ -405,6 +405,24 @@ func TestDiff_AWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenEnv 
 	diffGolden(t, host, "@@")
 }
 
+// TestDiff_SideBySideGolden pins the side-by-side layout (#674): the same AWS
+// param JSON diff, toggled to two columns with `s`. The old (left) and new
+// (right) values sit across the gutter, JSON stays pretty-printed in both columns
+// (#732), and no secret is involved — so the golden carries no unmasked value
+// beyond the intended (non-secret) content.
+func TestDiff_SideBySideGolden(t *testing.T) { //nolint:paralleltest // goldenEnv calls t.Setenv (NO_COLOR/TZ), which forbids t.Parallel
+	goldenEnv(t)
+
+	host := newDiffHost(diffReq(awsParamDiffSource(), "/app/api/DATABASE_URL", "13", "14"))
+
+	tm := teatest.NewTestModel(t, host, teatest.WithInitialTermSize(goldenTermWidth, goldenTermHeight))
+	waitFor(t, tm, "@@") // wait for the unified diff to load, then toggle to side-by-side
+	tm.Send(keyPress('s'))
+	tm.Send(keyPress('q'))
+
+	golden.RequireEqual(t, settledScreen(t, tm, goldenTermWidth, goldenTermHeight))
+}
+
 // TestDiff_AWSParamSecureStringGolden pins a SecureString PARAM diff: the
 // Compare/diff view is a surface the user explicitly opened to inspect the
 // change, so its values are REVEALED by default (#702/#735) — a SecureString is
