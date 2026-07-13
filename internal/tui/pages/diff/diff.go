@@ -1,8 +1,10 @@
 // Package diff renders the TUI's unified-diff page: two versions of one entry
 // compared with github.com/aymanbagabas/go-udiff (the same engine the CLI uses),
-// colorized per line in a scrollable viewport. `J` re-diffs with parse-json
-// normalization (parity with the CLI's --parse-json), recomputing the diff from
-// the already-fetched values without another round trip.
+// colorized per line in a scrollable viewport. A value that parses as JSON is
+// ALWAYS pretty-printed before diffing (parity with the GUI, which formats every
+// JSON value; #732) — no manual toggle. When pretty-printing collapses the two
+// sides to identical text even though the raw values differ (a whitespace-only
+// difference), the page says so rather than showing a bare "(no differences)".
 package diff
 
 import (
@@ -29,11 +31,6 @@ import (
 //
 //nolint:gochecknoglobals // immutable page-local binding
 var scrollKey = key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("↑/↓", "scroll"))
-
-// parseJSONKey toggles JSON normalization of both values before diffing.
-//
-//nolint:gochecknoglobals // immutable page-local binding
-var parseJSONKey = key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "parse-json"))
 
 // maskKey toggles masking of a secret diff. The Compare/diff view is a surface
 // the user explicitly opened to inspect the change, so its values are REVEALED
@@ -67,9 +64,8 @@ type Model struct {
 	width  int
 	height int
 
-	content   data.DiffContent
-	loaded    bool
-	parseJSON bool
+	content data.DiffContent
+	loaded  bool
 	// masked hides a secret diff's values. It defaults to false: an explicitly
 	// opened Compare/diff view reveals values so the diff is meaningful
 	// (#702/#735); `x` toggles it to mask both sides.
@@ -166,17 +162,12 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	}
 }
 
-// handleKey handles the page-local keys (parse-json toggle, back) and forwards
-// the rest to the viewport for scrolling.
+// handleKey handles the page-local keys (mask toggle, back) and forwards the
+// rest to the viewport for scrolling.
 func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Back):
 		return m, func() tea.Msg { return nav.PopPage{} }
-	case key.Matches(msg, parseJSONKey):
-		m.parseJSON = !m.parseJSON
-		m.render()
-
-		return m, nil
 	case key.Matches(msg, maskKey):
 		m.masked = !m.masked
 		m.render()
@@ -192,11 +183,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 }
 
 // HelpKeyMap reports the diff page's context-aware bindings for the help bar:
-// scroll and parse-json always, the mask toggle only on a loaded secret diff
-// (`x` is a no-op on a non-secret diff, so it is hidden there), then back. The
-// help bar makes `J`/`x`/esc discoverable — previously undocumented (#681).
+// scroll always, the mask toggle only on a loaded secret diff (`x` is a no-op on
+// a non-secret diff, so it is hidden there), then back. The help bar makes
+// `x`/esc discoverable — previously undocumented (#681).
 func (m *Model) HelpKeyMap() help.KeyMap {
-	bindings := []key.Binding{scrollKey, parseJSONKey}
+	bindings := []key.Binding{scrollKey}
 
 	if m.loaded && m.content.Secret {
 		bindings = append(bindings, maskKey)
@@ -216,8 +207,8 @@ func (m *Model) resizeViewport() {
 	m.render()
 }
 
-// render recomputes the colorized diff into the viewport for the current
-// parse-json state.
+// render recomputes the colorized diff into the viewport. A value that parses as
+// JSON is always pretty-printed before diffing (GUI parity, #732).
 func (m *Model) render() {
 	if !m.loaded {
 		return
@@ -229,13 +220,12 @@ func (m *Model) render() {
 	// change, so a secret's values are shown by default (#702/#735). Pressing `x`
 	// masks BOTH sides before diffing (per-line, length-capped bullets), so a
 	// change still shows as differing runs without disclosing content — and while
-	// masked, parse-json is skipped: the bullets are not JSON, and normalizing the
+	// masked, formatting is skipped: the bullets are not JSON, and normalizing the
 	// raw secret first could leak its structure.
-	switch {
-	case m.content.Secret && m.masked:
+	if m.content.Secret && m.masked {
 		oldVal = components.MaskValue(oldVal)
 		newVal = components.MaskValue(newVal)
-	case m.parseJSON:
+	} else {
 		if f, ok := jsonutil.TryFormat(oldVal); ok {
 			oldVal = f
 		}
@@ -246,6 +236,18 @@ func (m *Model) render() {
 	}
 
 	raw := output.DiffRaw(m.content.OldLabel, m.content.NewLabel, oldVal, newVal)
+
+	// A whitespace-only difference collapses under pretty-printing: the formatted
+	// sides are identical even though the raw values differ. Say so, rather than a
+	// bare "(no differences)", so a real (formatting-hidden) change is not read as
+	// no change at all — mirroring the GUI's always-formatted comparison (#732).
+	if raw == "" && (!m.content.Secret || !m.masked) && m.content.OldValue != m.content.NewValue {
+		m.vp.SetContent(m.styles.PageHint.Render(
+			"(no differences after JSON formatting — the values differ only in whitespace/formatting)"))
+
+		return
+	}
+
 	m.vp.SetContent(m.colorize(raw))
 }
 

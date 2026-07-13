@@ -264,14 +264,11 @@ func (m *Model) renderDetail(innerW, innerH int) (body string, valueLabelTop, hi
 	return fitLines(lines, innerH), valueLabelTop, historyTop, historyH
 }
 
-// valueLabelLine renders the "Value  (x to reveal)" / "(J to format)" label row.
+// valueLabelLine renders the "Value  (x to reveal)" label row. A JSON value is
+// always pretty-printed (GUI parity, #732), so there is no format toggle hint.
 func (m *Model) valueLabelLine(width int) string {
 	label := m.styles.PaneTitle.Render("Value")
 	if hint := m.valuePane.HintSuffix(); hint != "" {
-		label += "   " + m.styles.PageHint.Render(hint)
-	}
-
-	if hint := m.valuePane.ParseJSONHint(); hint != "" {
 		label += "   " + m.styles.PageHint.Render(hint)
 	}
 

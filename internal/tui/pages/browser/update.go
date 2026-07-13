@@ -306,13 +306,6 @@ func (m *Model) handleActionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		m.history.SetReveal(!m.valuePane.Masked())
 
 		return true, nil
-	case key.Matches(msg, parseJSONKey):
-		// Parse-JSON pretty-prints a JSON value in the detail pane (parity with the
-		// diff page's `J` and the GUI). It is a no-op while a secret is masked (the
-		// pane gates it behind reveal).
-		m.valuePane.ToggleParseJSON()
-
-		return true, nil
 	case key.Matches(msg, stagingKey):
 		return true, func() tea.Msg { return nav.OpenStaging{} }
 	case key.Matches(msg, compareKey):

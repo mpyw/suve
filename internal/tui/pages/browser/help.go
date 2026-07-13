@@ -13,8 +13,8 @@ import (
 // (#681). The map adapts to focus (a focused filter shows only commit/cancel;
 // the list and history panes advertise their own transitions) and gates each
 // binding on capability (tags only with HasTags, restore only with HasRestore,
-// load-more only with a next page, copy/reveal/parse-json only with a loaded
-// detail), so the bar never lists a key that would do nothing here.
+// load-more only with a next page, copy/reveal only with a loaded detail), so
+// the bar never lists a key that would do nothing here.
 func (m *Model) HelpKeyMap() help.KeyMap {
 	// A focused header field owns every keystroke (CapturesInput), so only the
 	// commit transition is meaningful while editing.
@@ -83,7 +83,7 @@ func (m *Model) viewColumn() []key.Binding {
 	col := []key.Binding{prefixKey, filterKey, valuesKey, recursiveKey}
 
 	if m.detailOK {
-		col = append(col, revealKey, parseJSONKey)
+		col = append(col, revealKey)
 	}
 
 	// Load-more only applies while a next page is pending (secret pagination).
