@@ -1,12 +1,12 @@
-╭───────────────────────────────────────────────────────────╮
-│Apply staged changes — Param                               │
-│                                                           │
-│Target   aws · account 123456789012 · region ap-northeast-1│
-│Changes  2 entries · 1 tag change                          │
-│                                                           │
-│▸ [ ] Ignore conflicts                                     │
-│                                                           │
-│  [ Apply ]      [ Cancel ]                                │
-│                                                           │
-│↑↓: move · space/enter: toggle/confirm · esc: cancel       │
-╰───────────────────────────────────────────────────────────╯
+╭───────────────────────────────────────────────────────────────╮
+│  Apply staged changes — Param                                 │
+│                                                               │
+│  Target   aws · account 123456789012 · region ap-northeast-1  │
+│  Changes  2 entries · 1 tag change                            │
+│                                                               │
+│  ▸ [ ] Ignore conflicts                                       │
+│                                                               │
+│    [ Apply ]      [ Cancel ]                                  │
+│                                                               │
+│  ↑↓: move · space/enter: toggle/confirm · esc: cancel         │
+╰───────────────────────────────────────────────────────────────╯

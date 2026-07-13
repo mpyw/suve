@@ -60,6 +60,13 @@ type Styles struct {
 	DiffRemoved lipgloss.Style
 }
 
+// dialogPadX is the modal dialog's horizontal interior padding (each side), so
+// content is not jammed against the box border (#698). Vertical padding is 0 to
+// preserve the row budget: the tallest fixed dialog must still fit the 60×16
+// minimum. It MUST stay in sync with dialogs.dialogChrome, which un-offsets a
+// modal click by the same frame.
+const dialogPadX = 2
+
 // New builds the default Styles. When NO_COLOR is set the palette collapses to
 // unstyled text (bold is kept for emphasis, which NO_COLOR does not govern),
 // keeping the layout intact without any color escapes.
@@ -74,7 +81,7 @@ func New() Styles {
 			Separator:   lipgloss.NewStyle(),
 			PageHint:    lipgloss.NewStyle(),
 			HelpBar:     lipgloss.NewStyle(),
-			Dialog:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
+			Dialog:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, dialogPadX),
 			Pane:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
 			// No color to distinguish the focused pane border under NO_COLOR; the
 			// selection marker and the adaptive hint carry the focus cue instead.
@@ -111,7 +118,7 @@ func New() Styles {
 		Separator:         lipgloss.NewStyle().Foreground(muted),
 		PageHint:          lipgloss.NewStyle().Foreground(muted).Italic(true),
 		HelpBar:           lipgloss.NewStyle().Foreground(muted),
-		Dialog:            lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Foreground(fgBright).Padding(0, 1),
+		Dialog:            lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Foreground(fgBright).Padding(0, dialogPadX),
 		Pane:              lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted),
 		PaneFocused:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent),
 		PaneTitle:         lipgloss.NewStyle().Bold(true).Foreground(accent),

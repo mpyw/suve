@@ -1,19 +1,19 @@
-╭──────────────────────────────────────────────────────╮
-│New setting                                           │
-│                                                      │
-│┃ Name                                                │
-│┃ >                                                   │
-│                                                      │
-│  Namespace                                           │
-│  > (default)                                         │
-│                                                      │
-│  Value                                               │
-│                                                      │
-│                                                      │
-│                                                      │
-│                                                      │
-│                                                      │
-│  Mode                                                │
-│  (•) Stage    ( ) Apply immediately                  │
-│tab/↑↓: fields · enter: submit · esc: cancel          │
-╰──────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────╮
+│  New setting                                             │
+│                                                          │
+│  ┃ Name                                                  │
+│  ┃ >                                                     │
+│                                                          │
+│    Namespace                                             │
+│    > (default)                                           │
+│                                                          │
+│    Value                                                 │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+│    Mode                                                  │
+│    (•) Stage    ( ) Apply immediately                    │
+│  tab/↑↓: fields · enter: submit · esc: cancel            │
+╰──────────────────────────────────────────────────────────╯

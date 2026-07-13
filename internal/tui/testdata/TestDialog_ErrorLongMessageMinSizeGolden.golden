@@ -1,16 +1,16 @@
-╭────────────────────────────────────────────────────────╮
-│Staging key lost                                        │
-│                                                        │
-│The staging data key could not be recovered from the    │
-│keychain, so every staged change for this scope is      │
-│unreadable and must be re-created from scratch after    │
-│clearing the store. Check that the login keychain is    │
-│unlocked, that no other process holds it, and that      │
-│SUVE_STAGING_KEY is either unset or matches the key the │
-│store was written with. If the keychain entry was       │
-│deleted, the staged changes cannot be recovered and the │
-│store must be reset before staging again from this      │
-│scope. Re-run the command after unlocking the keychain  │
-│                                                        │
-│↑↓/pgup/pgdn: scroll · enter/esc: close                 │
-╰────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────╮
+│  Staging key lost                                        │
+│                                                          │
+│  The staging data key could not be recovered from the    │
+│  keychain, so every staged change for this scope is      │
+│  unreadable and must be re-created from scratch after    │
+│  clearing the store. Check that the login keychain is    │
+│  unlocked, that no other process holds it, and that      │
+│  SUVE_STAGING_KEY is either unset or matches the key     │
+│  the store was written with. If the keychain entry was   │
+│  deleted, the staged changes cannot be recovered and     │
+│  the store must be reset before staging again from this  │
+│  scope. Re-run the command after unlocking the keychain  │
+│                                                          │
+│  ↑↓/pgup/pgdn: scroll · enter/esc: close                 │
+╰──────────────────────────────────────────────────────────╯

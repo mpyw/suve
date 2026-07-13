@@ -6,15 +6,19 @@ import (
 )
 
 // dialogChrome is the column overhead the shell's dialog frame adds around the
-// content (a 1-cell rounded border plus 1 cell of horizontal padding on each
-// side); a dialog caps its lines at width−dialogChrome so a long name, error, or
-// result line wraps inside the box instead of clipping its border.
-const dialogChrome = 4
+// content (a 1-cell rounded border plus 2 cells of horizontal padding on each
+// side; see styles.Dialog Padding(0,2), #698); a dialog caps its lines at
+// width−dialogChrome so a long name, error, or result line wraps inside the box
+// instead of clipping its border. It MUST track the Dialog style's horizontal
+// frame size — the shell un-offsets a modal click by that same frame.
+const dialogChrome = 6
 
 // dialogFrameHeight is the row overhead the shell's dialog frame adds above and
-// below the content (the rounded border's top and bottom rows). A dialog caps a
-// scrollable body at height−dialogFrameHeight (less its own pinned rows) so the
-// whole box stays on-screen at the minimum supported size.
+// below the content (the rounded border's top and bottom rows). Dialog padding is
+// horizontal-only (Padding(0,2), #698) so the row budget is unchanged and the
+// tallest fixed dialog (delete confirm) still fits the 60×16 minimum. A dialog
+// caps a scrollable body at height−dialogFrameHeight (less its own pinned rows)
+// so the whole box stays on-screen at the minimum supported size.
 const dialogFrameHeight = 2
 
 // minDialogContent floors the wrap width so a very narrow terminal still wraps
