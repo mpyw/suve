@@ -209,7 +209,7 @@ jobs:
       - name: Run Google Cloud e2e tests with coverage
         run: |
           COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
-          go test -v -race -tags e2e -run TestGoogleCloud -coverprofile=coverage-e2e-gcloud.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
+          go test -v -race -tags e2e -run '^TestGoogleCloud' -coverprofile=coverage-e2e-gcloud.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
         env:
           SUVE_GCLOUD_SECRETMANAGER_ENDPOINT: localhost:9090
 
@@ -219,6 +219,52 @@ jobs:
           files: ./coverage-e2e-gcloud.txt
           flags: e2e
           name: codecov-suve-e2e-gcloud
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+  e2e-gcloud-tui:
+    # TUI e2e: drives the real TUI App (teatest) against the Google Cloud Secret
+    # Manager emulator, exercising the browse → stage → apply loop over the real
+    # data path. Separate from e2e-gcloud (which filters `^TestGoogleCloud`)
+    # because the TUI tests use the `^TestTUIGoogleCloud` prefix; running them on a
+    # dedicated, FRESH emulator keeps them isolated from the CLI gcloud tests,
+    # whose created-then-deleted secrets would otherwise pollute the TUI browser's
+    # list on a shared emulator.
+    name: E2E Test (Google Cloud TUI)
+    runs-on: ubuntu-latest
+    services:
+      # Google Cloud Secret Manager emulator (gRPC :9090), no auth, offline.
+      gcloud-secretmanager:
+        image: ghcr.io/blackwell-systems/gcp-secret-manager-emulator-dual:latest
+        ports:
+          - 9090:9090
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4
+        with:
+          install_args: "go"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for the Secret Manager emulator
+        run: timeout 60 bash -c 'until (echo > /dev/tcp/localhost/9090) 2>/dev/null; do sleep 1; done'
+
+      - name: Run Google Cloud TUI e2e tests with coverage
+        run: |
+          COVERPKG=$(go list ./... | grep -v testutil | grep -v /e2e | grep -v internal/gui | grep -v /cmd/ | tr '\n' ',')
+          go test -v -race -tags e2e -run '^TestTUIGoogleCloud' -coverprofile=coverage-e2e-gcloud-tui.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
+        env:
+          SUVE_GCLOUD_SECRETMANAGER_ENDPOINT: localhost:9090
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: ./coverage-e2e-gcloud-tui.txt
+          flags: e2e
+          name: codecov-suve-e2e-gcloud-tui
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
