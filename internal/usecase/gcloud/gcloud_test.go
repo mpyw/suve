@@ -67,10 +67,11 @@ func TestShowUseCase(t *testing.T) {
 			assert.Equal(t, "3", ref.ID())
 
 			return &domain.Entry{
-				Name:    name,
-				Value:   "hello",
-				Version: domain.Version{ID: "3", State: "enabled"},
-				Tags:    []domain.Tag{{Key: "env", Value: "prod"}},
+				Name:        name,
+				Value:       "hello",
+				Version:     domain.Version{ID: "3", State: "enabled"},
+				Description: "app credentials",
+				Tags:        []domain.Tag{{Key: "env", Value: "prod"}},
 			}, nil
 		},
 	}
@@ -85,7 +86,56 @@ func TestShowUseCase(t *testing.T) {
 	assert.Equal(t, "hello", out.Value)
 	assert.Equal(t, "3", out.Version)
 	assert.Equal(t, "enabled", out.State)
+	assert.Equal(t, "app credentials", out.Description)
 	assert.Equal(t, []gcloud.ShowTag{{Key: "env", Value: "prod"}}, out.Tags)
+}
+
+// TestCreateUseCase_ThreadsDescription asserts the immediate create use case
+// forwards the description to the writer (stored as the "description"
+// annotation by the Google Cloud adapter) — the immediate axis of #666.
+func TestCreateUseCase_ThreadsDescription(t *testing.T) {
+	t.Parallel()
+
+	var gotDescription string
+
+	store := &providermock.Store{
+		CreateFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption) (domain.Version, error) {
+			gotDescription = description
+
+			return domain.Version{ID: "1"}, nil
+		},
+	}
+
+	uc := &gcloud.CreateUseCase{Writer: store}
+	out, err := uc.Execute(t.Context(), gcloud.CreateInput{Name: "my-secret", Value: "v1", Description: "app credentials"})
+	require.NoError(t, err)
+	assert.Equal(t, "1", out.Version)
+	assert.Equal(t, "app credentials", gotDescription)
+}
+
+// TestUpdateUseCase_ThreadsDescription asserts the immediate update use case
+// forwards the description to the writer on Put.
+func TestUpdateUseCase_ThreadsDescription(t *testing.T) {
+	t.Parallel()
+
+	var gotDescription string
+
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Value: "old"}, nil
+		},
+		PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, description string, _ ...provider.WriteOption) (domain.Version, error) {
+			gotDescription = description
+
+			return domain.Version{ID: "2"}, nil
+		},
+	}
+
+	uc := &gcloud.UpdateUseCase{Store: store}
+	out, err := uc.Execute(t.Context(), gcloud.UpdateInput{Name: "my-secret", Value: "v2", Description: "rotated key"})
+	require.NoError(t, err)
+	assert.Equal(t, "2", out.Version)
+	assert.Equal(t, "rotated key", gotDescription)
 }
 
 func TestDiffUseCase(t *testing.T) {

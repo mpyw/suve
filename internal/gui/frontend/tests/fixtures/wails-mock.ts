@@ -48,6 +48,10 @@ export interface StagedEntry {
   // per-service envelope round-trips back into the same service regardless of
   // the name shape (Google Cloud/Azure names carry no leading '/').
   service?: Service;
+  // Optional value-type secret flag. When set, StagingDiff stamps it onto the
+  // entry's DTO (mirroring the backend's DiffEntry.Secret) so the staging review
+  // masks a SecureString param even in the non-secret Param section.
+  secret?: boolean;
 }
 
 export interface StagedTagEntry {
@@ -625,7 +629,9 @@ export function createGoogleCloudState(overrides: Partial<MockState> = {}): Part
     // Google Cloud secret versions are integers and carry no ARN/staging labels;
     // they carry a per-version state (enabled/disabled/destroyed) instead.
     secrets: [
-      { name: 'gcloud-secret-1', value: 'v1', arn: '', stagingLabels: [], state: 'enabled' },
+      // gcloud-secret-1 carries a description (the "description" annotation) so a
+      // spec can assert the detail view surfaces it (#666 gcloud support).
+      { name: 'gcloud-secret-1', value: 'v1', arn: '', stagingLabels: [], state: 'enabled', description: 'app credentials' },
       { name: 'gcloud-secret-2', value: 'v2', arn: '', stagingLabels: [], state: 'enabled' },
     ],
     secretVersions: {
@@ -1013,11 +1019,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const versions = state.paramVersions[s1.name] || [];
         const v1 = versions.find((v: any) => v.version === s1.version);
         const v2 = versions.find((v: any) => v.version === s2.version);
+        // A SecureString param diff carries secret=true so the diff view masks
+        // both sides (mirrors the Go binding's value-type flag — #702).
+        const param = state.params.find((p: any) => p.name === s1.name);
         return {
           oldName: s1.name,
           newName: s2.name,
           oldValue: v1?.value || '',
           newValue: v2?.value || '',
+          secret: (param?.type || 'String') === 'SecureString',
         };
       },
       ParamAddTag: async (name: string, key: string, value: string) => {
@@ -1093,7 +1103,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           stagingLabels: secret?.stagingLabels !== undefined ? secret.stagingLabels : ['AWSCURRENT'],
           state: secret?.state ?? '',
           value: secret?.value || 'mock-secret',
-          description: '',
+          description: secret?.description ?? '',
           createdDate: new Date().toISOString(),
           tags,
         };
@@ -1206,6 +1216,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
             stagedValue: s.value || '',
             description: '',
             warning: '',
+            // Mirror the backend's value-type secret flag: secret-service
+            // entries are secret material (the create path leaves it unset —
+            // the section-level flag masks those). A per-entry override wins so
+            // a SecureString param can be flagged too.
+            secret: s.secret ?? (service === 'secret' && s.operation !== 'create'),
           })),
           tagEntries: tagStaged.map((t: any) => ({
             name: t.name,

@@ -19,6 +19,7 @@ var config = stgcli.CommandConfig{
 	ItemName:         "parameter",
 	Factory:          cliinternal.AWSParamStrategyFactory,
 	ParserFactory:    staging.AWSParamParserFactory,
+	HasDescription:   true,
 	ValueTypeFlags:   valueTypeFlags(),
 	ValueTypeFromCmd: resolveValueType,
 }

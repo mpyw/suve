@@ -10,8 +10,9 @@ import (
 
 // CreateInput holds input for the create use case.
 type CreateInput struct {
-	Name  string
-	Value string
+	Name        string
+	Value       string
+	Description string
 }
 
 // CreateOutput holds the result of the create use case.
@@ -29,7 +30,7 @@ type CreateUseCase struct {
 // if the secret already exists the provider returns a wrapped
 // provider.ErrAlreadyExists and no overwrite occurs.
 func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*CreateOutput, error) {
-	version, err := u.Writer.Create(ctx, input.Name, input.Value, domain.ValueTypeSecret, "")
+	version, err := u.Writer.Create(ctx, input.Name, input.Value, domain.ValueTypeSecret, input.Description)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secret: %w", err)
 	}

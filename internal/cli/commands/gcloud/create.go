@@ -21,8 +21,9 @@ type CreateRunner struct {
 
 // CreateOptions holds the options for the create command.
 type CreateOptions struct {
-	Name  string
-	Value string
+	Name        string
+	Value       string
+	Description string
 }
 
 // CreateCommand returns the Google Cloud Secret Manager create command.
@@ -39,6 +40,10 @@ secret, use 'suve gcloud secret update' instead.
 The secret is created with automatic replication, and the given value becomes
 its first version. To add labels after creation, use 'suve gcloud secret tag'.
 
+A --description is stored as the secret's "description" annotation (Google Cloud
+secrets have no native description field; the annotation axis is distinct from
+the labels that back tags).
+
 The value may be given as a positional argument, read from stdin with
 --value-stdin (so it never appears in argv/ps or shell history), or, when
 omitted, typed into $EDITOR.
@@ -50,6 +55,10 @@ EXAMPLES:
    suve gcloud secret create my-key                            Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			cliinternal.ValueStdinFlag(),
+			&cli.StringFlag{
+				Name:  "description",
+				Usage: "Description for the secret (stored as the \"description\" annotation)",
+			},
 		},
 		Action: createAction,
 	}
@@ -88,12 +97,12 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 		Stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, CreateOptions{Name: args.Get(0), Value: value})
+	return r.Run(ctx, CreateOptions{Name: args.Get(0), Value: value, Description: cmd.String("description")})
 }
 
 // Run executes the create command.
 func (r *CreateRunner) Run(ctx context.Context, opts CreateOptions) error {
-	result, err := r.UseCase.Execute(ctx, gcloud.CreateInput{Name: opts.Name, Value: opts.Value})
+	result, err := r.UseCase.Execute(ctx, gcloud.CreateInput{Name: opts.Name, Value: opts.Value, Description: opts.Description})
 	if err != nil {
 		return err
 	}
