@@ -75,11 +75,23 @@ func lookup(prov, service string) capability.ServiceCapability {
 	return capability.ServiceCapability{}
 }
 
-// newModel builds a browser model over a stub source.
+// newModel builds a browser model over a stub source. Its page-generation token
+// is 0, matching the zero-value token on the *LoadedMsg literals the other tests
+// build directly; tokenModel builds one with an explicit token for the cross-page
+// fencing test (#746).
 func newModel(t *testing.T, src *stubSource) *Model {
 	t.Helper()
 
-	m := New(context.Background(), src, nil, styles.New(), keys.Default())
+	return tokenModel(t, 0, src)
+}
+
+// tokenModel builds a browser model with an explicit page-generation token, so a
+// test can simulate two tab pages (distinct tokens) and prove a prior page's
+// response is fenced off (#746).
+func tokenModel(t *testing.T, token int, src *stubSource) *Model {
+	t.Helper()
+
+	m := New(context.Background(), token, src, nil, styles.New(), keys.Default())
 	m.width, m.height = 120, 30
 
 	return m
@@ -127,6 +139,90 @@ func TestStaleListResponseDropped(t *testing.T) {
 	m, _ = update(t, m, listLoadedMsg{seq: 2, res: data.ListResult{Items: []data.Item{{Name: "fresh"}}}})
 	require.Len(t, m.items, 1)
 	assert.Equal(t, "fresh", m.items[0].Name)
+}
+
+// TestCrossPageListResponseFenced pins the page-generation fence (#746): a list
+// response left in flight by a PRIOR tab's page must not splice its entries into
+// the freshly built new tab's page, even though the new page's per-Model seq
+// resets to the same value the prior response carries. Before the fix,
+// onListLoaded checked seq alone (1 == 1 → applied); the page token distinguishes
+// the two pages and drops the superseded one.
+func TestCrossPageListResponseFenced(t *testing.T) {
+	t.Parallel()
+
+	// Page A is the first tab; it issues its initial list load (seq → 1).
+	pageA := tokenModel(t, 1, &stubSource{svcCap: awsParamCap()})
+	_ = pageA.loadListCmd(false)
+	require.Equal(t, 1, pageA.listSeq)
+
+	// Page B is the second tab's freshly built page: its listSeq ALSO resets to 1,
+	// so A's response would collide on seq alone.
+	pageB := tokenModel(t, 2, &stubSource{svcCap: awsSecretCap()})
+	_ = pageB.loadListCmd(false)
+	require.Equal(t, 1, pageB.listSeq)
+
+	// A's in-flight response lands after the switch to B. Its seq (1) matches B's
+	// listSeq (1) — the pre-fix collision — but its page token (1) does not match
+	// B's (2), so B drops it and its (empty) list is untouched.
+	stale := listLoadedMsg{token: 1, seq: 1, res: data.ListResult{Items: []data.Item{{Name: "from-tab-A"}}}}
+	pageB, _ = update(t, pageB, stale)
+	assert.Empty(t, pageB.items, "a prior page's list response must not splice into the new tab (#746)")
+
+	// B's own response (matching token) applies normally.
+	own := listLoadedMsg{token: 2, seq: 1, res: data.ListResult{Items: []data.Item{{Name: "from-tab-B"}}}}
+	pageB, _ = update(t, pageB, own)
+	require.Len(t, pageB.items, 1)
+	assert.Equal(t, "from-tab-B", pageB.items[0].Name, "the new tab's own response still applies")
+}
+
+// TestSelectionMoveResetsDetailOK pins the stale-detail-seed fix (#748): moving
+// the selection to a new entry marks the loaded detail not-OK immediately, so the
+// value-seeded openEdit/openTag no-op during the load window (like they do before
+// the first load) instead of opening a dialog for the PREVIOUS entry — matching
+// openDelete, which always targets the live selection.
+func TestSelectionMoveResetsDetailOK(t *testing.T) {
+	t.Parallel()
+
+	src := &stubSource{svcCap: awsParamCap()}
+	m := newModel(t, src)
+
+	// Load a two-item list and item A's detail, so detailOK is true and m.detail
+	// describes A.
+	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
+		{Name: "/app/a"}, {Name: "/app/b"},
+	}}})
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/a", Value: "aaa"}})
+	require.True(t, m.detailOK)
+	require.Equal(t, "/app/a", m.detail.Name)
+
+	// Move down to item B. selectionCmd issues a fresh detail load but must mark the
+	// loaded detail stale immediately.
+	_ = m.move(1)
+	assert.False(t, m.detailOK, "detailOK resets when the selection moves to a new entry (#748)")
+
+	// openEdit is a no-op in the load window: no dialog seeded from the old entry A.
+	assert.Nil(t, m.openEdit(), "openEdit no-ops while the new selection's detail is loading")
+
+	// openDelete still targets the LIVE selection (item B), never the stale detail.
+	delCmd := m.openDelete()
+	require.NotNil(t, delCmd)
+	del, ok := delCmd().(nav.OpenDelete)
+	require.True(t, ok)
+	assert.Equal(t, "/app/b", del.Name, "openDelete uses the live selection, not the stale detail")
+
+	// When B's detail lands, detailOK is true again and now describes B; openEdit
+	// then seeds B (not A).
+	m, _ = update(t, m, detailLoadedMsg{seq: m.detailSeq, d: data.Detail{Name: "/app/b", Value: "bbb"}})
+	require.True(t, m.detailOK)
+	editCmd := m.openEdit()
+	require.NotNil(t, editCmd)
+	form, ok := editCmd().(nav.OpenEntryForm)
+	require.True(t, ok)
+	assert.Equal(t, "/app/b", form.Name, "openEdit seeds the freshly loaded entry")
+
+	// A same-entry reload keeps detailOK true — no value-pane flicker.
+	_ = m.selectionCmd()
+	assert.True(t, m.detailOK, "a same-entry reload keeps detailOK (no flicker)")
 }
 
 // TestPrefixDebounceSequenceGuard pins the debounce: a burst of edits schedules

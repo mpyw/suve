@@ -109,6 +109,15 @@ type Model struct {
 	staging data.StagingProbe // may be nil (no staging badges)
 	svcCap  capability.ServiceCapability
 
+	// token is this page instance's generation, stamped into every *LoadedMsg it
+	// emits and checked when one lands. The per-Model seq counters reset to the
+	// same value in each freshly built page, so on a tab switch the previous tab's
+	// in-flight response could still match the new tab's seq; the token is unique
+	// per page creation (bumped by the app in pageForTab), so a superseded prior
+	// page's message is dropped instead of splicing its data into the new tab
+	// (#746).
+	token int
+
 	styles styles.Styles
 	keys   keys.Map
 
@@ -204,8 +213,11 @@ const (
 
 // New builds a browser page over a data source. ctx is the Run context threaded
 // through every fetch. staging may be nil when the service has no staging
-// workflow.
-func New(ctx context.Context, source data.Source, staging data.StagingProbe, st styles.Styles, km keys.Map) *Model {
+// workflow. token is the page-generation identity the app assigns per page
+// creation so a superseded prior page's in-flight response is dropped (#746).
+func New(
+	ctx context.Context, token int, source data.Source, staging data.StagingProbe, st styles.Styles, km keys.Map,
+) *Model {
 	prefix := textinput.New()
 	prefix.Prompt = ""
 
@@ -216,6 +228,7 @@ func New(ctx context.Context, source data.Source, staging data.StagingProbe, st 
 
 	m := &Model{
 		ctx:              ctx,
+		token:            token,
 		source:           source,
 		staging:          staging,
 		svcCap:           source.Capability(),
