@@ -451,8 +451,12 @@ func TestStaging_ApplyResultsGolden(t *testing.T) { //nolint:paralleltest // gol
 		TargetLine: "aws", Title: "Apply staged changes — Param", EntryCount: 2, TagCount: 1, Styles: styles.New(),
 	})
 
-	// Focus Apply (row 1) and confirm to reach the results view.
-	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(d, nil), "Apply results",
+	// Focus Apply (row 1) and confirm to reach the results view. Gate on the
+	// unstage-warning line — the LAST block the results body renders (entries →
+	// tags → conflicts → unstage warnings) — not just the "Apply results" title,
+	// so a slow CI apply can never quit on a partially-rendered results frame
+	// (#796).
+	golden.RequireEqual(t, captureDialogWithKeys(t, newDialogHost(d, nil), "could not be unstaged",
 		keyDownMsg(), keyEnterMsg()))
 }
 
