@@ -3,19 +3,23 @@ package param_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/azure/param"
+	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
 	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/providermock"
+	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/azure"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
@@ -358,4 +362,125 @@ func TestListRunner_NonAppConfigNoColumn(t *testing.T) {
 	}
 	require.NoError(t, r.Run(t.Context(), param.ListOptions{}))
 	assert.Equal(t, "k1\nk2\n", buf.String())
+}
+
+// TestShowPresenter_RenderJSON covers the App Configuration show presenter's
+// JSON path: name/value plus the optional "modified" timestamp and the tags map.
+func TestShowPresenter_RenderJSON(t *testing.T) {
+	t.Parallel()
+
+	modified := time.Date(2024, 5, 6, 7, 8, 9, 0, time.UTC)
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			assert.Empty(t, spec)
+
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:    name,
+				Value:   "30",
+				Type:    domain.ValueTypePlaintext,
+				Version: domain.Version{Created: &modified}, // unversioned, but carries a modified time
+				Tags:    []domain.Tag{{Key: "env", Value: "prod"}},
+			}, nil
+		},
+	}
+
+	spec, err := azureappconfigversion.Parse("app/timeout")
+	require.NoError(t, err)
+
+	presenter := param.NewShowPresenter(store, spec)
+	require.NoError(t, presenter.Fetch(t.Context()))
+
+	var buf, errBuf bytes.Buffer
+
+	value := presenter.Value(false, &errBuf)
+	require.NoError(t, presenter.RenderJSON(&buf, value))
+
+	var out struct {
+		Name     string            `json:"name"`
+		Modified string            `json:"modified"`
+		Tags     map[string]string `json:"tags"`
+		Value    string            `json:"value"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &out))
+	assert.Equal(t, "app/timeout", out.Name)
+	assert.Equal(t, "30", out.Value)
+	assert.Equal(t, timeutil.FormatRFC3339(modified), out.Modified)
+	assert.Equal(t, map[string]string{"env": "prod"}, out.Tags)
+}
+
+// TestDiffPresenter_RenderJSON drives the App Configuration diff presenter end to
+// end through the generic Runner with --output=json, covering NewDiffPresenter,
+// Fetch, OldValue/NewValue, Labels, and RenderJSON. App Configuration is
+// unversioned, so diff compares two distinct keys with an empty suffix.
+func TestDiffPresenter_RenderJSON(t *testing.T) {
+	t.Parallel()
+
+	values := map[string]string{"key-a": "alpha", "key-b": "beta"}
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			assert.Empty(t, spec) // App Configuration is unversioned.
+
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Value: values[name]}, nil
+		},
+	}
+
+	spec1, err := azureappconfigversion.Parse("key-a")
+	require.NoError(t, err)
+	spec2, err := azureappconfigversion.Parse("key-b")
+	require.NoError(t, err)
+
+	presenter := param.NewDiffPresenter(store, spec1, spec2)
+
+	var stdout, stderr bytes.Buffer
+
+	r := &genericdiff.Runner{
+		Presenter: presenter,
+		Options:   genericdiff.Options{Output: output.FormatJSON},
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+	require.NoError(t, r.Run(t.Context()))
+
+	var out struct {
+		OldName   string `json:"oldName"`
+		OldValue  string `json:"oldValue"`
+		NewName   string `json:"newName"`
+		NewValue  string `json:"newValue"`
+		Identical bool   `json:"identical"`
+	}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))
+	assert.Equal(t, "key-a", out.OldName)
+	assert.Equal(t, "alpha", out.OldValue)
+	assert.Equal(t, "key-b", out.NewName)
+	assert.Equal(t, "beta", out.NewValue)
+	assert.False(t, out.Identical)
+}
+
+// TestLogPresenter_RenderStubs covers the App Configuration log presenter's
+// render stubs. App Configuration has no version history, so these methods only
+// exist to satisfy the genericlog.Presenter interface and must be safe no-ops.
+func TestLogPresenter_RenderStubs(t *testing.T) {
+	t.Parallel()
+
+	presenter := param.NewLogPresenter(&providermock.Store{}, genericlog.Request{Name: "my-key"})
+
+	var buf, errBuf bytes.Buffer
+
+	assert.Equal(t, 0, presenter.Len())
+	require.NoError(t, presenter.RenderJSON(&buf))
+	presenter.RenderOneline(&buf, 0, 0)
+	presenter.RenderHeader(&buf, 0)
+	presenter.RenderValue(&buf, 0, 0)
+	presenter.RenderPatch(&buf, &errBuf, 0, false, false)
+
+	assert.Empty(t, buf.String())
+	assert.Empty(t, errBuf.String())
 }
