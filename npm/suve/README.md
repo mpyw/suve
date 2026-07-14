@@ -14,6 +14,12 @@ The right prebuilt binary for your platform is installed automatically as an
 optional dependency (`@mpyw/suve-<os>-<cpu>`). No build step, no network fetch
 at install time beyond the npm registry.
 
+A network-free `postinstall` step then points the `suve` command straight at the
+native binary, so it runs without a wrapping `node` process (on macOS/Linux).
+If install scripts are disabled (`--ignore-scripts`) or you're on Windows, a
+tiny Node launcher transparently forwards to the binary instead — same result,
+one extra process.
+
 ### Supported platforms
 
 | OS | Architectures | Build |

@@ -32,9 +32,11 @@
   "files": [
     "bin/suve",
     "lib/resolve.mjs",
+    "install.mjs",
     "README.md"
   ],
   "scripts": {
+    "postinstall": "node install.mjs",
     "test": "node --test"
   },
   "engines": {
