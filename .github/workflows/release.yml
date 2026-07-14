@@ -720,26 +720,11 @@ jobs:
       - name: Publish to npm
         if: ${{ inputs.mode != 'Release Without NPM' }}
         env:
-          # NPM_TOKEN is optional: it only bootstraps the very first publish of
-          # each package (needed before a trusted publisher can be configured).
-          # Once npm trusted publishers are set up, leave the secret unset and
-          # publishing authenticates tokenlessly via GitHub OIDC (id-token).
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          # Gate: set repo variable NPM_PUBLISH=true to enable publishing. Keeps
-          # releases from failing before npm auth (token or OIDC) is configured.
-          NPM_PUBLISH: ${{ vars.NPM_PUBLISH }}
           TAG: ${{ inputs.version }}
         run: |
-          if [[ "$NPM_PUBLISH" != "true" ]]; then
-            echo "vars.NPM_PUBLISH is not 'true'; skipping npm publish"
-            exit 0
-          fi
-          # A recent npm is needed for trusted publishing (OIDC) and provenance.
+          # Authenticates tokenlessly via GitHub OIDC trusted publishing
+          # (id-token: write on this job); provenance is attached automatically.
+          # A recent npm is required for both. Each package must have a trusted
+          # publisher configured on npmjs.com (owner mpyw/suve, this workflow).
           npm install -g npm@latest
-          if [[ -n "$NPM_TOKEN" ]]; then
-            echo "npm auth: token (bootstrap)"
-            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          else
-            echo "npm auth: OIDC trusted publishing (tokenless)"
-          fi
           .github/scripts/npm-publish.sh "${TAG#v}"

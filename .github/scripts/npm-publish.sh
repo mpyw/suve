@@ -13,7 +13,9 @@
 #                       is "suve" even though the archive is named suve-cli_*.
 #
 # Usage: .github/scripts/npm-publish.sh <version-without-v> [--dry-run]
-#   Requires: node, npm; releases/ populated; NODE_AUTH_TOKEN for a real publish.
+#   Requires: node, npm; releases/ populated. A real publish authenticates via
+#   whatever the environment provides (OIDC trusted publishing in CI); this
+#   script does not configure auth itself.
 set -euo pipefail
 
 VERSION="${1:?usage: npm-publish.sh <version> [--dry-run]}"
@@ -46,6 +48,12 @@ const dirs = fs.readdirSync(npmDir, { withFileTypes: true })
   .filter((d) => d.isDirectory())
   .map((d) => path.join(npmDir, d.name, "package.json"))
   .filter((p) => fs.existsSync(p));
+// Guard against a wrong NPM_DIR or a dropped package dir: expect exactly the
+// main package plus the six platform packages.
+if (dirs.length !== 7) {
+  console.error(`Expected 7 npm package.json files, found ${dirs.length} under ${npmDir}`);
+  process.exit(1);
+}
 for (const p of dirs) {
   const pkg = JSON.parse(fs.readFileSync(p, "utf8"));
   pkg.version = version;
@@ -61,6 +69,8 @@ NODE
 
 # --- Extract each prebuilt binary into its platform package -------------------
 echo "==> Extracting prebuilt binaries from ${RELEASES}"
+TMPROOT="$(mktemp -d)"
+trap 'rm -rf "$TMPROOT"' EXIT
 for entry in "${PLATFORMS[@]}"; do
   IFS="|" read -r dir archive member dest <<<"$entry"
   src="$RELEASES/$archive"
@@ -69,19 +79,19 @@ for entry in "${PLATFORMS[@]}"; do
   [[ -f "$src" ]] || { echo "Error: missing archive $src"; exit 1; }
   mkdir -p "$bindir"
 
-  tmp="$(mktemp -d)"
+  tmp="$(mktemp -d "$TMPROOT/XXXXXX")"
   case "$archive" in
     *.tar.gz) tar -xzf "$src" -C "$tmp" ;;
     *.zip)    unzip -q -o "$src" -d "$tmp" ;;
     *) echo "Error: unknown archive type $archive"; exit 1 ;;
   esac
 
-  found="$(find "$tmp" -type f -name "$member" | head -1)"
+  # -print -quit stops at the first match (no pipe, so no SIGPIPE/pipefail risk).
+  found="$(find "$tmp" -type f -name "$member" -print -quit)"
   [[ -n "$found" ]] || { echo "Error: '$member' not found in $archive"; exit 1; }
   cp "$found" "$bindir/$dest"
   chmod +x "$bindir/$dest"
   cp "$LICENSE" "$pkgdir/LICENSE"
-  rm -rf "$tmp"
   echo "   $dir/bin/$dest <- $archive ($member)"
 done
 
@@ -97,20 +107,44 @@ else
   PUBLISH_ARGS=(--provenance --access public)
 fi
 
-# Publish one package directory, tolerating an already-published version so that
-# re-running the job after a partial failure can complete the set (npm returns a
-# hard error for a duplicate version, which would otherwise abort under set -e
-# before the remaining packages — and the main package — get published).
+# Publish one package directory idempotently, so re-running after a partial
+# failure can complete the set. npm hard-errors on a duplicate version, which
+# under `set -e` would otherwise abort before the remaining packages — and the
+# main package — get published.
 publish_one() {
-  local pkgdir="$1" name version
+  local pkgdir="$1" name version published out
   name="$(node -p "require('${pkgdir}/package.json').name")"
   version="$(node -p "require('${pkgdir}/package.json').version")"
-  if [[ "$(npm view "${name}@${version}" version 2>/dev/null || true)" == "${version}" ]]; then
-    echo "==> ${name}@${version} already published, skipping"
+  local label=".github/npm/$(basename "$pkgdir")"
+
+  # Fast path: skip if this exact version is already on the registry. Only a
+  # clean `npm view` (exit 0) reporting the same version is trusted as "already
+  # published" — a nonzero exit (E404 = not published, or a transient error) is
+  # NOT treated as published; we fall through and let the publish itself decide,
+  # tolerating a duplicate-version error below. A dry-run never conflicts, so it
+  # always rehearses (no skip).
+  if [[ "$DRY_RUN" != "--dry-run" ]]; then
+    if published="$(npm view "${name}@${version}" version 2>/dev/null)" \
+       && [[ "$published" == "$version" ]]; then
+      echo "==> ${name}@${version} already published, skipping"
+      return 0
+    fi
+  fi
+
+  echo "==> npm publish ${name}@${version} (${label})"
+  if out="$(cd "$pkgdir" && npm publish "${PUBLISH_ARGS[@]}" 2>&1)"; then
+    printf '%s\n' "$out"
     return 0
   fi
-  echo "==> npm publish ${name}@${version} (.github/npm/$(basename "$pkgdir"))"
-  (cd "$pkgdir" && npm publish "${PUBLISH_ARGS[@]}")
+  printf '%s\n' "$out"
+  # Idempotent skip: a duplicate-version error means someone already published
+  # this exact version (e.g. an earlier partial run), so treat it as success
+  # rather than wedging the rest of the set.
+  if grep -qiE 'cannot publish over|previously published|EPUBLISHCONFLICT' <<<"$out"; then
+    echo "==> ${name}@${version} already published (publish conflict), skipping"
+    return 0
+  fi
+  return 1
 }
 
 for entry in "${PLATFORMS[@]}"; do
