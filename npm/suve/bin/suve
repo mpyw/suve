@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+// Thin launcher: resolve the prebuilt binary shipped by the platform-specific
+// optionalDependency and hand off to it, forwarding args, stdio, and exit code.
+import { spawnSync } from "node:child_process";
+import { resolveBinary } from "../lib/resolve.mjs";
+
+let binary;
+try {
+  binary = resolveBinary();
+} catch (err) {
+  process.stderr.write(`${err.message}\n`);
+  process.exit(1);
+}
+
+const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
+
+if (result.error) {
+  process.stderr.write(`suve: failed to launch ${binary}: ${result.error.message}\n`);
+  process.exit(1);
+}
+
+// Propagate signal-terminated children as a failure exit code.
+if (result.signal) {
+  process.exit(1);
+}
+
+process.exit(result.status ?? 0);

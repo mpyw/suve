@@ -1,0 +1,22 @@
+{
+  "name": "@mpyw/suve-darwin-x64",
+  "version": "0.0.0",
+  "description": "Prebuilt suve binary for macOS (Intel)",
+  "license": "MIT",
+  "author": "mpyw",
+  "homepage": "https://github.com/mpyw/suve#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mpyw/suve.git",
+    "directory": "npm/darwin-x64"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin"
+  ]
+}
