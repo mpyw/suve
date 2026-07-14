@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/coverage';
 import { setupWailsMocks } from './fixtures/wails-mock';
 
 // Infrastructure test (not a feature spec): it exercises the provider-aware

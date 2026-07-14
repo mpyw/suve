@@ -5,6 +5,11 @@ const BASE_URL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: './tests',
+  // Coverage lifecycle (no-op unless COVERAGE=1): clean monocart's shared V8
+  // cache before the run, then merge every worker's collected coverage into
+  // lcov after it. The per-test collection lives in tests/fixtures/coverage.ts.
+  globalSetup: './tests/coverage/global-setup.ts',
+  globalTeardown: './tests/coverage/global-teardown.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

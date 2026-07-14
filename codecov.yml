@@ -5,11 +5,11 @@ coverage:
   status:
     project:
       default:
-        # 2 (unit + e2e) + 3 (platform: linux, darwin, windows) + 1 (gui)
-        after_n_builds: 6
+        # 2 (unit + e2e) + 3 (platform: linux, darwin, windows) + 1 (gui) + 1 (gui-frontend)
+        after_n_builds: 7
     patch:
       default:
-        after_n_builds: 6
+        after_n_builds: 7
 
 # Untestable runtime glue: entrypoints and desktop/window bootstrap that can only
 # run against a live terminal, a live Wails window, or the OS — no injectable seam.
