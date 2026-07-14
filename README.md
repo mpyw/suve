@@ -57,7 +57,7 @@ All key=value metadata is unified as **tags**; suve adds no per-provider command
 > [!NOTE]
 > On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI/TUI-only version if you don't need the desktop GUI. The keyboard-driven **TUI (`--tui`) is pure Go and ships in every build**, including the CLI/TUI-only one — only the desktop **GUI (`--gui`)** needs the GTK3/WebKit2GTK dependencies.
 
-### <img src="https://mise.jdx.dev/logo.svg" height="20" alt=""> Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
+### <img src="https://mise.jdx.dev/logo.svg" height="28" alt=""> Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
 
 suve is installable directly from GitHub Releases via mise's `github` backend — no extra registry required:
 
@@ -76,7 +76,7 @@ mise use -g "github:mpyw/suve[matching=cli]"
 > "github:mpyw/suve" = { version = "latest", matching_regex = "(darwin|windows|cli_[0-9.]+_linux)" }
 > ```
 
-### <img src="https://raw.githubusercontent.com/aquaproj/aqua/main/logo/aqua_without_text.svg" height="20" alt=""> Using [aqua](https://aquaproj.github.io/) (macOS/Linux/Windows)
+### <img src="https://raw.githubusercontent.com/aquaproj/aqua/main/logo/aqua_without_text.svg" height="28" alt=""> Using [aqua](https://aquaproj.github.io/) (macOS/Linux/Windows)
 
 suve is available in the [standard aqua registry](https://github.com/aquaproj/aqua-registry):
 
@@ -86,7 +86,7 @@ aqua g -i mpyw/suve
 
 The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (supported from v1.6.1).
 
-### <img src="https://cdn.simpleicons.org/homebrew" height="20" alt=""> Using [Homebrew](https://brew.sh/) (macOS/Linux)
+### <img src="https://cdn.simpleicons.org/homebrew" height="28" alt=""> Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
 ```bash
 # Full version (CLI/TUI + GUI)
@@ -96,14 +96,14 @@ brew install mpyw/tap/suve
 brew install mpyw/tap/suve-cli
 ```
 
-### <img src="https://github.com/ScoopInstaller.png?size=64" height="20" alt=""> Using [Scoop](https://scoop.sh/) (Windows)
+### <img src="https://github.com/ScoopInstaller.png?size=64" height="28" alt=""> Using [Scoop](https://scoop.sh/) (Windows)
 
 ```powershell
 scoop bucket add mpyw https://github.com/mpyw/scoop-bucket.git
 scoop install suve
 ```
 
-### <img src="https://cdn.simpleicons.org/npm" height="20" alt=""> Using [npm](https://www.npmjs.com/package/@mpyw/suve) (macOS/Linux/Windows)
+### <img src="https://cdn.simpleicons.org/npm" height="28" alt=""> Using [npm](https://www.npmjs.com/package/@mpyw/suve) (macOS/Linux/Windows)
 
 ```bash
 # Global install
