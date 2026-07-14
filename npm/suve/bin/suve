@@ -19,8 +19,12 @@ if (result.error) {
   process.exit(1);
 }
 
-// Propagate signal-terminated children as a failure exit code.
+// If the child was killed by a signal (e.g. Ctrl+C -> SIGINT), terminate this
+// launcher with the same signal so the shell sees the conventional 128+signal
+// exit status (130 for SIGINT) rather than a plain failure code.
 if (result.signal) {
+  process.kill(process.pid, result.signal);
+  // Reached only if the signal is ignored/blocked; still exit non-zero.
   process.exit(1);
 }
 
