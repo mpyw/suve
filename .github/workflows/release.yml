@@ -4,15 +4,25 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g., v1.2.3) - tag must already exist"
+        description: "Version to release (e.g., v1.2.3). For a real release the tag must already exist; for a dry-run it is only used for archive naming."
         required: true
         type: string
+      dry_run:
+        description: "Rehearse the full build/archive/npm-publish path without creating a release, updating Homebrew/Scoop, or publishing to npm. Builds the checked-out ref (branch), not the tag."
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       version:
         description: "Version to release (e.g., v1.2.3) - tag must already exist"
         required: true
         type: string
+      dry_run:
+        description: "Rehearse only: build + archive + npm publish --dry-run, with no release/publish side effects."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -36,6 +46,7 @@ jobs:
           echo "Version format valid: $VERSION"
 
       - name: Check tag exists
+        if: ${{ !inputs.dry_run }}
         env:
           VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ github.token }}
@@ -57,7 +68,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.dry_run && github.ref_name || inputs.version }}
           fetch-depth: 0
 
       - name: Set up toolchain (mise)
@@ -118,7 +129,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.dry_run && github.ref_name || inputs.version }}
           fetch-depth: 0
 
       # Ubuntu 22.04 (the only runner with libwebkit2gtk-4.0-dev) ships glibc
@@ -163,7 +174,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.dry_run && github.ref_name || inputs.version }}
           fetch-depth: 0
 
       # Ubuntu 22.04 (the only runner with libwebkit2gtk-4.0-dev) ships glibc
@@ -211,7 +222,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.dry_run && github.ref_name || inputs.version }}
           fetch-depth: 0
 
       - name: Set up toolchain (mise)
@@ -254,7 +265,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.dry_run && github.ref_name || inputs.version }}
           fetch-depth: 0
 
       - name: Set up toolchain (mise)
@@ -300,7 +311,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.dry_run && github.ref_name || inputs.version }}
           fetch-depth: 0
 
       - name: Set up toolchain (mise)
@@ -335,7 +346,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.dry_run && github.ref_name || inputs.version }}
           fetch-depth: 0
 
       - name: Set up toolchain (mise)
@@ -411,7 +422,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.dry_run && github.ref_name || inputs.version }}
           fetch-depth: 0
 
       - name: Set up toolchain (mise)
@@ -604,6 +615,7 @@ jobs:
           cat checksums.txt
 
       - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.version }}
@@ -629,6 +641,7 @@ jobs:
             releases/*
 
       - name: Update Homebrew formulas
+        if: ${{ !inputs.dry_run }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           TAG: ${{ inputs.version }}
@@ -663,6 +676,7 @@ jobs:
           git push
 
       - name: Update Scoop manifest
+        if: ${{ !inputs.dry_run }}
         env:
           SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
           TAG: ${{ inputs.version }}
@@ -709,14 +723,25 @@ jobs:
           # Gate: set repo variable NPM_PUBLISH=true to enable publishing. Keeps
           # releases from failing before npm auth (token or OIDC) is configured.
           NPM_PUBLISH: ${{ vars.NPM_PUBLISH }}
+          DRY_RUN: ${{ inputs.dry_run }}
           TAG: ${{ inputs.version }}
         run: |
+          # A recent npm is needed for trusted publishing (OIDC) and provenance.
+          npm install -g npm@latest
+
+          if [[ "$DRY_RUN" == "true" ]]; then
+            # Full rehearsal: exercise version-set + binary extraction + the
+            # `npm publish` path end-to-end without publishing anything. No auth
+            # is required for --dry-run.
+            echo "Dry-run: exercising the npm publish path (no packages published)"
+            scripts/npm-publish.sh "${TAG#v}" --dry-run
+            exit 0
+          fi
+
           if [[ "$NPM_PUBLISH" != "true" ]]; then
             echo "vars.NPM_PUBLISH is not 'true'; skipping npm publish"
             exit 0
           fi
-          # Trusted publishing (OIDC) and provenance both need a recent npm.
-          npm install -g npm@latest
           if [[ -n "$NPM_TOKEN" ]]; then
             echo "npm auth: token (bootstrap)"
             npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"

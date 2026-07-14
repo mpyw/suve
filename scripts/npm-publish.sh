@@ -87,10 +87,13 @@ done
 cp "$LICENSE" "$NPM_DIR/suve/LICENSE"
 
 # --- Publish: platform packages first, then the main meta-package ------------
-PUBLISH_ARGS=(--provenance --access public)
 if [[ "$DRY_RUN" == "--dry-run" ]]; then
-  PUBLISH_ARGS+=(--dry-run)
+  # No provenance on a dry-run: nothing is published, so attestation is
+  # meaningless, and skipping it keeps the rehearsal free of OIDC/Sigstore.
+  PUBLISH_ARGS=(--access public --dry-run)
   echo "==> DRY RUN (no packages will be published)"
+else
+  PUBLISH_ARGS=(--provenance --access public)
 fi
 
 # Publish one package directory, tolerating an already-published version so that
