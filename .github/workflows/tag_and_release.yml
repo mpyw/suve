@@ -22,4 +22,5 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       version: ${{ inputs.version }}
+      mode: Release All
     secrets: inherit
