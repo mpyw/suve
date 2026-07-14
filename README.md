@@ -76,7 +76,7 @@ mise use -g "github:mpyw/suve[matching=cli]"
 > "github:mpyw/suve" = { version = "latest", matching_regex = "(darwin|windows|cli_[0-9.]+_linux)" }
 > ```
 
-### <img src="https://cdn.simpleicons.org/aqua" height="20" alt=""> Using [aqua](https://aquaproj.github.io/) (macOS/Linux/Windows)
+### <img src="https://raw.githubusercontent.com/aquaproj/aqua/main/logo/aqua_without_text.svg" height="20" alt=""> Using [aqua](https://aquaproj.github.io/) (macOS/Linux/Windows)
 
 suve is available in the [standard aqua registry](https://github.com/aquaproj/aqua-registry):
 
