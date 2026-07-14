@@ -116,7 +116,7 @@ npx @mpyw/suve --version
 The right prebuilt binary is pulled in automatically per platform: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (so **`--gui` is not available via npm on Linux**).
 
 <details>
-<summary><img src="https://cdn.simpleicons.org/linux" height="20" alt=""> Linux (.deb / .rpm)</summary>
+<summary><img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Tux.png" height="20" alt=""> Linux (.deb / .rpm)</summary>
 
 Download packages from [GitHub Releases](https://github.com/mpyw/suve/releases):
 
