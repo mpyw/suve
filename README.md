@@ -113,7 +113,7 @@ npm install -g @mpyw/suve
 npx @mpyw/suve --version
 ```
 
-The installed command is just `suve` (only the package name is scoped). The right prebuilt binary is pulled in automatically as a platform-specific optional dependency (`@mpyw/suve-<os>-<cpu>`) — no build step or install-time download. macOS/Windows get the self-contained GUI build; Linux gets the dependency-free CLI/TUI-only static build, so **`--gui` is not available via npm on Linux** (use a package manager or the `.deb`/`.rpm` for the desktop GUI). The `--tui` works on every platform.
+The right prebuilt binary is pulled in automatically per platform: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (so **`--gui` is not available via npm on Linux**).
 
 <details>
 <summary><img src="https://cdn.simpleicons.org/linux" height="20" alt=""> Linux (.deb / .rpm)</summary>
