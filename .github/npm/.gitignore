@@ -1,0 +1,9 @@
+# Prebuilt binaries are fetched from GitHub Releases into the platform packages
+# at publish time (see .github/workflows/release.yml). Never commit them.
+*/bin/suve
+*/bin/suve.exe
+# ...but the main package's launcher shim IS committed.
+!/suve/bin/suve
+
+# LICENSE is copied into each package at publish time.
+*/LICENSE

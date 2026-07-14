@@ -1,0 +1,22 @@
+{
+  "name": "@mpyw/suve-linux-x64",
+  "version": "0.0.0",
+  "description": "Prebuilt suve binary for Linux x64 (CLI/TUI-only, static)",
+  "license": "MIT",
+  "author": "mpyw",
+  "homepage": "https://github.com/mpyw/suve#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mpyw/suve.git",
+    "directory": ".github/npm/linux-x64"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/suve"
+  ]
+}

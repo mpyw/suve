@@ -7,12 +7,26 @@ on:
         description: "Version to release (e.g., v1.2.3) - tag must already exist"
         required: true
         type: string
+      mode:
+        description: "What to release for this tag"
+        required: true
+        type: choice
+        default: Release All
+        options:
+          - Release All
+          - Release Without NPM
+          - Release Only NPM
   workflow_call:
     inputs:
       version:
         description: "Version to release (e.g., v1.2.3) - tag must already exist"
         required: true
         type: string
+      mode:
+        description: "Release All | Release Without NPM | Release Only NPM"
+        required: false
+        type: string
+        default: Release All
 
 permissions:
   contents: write
@@ -404,6 +418,9 @@ jobs:
       - build-linux-cli
       - build-windows
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # npm provenance
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -601,6 +618,7 @@ jobs:
           cat checksums.txt
 
       - name: Create GitHub Release
+        if: ${{ inputs.mode != 'Release Only NPM' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.version }}
@@ -626,6 +644,7 @@ jobs:
             releases/*
 
       - name: Update Homebrew formulas
+        if: ${{ inputs.mode != 'Release Only NPM' }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           TAG: ${{ inputs.version }}
@@ -660,6 +679,7 @@ jobs:
           git push
 
       - name: Update Scoop manifest
+        if: ${{ inputs.mode != 'Release Only NPM' }}
         env:
           SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
           TAG: ${{ inputs.version }}
@@ -690,3 +710,21 @@ jobs:
           git add suve.json
           git commit -m "Update suve to ${VERSION}"
           git push
+
+      - name: Set up Node.js (npm publish)
+        if: ${{ inputs.mode != 'Release Without NPM' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v6.0.0
+        with:
+          node-version: "22"
+
+      - name: Publish to npm
+        if: ${{ inputs.mode != 'Release Without NPM' }}
+        env:
+          TAG: ${{ inputs.version }}
+        run: |
+          # Authenticates tokenlessly via GitHub OIDC trusted publishing
+          # (id-token: write on this job); provenance is attached automatically.
+          # A recent npm is required for both. Each package must have a trusted
+          # publisher configured on npmjs.com (owner mpyw/suve, this workflow).
+          npm install -g npm@latest
+          .github/scripts/npm-publish.sh "${TAG#v}"

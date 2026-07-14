@@ -1,0 +1,53 @@
+{
+  "name": "suve",
+  "version": "0.0.0",
+  "description": "Git-like CLI/TUI/GUI for multi-cloud secret and parameter management across AWS, Google Cloud, and Azure",
+  "license": "MIT",
+  "author": "mpyw",
+  "homepage": "https://github.com/mpyw/suve#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mpyw/suve.git",
+    "directory": ".github/npm/suve"
+  },
+  "bugs": {
+    "url": "https://github.com/mpyw/suve/issues"
+  },
+  "keywords": [
+    "aws",
+    "azure",
+    "gcp",
+    "google-cloud",
+    "secrets",
+    "secret-manager",
+    "parameter-store",
+    "key-vault",
+    "cli",
+    "secrets-management"
+  ],
+  "type": "module",
+  "bin": {
+    "suve": "bin/suve"
+  },
+  "files": [
+    "bin/suve",
+    "lib/resolve.mjs",
+    "install.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node install.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@mpyw/suve-darwin-arm64": "0.0.0",
+    "@mpyw/suve-darwin-x64": "0.0.0",
+    "@mpyw/suve-linux-arm64": "0.0.0",
+    "@mpyw/suve-linux-x64": "0.0.0",
+    "@mpyw/suve-win32-arm64": "0.0.0",
+    "@mpyw/suve-win32-x64": "0.0.0"
+  }
+}
