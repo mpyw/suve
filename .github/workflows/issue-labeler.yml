@@ -17,3 +17,6 @@ jobs:
           configuration-path: .github/issue-labeler.yml
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           include-title: 1
+          # Required by v3.4. Our config is the flat `label: [regex]` form, not
+          # the versioned-template form, so disable versioned regex.
+          enable-versioned-regex: 0

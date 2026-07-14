@@ -1,5 +1,8 @@
 name: Tag
 
+# Show the target version in the run title, e.g. "Tag v1.2.3".
+run-name: "Tag ${{ inputs.version }}"
+
 on:
   workflow_dispatch:
     inputs:
