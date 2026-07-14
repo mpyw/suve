@@ -12,14 +12,23 @@
 #                       renames suve-cli -> suve inside the archive, so the member
 #                       is "suve" even though the archive is named suve-cli_*.
 #
-# Usage: .github/scripts/npm-publish.sh <version-without-v> [--dry-run]
+# Usage: .github/scripts/npm-publish.sh <version-without-v> [--dry-run|--no-provenance]
 #   Requires: node, npm; releases/ populated. A real publish authenticates via
 #   whatever the environment provides (OIDC trusted publishing in CI); this
 #   script does not configure auth itself.
+#
+#   --dry-run        pack/publish rehearsal, publishes nothing (no provenance).
+#   --no-provenance  real publish without provenance — for a LOCAL bootstrap
+#                    (npm login first). Provenance requires a CI/OIDC environment,
+#                    so `npm publish --provenance` fails when run locally.
 set -euo pipefail
 
-VERSION="${1:?usage: npm-publish.sh <version> [--dry-run]}"
-DRY_RUN="${2:-}"
+VERSION="${1:?usage: npm-publish.sh <version> [--dry-run|--no-provenance]}"
+MODE="${2:-}"
+case "$MODE" in
+  "" | --dry-run | --no-provenance) ;;
+  *) echo "Error: unknown option '$MODE' (expected --dry-run or --no-provenance)"; exit 1 ;;
+esac
 
 # This script lives at .github/scripts/; the repo root is two levels up.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -98,14 +107,22 @@ done
 cp "$LICENSE" "$NPM_DIR/suve/LICENSE"
 
 # --- Publish: platform packages first, then the main meta-package ------------
-if [[ "$DRY_RUN" == "--dry-run" ]]; then
-  # No provenance on a dry-run: nothing is published, so attestation is
-  # meaningless, and skipping it keeps the rehearsal free of OIDC/Sigstore.
-  PUBLISH_ARGS=(--access public --dry-run)
-  echo "==> DRY RUN (no packages will be published)"
-else
-  PUBLISH_ARGS=(--provenance --access public)
-fi
+case "$MODE" in
+  --dry-run)
+    # Nothing is published, so provenance is meaningless; skipping it keeps the
+    # rehearsal free of OIDC/Sigstore.
+    PUBLISH_ARGS=(--access public --dry-run)
+    echo "==> DRY RUN (no packages will be published)"
+    ;;
+  --no-provenance)
+    # Real publish without provenance (local bootstrap; see usage).
+    PUBLISH_ARGS=(--access public)
+    echo "==> Publishing WITHOUT provenance (local bootstrap)"
+    ;;
+  *)
+    PUBLISH_ARGS=(--provenance --access public)
+    ;;
+esac
 
 # Publish one package directory idempotently, so re-running after a partial
 # failure can complete the set. npm hard-errors on a duplicate version, which
@@ -123,7 +140,7 @@ publish_one() {
   # NOT treated as published; we fall through and let the publish itself decide,
   # tolerating a duplicate-version error below. A dry-run never conflicts, so it
   # always rehearses (no skip).
-  if [[ "$DRY_RUN" != "--dry-run" ]]; then
+  if [[ "$MODE" != "--dry-run" ]]; then
     if published="$(npm view "${name}@${version}" version 2>/dev/null)" \
        && [[ "$published" == "$version" ]]; then
       echo "==> ${name}@${version} already published, skipping"
