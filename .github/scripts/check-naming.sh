@@ -9,9 +9,10 @@
 # Three occurrences are allowed:
 #   - the third-party emulator image name "gcp-secret-manager-emulator",
 #     which we do not control;
-#   - the exact npm keyword token "gcp" (quoted), a deliberate discoverability
-#     term in npm/**/package.json — npm users search the bare acronym, and JSON
-#     manifests cannot carry the inline marker below;
+#   - the exact npm keyword line `"gcp",` inside npm/*/package.json only, a
+#     deliberate discoverability term — npm users search the bare acronym, and
+#     JSON manifests cannot carry the inline marker below. The waiver is anchored
+#     to that path+line shape so it cannot mask a stray "gcp" anywhere else;
 #   - any line carrying the inline marker "naming-allow-gcp", used to waive
 #     the ban at a single deliberate site (e.g. a user-facing CLI alias).
 set -euo pipefail
@@ -29,7 +30,7 @@ matches=$(
     ':(exclude)**/package-lock.json' \
     ':(exclude)**/*.lock' \
     | { grep -vi 'gcp-secret-manager-emulator' || true; } \
-    | { grep -v '"gcp"' || true; } \
+    | { grep -vE '^npm/[^:]*/package\.json:[0-9]+:[[:space:]]*"gcp",?$' || true; } \
     | { grep -v 'naming-allow-gcp' || true; }
 )
 

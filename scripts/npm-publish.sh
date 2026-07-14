@@ -8,7 +8,9 @@
 #
 # Reuses the archives already built in releases/ by the release workflow:
 #   darwin / windows -> self-contained GUI build (binary: suve / suve.exe)
-#   linux            -> CLI/TUI-only static build (binary: suve-cli -> renamed suve)
+#   linux            -> CLI/TUI-only static build; the release workflow already
+#                       renames suve-cli -> suve inside the archive, so the member
+#                       is "suve" even though the archive is named suve-cli_*.
 #
 # Usage: scripts/npm-publish.sh <version-without-v> [--dry-run]
 #   Requires: node, npm; releases/ populated; NODE_AUTH_TOKEN for a real publish.
@@ -26,8 +28,8 @@ LICENSE="$REPO_ROOT/LICENSE"
 PLATFORMS=(
   "darwin-arm64|suve_${VERSION}_darwin_arm64.tar.gz|suve|suve"
   "darwin-x64|suve_${VERSION}_darwin_amd64.tar.gz|suve|suve"
-  "linux-arm64|suve-cli_${VERSION}_linux_arm64.tar.gz|suve-cli|suve"
-  "linux-x64|suve-cli_${VERSION}_linux_amd64.tar.gz|suve-cli|suve"
+  "linux-arm64|suve-cli_${VERSION}_linux_arm64.tar.gz|suve|suve"
+  "linux-x64|suve-cli_${VERSION}_linux_amd64.tar.gz|suve|suve"
   "win32-arm64|suve_${VERSION}_windows_arm64.zip|suve.exe|suve.exe"
   "win32-x64|suve_${VERSION}_windows_amd64.zip|suve.exe|suve.exe"
 )
@@ -91,13 +93,27 @@ if [[ "$DRY_RUN" == "--dry-run" ]]; then
   echo "==> DRY RUN (no packages will be published)"
 fi
 
+# Publish one package directory, tolerating an already-published version so that
+# re-running the job after a partial failure can complete the set (npm returns a
+# hard error for a duplicate version, which would otherwise abort under set -e
+# before the remaining packages — and the main package — get published).
+publish_one() {
+  local pkgdir="$1" name version
+  name="$(node -p "require('${pkgdir}/package.json').name")"
+  version="$(node -p "require('${pkgdir}/package.json').version")"
+  if [[ "$(npm view "${name}@${version}" version 2>/dev/null || true)" == "${version}" ]]; then
+    echo "==> ${name}@${version} already published, skipping"
+    return 0
+  fi
+  echo "==> npm publish ${name}@${version} (npm/$(basename "$pkgdir"))"
+  (cd "$pkgdir" && npm publish "${PUBLISH_ARGS[@]}")
+}
+
 for entry in "${PLATFORMS[@]}"; do
   IFS="|" read -r dir _ _ _ <<<"$entry"
-  echo "==> npm publish npm/$dir"
-  (cd "$NPM_DIR/$dir" && npm publish "${PUBLISH_ARGS[@]}")
+  publish_one "$NPM_DIR/$dir"
 done
 
-echo "==> npm publish npm/suve"
-(cd "$NPM_DIR/suve" && npm publish "${PUBLISH_ARGS[@]}")
+publish_one "$NPM_DIR/suve"
 
 echo "==> Done."
