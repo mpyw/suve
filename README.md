@@ -13,7 +13,7 @@
 > [!NOTE]
 > This project was written by AI (Claude Code).
 
-A **Git-like CLI/TUI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud Secret Manager, and Azure Key Vault / App Configuration. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
+A **Git-like CLI/TUI/GUI** for <img src="https://github.com/user-attachments/assets/03a2fde5-bf10-45f3-8bf0-722b10b6c97f" height="16" alt=""> AWS Parameter Store / Secrets Manager, <img src="https://github.com/user-attachments/assets/d6e64422-dd06-482b-90a9-e2eb1e8c3de5" height="16" alt=""> Google Cloud Secret Manager, and <img src="https://github.com/user-attachments/assets/5095c477-6f77-4cea-84b6-50eff8e61df4" height="16" alt=""> Azure Key Vault / App Configuration. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
 
 <p align="center">
   <img src="demo/cli-demo.gif" alt="CLI Demo" width="800">
@@ -35,8 +35,8 @@ A **Git-like CLI/TUI/GUI** for AWS Parameter Store / Secrets Manager, Google Clo
 - **Colored diff output**: Easy-to-read unified diff format
 - **Multi-cloud**: [AWS SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) / [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html), [Google Cloud Secret Manager](https://cloud.google.com/secret-manager/docs), and [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/) / [App Configuration](https://learn.microsoft.com/en-us/azure/azure-app-configuration/)
 - **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`). When no key is available (no keychain backend and no `SUVE_STAGING_KEY`), an interactive session falls back to plaintext with a warning, while a non-interactive one refuses to write unencrypted unless `SUVE_STAGING_ALLOW_PLAINTEXT` is set. Exported snapshot files carry a separately passphrase-encrypted payload ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode); an empty passphrase writes plaintext).
-- **TUI mode**: Keyboard-driven terminal UI via `--tui` flag (built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)); ships in every build, including the dependency-free CLI/TUI-only one
-- **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
+- **TUI mode**: Keyboard-driven terminal UI via `--tui` flag (built with <img src="https://github.com/user-attachments/assets/ad408275-8799-488f-9303-441e7f869535" height="16" alt=""> [Bubble Tea](https://github.com/charmbracelet/bubbletea)); ships in every build, including the dependency-free CLI/TUI-only one
+- **GUI mode**: Desktop application via `--gui` flag (built with <img src="https://github.com/wailsapp.png" height="16" alt=""> [Wails](https://wails.io/))
 
 ### Metadata terminology
 
@@ -84,7 +84,7 @@ suve is available in the [standard aqua registry](https://github.com/aquaproj/aq
 aqua g -i mpyw/suve
 ```
 
-The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux, supported from v1.6.1 (so **`--gui` is not available via aqua on Linux**).
+The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (so **`--gui` is not available via aqua on Linux**).
 
 ### <img src="https://cdn.simpleicons.org/homebrew" height="28" alt=""> Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
