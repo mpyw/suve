@@ -841,5 +841,5 @@ jobs:
           node-version: "22"
 
       - name: Test the bin shim and platform-package name sync
-        working-directory: npm/suve
+        working-directory: .github/npm/suve
         run: node --test

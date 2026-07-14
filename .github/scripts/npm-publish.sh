@@ -2,7 +2,7 @@
 #
 # Assemble and publish the suve npm packages from GitHub Release archives.
 #
-# Layout (see npm/):
+# Layout (see .github/npm/):
 #   suve                  main package (bin shim + optionalDependencies)
 #   @mpyw/suve-<os>-<cpu> six platform packages, each shipping one prebuilt binary
 #
@@ -12,15 +12,16 @@
 #                       renames suve-cli -> suve inside the archive, so the member
 #                       is "suve" even though the archive is named suve-cli_*.
 #
-# Usage: scripts/npm-publish.sh <version-without-v> [--dry-run]
+# Usage: .github/scripts/npm-publish.sh <version-without-v> [--dry-run]
 #   Requires: node, npm; releases/ populated; NODE_AUTH_TOKEN for a real publish.
 set -euo pipefail
 
 VERSION="${1:?usage: npm-publish.sh <version> [--dry-run]}"
 DRY_RUN="${2:-}"
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NPM_DIR="$REPO_ROOT/npm"
+# This script lives at .github/scripts/; the repo root is two levels up.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+NPM_DIR="$REPO_ROOT/.github/npm"
 RELEASES="$REPO_ROOT/releases"
 LICENSE="$REPO_ROOT/LICENSE"
 
@@ -108,7 +109,7 @@ publish_one() {
     echo "==> ${name}@${version} already published, skipping"
     return 0
   fi
-  echo "==> npm publish ${name}@${version} (npm/$(basename "$pkgdir"))"
+  echo "==> npm publish ${name}@${version} (.github/npm/$(basename "$pkgdir"))"
   (cd "$pkgdir" && npm publish "${PUBLISH_ARGS[@]}")
 }
 

@@ -1,17 +1,17 @@
 {
-  "name": "@mpyw/suve-linux-arm64",
+  "name": "@mpyw/suve-win32-arm64",
   "version": "0.0.0",
-  "description": "Prebuilt suve binary for Linux arm64 (CLI/TUI-only, static)",
+  "description": "Prebuilt suve binary for Windows arm64",
   "license": "MIT",
   "author": "mpyw",
   "homepage": "https://github.com/mpyw/suve#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mpyw/suve.git",
-    "directory": "npm/linux-arm64"
+    "directory": ".github/npm/win32-arm64"
   },
   "os": [
-    "linux"
+    "win32"
   ],
   "cpu": [
     "arm64"

@@ -1,20 +1,20 @@
 {
-  "name": "@mpyw/suve-win32-x64",
+  "name": "@mpyw/suve-darwin-arm64",
   "version": "0.0.0",
-  "description": "Prebuilt suve binary for Windows x64",
+  "description": "Prebuilt suve binary for macOS (Apple Silicon)",
   "license": "MIT",
   "author": "mpyw",
   "homepage": "https://github.com/mpyw/suve#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mpyw/suve.git",
-    "directory": "npm/win32-x64"
+    "directory": ".github/npm/darwin-arm64"
   },
   "os": [
-    "win32"
+    "darwin"
   ],
   "cpu": [
-    "x64"
+    "arm64"
   ],
   "files": [
     "bin/suve",

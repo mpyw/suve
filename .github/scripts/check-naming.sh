@@ -9,7 +9,7 @@
 # Three occurrences are allowed:
 #   - the third-party emulator image name "gcp-secret-manager-emulator",
 #     which we do not control;
-#   - the exact npm keyword line `"gcp",` inside npm/*/package.json only, a
+#   - the exact npm keyword line `"gcp",` inside .github/npm/*/package.json only, a
 #     deliberate discoverability term — npm users search the bare acronym, and
 #     JSON manifests cannot carry the inline marker below. The waiver is anchored
 #     to that path+line shape so it cannot mask a stray "gcp" anywhere else;
@@ -30,7 +30,7 @@ matches=$(
     ':(exclude)**/package-lock.json' \
     ':(exclude)**/*.lock' \
     | { grep -vi 'gcp-secret-manager-emulator' || true; } \
-    | { grep -vE '^npm/[^:]*/package\.json:[0-9]+:[[:space:]]*"gcp",?$' || true; } \
+    | { grep -vE '^\.github/npm/[^:]*/package\.json:[0-9]+:[[:space:]]*"gcp",?$' || true; } \
     | { grep -v 'naming-allow-gcp' || true; }
 )
 

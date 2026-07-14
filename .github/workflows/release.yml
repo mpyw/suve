@@ -734,7 +734,7 @@ jobs:
             # `npm publish` path end-to-end without publishing anything. No auth
             # is required for --dry-run.
             echo "Dry-run: exercising the npm publish path (no packages published)"
-            scripts/npm-publish.sh "${TAG#v}" --dry-run
+            .github/scripts/npm-publish.sh "${TAG#v}" --dry-run
             exit 0
           fi
 
@@ -748,4 +748,4 @@ jobs:
           else
             echo "npm auth: OIDC trusted publishing (tokenless)"
           fi
-          scripts/npm-publish.sh "${TAG#v}"
+          .github/scripts/npm-publish.sh "${TAG#v}"
