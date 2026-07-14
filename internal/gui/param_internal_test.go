@@ -5,6 +5,7 @@ package gui
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,33 @@ type fakeFactory struct{ store provider.Store }
 
 func (f fakeFactory) Store(context.Context, provider.Scope, provider.Kind) (provider.Store, error) {
 	return f.store, nil
+}
+
+// recordingFactory is a fakeFactory that also captures the scope it was asked to
+// build a store for, so a test can assert how a binding threaded the App
+// Configuration namespace into the resolved scope (paramStoreForNamespace).
+type recordingFactory struct {
+	store    provider.Store
+	gotScope provider.Scope
+}
+
+func (f *recordingFactory) Store(_ context.Context, sc provider.Scope, _ provider.Kind) (provider.Store, error) {
+	f.gotScope = sc
+
+	return f.store, nil
+}
+
+// installParamStore swaps the package-global registry for one whose sole factory
+// serves store for provider p, restoring the original on cleanup. It centralizes
+// the registry override the binding tests share.
+func installParamStore(t *testing.T, p provider.Provider, factory provider.Factory) {
+	t.Helper()
+
+	orig := registry
+	registry = provider.NewRegistry()
+	registry.Register(p, factory)
+
+	t.Cleanup(func() { registry = orig })
 }
 
 // fakeNamespaceLister is a minimal appConfigNamespaceLister for testing the
@@ -327,4 +355,252 @@ func TestParamNamespaceHelpers(t *testing.T) {
 		eff := app.effectiveParamScope("dev")
 		assert.Empty(t, eff.AppConfigNamespace)
 	})
+}
+
+// TestParamShow_MapsEntry covers the ParamShow binding: it resolves + gets via
+// the param.ShowUseCase and mirrors every field onto the DTO, including
+// Type/Secret from the domain value type (SecureString ⇒ secret) and the
+// formatted LastModified/tags (#702).
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamShow_MapsEntry(t *testing.T) {
+	modified := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	store := &providermock.Store{
+		ResolveFunc: func(context.Context, string, string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name:        name,
+				Value:       "sekret",
+				Version:     domain.Version{ID: "3"},
+				Type:        domain.ValueTypeSecret,
+				Description: "the description",
+				Modified:    &modified,
+				Tags:        []domain.Tag{{Key: "env", Value: "prod"}},
+			}, nil
+		},
+	}
+
+	installParamStore(t, provider.ProviderAWS, fakeFactory{store: store})
+
+	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+	res, err := app.ParamShow("/my/secure", "")
+	require.NoError(t, err)
+
+	assert.Equal(t, "/my/secure", res.Name)
+	assert.Equal(t, "sekret", res.Value)
+	assert.Equal(t, int64(3), res.Version)
+	assert.Equal(t, paramtype.SecureString, res.Type)
+	assert.True(t, res.Secret, "a SecureString param must be flagged secret")
+	assert.Equal(t, "the description", res.Description)
+	assert.NotEmpty(t, res.LastModified, "a known modification time must be formatted")
+	require.Len(t, res.Tags, 1)
+	assert.Equal(t, ParamShowTag{Key: "env", Value: "prod"}, res.Tags[0])
+}
+
+// TestParamLog_MapsVersions covers the ParamLog binding: it walks the history
+// via param.LogUseCase and mirrors each version's Type/Secret and the IsCurrent
+// flag (the highest version) onto the DTO.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamLog_MapsVersions(t *testing.T) {
+	store := &providermock.Store{
+		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
+			return []domain.Version{{ID: "2"}, {ID: "1"}}, nil
+		},
+		ResolveFunc: func(context.Context, string, string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			// Return a secret value so Type/Secret mapping is exercised.
+			return &domain.Entry{Name: name, Value: "v", Type: domain.ValueTypeSecret}, nil
+		},
+	}
+
+	installParamStore(t, provider.ProviderAWS, fakeFactory{store: store})
+
+	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+	res, err := app.ParamLog("/my/secure", 0, "")
+	require.NoError(t, err)
+	assert.Equal(t, "/my/secure", res.Name)
+	require.Len(t, res.Entries, 2)
+
+	// History is newest-first, so version 2 leads and is the current one.
+	assert.Equal(t, int64(2), res.Entries[0].Version)
+	assert.True(t, res.Entries[0].IsCurrent, "the highest version is current")
+	assert.Equal(t, paramtype.SecureString, res.Entries[0].Type)
+	assert.True(t, res.Entries[0].Secret, "a SecureString version must be flagged secret")
+
+	assert.Equal(t, int64(1), res.Entries[1].Version)
+	assert.False(t, res.Entries[1].IsCurrent, "an older version is not current")
+}
+
+// TestParamDiff_SetsSecretMaskForSecureString is the risk branch (#702): the
+// diff DTO's Secret flag must be true when EITHER side is a SecureString, so the
+// diff view masks both sides; it stays false when both sides are plaintext.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamDiff_SetsSecretMaskForSecureString(t *testing.T) {
+	newStore := func(t1, t2 domain.ValueType) *providermock.Store {
+		return &providermock.Store{
+			ResolveFunc: func(context.Context, string, string) (provider.VersionRef, error) {
+				return provider.VersionRef{}, nil
+			},
+			GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+				if name == "/a" {
+					return &domain.Entry{Name: name, Value: "old", Type: t1}, nil
+				}
+
+				return &domain.Entry{Name: name, Value: "new", Type: t2}, nil
+			},
+		}
+	}
+
+	t.Run("secure side masks both", func(t *testing.T) {
+		installParamStore(t, provider.ProviderAWS,
+			fakeFactory{store: newStore(domain.ValueTypePlaintext, domain.ValueTypeSecret)})
+
+		app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+		res, err := app.ParamDiff("/a", "/b", "")
+		require.NoError(t, err)
+		assert.Equal(t, "/a", res.OldName)
+		assert.Equal(t, "/b", res.NewName)
+		assert.Equal(t, "old", res.OldValue)
+		assert.Equal(t, "new", res.NewValue)
+		assert.True(t, res.Secret, "a SecureString on either side must set the mask flag")
+	})
+
+	t.Run("plaintext both sides is not masked", func(t *testing.T) {
+		installParamStore(t, provider.ProviderAWS,
+			fakeFactory{store: newStore(domain.ValueTypePlaintext, domain.ValueTypePlaintext)})
+
+		app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+		res, err := app.ParamDiff("/a", "/b", "")
+		require.NoError(t, err)
+		assert.False(t, res.Secret, "two plaintext params must not set the mask flag")
+	})
+}
+
+// TestParamDelete covers the ParamDelete binding: it drives param.DeleteUseCase
+// and returns the deleted name.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamDelete(t *testing.T) {
+	var gotName string
+
+	store := &providermock.Store{
+		DeleteFunc: func(_ context.Context, name string, _ ...provider.DeleteOption) error {
+			gotName = name
+
+			return nil
+		},
+	}
+
+	installParamStore(t, provider.ProviderAWS, fakeFactory{store: store})
+
+	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+	res, err := app.ParamDelete("/my/param", "")
+	require.NoError(t, err)
+	assert.Equal(t, "/my/param", res.Name)
+	assert.Equal(t, "/my/param", gotName, "the delete must reach the provider writer")
+}
+
+// TestParamAddTag covers the ParamAddTag binding: it forwards a single key/value
+// as the Add map of param.TagUseCase.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamAddTag(t *testing.T) {
+	var gotName string
+
+	var gotAdd map[string]string
+
+	store := &providermock.Store{
+		TagFunc: func(_ context.Context, name string, add map[string]string) error {
+			gotName = name
+			gotAdd = add
+
+			return nil
+		},
+	}
+
+	installParamStore(t, provider.ProviderAWS, fakeFactory{store: store})
+
+	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+	require.NoError(t, app.ParamAddTag("/my/param", "env", "prod", ""))
+	assert.Equal(t, "/my/param", gotName)
+	assert.Equal(t, map[string]string{"env": "prod"}, gotAdd)
+}
+
+// TestParamRemoveTag covers the ParamRemoveTag binding: it forwards the key as
+// the Remove list of param.TagUseCase.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamRemoveTag(t *testing.T) {
+	var gotName string
+
+	var gotKeys []string
+
+	store := &providermock.Store{
+		UntagFunc: func(_ context.Context, name string, keys []string) error {
+			gotName = name
+			gotKeys = keys
+
+			return nil
+		},
+	}
+
+	installParamStore(t, provider.ProviderAWS, fakeFactory{store: store})
+
+	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
+
+	require.NoError(t, app.ParamRemoveTag("/my/param", "env", ""))
+	assert.Equal(t, "/my/param", gotName)
+	assert.Equal(t, []string{"env"}, gotKeys)
+}
+
+// TestParamShow_AppConfigNamespaceThreadsThroughStore covers the App
+// Configuration namespace axis shared by every param binding: the namespace
+// argument must be threaded through paramStoreForNamespace onto the resolved
+// store's scope (the label axis), so a namespaced setting is read under its own
+// namespace rather than the shared read scope's. It also asserts the App
+// Configuration value maps to a non-secret "String" via paramtype.Display.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamShow_AppConfigNamespaceThreadsThroughStore(t *testing.T) {
+	store := &providermock.Store{
+		ResolveFunc: func(context.Context, string, string) (provider.VersionRef, error) {
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			// App Configuration values are always plaintext.
+			return &domain.Entry{Name: name, Value: "v", Type: domain.ValueTypePlaintext}, nil
+		},
+	}
+
+	factory := &recordingFactory{store: store}
+	installParamStore(t, provider.ProviderAzure, factory)
+
+	app := &App{
+		ctx:   t.Context(),
+		scope: provider.Scope{Provider: provider.ProviderAzure, StoreName: "store"},
+	}
+
+	res, err := app.ParamShow("app/config", "dev")
+	require.NoError(t, err)
+
+	assert.Equal(t, "dev", factory.gotScope.AppConfigNamespace,
+		"the entry's namespace must be threaded onto the resolved store scope")
+	assert.Equal(t, "store", factory.gotScope.StoreName, "the read scope's store name is preserved")
+
+	assert.False(t, res.Secret, "App Configuration values are never secrets")
+	assert.Equal(t, paramtype.Display(domain.ValueTypePlaintext), res.Type)
+	assert.Equal(t, paramtype.String, res.Type)
 }
