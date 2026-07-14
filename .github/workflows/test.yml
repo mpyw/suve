@@ -475,8 +475,27 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      # V8 coverage is identical across OSes, so collect + upload it once on
+      # ubuntu (COVERAGE=1 turns on the monocart pipeline; see
+      # tests/fixtures/coverage.ts). Other OSes run the plain suite.
+      - name: Run Playwright tests (with coverage)
+        if: matrix.os == 'ubuntu-latest'
+        run: COVERAGE=1 npm test
+
       - name: Run Playwright tests
+        if: matrix.os != 'ubuntu-latest'
         run: npm test
+
+      - name: Upload frontend coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: ./internal/gui/frontend/coverage/lcov.info
+          flags: gui-frontend
+          name: codecov-suve-gui-frontend
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

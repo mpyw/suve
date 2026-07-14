@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/coverage';
 import { setupWailsMocks, type MockState, createAWSIdentityState, createNoAWSIdentityState } from './fixtures/wails-mock';
 
 test.describe('App Navigation', () => {

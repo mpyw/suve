@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures/coverage';
 import { setupWailsMocks, createAzureState, navigateTo } from './fixtures/wails-mock';
 
 // Azure Key Vault soft-deletes secrets like AWS Secrets Manager, so the GUI must

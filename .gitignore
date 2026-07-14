@@ -41,6 +41,10 @@ Thumbs.db
 /internal/gui/frontend/playwright-report/
 /internal/gui/frontend/playwright/.cache/
 
+# Frontend JS/TS coverage (monocart V8 output + its shared cache); only written
+# when COVERAGE=1, never committed.
+/internal/gui/frontend/coverage/
+
 # Demo recording artifacts
 *.webm
 
