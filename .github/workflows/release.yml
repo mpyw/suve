@@ -1,5 +1,9 @@
 name: Release
 
+# Show the target version and selected mode in the run title, e.g.
+# "Release v1.2.3 · Release Only NPM".
+run-name: "Release ${{ inputs.version }} · ${{ inputs.mode }}"
+
 on:
   workflow_dispatch:
     inputs:
@@ -449,7 +453,7 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           VERSION="${VERSION#v}"
-          mkdir -p releases
+          mkdir -p .github/releases
 
           # All builds use goreleaser format: dist/{id}_{goos}_{goarch}/
           for dir in dist/*/; do
@@ -505,18 +509,18 @@ jobs:
               # github backend) get "Permission denied".
               chmod +x "$staging/${dst_binary}.exe"
               cp README.md LICENSE "$staging/"
-              (cd "$staging" && zip -r "../releases/${archive_name}" .)
+              (cd "$staging" && zip -r "../.github/releases/${archive_name}" .)
             else
               cp "$dir/${src_binary}" "$staging/${dst_binary}"
               # Restore the executable bit (see note above).
               chmod +x "$staging/${dst_binary}"
               cp README.md LICENSE "$staging/"
-              tar -czvf "releases/${archive_name}" -C "$staging" .
+              tar -czvf ".github/releases/${archive_name}" -C "$staging" .
             fi
             rm -rf "$staging"
           done
 
-          ls -la releases/
+          ls -la .github/releases/
 
       - name: Create Linux packages (.deb, .rpm)
         env:
@@ -546,8 +550,8 @@ jobs:
             cp "${cli_dir}/suve-cli" ./suve-cli
 
             echo "=== Generating suve-cli packages for ${arch} ==="
-            nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target "releases/suve-cli_${VERSION}-1_${deb_arch}.deb"
-            nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target "releases/suve-cli-${VERSION}-1.${rpm_arch}.rpm"
+            nfpm pkg --config .github/templates/nfpm.yaml --packager deb --target ".github/releases/suve-cli_${VERSION}-1_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target ".github/releases/suve-cli-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve-cli
 
             # --- GUI package (webkit2gtk-4.0) ---
@@ -565,8 +569,8 @@ jobs:
             cp "${gui_dir}/suve" ./suve
 
             echo "=== Generating suve packages for ${arch} (webkit2gtk-4.0) ==="
-            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target "releases/suve_${VERSION}-1_${deb_arch}.deb"
-            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target "releases/suve-${VERSION}-1.${rpm_arch}.rpm"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target ".github/releases/suve_${VERSION}-1_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target ".github/releases/suve-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve
 
             # --- GUI package (webkit2gtk-4.1) ---
@@ -582,19 +586,19 @@ jobs:
             cp "${gui41_dir}/suve" ./suve
 
             echo "=== Generating suve_webkit2_41 packages for ${arch} (webkit2gtk-4.1) ==="
-            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target "releases/suve_webkit2_41_${VERSION}-1_${deb_arch}.deb"
-            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target "releases/suve_webkit2_41-${VERSION}-1.${rpm_arch}.rpm"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target ".github/releases/suve_webkit2_41_${VERSION}-1_${deb_arch}.deb"
+            nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target ".github/releases/suve_webkit2_41-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve
           done
 
           echo "=== Generated packages ==="
-          ls -la releases/*.deb releases/*.rpm
+          ls -la .github/releases/*.deb .github/releases/*.rpm
 
           echo "=== Installing verification tools ==="
           sudo apt-get update && sudo apt-get install -y lintian rpm rpmlint
 
           echo "=== Verifying .deb packages ==="
-          for deb_pkg in releases/*.deb; do
+          for deb_pkg in .github/releases/*.deb; do
             echo "--- ${deb_pkg} ---"
             dpkg-deb -I "${deb_pkg}"
             echo "--- lintian ${deb_pkg} ---"
@@ -604,7 +608,7 @@ jobs:
           done
 
           echo "=== Verifying .rpm packages ==="
-          for rpm_pkg in releases/*.rpm; do
+          for rpm_pkg in .github/releases/*.rpm; do
             echo "--- ${rpm_pkg} ---"
             rpm -qip "${rpm_pkg}"
             echo "--- rpmlint ${rpm_pkg} ---"
@@ -613,7 +617,7 @@ jobs:
 
       - name: Generate checksums
         run: |
-          cd releases
+          cd .github/releases
           sha256sum *.tar.gz *.zip *.deb *.rpm > checksums.txt
           cat checksums.txt
 
@@ -641,7 +645,7 @@ jobs:
           gh release create "$TAG" \
             --title "$TAG" \
             --notes "$FINAL_BODY" \
-            releases/*
+            .github/releases/*
 
       - name: Update Homebrew formulas
         if: ${{ inputs.mode != 'Release Only NPM' }}
@@ -655,12 +659,12 @@ jobs:
           fi
 
           export VERSION="${TAG#v}"
-          export SHA256_DARWIN_AMD64=$(grep "suve_.*_darwin_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_DARWIN_ARM64=$(grep "suve_.*_darwin_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_LINUX_AMD64=$(grep -E "suve_[0-9.]+_linux_amd64\.tar\.gz$" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_LINUX_ARM64=$(grep -E "suve_[0-9.]+_linux_arm64\.tar\.gz$" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_LINUX_CLI_AMD64=$(grep "suve-cli_.*_linux_amd64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_LINUX_CLI_ARM64=$(grep "suve-cli_.*_linux_arm64.tar.gz" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_DARWIN_AMD64=$(grep "suve_.*_darwin_amd64.tar.gz" .github/releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_DARWIN_ARM64=$(grep "suve_.*_darwin_arm64.tar.gz" .github/releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_AMD64=$(grep -E "suve_[0-9.]+_linux_amd64\.tar\.gz$" .github/releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_ARM64=$(grep -E "suve_[0-9.]+_linux_arm64\.tar\.gz$" .github/releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_CLI_AMD64=$(grep "suve-cli_.*_linux_amd64.tar.gz" .github/releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_LINUX_CLI_ARM64=$(grep "suve-cli_.*_linux_arm64.tar.gz" .github/releases/checksums.txt | cut -d' ' -f1)
 
           # Generate both formulas
           envsubst < .github/templates/homebrew-formula.rb > suve.rb
@@ -690,12 +694,12 @@ jobs:
           fi
 
           export VERSION="${TAG#v}"
-          export SHA256_WINDOWS_AMD64=$(grep "windows_amd64.zip" releases/checksums.txt | cut -d' ' -f1)
-          export SHA256_WINDOWS_ARM64=$(grep "windows_arm64.zip" releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_WINDOWS_AMD64=$(grep "windows_amd64.zip" .github/releases/checksums.txt | cut -d' ' -f1)
+          export SHA256_WINDOWS_ARM64=$(grep "windows_arm64.zip" .github/releases/checksums.txt | cut -d' ' -f1)
 
           if [[ -z "$SHA256_WINDOWS_AMD64" || -z "$SHA256_WINDOWS_ARM64" ]]; then
             echo "Error: Could not find SHA256 checksums for Windows builds"
-            cat releases/checksums.txt
+            cat .github/releases/checksums.txt
             exit 1
           fi
 
@@ -710,6 +714,19 @@ jobs:
           git add suve.json
           git commit -m "Update suve to ${VERSION}"
           git push
+
+      - name: Restore npm tooling from the workflow ref
+        if: ${{ inputs.mode != 'Release Without NPM' }}
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          # The build/release steps operate on inputs.version (the tag). A tag
+          # created before npm support lacks .github/npm and the publish script,
+          # so overlay them from the ref this workflow runs on (github.sha =
+          # current main). This lets an older tag be published to npm using the
+          # current tooling with that tag's freshly built binaries.
+          git fetch --no-tags --depth=1 origin "$SHA"
+          git checkout "$SHA" -- .github/scripts/npm-publish.sh .github/npm
 
       - name: Set up Node.js (npm publish)
         if: ${{ inputs.mode != 'Release Without NPM' }}

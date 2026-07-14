@@ -6,14 +6,14 @@
 #   suve                  main package (bin shim + optionalDependencies)
 #   @mpyw/suve-<os>-<cpu> six platform packages, each shipping one prebuilt binary
 #
-# Reuses the archives already built in releases/ by the release workflow:
+# Reuses the archives already built in .github/releases/ by the release workflow:
 #   darwin / windows -> self-contained GUI build (binary: suve / suve.exe)
 #   linux            -> CLI/TUI-only static build; the release workflow already
 #                       renames suve-cli -> suve inside the archive, so the member
 #                       is "suve" even though the archive is named suve-cli_*.
 #
 # Usage: .github/scripts/npm-publish.sh <version-without-v> [--dry-run|--no-provenance]
-#   Requires: node, npm; releases/ populated. A real publish authenticates via
+#   Requires: node, npm; .github/releases/ populated. A real publish authenticates via
 #   whatever the environment provides (OIDC trusted publishing in CI); this
 #   script does not configure auth itself.
 #
@@ -33,7 +33,7 @@ esac
 # This script lives at .github/scripts/; the repo root is two levels up.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NPM_DIR="$REPO_ROOT/.github/npm"
-RELEASES="$REPO_ROOT/releases"
+RELEASES="$REPO_ROOT/.github/releases"
 LICENSE="$REPO_ROOT/LICENSE"
 
 # platform-dir | archive filename | member inside archive | destination binary

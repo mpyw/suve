@@ -53,6 +53,9 @@ Thumbs.db
 /internal/gui/frontend/dist/
 /cover.html
 
+# Release workflow staging dir (archives assembled at release time)
+/.github/releases/
+
 # Windows icon resources (generated during build)
 /cmd/suve/versioninfo.json
 /cmd/suve/appicon.ico

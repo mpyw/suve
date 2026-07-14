@@ -1,5 +1,9 @@
 name: Tag and Release
 
+# Show the target version in the run title, e.g. "Tag and Release v1.2.3".
+# This flow always releases everything (mode: Release All below).
+run-name: "Tag and Release ${{ inputs.version }}"
+
 on:
   workflow_dispatch:
     inputs:
