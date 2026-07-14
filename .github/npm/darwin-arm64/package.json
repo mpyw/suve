@@ -17,7 +17,6 @@
     "arm64"
   ],
   "files": [
-    "bin/suve",
-    "bin/suve.exe"
+    "bin/suve"
   ]
 }
