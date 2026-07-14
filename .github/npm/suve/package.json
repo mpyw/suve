@@ -1,5 +1,5 @@
 {
-  "name": "suve",
+  "name": "@mpyw/suve",
   "version": "0.0.0",
   "description": "Git-like CLI/TUI/GUI for multi-cloud secret and parameter management across AWS, Google Cloud, and Azure",
   "license": "MIT",

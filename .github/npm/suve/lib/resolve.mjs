@@ -47,7 +47,7 @@ export function resolveBinary(platform = process.platform, arch = process.arch) 
       `suve: the platform package "${pkg}" is not installed.\n` +
         `This usually means npm skipped optionalDependencies (for example with ` +
         `--no-optional, or --ignore-scripts on an incompatible host).\n` +
-        `Reinstall to fetch it: npm install suve`
+        `Reinstall to fetch it: npm install @mpyw/suve`
     );
   }
 }
