@@ -5,10 +5,13 @@
 ## Install
 
 ```bash
-npm install -g suve
+npm install -g @mpyw/suve
 # or run without installing
-npx suve --version
+npx @mpyw/suve --version
 ```
+
+After install the command is just `suve` (the package name is scoped, the
+binary is not).
 
 The right prebuilt binary for your platform is installed automatically as an
 optional dependency (`@mpyw/suve-<os>-<cpu>`). No build step, no network fetch

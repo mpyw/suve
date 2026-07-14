@@ -103,17 +103,17 @@ scoop bucket add mpyw https://github.com/mpyw/scoop-bucket.git
 scoop install suve
 ```
 
-### Using [npm](https://www.npmjs.com/package/suve) (macOS/Linux/Windows)
+### Using [npm](https://www.npmjs.com/package/@mpyw/suve) (macOS/Linux/Windows)
 
 ```bash
 # Global install
-npm install -g suve
+npm install -g @mpyw/suve
 
 # Or run without installing
-npx suve --version
+npx @mpyw/suve --version
 ```
 
-The right prebuilt binary is pulled in automatically as a platform-specific optional dependency (`@mpyw/suve-<os>-<cpu>`) — no build step or install-time download. macOS/Windows get the self-contained GUI build; Linux gets the dependency-free CLI/TUI-only static build, so **`--gui` is not available via npm on Linux** (use a package manager or the `.deb`/`.rpm` for the desktop GUI). The `--tui` works on every platform.
+The installed command is just `suve` (only the package name is scoped). The right prebuilt binary is pulled in automatically as a platform-specific optional dependency (`@mpyw/suve-<os>-<cpu>`) — no build step or install-time download. macOS/Windows get the self-contained GUI build; Linux gets the dependency-free CLI/TUI-only static build, so **`--gui` is not available via npm on Linux** (use a package manager or the `.deb`/`.rpm` for the desktop GUI). The `--tui` works on every platform.
 
 <details>
 <summary>Linux (.deb / .rpm)</summary>
