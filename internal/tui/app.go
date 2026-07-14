@@ -931,7 +931,7 @@ func (m *App) pushStagingDetail(req nav.OpenStagingDetail) tea.Cmd {
 func (m *App) applyTargetLine() string {
 	switch m.scope.Provider {
 	case provider.ProviderAWS:
-		parts := []string{"aws"}
+		parts := []string{string(provider.ProviderAWS)}
 		if m.identity != nil {
 			parts = appendKV(parts, "account", m.identity.Account)
 			parts = appendKV(parts, "region", m.identity.Region)
@@ -939,9 +939,9 @@ func (m *App) applyTargetLine() string {
 
 		return strings.Join(parts, " · ")
 	case provider.ProviderGoogleCloud:
-		return strings.Join(appendKV([]string{"googlecloud"}, "project", m.scope.ProjectID), " · ")
+		return strings.Join(appendKV([]string{string(provider.ProviderGoogleCloud)}, "project", m.scope.ProjectID), " · ")
 	case provider.ProviderAzure:
-		parts := []string{"azure"}
+		parts := []string{string(provider.ProviderAzure)}
 		parts = appendKV(parts, "vault", m.scope.VaultName)
 		parts = appendKV(parts, "store", m.scope.StoreName)
 
