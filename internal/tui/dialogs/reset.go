@@ -14,6 +14,9 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
+// statusNothingStaged is the voiced result when a reset finds no staged changes.
+const statusNothingStaged = "Nothing staged."
+
 // resetControl identifies a focusable row in the reset confirmation.
 type resetControl int
 
@@ -237,7 +240,7 @@ func resetSummary(results []data.StagingResetResult) string {
 	}
 
 	if total == 0 {
-		return "Nothing staged."
+		return statusNothingStaged
 	}
 
 	return "Unstaged " + strconv.Itoa(total) + " staged change(s)."
@@ -249,7 +252,7 @@ func resetTypeStatus(r data.StagingResetResult) string {
 	case data.StagingResetUnstagedAll:
 		return "Unstaged " + strconv.Itoa(r.Count) + " staged change(s)."
 	case data.StagingResetNothingStaged:
-		return "Nothing staged."
+		return statusNothingStaged
 	case data.StagingResetUnstaged:
 		return "Unstaged the staged change."
 	case data.StagingResetUnstagedTag:
