@@ -116,7 +116,7 @@ npx @mpyw/suve --version
 The installed command is just `suve` (only the package name is scoped). The right prebuilt binary is pulled in automatically as a platform-specific optional dependency (`@mpyw/suve-<os>-<cpu>`) — no build step or install-time download. macOS/Windows get the self-contained GUI build; Linux gets the dependency-free CLI/TUI-only static build, so **`--gui` is not available via npm on Linux** (use a package manager or the `.deb`/`.rpm` for the desktop GUI). The `--tui` works on every platform.
 
 <details>
-<summary>Linux (.deb / .rpm)</summary>
+<summary><img src="https://cdn.simpleicons.org/linux" height="20" alt=""> Linux (.deb / .rpm)</summary>
 
 Download packages from [GitHub Releases](https://github.com/mpyw/suve/releases):
 
@@ -159,7 +159,7 @@ sudo rpm -i "suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 </details>
 
 <details>
-<summary>Using <code>go install</code> (CLI/TUI only)</summary>
+<summary><img src="https://cdn.simpleicons.org/go" height="20" alt=""> Using <code>go install</code> (CLI/TUI only)</summary>
 
 ```bash
 go install github.com/mpyw/suve/cmd/suve@latest
@@ -170,7 +170,7 @@ go install github.com/mpyw/suve/cmd/suve@latest
 </details>
 
 <details>
-<summary>Using <code>go tool</code> (CLI/TUI only, Go 1.25+)</summary>
+<summary><img src="https://cdn.simpleicons.org/go" height="20" alt=""> Using <code>go tool</code> (CLI/TUI only, Go 1.25+)</summary>
 
 ```bash
 # Add to go.mod as a tool dependency
@@ -183,7 +183,7 @@ go tool suve param show /my/param
 </details>
 
 <details>
-<summary>Building from Source</summary>
+<summary><img src="https://cdn.simpleicons.org/git" height="20" alt=""> Building from Source</summary>
 
 For platforms without pre-built packages (e.g., Arch Linux) or if you need the latest development version with GUI:
 
