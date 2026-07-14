@@ -13,7 +13,7 @@
 > [!NOTE]
 > This project was written by AI (Claude Code).
 
-A **Git-like CLI/TUI/GUI** for AWS Parameter Store / Secrets Manager, Google Cloud Secret Manager, and Azure Key Vault / App Configuration. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
+A **Git-like CLI/TUI/GUI** for <img src="https://github.com/user-attachments/assets/03a2fde5-bf10-45f3-8bf0-722b10b6c97f" height="16" alt=""> AWS Parameter Store / Secrets Manager, <img src="https://github.com/user-attachments/assets/d6e64422-dd06-482b-90a9-e2eb1e8c3de5" height="16" alt=""> Google Cloud Secret Manager, and <img src="https://github.com/user-attachments/assets/5095c477-6f77-4cea-84b6-50eff8e61df4" height="16" alt=""> Azure Key Vault / App Configuration. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
 
 <p align="center">
   <img src="demo/cli-demo.gif" alt="CLI Demo" width="800">
@@ -35,8 +35,8 @@ A **Git-like CLI/TUI/GUI** for AWS Parameter Store / Secrets Manager, Google Clo
 - **Colored diff output**: Easy-to-read unified diff format
 - **Multi-cloud**: [AWS SSM Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html) / [Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html), [Google Cloud Secret Manager](https://cloud.google.com/secret-manager/docs), and [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/) / [App Configuration](https://learn.microsoft.com/en-us/azure/azure-app-configuration/)
 - **Secure staging**: Working staging state is encrypted at rest with a data key stored in the OS keychain (override with `SUVE_STAGING_KEY`). When no key is available (no keychain backend and no `SUVE_STAGING_KEY`), an interactive session falls back to plaintext with a warning, while a non-interactive one refuses to write unencrypted unless `SUVE_STAGING_ALLOW_PLAINTEXT` is set. Exported snapshot files carry a separately passphrase-encrypted payload ([Argon2](https://en.wikipedia.org/wiki/Argon2) + [AES-GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode); an empty passphrase writes plaintext).
-- **TUI mode**: Keyboard-driven terminal UI via `--tui` flag (built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)); ships in every build, including the dependency-free CLI/TUI-only one
-- **GUI mode**: Desktop application via `--gui` flag (built with [Wails](https://wails.io/))
+- **TUI mode**: Keyboard-driven terminal UI via `--tui` flag (built with <img src="https://github.com/user-attachments/assets/ad408275-8799-488f-9303-441e7f869535" height="16" alt=""> [Bubble Tea](https://github.com/charmbracelet/bubbletea)); ships in every build, including the dependency-free CLI/TUI-only one
+- **GUI mode**: Desktop application via `--gui` flag (built with <img src="https://github.com/wailsapp.png" height="16" alt=""> [Wails](https://wails.io/))
 
 ### Metadata terminology
 
@@ -57,7 +57,7 @@ All key=value metadata is unified as **tags**; suve adds no per-provider command
 > [!NOTE]
 > On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI/TUI-only version if you don't need the desktop GUI. The keyboard-driven **TUI (`--tui`) is pure Go and ships in every build**, including the CLI/TUI-only one — only the desktop **GUI (`--gui`)** needs the GTK3/WebKit2GTK dependencies.
 
-### Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
+### <img src="https://mise.jdx.dev/logo.svg" height="28" alt=""> Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
 
 suve is installable directly from GitHub Releases via mise's `github` backend — no extra registry required:
 
@@ -76,7 +76,7 @@ mise use -g "github:mpyw/suve[matching=cli]"
 > "github:mpyw/suve" = { version = "latest", matching_regex = "(darwin|windows|cli_[0-9.]+_linux)" }
 > ```
 
-### Using [aqua](https://aquaproj.github.io/) (macOS/Linux/Windows)
+### <img src="https://raw.githubusercontent.com/aquaproj/aqua/main/logo/aqua_without_text.svg" height="28" alt=""> Using [aqua](https://aquaproj.github.io/) (macOS/Linux/Windows)
 
 suve is available in the [standard aqua registry](https://github.com/aquaproj/aqua-registry):
 
@@ -84,9 +84,9 @@ suve is available in the [standard aqua registry](https://github.com/aquaproj/aq
 aqua g -i mpyw/suve
 ```
 
-The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (supported from v1.6.1).
+The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (so **`--gui` is not available via aqua on Linux**).
 
-### Using [Homebrew](https://brew.sh/) (macOS/Linux)
+### <img src="https://cdn.simpleicons.org/homebrew" height="28" alt=""> Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
 ```bash
 # Full version (CLI/TUI + GUI)
@@ -96,14 +96,14 @@ brew install mpyw/tap/suve
 brew install mpyw/tap/suve-cli
 ```
 
-### Using [Scoop](https://scoop.sh/) (Windows)
+### <img src="https://github.com/ScoopInstaller.png?size=64" height="28" alt=""> Using [Scoop](https://scoop.sh/) (Windows)
 
 ```powershell
 scoop bucket add mpyw https://github.com/mpyw/scoop-bucket.git
 scoop install suve
 ```
 
-### Using [npm](https://www.npmjs.com/package/@mpyw/suve) (macOS/Linux/Windows)
+### <img src="https://cdn.simpleicons.org/npm" height="28" alt=""> Using [npm](https://www.npmjs.com/package/@mpyw/suve) (macOS/Linux/Windows)
 
 ```bash
 # Global install
@@ -113,10 +113,10 @@ npm install -g @mpyw/suve
 npx @mpyw/suve --version
 ```
 
-The installed command is just `suve` (only the package name is scoped). The right prebuilt binary is pulled in automatically as a platform-specific optional dependency (`@mpyw/suve-<os>-<cpu>`) — no build step or install-time download. macOS/Windows get the self-contained GUI build; Linux gets the dependency-free CLI/TUI-only static build, so **`--gui` is not available via npm on Linux** (use a package manager or the `.deb`/`.rpm` for the desktop GUI). The `--tui` works on every platform.
+The right prebuilt binary is pulled in automatically per platform: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (so **`--gui` is not available via npm on Linux**).
 
 <details>
-<summary>Linux (.deb / .rpm)</summary>
+<summary><img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Tux.png" height="20" alt=""> Linux (.deb / .rpm)</summary>
 
 Download packages from [GitHub Releases](https://github.com/mpyw/suve/releases):
 
@@ -159,7 +159,7 @@ sudo rpm -i "suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 </details>
 
 <details>
-<summary>Using <code>go install</code> (CLI/TUI only)</summary>
+<summary><img src="https://cdn.simpleicons.org/go" height="20" alt=""> Using <code>go install</code> (CLI/TUI only)</summary>
 
 ```bash
 go install github.com/mpyw/suve/cmd/suve@latest
@@ -170,7 +170,7 @@ go install github.com/mpyw/suve/cmd/suve@latest
 </details>
 
 <details>
-<summary>Using <code>go tool</code> (CLI/TUI only, Go 1.25+)</summary>
+<summary><img src="https://cdn.simpleicons.org/go" height="20" alt=""> Using <code>go tool</code> (CLI/TUI only, Go 1.25+)</summary>
 
 ```bash
 # Add to go.mod as a tool dependency
@@ -183,7 +183,7 @@ go tool suve param show /my/param
 </details>
 
 <details>
-<summary>Building from Source</summary>
+<summary><img src="https://cdn.simpleicons.org/git" height="20" alt=""> Building from Source</summary>
 
 For platforms without pre-built packages (e.g., Arch Linux) or if you need the latest development version with GUI:
 
