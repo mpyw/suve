@@ -70,6 +70,7 @@ jobs:
   # ===========================================================================
   build-darwin:
     needs: [validate]
+    if: ${{ inputs.mode != 'Release Only NPM' }}
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -131,6 +132,7 @@ jobs:
   # ===========================================================================
   build-linux-amd64:
     needs: [validate]
+    if: ${{ inputs.mode != 'Release Only NPM' }}
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -176,6 +178,7 @@ jobs:
 
   build-linux-arm64:
     needs: [validate]
+    if: ${{ inputs.mode != 'Release Only NPM' }}
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout
@@ -224,6 +227,7 @@ jobs:
   # ===========================================================================
   build-linux-amd64-webkit2_41:
     needs: [validate]
+    if: ${{ inputs.mode != 'Release Only NPM' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -267,6 +271,7 @@ jobs:
 
   build-linux-arm64-webkit2_41:
     needs: [validate]
+    if: ${{ inputs.mode != 'Release Only NPM' }}
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
@@ -313,6 +318,7 @@ jobs:
   # ===========================================================================
   build-linux-cli:
     needs: [validate]
+    if: ${{ inputs.mode != 'Release Only NPM' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -348,6 +354,7 @@ jobs:
   # ===========================================================================
   build-windows:
     needs: [validate]
+    if: ${{ inputs.mode != 'Release Only NPM' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -413,6 +420,9 @@ jobs:
   # Release: Combine all artifacts and publish
   # ===========================================================================
   release:
+    # Full build/assemble/publish path. Release Only NPM skips this entirely and
+    # uses publish-npm-only below (download the tag's released binaries instead).
+    if: ${{ inputs.mode != 'Release Only NPM' }}
     needs:
       - build-darwin
       - build-linux-amd64
@@ -743,5 +753,52 @@ jobs:
           # (id-token: write on this job); provenance is attached automatically.
           # A recent npm is required for both. Each package must have a trusted
           # publisher configured on npmjs.com (owner mpyw/suve, this workflow).
+          npm install -g npm@latest
+          .github/scripts/npm-publish.sh "${TAG#v}"
+
+  # ===========================================================================
+  # Release Only NPM: no rebuild. Publish to npm from the tag's already-released
+  # binaries (downloaded from its GitHub Release), using the current tooling
+  # from this workflow's ref. Runs independently of the build matrix.
+  # ===========================================================================
+  publish-npm-only:
+    if: ${{ inputs.mode == 'Release Only NPM' }}
+    needs: [validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance / OIDC trusted publishing
+    steps:
+      # Default checkout ref = the ref this workflow runs on (current main), so
+      # .github/npm and the publish script are the current tooling — not the tag.
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v6.0.0
+        with:
+          node-version: "22"
+
+      - name: Download released archives for the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.version }}
+        run: |
+          mkdir -p .github/releases
+          # Only the archives npm-publish.sh consumes: macOS/Windows self-contained
+          # builds and the Linux CLI-only static build.
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            -D .github/releases \
+            -p 'suve_*_darwin_*.tar.gz' \
+            -p 'suve_*_windows_*.zip' \
+            -p 'suve-cli_*_linux_*.tar.gz'
+          ls -la .github/releases
+
+      - name: Publish to npm
+        env:
+          TAG: ${{ inputs.version }}
+        run: |
+          # Tokenless OIDC trusted publishing (id-token: write); provenance auto.
           npm install -g npm@latest
           .github/scripts/npm-publish.sh "${TAG#v}"
