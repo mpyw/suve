@@ -1,49 +1,36 @@
 version: 2
 updates:
-  # Go modules
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
-    # Supply-chain hardening: wait until a version has been public for 7 days
-    # before opening a bump PR, so a compromised release (typically yanked
-    # within days) never lands here. Uniform across major/minor/patch.
     cooldown:
       default-days: 7
     groups:
       wailsapp:
-        patterns:
-          - "github.com/wailsapp/*"
-      go-dependencies:
-        patterns:
-          - "*"
-        exclude-patterns:
-          - "github.com/wailsapp/*"
-
-  # npm (GUI frontend)
+        patterns: ["github.com/wailsapp/*"]
+        update-types: ["minor", "patch"]
+      go-minor:
+        patterns: ["*"]
+        exclude-patterns: ["github.com/wailsapp/*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: npm
     directory: /internal/gui/frontend
     schedule:
       interval: weekly
-    # Mirrors the install-time min-release-age=7 in
-    # internal/gui/frontend/.npmrc so automated bumps obey the same 7-day age.
     cooldown:
       default-days: 7
     groups:
-      npm-dependencies:
-        patterns:
-          - "*"
-
-  # GitHub Actions
+      npm-minor:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    # 7-day cooldown before bumping pinned action SHAs (see workflows: actions
-    # are pinned to full commit SHAs with a `# vX` tag comment).
     cooldown:
       default-days: 7
     groups:
-      github-actions:
-        patterns:
-          - "*"
+      actions-minor:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
