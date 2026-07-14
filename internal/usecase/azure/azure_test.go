@@ -245,3 +245,292 @@ func TestListUseCase_SortsNames(t *testing.T) {
 
 	assert.Equal(t, []string{"alpha", "bravo", "charlie"}, names)
 }
+
+// TestListUseCase_WithValue exercises the --with-value parallel fetch path
+// (Execute + buildOutput + fetchValues): every name's value is fetched, and a
+// per-name Get failure is surfaced on that entry's Error field.
+func TestListUseCase_WithValue(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		ListFunc: func(_ context.Context) ([]string, error) {
+			return []string{"alpha", "bravo"}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			if name == "bravo" {
+				return nil, assert.AnError
+			}
+
+			return &domain.Entry{Name: name, Value: "val-" + name}, nil
+		},
+	}
+
+	uc := &azure.ListUseCase{Reader: store}
+	out, err := uc.Execute(t.Context(), azure.ListInput{WithValue: true})
+	require.NoError(t, err)
+	require.Len(t, out.Entries, 2)
+
+	byName := lo.SliceToMap(out.Entries, func(e azure.ListEntry) (string, azure.ListEntry) {
+		return e.Name, e
+	})
+
+	require.NotNil(t, byName["alpha"].Value)
+	assert.Equal(t, "val-alpha", *byName["alpha"].Value)
+	require.NoError(t, byName["alpha"].Error)
+
+	assert.Nil(t, byName["bravo"].Value)
+	require.ErrorIs(t, byName["bravo"].Error, assert.AnError)
+}
+
+// TestListUseCase_Error asserts a List failure is wrapped and propagated.
+func TestListUseCase_Error(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		ListFunc: func(_ context.Context) ([]string, error) {
+			return nil, assert.AnError
+		},
+	}
+
+	uc := &azure.ListUseCase{Reader: store}
+	_, err := uc.Execute(t.Context(), azure.ListInput{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to list entries")
+}
+
+// TestListUseCase_InvalidFilter asserts a bad regex is a usage error.
+func TestListUseCase_InvalidFilter(t *testing.T) {
+	t.Parallel()
+
+	uc := &azure.ListUseCase{Reader: &providermock.Store{}}
+	_, err := uc.Execute(t.Context(), azure.ListInput{Filter: "["})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid filter regex")
+}
+
+func TestDeleteUseCase_GetCurrentValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		getErr    error
+		wantValue string
+		wantErr   error
+	}{
+		{name: "found", wantValue: "current"},
+		{name: "not found yields empty", getErr: provider.ErrNotFound},
+		{name: "other error propagates", getErr: assert.AnError, wantErr: assert.AnError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := &providermock.Store{
+				GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+					if tt.getErr != nil {
+						return nil, tt.getErr
+					}
+
+					return &domain.Entry{Name: name, Value: "current"}, nil
+				},
+			}
+
+			uc := &azure.DeleteUseCase{Store: store}
+			val, err := uc.GetCurrentValue(t.Context(), "my-entry")
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantValue, val)
+		})
+	}
+}
+
+func TestDeleteUseCase_Execute(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		var deleted string
+
+		store := &providermock.Store{
+			DeleteFunc: func(_ context.Context, name string, _ ...provider.DeleteOption) error {
+				deleted = name
+
+				return nil
+			},
+		}
+
+		uc := &azure.DeleteUseCase{Store: store}
+		out, err := uc.Execute(t.Context(), azure.DeleteInput{Name: "my-entry"})
+		require.NoError(t, err)
+		assert.Equal(t, "my-entry", out.Name)
+		assert.Equal(t, "my-entry", deleted)
+	})
+
+	t.Run("error is wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		store := &providermock.Store{
+			DeleteFunc: func(_ context.Context, _ string, _ ...provider.DeleteOption) error {
+				return assert.AnError
+			},
+		}
+
+		uc := &azure.DeleteUseCase{Store: store}
+		_, err := uc.Execute(t.Context(), azure.DeleteInput{Name: "my-entry"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to delete entry")
+	})
+}
+
+// TestRestoreUseCase_Execute covers the Key Vault soft-delete recovery path
+// (delete.go RestoreUseCase.Execute), both success and wrapped-error.
+func TestRestoreUseCase_Execute(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		var restored string
+
+		store := &providermock.Store{
+			RestoreFunc: func(_ context.Context, name string) error {
+				restored = name
+
+				return nil
+			},
+		}
+
+		uc := &azure.RestoreUseCase{Restorer: store}
+		out, err := uc.Execute(t.Context(), azure.RestoreInput{Name: "my-entry"})
+		require.NoError(t, err)
+		assert.Equal(t, "my-entry", out.Name)
+		assert.Equal(t, "my-entry", restored)
+	})
+
+	t.Run("error is wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		store := &providermock.Store{
+			RestoreFunc: func(_ context.Context, _ string) error {
+				return assert.AnError
+			},
+		}
+
+		uc := &azure.RestoreUseCase{Restorer: store}
+		_, err := uc.Execute(t.Context(), azure.RestoreInput{Name: "my-entry"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to restore entry")
+	})
+}
+
+func TestUpdateUseCase_GetCurrentValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		getErr    error
+		wantValue string
+		wantErr   error
+	}{
+		{name: "found", wantValue: "current"},
+		{name: "not found yields empty", getErr: provider.ErrNotFound},
+		{name: "other error propagates", getErr: assert.AnError, wantErr: assert.AnError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := &providermock.Store{
+				GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+					if tt.getErr != nil {
+						return nil, tt.getErr
+					}
+
+					return &domain.Entry{Name: name, Value: "current"}, nil
+				},
+			}
+
+			uc := &azure.UpdateUseCase{Store: store}
+			val, err := uc.GetCurrentValue(t.Context(), "my-entry")
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantValue, val)
+		})
+	}
+}
+
+// TestUpdateUseCase_Execute covers the success path plus the non-not-found read
+// failure and Put failure branches (the not-found branch is TestUpdateUseCase_NotFound).
+func TestUpdateUseCase_Execute(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		var gotType domain.ValueType
+
+		store := &providermock.Store{
+			GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Name: name, Value: "old"}, nil
+			},
+			PutFunc: func(_ context.Context, _, _ string, valueType domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+				gotType = valueType
+
+				return domain.Version{ID: "abc"}, nil
+			},
+		}
+
+		uc := &azure.UpdateUseCase{Store: store}
+		out, err := uc.Execute(t.Context(), azure.UpdateInput{Name: "my-entry", Value: "v", ValueType: domain.ValueTypeSecret})
+		require.NoError(t, err)
+		assert.Equal(t, "abc", out.Version)
+		assert.Equal(t, domain.ValueTypeSecret, gotType)
+	})
+
+	t.Run("read failure propagates unchanged", func(t *testing.T) {
+		t.Parallel()
+
+		store := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return nil, assert.AnError
+			},
+		}
+
+		uc := &azure.UpdateUseCase{Store: store}
+		_, err := uc.Execute(t.Context(), azure.UpdateInput{Name: "my-entry", Value: "v", ValueType: domain.ValueTypePlaintext})
+		require.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("put failure is wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		store := &providermock.Store{
+			GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+				return &domain.Entry{Name: name, Value: "old"}, nil
+			},
+			PutFunc: func(_ context.Context, _, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+				return domain.Version{}, assert.AnError
+			},
+		}
+
+		uc := &azure.UpdateUseCase{Store: store}
+		_, err := uc.Execute(t.Context(), azure.UpdateInput{Name: "my-entry", Value: "v", ValueType: domain.ValueTypePlaintext})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update entry")
+	})
+}
