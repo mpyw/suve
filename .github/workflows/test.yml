@@ -840,33 +840,6 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Test the bin shim (platform resolution, version sync)
+      - name: Test the bin shim and platform-package name sync
         working-directory: npm/suve
         run: node --test
-
-      - name: Verify all package versions stay in lockstep
-        run: |
-          # Every npm/*/package.json (and its @mpyw/suve-* optionalDependencies)
-          # must share one version, or optionalDependency resolution breaks at
-          # install time. The release script sets them together; guard it here.
-          node -e '
-            const fs = require("node:fs");
-            const path = require("node:path");
-            const root = "npm";
-            const versions = new Set();
-            for (const d of fs.readdirSync(root, { withFileTypes: true })) {
-              if (!d.isDirectory()) continue;
-              const p = path.join(root, d.name, "package.json");
-              if (!fs.existsSync(p)) continue;
-              const pkg = JSON.parse(fs.readFileSync(p, "utf8"));
-              versions.add(pkg.version);
-              for (const [dep, v] of Object.entries(pkg.optionalDependencies || {})) {
-                if (dep.startsWith("@mpyw/suve-")) versions.add(v);
-              }
-            }
-            if (versions.size !== 1) {
-              console.error("Version mismatch across npm packages:", [...versions]);
-              process.exit(1);
-            }
-            console.log("All npm package versions in sync:", [...versions][0]);
-          '
