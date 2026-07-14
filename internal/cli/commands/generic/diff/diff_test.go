@@ -3,6 +3,7 @@ package diff_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -705,6 +706,56 @@ func TestRunSecret(t *testing.T) {
 				t.Helper()
 				assert.Contains(t, output, "-not json")
 				assert.Contains(t, output, "+also not json")
+			},
+		},
+		{
+			// --output=json serializes the full (untruncated) version IDs and the
+			// identical flag via aws/secret diffPresenter.RenderJSON.
+			name: "json output serializes version IDs (differing)",
+			opts: genericdiff.Options{Output: output.FormatJSON},
+			store: secretDiffStore(map[string]*domain.Entry{
+				":AWSPREVIOUS": {Name: "my-secret", Value: "old-secret", Version: domain.Version{ID: "prev-version-id-long"}},
+				":AWSCURRENT":  {Name: "my-secret", Value: "new-secret", Version: domain.Version{ID: "curr-version-id-long"}},
+			}, nil),
+			check: func(t *testing.T, out string) {
+				t.Helper()
+
+				var diffOut struct {
+					OldVersionID string `json:"oldVersionId"`
+					NewVersionID string `json:"newVersionId"`
+					Identical    bool   `json:"identical"`
+					Diff         string `json:"diff"`
+				}
+				require.NoError(t, json.Unmarshal([]byte(out), &diffOut))
+				assert.Equal(t, "prev-version-id-long", diffOut.OldVersionID)
+				assert.Equal(t, "curr-version-id-long", diffOut.NewVersionID)
+				assert.False(t, diffOut.Identical)
+				assert.NotEmpty(t, diffOut.Diff)
+			},
+		},
+		{
+			// Same content across two distinct versions: identical is true and the
+			// diff field is omitted, but both version IDs still serialize.
+			name: "json output serializes version IDs (identical)",
+			opts: genericdiff.Options{Output: output.FormatJSON},
+			store: secretDiffStore(map[string]*domain.Entry{
+				":AWSPREVIOUS": {Name: "my-secret", Value: "same-secret", Version: domain.Version{ID: "prev-version-id-long"}},
+				":AWSCURRENT":  {Name: "my-secret", Value: "same-secret", Version: domain.Version{ID: "curr-version-id-long"}},
+			}, nil),
+			check: func(t *testing.T, out string) {
+				t.Helper()
+
+				var diffOut struct {
+					OldVersionID string `json:"oldVersionId"`
+					NewVersionID string `json:"newVersionId"`
+					Identical    bool   `json:"identical"`
+					Diff         string `json:"diff"`
+				}
+				require.NoError(t, json.Unmarshal([]byte(out), &diffOut))
+				assert.Equal(t, "prev-version-id-long", diffOut.OldVersionID)
+				assert.Equal(t, "curr-version-id-long", diffOut.NewVersionID)
+				assert.True(t, diffOut.Identical)
+				assert.Empty(t, diffOut.Diff)
 			},
 		},
 	}
