@@ -6,9 +6,12 @@
 #   - "gcloud"        CLI command group, package names, identifiers
 #   - "GoogleCloud"   Go provider identifier (provider.ProviderGoogleCloud)
 #
-# Two occurrences are allowed:
+# Three occurrences are allowed:
 #   - the third-party emulator image name "gcp-secret-manager-emulator",
 #     which we do not control;
+#   - the exact npm keyword token "gcp" (quoted), a deliberate discoverability
+#     term in npm/**/package.json — npm users search the bare acronym, and JSON
+#     manifests cannot carry the inline marker below;
 #   - any line carrying the inline marker "naming-allow-gcp", used to waive
 #     the ban at a single deliberate site (e.g. a user-facing CLI alias).
 set -euo pipefail
@@ -26,6 +29,7 @@ matches=$(
     ':(exclude)**/package-lock.json' \
     ':(exclude)**/*.lock' \
     | { grep -vi 'gcp-secret-manager-emulator' || true; } \
+    | { grep -v '"gcp"' || true; } \
     | { grep -v 'naming-allow-gcp' || true; }
 )
 
