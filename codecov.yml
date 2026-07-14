@@ -10,3 +10,16 @@ coverage:
     patch:
       default:
         after_n_builds: 7
+
+# Untestable runtime glue: entrypoints and desktop/window bootstrap that can only
+# run against a live terminal, a live Wails window, or the OS — no injectable seam.
+# Excluded so they don't drag the denominator. (Function-level exclusions such as
+# GUI PickExport/ImportPath, GetAWSIdentity, and the TUI run.go Run/awsIdentityFetcher
+# are not expressible here — those files also hold tested code — and are left as an
+# optional refactor.)
+ignore:
+  - "cmd/suve/main.go"
+  - "internal/gui/run.go"
+  - "internal/gui/run_darwin.go"
+  - "internal/gui/run_linux.go"
+  - "internal/gui/run_windows.go"

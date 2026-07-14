@@ -408,6 +408,39 @@ func TestDelete(t *testing.T) {
 	assert.Equal(t, "/my/param", gotName)
 }
 
+// TestDelete_NotFoundMapsSentinel guards the ParameterNotFound→ErrNotFound
+// mapping so callers can treat a missing parameter idempotently.
+func TestDelete_NotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		deleteParameter: func(*ssm.DeleteParameterInput) (*ssm.DeleteParameterOutput, error) {
+			return nil, &types.ParameterNotFound{Message: aws.String("nope")}
+		},
+	})
+
+	err := store.Delete(t.Context(), "/missing")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, provider.ErrNotFound)
+}
+
+// TestDelete_GenericErrorWrapped covers the non-NotFound delete error path: it
+// is wrapped (not mapped to the sentinel) so callers do not treat it as absent.
+func TestDelete_GenericErrorWrapped(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		deleteParameter: func(*ssm.DeleteParameterInput) (*ssm.DeleteParameterOutput, error) {
+			return nil, assert.AnError
+		},
+	})
+
+	err := store.Delete(t.Context(), "/my/param")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, provider.ErrNotFound)
+	assert.Contains(t, err.Error(), "failed to delete parameter")
+}
+
 func TestTagAndUntag(t *testing.T) {
 	t.Parallel()
 
@@ -437,6 +470,65 @@ func TestTagAndUntag(t *testing.T) {
 	require.NoError(t, store.Untag(t.Context(), "/my/param", []string{"env"}))
 	require.NotNil(t, removeIn)
 	assert.Equal(t, []string{"env"}, removeIn.TagKeys)
+}
+
+// TestTag_EmptyIsNoop / TestUntag_EmptyIsNoop cover the early-return guards:
+// with nothing to add/remove the adapter must not call AWS.
+func TestTag_EmptyIsNoop(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		addTags: func(*ssm.AddTagsToResourceInput) (*ssm.AddTagsToResourceOutput, error) {
+			t.Fatal("AddTagsToResource must not be called for an empty tag set")
+
+			return &ssm.AddTagsToResourceOutput{}, nil
+		},
+	})
+
+	require.NoError(t, store.Tag(t.Context(), "/my/param", nil))
+}
+
+func TestUntag_EmptyIsNoop(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		removeTags: func(*ssm.RemoveTagsFromResourceInput) (*ssm.RemoveTagsFromResourceOutput, error) {
+			t.Fatal("RemoveTagsFromResource must not be called for an empty key set")
+
+			return &ssm.RemoveTagsFromResourceOutput{}, nil
+		},
+	})
+
+	require.NoError(t, store.Untag(t.Context(), "/my/param", nil))
+}
+
+// TestTag_ErrorWrapped / TestUntag_ErrorWrapped cover the AWS-error branches.
+func TestTag_ErrorWrapped(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		addTags: func(*ssm.AddTagsToResourceInput) (*ssm.AddTagsToResourceOutput, error) {
+			return nil, assert.AnError
+		},
+	})
+
+	err := store.Tag(t.Context(), "/my/param", map[string]string{"env": "prod"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to add tags")
+}
+
+func TestUntag_ErrorWrapped(t *testing.T) {
+	t.Parallel()
+
+	store := param.New(&mockClient{
+		removeTags: func(*ssm.RemoveTagsFromResourceInput) (*ssm.RemoveTagsFromResourceOutput, error) {
+			return nil, assert.AnError
+		},
+	})
+
+	err := store.Untag(t.Context(), "/my/param", []string{"env"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to remove tags")
 }
 
 func TestCreate_NewReturnsVersion(t *testing.T) {

@@ -3,16 +3,20 @@ package gcloud_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/gcloud"
+	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
 	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
@@ -232,6 +236,28 @@ func TestShowPresenter(t *testing.T) {
 	// No ARN or Stages fields for Google Cloud.
 	assert.NotContains(t, out, "ARN")
 	assert.NotContains(t, out, "Stages")
+
+	// RenderJSON emits the structured view over the same fetched entry.
+	var jsonBuf bytes.Buffer
+	require.NoError(t, presenter.RenderJSON(&jsonBuf, value))
+
+	var showOut struct {
+		Name        string            `json:"name"`
+		Version     string            `json:"version"`
+		State       string            `json:"state"`
+		Description string            `json:"description"`
+		Created     string            `json:"created"`
+		Labels      map[string]string `json:"labels"`
+		Value       string            `json:"value"`
+	}
+	require.NoError(t, json.Unmarshal(jsonBuf.Bytes(), &showOut))
+	assert.Equal(t, "my-secret", showOut.Name)
+	assert.Equal(t, "3", showOut.Version)
+	assert.Equal(t, "enabled", showOut.State)
+	assert.Equal(t, "app credentials", showOut.Description)
+	assert.Equal(t, "s3cr3t", showOut.Value)
+	assert.Equal(t, map[string]string{"env": "prod"}, showOut.Labels)
+	assert.NotEmpty(t, showOut.Created)
 }
 
 func TestLogPresenter(t *testing.T) {
@@ -270,6 +296,50 @@ func TestLogPresenter(t *testing.T) {
 	out := buf.String()
 	assert.Contains(t, out, "Version 2")
 	assert.Contains(t, out, "enabled")
+
+	// RenderValue is a no-op for Google Cloud log (no default value preview).
+	var valueBuf bytes.Buffer
+	presenter.RenderValue(&valueBuf, 0, 0)
+	assert.Empty(t, valueBuf.String())
+
+	// RenderOneline emits a compact per-version line with the state tag.
+	var onelineBuf bytes.Buffer
+	presenter.RenderOneline(&onelineBuf, 0, 0)
+	oneline := onelineBuf.String()
+	assert.Contains(t, oneline, "2")
+	assert.Contains(t, oneline, "enabled")
+
+	// RenderJSON serializes every version; the destroyed version surfaces its
+	// fetch error instead of a value.
+	var jsonBuf bytes.Buffer
+	require.NoError(t, presenter.RenderJSON(&jsonBuf))
+
+	var items []struct {
+		Version string  `json:"version"`
+		State   string  `json:"state"`
+		Created string  `json:"created"`
+		Value   *string `json:"value"`
+		Error   string  `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(jsonBuf.Bytes(), &items))
+	require.Len(t, items, 2)
+	assert.Equal(t, "2", items[0].Version)
+	assert.Equal(t, "enabled", items[0].State)
+	require.NotNil(t, items[0].Value)
+	assert.Equal(t, "v2", *items[0].Value)
+	assert.Empty(t, items[0].Error)
+	assert.Equal(t, "1", items[1].Version)
+	assert.Equal(t, "destroyed", items[1].State)
+	assert.Nil(t, items[1].Value)
+	assert.Contains(t, items[1].Error, "cannot access destroyed version")
+
+	// RenderPatch skips versions whose value is inaccessible: i=0 (v2) has a
+	// destroyed parent (v1), and i=1 (v1) is itself destroyed. Both branches
+	// return without emitting a diff.
+	var patchBuf, patchErrBuf bytes.Buffer
+	presenter.RenderPatch(&patchBuf, &patchErrBuf, 0, false, false)
+	presenter.RenderPatch(&patchBuf, &patchErrBuf, 1, false, false)
+	assert.Empty(t, patchBuf.String())
 }
 
 func TestLogPresenter_Patch(t *testing.T) {
@@ -309,4 +379,130 @@ func TestLogPresenter_Patch(t *testing.T) {
 	assert.Contains(t, out, "my-secret#2")
 	// The initial version renders its all-added creation diff (+v1).
 	assert.Contains(t, out, "+v1")
+}
+
+// diffVersionSpec builds a Google Cloud diff spec pinned to an integer version.
+func diffVersionSpec(v int64) *gcloudversion.Spec {
+	return &gcloudversion.Spec{Name: "my-secret", Absolute: gcloudversion.AbsoluteSpec{Version: lo.ToPtr(v)}}
+}
+
+// diffStore resolves each spec suffix ("#N") to a ref and returns the mapped
+// entry, matching the gcloud diff usecase's resolve-then-get flow.
+func diffStore(byRef map[string]*domain.Entry) *providermock.Store {
+	return &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			return provider.NewVersionRef(spec), nil
+		},
+		GetFunc: func(_ context.Context, _ string, ref provider.VersionRef) (*domain.Entry, error) {
+			entry, ok := byRef[ref.ID()]
+			if !ok {
+				return nil, errors.New("version not found")
+			}
+
+			return entry, nil
+		},
+	}
+}
+
+func runDiff(
+	t *testing.T, presenter genericdiff.Presenter, opts genericdiff.Options,
+) (string, error) {
+	t.Helper()
+
+	var stdout, stderr bytes.Buffer
+
+	r := &genericdiff.Runner{Presenter: presenter, Options: opts, Stdout: &stdout, Stderr: &stderr}
+	err := r.Run(t.Context())
+
+	return stdout.String(), err
+}
+
+func TestDiffPresenter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("text diff between two versions", func(t *testing.T) {
+		t.Parallel()
+
+		store := diffStore(map[string]*domain.Entry{
+			"#1": {Name: "my-secret", Value: "old-value", Version: domain.Version{ID: "1"}},
+			"#2": {Name: "my-secret", Value: "new-value", Version: domain.Version{ID: "2"}},
+		})
+
+		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
+		out, err := runDiff(t, presenter, genericdiff.Options{})
+		require.NoError(t, err)
+		assert.Contains(t, out, "-old-value")
+		assert.Contains(t, out, "+new-value")
+		// Labels carry the Google Cloud "name#version" form.
+		assert.Contains(t, out, "my-secret#1")
+		assert.Contains(t, out, "my-secret#2")
+	})
+
+	t.Run("json output for differing versions", func(t *testing.T) {
+		t.Parallel()
+
+		store := diffStore(map[string]*domain.Entry{
+			"#1": {Name: "my-secret", Value: "old-value", Version: domain.Version{ID: "1"}},
+			"#2": {Name: "my-secret", Value: "new-value", Version: domain.Version{ID: "2"}},
+		})
+
+		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
+		out, err := runDiff(t, presenter, genericdiff.Options{Output: output.FormatJSON})
+		require.NoError(t, err)
+
+		var diffOut struct {
+			OldName    string `json:"oldName"`
+			OldVersion string `json:"oldVersion"`
+			OldValue   string `json:"oldValue"`
+			NewName    string `json:"newName"`
+			NewVersion string `json:"newVersion"`
+			NewValue   string `json:"newValue"`
+			Identical  bool   `json:"identical"`
+			Diff       string `json:"diff"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(out), &diffOut))
+		assert.Equal(t, "my-secret", diffOut.OldName)
+		assert.Equal(t, "1", diffOut.OldVersion)
+		assert.Equal(t, "old-value", diffOut.OldValue)
+		assert.Equal(t, "my-secret", diffOut.NewName)
+		assert.Equal(t, "2", diffOut.NewVersion)
+		assert.Equal(t, "new-value", diffOut.NewValue)
+		assert.False(t, diffOut.Identical)
+		assert.NotEmpty(t, diffOut.Diff)
+	})
+
+	t.Run("fetch error propagates", func(t *testing.T) {
+		t.Parallel()
+
+		// Only version 2 is resolvable; fetching spec1 (#1) fails, so Fetch — and
+		// thus the whole run — returns the error.
+		store := diffStore(map[string]*domain.Entry{
+			"#2": {Name: "my-secret", Value: "new-value", Version: domain.Version{ID: "2"}},
+		})
+
+		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
+		_, err := runDiff(t, presenter, genericdiff.Options{})
+		require.Error(t, err)
+	})
+
+	t.Run("json output for identical versions", func(t *testing.T) {
+		t.Parallel()
+
+		store := diffStore(map[string]*domain.Entry{
+			"#1": {Name: "my-secret", Value: "same-value", Version: domain.Version{ID: "1"}},
+			"#2": {Name: "my-secret", Value: "same-value", Version: domain.Version{ID: "2"}},
+		})
+
+		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
+		out, err := runDiff(t, presenter, genericdiff.Options{Output: output.FormatJSON})
+		require.NoError(t, err)
+
+		var diffOut struct {
+			Identical bool   `json:"identical"`
+			Diff      string `json:"diff"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(out), &diffOut))
+		assert.True(t, diffOut.Identical)
+		assert.Empty(t, diffOut.Diff)
+	})
 }

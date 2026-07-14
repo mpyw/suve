@@ -2,6 +2,7 @@ package passphrase_test
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -139,6 +140,105 @@ func TestPrompter_WarnNonTTY(t *testing.T) {
 	p.WarnNonTTY()
 	assert.Contains(t, stderr.String(), "Non-interactive mode")
 	assert.Contains(t, stderr.String(), "plain text")
+}
+
+// errReader fails on the first Read, standing in for a stdin whose read errors
+// (something other than EOF), so the non-TTY read paths surface the failure.
+type errReader struct{ err error }
+
+func (r errReader) Read([]byte) (int, error) { return 0, r.err }
+
+// dataThenErrReader yields data once, then fails on the next Read. It lets a
+// prompt's first read succeed and its second read (the confirmation) error.
+type dataThenErrReader struct {
+	data []byte
+	err  error
+	done bool
+}
+
+func (r *dataThenErrReader) Read(p []byte) (int, error) {
+	if r.done {
+		return 0, r.err
+	}
+
+	r.done = true
+
+	return copy(p, r.data), nil
+}
+
+func TestPrompter_PromptForEncrypt_EmptyConfirmReadError(t *testing.T) {
+	t.Parallel()
+
+	// Empty passphrase reaches confirmPlainText; the reader is then at EOF, so
+	// the confirmation ReadString errors and the prompt treats it as a decline.
+	p := &passphrase.Prompter{
+		Stdin:  strings.NewReader("\n"),
+		Stdout: &bytes.Buffer{},
+		Stderr: &bytes.Buffer{},
+	}
+
+	_, err := p.PromptForEncrypt()
+	assert.ErrorIs(t, err, passphrase.ErrCancelled)
+}
+
+func TestPrompter_PromptForEncrypt_ReadError(t *testing.T) {
+	t.Parallel()
+
+	p := &passphrase.Prompter{
+		Stdin:  errReader{err: errors.New("boom")},
+		Stdout: &bytes.Buffer{},
+		Stderr: &bytes.Buffer{},
+	}
+
+	_, err := p.PromptForEncrypt()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read passphrase")
+}
+
+func TestPrompter_PromptForEncrypt_ConfirmReadError(t *testing.T) {
+	t.Parallel()
+
+	// The first read yields a non-empty passphrase; the confirmation read then
+	// errors, so the prompt reports a confirmation-read failure.
+	p := &passphrase.Prompter{
+		Stdin:  &dataThenErrReader{data: []byte("secret\n"), err: errors.New("boom")},
+		Stdout: &bytes.Buffer{},
+		Stderr: &bytes.Buffer{},
+	}
+
+	_, err := p.PromptForEncrypt()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read confirmation")
+}
+
+func TestPrompter_PromptForDecrypt_ReadError(t *testing.T) {
+	t.Parallel()
+
+	p := &passphrase.Prompter{
+		Stdin:  errReader{err: errors.New("boom")},
+		Stdout: &bytes.Buffer{},
+		Stderr: &bytes.Buffer{},
+	}
+
+	_, err := p.PromptForDecrypt()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read passphrase")
+}
+
+func TestPrompter_ReadFromStdin_ReadError(t *testing.T) {
+	t.Parallel()
+
+	// A non-EOF read error must propagate rather than be swallowed as empty.
+	sentinel := errors.New("boom")
+
+	p := &passphrase.Prompter{
+		Stdin:  errReader{err: sentinel},
+		Stdout: &bytes.Buffer{},
+		Stderr: &bytes.Buffer{},
+	}
+
+	_, err := p.ReadFromStdin()
+	assert.ErrorIs(t, err, sentinel)
 }
 
 func TestPrompter_ReadFromStdin(t *testing.T) {
