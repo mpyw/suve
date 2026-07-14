@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -400,4 +402,145 @@ func writeTempCache(t *testing.T, entry cacheEntry) string {
 	require.NoError(t, writeCache(path, entry))
 
 	return path
+}
+
+// withReleasesAPIURL points the releases API endpoint at u for the duration of
+// the test and restores it afterward. Tests using it must not run in parallel:
+// releasesAPIURL is a process-wide seam.
+func withReleasesAPIURL(t *testing.T, u string) {
+	t.Helper()
+
+	prev := releasesAPIURL
+	releasesAPIURL = u
+
+	t.Cleanup(func() { releasesAPIURL = prev })
+}
+
+func TestFetchLatestRelease_Valid(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
+	var gotAccept string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAccept = r.Header.Get("Accept")
+
+		_, _ = w.Write([]byte(`{"tag_name": "v9.9.9"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	withReleasesAPIURL(t, srv.URL)
+
+	got, err := fetchLatestRelease(context.Background(), srv.Client())
+	require.NoError(t, err)
+	assert.Equal(t, "v9.9.9", got)
+	assert.Equal(t, "application/vnd.github+json", gotAccept, "request must advertise the GitHub JSON media type")
+}
+
+func TestFetchLatestRelease_Non200(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+
+	withReleasesAPIURL(t, srv.URL)
+
+	_, err := fetchLatestRelease(context.Background(), srv.Client())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected status: 404")
+}
+
+func TestFetchLatestRelease_MalformedJSON(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{not json`))
+	}))
+	t.Cleanup(srv.Close)
+
+	withReleasesAPIURL(t, srv.URL)
+
+	_, err := fetchLatestRelease(context.Background(), srv.Client())
+	require.Error(t, err)
+}
+
+func TestFetchLatestRelease_RequestBuildError(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
+	// An unparseable URL makes http.NewRequestWithContext fail before any I/O.
+	withReleasesAPIURL(t, "://bad")
+
+	_, err := fetchLatestRelease(context.Background(), http.DefaultClient)
+	require.Error(t, err)
+}
+
+func TestFetchLatestRelease_NetworkError(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
+	// A server closed before the request forces client.Do to fail.
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	url := srv.URL
+	srv.Close()
+
+	withReleasesAPIURL(t, url)
+
+	_, err := fetchLatestRelease(context.Background(), http.DefaultClient)
+	require.Error(t, err)
+}
+
+func TestNotice_EndToEnd_RealFetch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"tag_name": "v9.9.9"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	withReleasesAPIURL(t, srv.URL)
+
+	// Isolate HOME so defaultCachePath resolves under a temp dir with no cache,
+	// forcing the real fetch through defaultChecker's fetchLatest closure.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(envOptOut, "") // ensure the check is not opted out
+
+	got := Notice(context.Background(), "v1.0.0")
+	assert.Contains(t, got, "v1.0.0 -> v9.9.9")
+
+	// The fetched result must be cached under ~/.suve.
+	entry, ok := readCache(filepath.Join(home, baseDirName, cacheFileName))
+	require.True(t, ok, "a successful fetch must persist the cache")
+	assert.Equal(t, "v9.9.9", entry.LatestVersion)
+}
+
+func TestDefaultCachePath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	path, err := defaultCachePath()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(home, baseDirName, cacheFileName), path)
+}
+
+func TestNormalize(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty stays empty", in: "", want: ""},
+		{name: "lowercase v preserved", in: "v1.2.3", want: "v1.2.3"},
+		{name: "uppercase V normalized", in: "V1.2.3", want: "v1.2.3"},
+		{name: "bare version gains v", in: "1.2.3", want: "v1.2.3"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, normalize(tt.in))
+		})
+	}
+}
+
+func TestWriteCache_MkdirAllError(t *testing.T) {
+	t.Parallel()
+
+	// A parent that is a regular file makes MkdirAll fail.
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600))
+
+	err := writeCache(filepath.Join(blocker, cacheFileName), cacheEntry{CheckedAt: time.Now()})
+	require.Error(t, err)
 }

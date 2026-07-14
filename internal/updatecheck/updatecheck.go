@@ -37,14 +37,19 @@ const (
 	baseDirName   = ".suve"
 	cacheFileName = "update-check.json"
 
-	// releasesAPIURL is the GitHub API endpoint for the latest release.
-	releasesAPIURL = "https://api.github.com/repos/mpyw/suve/releases/latest"
 	// releasesPageURL is the human-facing releases page shown in the notice.
 	releasesPageURL = "https://github.com/mpyw/suve/releases/latest"
 
 	// devVersion is the sentinel version of local/dev builds, which never nag.
 	devVersion = "dev"
 )
+
+// releasesAPIURL is the GitHub API endpoint for the latest release. It is a var
+// (not a const) solely so tests can point it at an httptest.Server to exercise
+// the real HTTP fetch path; production never reassigns it.
+//
+//nolint:gochecknoglobals // test-overridable endpoint seam; never mutated in production
+var releasesAPIURL = "https://api.github.com/repos/mpyw/suve/releases/latest"
 
 // cacheEntry is the on-disk cache format:
 //
