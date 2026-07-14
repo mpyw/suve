@@ -84,7 +84,7 @@ suve is available in the [standard aqua registry](https://github.com/aquaproj/aq
 aqua g -i mpyw/suve
 ```
 
-The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (supported from v1.6.1).
+The registry picks the right asset per platform automatically: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux, supported from v1.6.1 (so **`--gui` is not available via aqua on Linux**).
 
 ### <img src="https://cdn.simpleicons.org/homebrew" height="28" alt=""> Using [Homebrew](https://brew.sh/) (macOS/Linux)
 
