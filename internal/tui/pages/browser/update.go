@@ -11,6 +11,7 @@ import (
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/nav"
+	"github.com/mpyw/suve/internal/tui/termquirk"
 )
 
 // Update handles forwarded messages. It returns itself as the page (the app
@@ -547,17 +548,17 @@ func (m *Model) handleNavKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 }
 
 // move shifts the focused widget's selection; moving the list reloads the
-// selection's detail/history.
+// selection's detail/history. When the move scrolls the viewport on a terminal
+// that mishandles Bubble Tea's scroll-region optimization (CloudShell), a full
+// repaint is forced so the scroll renders cleanly (see internal/tui/termquirk).
 func (m *Model) move(delta int) tea.Cmd {
 	if m.focus == focusHistory {
-		m.history.Move(delta)
-
-		return nil
+		return termquirk.RepaintOnScroll(m.history.Move(delta), nil)
 	}
 
-	m.list.Move(delta)
+	scrolled := m.list.Move(delta)
 
-	return m.selectionCmd()
+	return termquirk.RepaintOnScroll(scrolled, m.selectionCmd())
 }
 
 // onSelect: from the list it moves focus into the history; from the history in

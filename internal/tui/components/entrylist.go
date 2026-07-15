@@ -93,30 +93,45 @@ func (l *EntryList) SelectedRow() (ListRow, bool) {
 }
 
 // Move changes the selection by delta, clamping at the ends, and keeps the
-// selection visible.
-func (l *EntryList) Move(delta int) {
+// selection visible. It reports whether the viewport actually scrolled (the
+// offset changed), so callers can force a full repaint only when a scroll-region
+// optimization would otherwise fire (see internal/tui/termquirk).
+func (l *EntryList) Move(delta int) bool {
 	if len(l.rows) == 0 {
-		return
+		return false
 	}
 
+	before := l.offset
 	l.selected = clamp(l.selected+delta, 0, len(l.rows)-1)
 	l.ensureVisible()
+
+	return l.offset != before
 }
 
-// SelectIndex selects a specific index (clamped) and keeps it visible.
-func (l *EntryList) SelectIndex(i int) {
+// SelectIndex selects a specific index (clamped) and keeps it visible. It reports
+// whether the offset changed (a click on a partially-visible row scrolls it fully
+// into view), so callers can force a full repaint only then (see termquirk).
+func (l *EntryList) SelectIndex(i int) bool {
 	if len(l.rows) == 0 {
-		return
+		return false
 	}
 
+	before := l.offset
 	l.selected = clamp(i, 0, len(l.rows)-1)
 	l.ensureVisible()
+
+	return l.offset != before
 }
 
 // Scroll moves the viewport by delta rows without moving the selection (wheel
-// scrolling), clamped so it never scrolls past the ends.
-func (l *EntryList) Scroll(delta int) {
+// scrolling), clamped so it never scrolls past the ends. It reports whether the
+// offset actually changed (false when already clamped at an end), so callers can
+// force a full repaint only on a real scroll (see internal/tui/termquirk).
+func (l *EntryList) Scroll(delta int) bool {
+	before := l.offset
 	l.offset = clamp(l.offset+delta, 0, l.maxOffset())
+
+	return l.offset != before
 }
 
 // RowAtLine maps a 0-based content line (relative to the list body, i.e. below

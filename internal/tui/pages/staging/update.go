@@ -7,6 +7,7 @@ import (
 	"github.com/mpyw/suve/internal/tui/components"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/nav"
+	"github.com/mpyw/suve/internal/tui/termquirk"
 )
 
 // Update handles forwarded messages. It returns itself as the page (the app
@@ -99,11 +100,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Up):
 		m.moveSelection(-1)
 
-		return m, nil
+		return m, termquirk.RepaintOnScroll(true, nil)
 	case key.Matches(msg, m.keys.Down):
 		m.moveSelection(1)
 
-		return m, nil
+		return m, termquirk.RepaintOnScroll(true, nil)
 	case key.Matches(msg, viewKey):
 		return m, m.toggleView()
 	case key.Matches(msg, m.keys.Select):

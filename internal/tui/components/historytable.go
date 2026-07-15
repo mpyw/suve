@@ -104,29 +104,45 @@ func (t *HistoryTable) Selected() int {
 	return t.selected
 }
 
-// Move changes the selection by delta, clamped, keeping it visible.
-func (t *HistoryTable) Move(delta int) {
+// Move changes the selection by delta, clamped, keeping it visible. It reports
+// whether the viewport actually scrolled (the offset changed), so callers can
+// force a full repaint only when a scroll-region optimization would otherwise
+// fire (see internal/tui/termquirk).
+func (t *HistoryTable) Move(delta int) bool {
 	if len(t.rows) == 0 {
-		return
+		return false
 	}
 
+	before := t.offset
 	t.selected = clamp(t.selected+delta, 0, len(t.rows)-1)
 	t.ensureVisible()
+
+	return t.offset != before
 }
 
-// SelectIndex selects a specific row index (clamped).
-func (t *HistoryTable) SelectIndex(i int) {
+// SelectIndex selects a specific row index (clamped). It reports whether the
+// offset changed (a click on a partially-visible row scrolls it fully into view),
+// so callers can force a full repaint only then (see termquirk).
+func (t *HistoryTable) SelectIndex(i int) bool {
 	if len(t.rows) == 0 {
-		return
+		return false
 	}
 
+	before := t.offset
 	t.selected = clamp(i, 0, len(t.rows)-1)
 	t.ensureVisible()
+
+	return t.offset != before
 }
 
-// Scroll wheel-scrolls without moving the selection.
-func (t *HistoryTable) Scroll(delta int) {
+// Scroll wheel-scrolls without moving the selection. It reports whether the
+// offset actually changed (false when already clamped at an end), so callers can
+// force a full repaint only on a real scroll (see internal/tui/termquirk).
+func (t *HistoryTable) Scroll(delta int) bool {
+	before := t.offset
 	t.offset = clamp(t.offset+delta, 0, t.maxOffset())
+
+	return t.offset != before
 }
 
 // SetCompare toggles compare mode; leaving it clears the picks.

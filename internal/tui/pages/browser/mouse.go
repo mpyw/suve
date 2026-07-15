@@ -2,6 +2,8 @@ package browser
 
 import (
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/mpyw/suve/internal/tui/termquirk"
 )
 
 // handleMouseClick resolves a left click against the last-rendered hit map and
@@ -37,9 +39,9 @@ func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
 	case regionList:
 		if idx, rowOK := m.list.RowAtLine(dy); rowOK {
 			m.focus = focusList
-			m.list.SelectIndex(idx)
+			scrolled := m.list.SelectIndex(idx)
 
-			return m, m.selectionCmd()
+			return m, termquirk.RepaintOnScroll(scrolled, m.selectionCmd())
 		}
 	case regionHistory:
 		if idx, rowOK := m.history.RowAtLine(dy); rowOK {
@@ -69,19 +71,19 @@ func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (*Model, tea.Cmd) {
 // keyboard space-pick / enter-diff flow, reducing to the same nav.OpenDiff.
 func (m *Model) clickHistoryRow(idx int) tea.Cmd {
 	m.focus = focusHistory
-	m.history.SelectIndex(idx)
+	scrolled := m.history.SelectIndex(idx)
 
 	if !m.history.Compare() {
-		return nil
+		return termquirk.RepaintOnScroll(scrolled, nil)
 	}
 
 	m.history.TogglePick()
 
 	if _, _, ok := m.history.PickedVersions(); ok {
-		return m.openDiff()
+		return termquirk.RepaintOnScroll(scrolled, m.openDiff())
 	}
 
-	return nil
+	return termquirk.RepaintOnScroll(scrolled, nil)
 }
 
 // handleMouseMotion resizes the list while a divider drag is in progress: the
@@ -117,11 +119,13 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) (*Model, tea.Cmd) {
 
 	switch id {
 	case regionList:
-		m.list.Scroll(delta)
+		return m, termquirk.RepaintOnScroll(m.list.Scroll(delta), nil)
 	case regionHistory:
-		m.history.Scroll(delta)
+		return m, termquirk.RepaintOnScroll(m.history.Scroll(delta), nil)
 	case regionDetail, regionValueLabel:
-		return m, m.valuePane.Update(msg)
+		cmd, scrolled := m.valuePane.Update(msg)
+
+		return m, termquirk.RepaintOnScroll(scrolled, cmd)
 	}
 
 	return m, nil

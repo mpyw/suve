@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/mpyw/suve/internal/tui/termquirk"
 )
 
 // handleMouseClick resolves a left click against the last-rendered hit map and
@@ -86,7 +88,10 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) (*Model, tea.Cmd) {
 	m.scroll += delta
 	m.scrollToSelection = false // an explicit scroll is not overridden by the selection
 
-	return m, nil
+	// The staging scroll offset (m.scroll) is clamped later at view time in
+	// clampScroll, so an actual-change signal is not available here; force the
+	// repaint on any wheel when the terminal needs it (see termquirk).
+	return m, termquirk.RepaintOnScroll(true, nil)
 }
 
 // wheelDelta maps a wheel button to a row delta (down positive, up negative).
