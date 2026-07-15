@@ -49,6 +49,11 @@ CODE_SPAN_RE = re.compile(r"(`+)(?:.*?)\1")
 # A <details> summary is not a heading, so MkDocs (and GitHub) give it no anchor.
 # We map its text and inject a matching id so #anchor links to it still resolve.
 SUMMARY_RE = re.compile(r"<summary(\s[^>]*)?>(.*?)</summary>", re.IGNORECASE)
+# Reference-style link definition (`[label]: url`) and usage (`[text][label]`,
+# collapsed `[text][]`). Splitting the README can separate a usage from its
+# definition, which would silently render as plain text; we detect that.
+REF_DEF_RE = re.compile(r"^ {0,3}\[([^\]]+)\]:\s+\S")
+REF_USE_RE = re.compile(r"\[([^\]]+)\]\[([^\]]*)\]")
 
 
 def _load_slugify():
@@ -78,8 +83,13 @@ class Fences:
     def __init__(self) -> None:
         self._char = ""
         self._len = 0
+        self.open_line = 0  # 1-based line where the currently-open fence started
 
-    def is_code(self, line: str) -> bool:
+    @property
+    def open(self) -> bool:
+        return bool(self._char)
+
+    def is_code(self, line: str, lineno: int = 0) -> bool:
         """Feed the next line; return True if it is a fence marker or inside a
         fenced block (i.e. not ordinary prose)."""
         m = FENCE_RE.match(line)
@@ -87,6 +97,7 @@ class Fences:
             if m:
                 self._char = m.group(1)[0]
                 self._len = len(m.group(1))
+                self.open_line = lineno
                 return True
             return False
         # Inside a fence: only a closing marker of the same char, >= the opening
@@ -126,21 +137,36 @@ def apply_outside_code(line: str, fn) -> str:
 def build_readme_pages(readme: str, err):
     """Split the README into (filename, title, body) pages at each `## ` heading,
     and build the anchor→filename map over every heading. The pre-first-section
-    content is the home page (index.md)."""
+    content is the home page (index.md).
+
+    Returns (pages, anchor_page, duplicate_slugs). duplicate_slugs are slugs that
+    occur on more than one heading/summary — a link to one is ambiguous after the
+    split, so rewrite_links treats it as an error rather than guessing.
+    """
     lines = readme.splitlines(keepends=True)
     pages: list[tuple[str, str, list[str]]] = []
     anchor_page: dict[str, str] = {}
+    slug_counts: dict[str, int] = {}
+
+    # Per-page reference-style link bookkeeping (see check below).
+    page_defs: dict[str, set[str]] = {}
+    page_uses: dict[str, set[str]] = {}
+    global_defs: set[str] = set()
 
     current_name = "index.md"
     current_title = "Home"
     current_body: list[str] = []
     fences = Fences()
 
+    def note_slug(slug: str) -> None:
+        slug_counts[slug] = slug_counts.get(slug, 0) + 1
+        anchor_page.setdefault(slug, current_name)
+
     def flush():
         pages.append((current_name, current_title, current_body))
 
-    for line in lines:
-        if fences.is_code(line):
+    for i, line in enumerate(lines, start=1):
+        if fences.is_code(line, i):
             current_body.append(line)
             continue
 
@@ -152,28 +178,69 @@ def build_readme_pages(readme: str, err):
             if current_name == ".md":
                 err(f"README section {current_title!r} slugifies to an empty page name")
             current_body = [line]
-            anchor_page.setdefault(heading_slug(current_title), current_name)
+            note_slug(heading_slug(current_title))
             continue
 
         mh = HEADING_RE.match(line)
         if mh:
-            anchor_page.setdefault(heading_slug(mh.group(2)), current_name)
+            note_slug(heading_slug(mh.group(2)))
 
         for ms in SUMMARY_RE.finditer(line):
-            anchor_page.setdefault(heading_slug(ms.group(2)), current_name)
+            note_slug(heading_slug(ms.group(2)))
 
+        # Reference-style link accounting (ignore matches inside inline code).
+        md = REF_DEF_RE.match(line)
+        if md:
+            label = md.group(1).strip().lower()
+            page_defs.setdefault(current_name, set()).add(label)
+            global_defs.add(label)
+
+        def collect_uses(text: str) -> str:
+            for mu in REF_USE_RE.finditer(text):
+                label = (mu.group(2) or mu.group(1)).strip().lower()
+                page_uses.setdefault(current_name, set()).add(label)
+            return text
+
+        apply_outside_code(line, collect_uses)
         current_body.append(line)
 
     flush()
-    return pages, anchor_page
+
+    if fences.open:
+        err(f"unclosed code fence opened at README line {fences.open_line}")
+
+    # A reference-style usage whose definition landed on a different page renders
+    # as plain text (no <a> for any downstream check to catch) — flag it.
+    for name, uses in page_uses.items():
+        for label in uses:
+            if label in global_defs and label not in page_defs.get(name, set()):
+                err(
+                    f"reference-style link [...][{label}] on page {name} is separated from its "
+                    f"[{label}]: definition by the section split — use an inline link or keep the "
+                    f"definition in the same section"
+                )
+
+    duplicate_slugs = {s for s, n in slug_counts.items() if n > 1}
+    return pages, anchor_page, duplicate_slugs
 
 
-def rewrite_links(body: str, anchor_page: dict[str, str], *, from_readme: bool, err) -> str:
+def rewrite_links(
+    body: str,
+    anchor_page: dict[str, str],
+    *,
+    from_readme: bool,
+    err,
+    duplicates: frozenset[str] = frozenset(),
+) -> str:
     """Rewrite cross-page links so they survive the split. Links inside fenced or
-    inline code are left untouched; an unmapped anchor is a hard error."""
+    inline code are left untouched; an unmapped or ambiguous anchor is an error."""
 
     def map_anchor(anchor: str, whole: str) -> str:
-        page = anchor_page.get(anchor.lower())
+        key = anchor.lower()
+        if key in duplicates:
+            err(f"ambiguous anchor #{anchor} in {whole!r}: the slug occurs on more than one heading")
+            return whole
+        page = anchor_page.get(key)
         if page is None:
             err(f"unmapped anchor #{anchor} in {whole!r}")
             return whole
@@ -264,19 +331,20 @@ def main() -> int:
     SRC.mkdir(parents=True)
 
     readme = (REPO / "README.md").read_text(encoding="utf-8")
-    pages, anchor_page = build_readme_pages(readme, err)
+    pages, anchor_page, duplicates = build_readme_pages(readme, err)
     anchor_page.setdefault("", "index.md")  # bare ../README.md -> home
+    dups = frozenset(duplicates)
 
     nav: list[tuple[str, str]] = []
     for name, title, body in pages:
         claim(name, f"README section {title!r}")
-        text = rewrite_links("".join(body), anchor_page, from_readme=True, err=err)
+        text = rewrite_links("".join(body), anchor_page, from_readme=True, err=err, duplicates=dups)
         (SRC / name).write_text(text, encoding="utf-8")
         nav.append((name, "Home" if name == "index.md" else title))
 
     for path, name, title in discover_doc_pages(err):
         claim(name, f"docs/{path.name}")
-        text = rewrite_links(path.read_text(encoding="utf-8"), anchor_page, from_readme=False, err=err)
+        text = rewrite_links(path.read_text(encoding="utf-8"), anchor_page, from_readme=False, err=err, duplicates=dups)
         (SRC / name).write_text(text, encoding="utf-8")
         nav.append((name, title))
 
