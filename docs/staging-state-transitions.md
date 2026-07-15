@@ -1,4 +1,4 @@
-# Staging State Transitions
+# Stage Lifecycle
 
 > [Back to README](../README.md#staging-workflow)
 
