@@ -675,7 +675,7 @@ For convenience, suve also exposes **bare top-level aliases** — `suve param`, 
 
    | Backend | Active when set |
    |---------|-----------------|
-   | AWS | `AWS_ACCESS_KEY_ID`, `AWS_VAULT`, or `AWS_PROFILE` |
+   | AWS | `AWS_ACCESS_KEY_ID`, `AWS_VAULT`, `AWS_PROFILE`, or an ambient-credential variable from AWS-managed compute (CloudShell / ECS / IRSA — see [Cloud Shell support](#cloud-shell-support)) |
    | Google Cloud | `GOOGLE_CLOUD_PROJECT` |
    | Azure Key Vault (secret) | `AZURE_KEYVAULT_NAME` |
    | Azure App Configuration (param) | `AZURE_APPCONFIG_NAME` |
@@ -689,6 +689,7 @@ Examples (`—` = alias not exposed):
 |-------------|-----------|------------|-----------|
 | nothing set, `~/.aws/credentials` present | `aws` | `aws` | `aws` |
 | `AWS_PROFILE` | `aws` | `aws` | `aws` |
+| AWS CloudShell (`AWS_CONTAINER_CREDENTIALS_FULL_URI`) | `aws` | `aws` | `aws` |
 | `GOOGLE_CLOUD_PROJECT` | — | `gcloud` | `gcloud` |
 | `AZURE_KEYVAULT_NAME` | — | `azure` | `azure` |
 | `AZURE_APPCONFIG_NAME` | `azure` | — | `azure` |
@@ -712,7 +713,7 @@ suve aws param --tui       # a service subgroup preselects that tab (Param / Sec
 suve azure secret --tui    # opens on the Key Vault tab
 ```
 
-- **Unique-provider rule:** bare `suve --tui` follows the same detection as the bare aliases — it launches only when exactly one provider is active across the union of the param/secret/stage axes (AWS is accepted via `~/.aws/credentials` when nothing else is set). With two or more active, it lists the explicit `suve <group> --tui` forms instead; there is no silent priority.
+- **Unique-provider rule:** bare `suve --tui` follows the same detection as the bare aliases — it launches only when exactly one provider is active across the union of the param/secret/stage axes (AWS is also accepted via `~/.aws/credentials`, or an ambient-credential variable in a cloud shell — see [Cloud Shell support](#cloud-shell-support)). With two or more active, it lists the explicit `suve <group> --tui` forms instead; there is no silent priority.
 - **Scope / env:** the TUI consumes the same scope inputs as the CLI — `GOOGLE_CLOUD_PROJECT` for Google Cloud, `--vault-name` / `AZURE_KEYVAULT_NAME` and `--store-name` / `AZURE_APPCONFIG_NAME` (plus `--namespace` / `AZURE_APPCONFIG_NAMESPACE`) for Azure. AWS uses the ambient shared config.
 - **Azure tab gating:** the Param (App Configuration) and Secret (Key Vault) tabs appear only for the services the launch scope resolves — set `--vault-name` for the Key Vault tab, `--store-name` for the App Configuration tab, either or both as needed. The Staging tab is always present.
 - **Shared staging area:** staged edits made in the TUI use the same per-scope staging store as the CLI/GUI, so `suve stage status` sees them and `stage apply` from either side applies the same working set.
@@ -755,6 +756,24 @@ Keymap (the in-app `?` toggles full help, which is the source of truth):
 | Dialogs | `esc` | cancel (press twice to discard an edited form) |
 
 JSON values are always pretty-printed automatically (parity with `--parse-json`), so there is no format toggle. Mutations are **staged by default** where the backend supports staging: completing a create, edit, or delete opens a **Stage / Apply** confirmation popup (`←`/`→` choose, `enter` confirms, `esc` returns to the form); on a backend without staging the write is always immediate. Operation markers and unsupported controls follow each backend's capabilities. Rendering honors `NO_COLOR` and degrades gracefully on narrow terminals.
+
+### Cloud Shell support
+
+suve runs in the browser-based cloud shells, with two environment-specific behaviors worth knowing.
+
+**Provider auto-selection.** In AWS CloudShell, credentials are delivered through a container-credentials endpoint rather than `AWS_ACCESS_KEY_ID` / `AWS_PROFILE` or a `~/.aws/credentials` file, so AWS is detected from the ambient-credential variables that AWS-managed compute sets:
+
+| Variable | Set by |
+|----------|--------|
+| `AWS_CONTAINER_CREDENTIALS_FULL_URI` | CloudShell, App Runner, EKS Pod Identity |
+| `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` | ECS |
+| `AWS_WEB_IDENTITY_TOKEN_FILE` | IRSA / EKS |
+
+Any of these marks AWS active for the bare `param` / `secret` / `stage` aliases (and bare `suve --tui`), exactly like `AWS_PROFILE`. Detection reads environment variables only — no network calls — so shell completion stays instant. Google Cloud Shell and Azure Cloud Shell auto-select through their existing variables (`GOOGLE_CLOUD_PROJECT`; `AZURE_KEYVAULT_NAME` / `AZURE_APPCONFIG_NAME`).
+
+> A bare **EC2 instance profile** delivers credentials only over IMDS, which sets no environment marker, so it is not auto-detected — use the explicit `suve aws ...` group there.
+
+**TUI rendering.** The `--tui` renderer relies on a terminal scroll-region optimization that some browser terminals (notably CloudShell's `xterm.js`) mishandle, corrupting the display while scrolling. suve detects the known cloud shells — `AWS_EXECUTION_ENV=CloudShell`, `CLOUD_SHELL=true` (Google), `AZUREPS_HOST_ENVIRONMENT=cloud-shell/…` (Azure) — and forces a clean full repaint on scroll there (lists, history, value/diff panes, staging, dialogs, and the create/edit/tag forms), leaving native terminals on the fast path untouched. If you hit scroll corruption in another browser-based terminal, set `SUVE_TUI_FULL_REPAINT=1` to opt into the same full-repaint behavior; resizing the terminal once also clears a corrupted frame.
 
 ### Feature support
 
@@ -1024,6 +1043,7 @@ All timestamps are formatted in RFC3339 format with the local timezone offset ap
 | `SUVE_NO_UPDATE_CHECK` | Opt out of the update-check notification |
 | `SUVE_DEBUG` | Enable verbose debug logging (same as the global `--debug` flag); any non-empty value except `0`/`false` enables it |
 | `SUVE_NO_REDACTION` | With debug enabled, log full request/response bodies and unmasked headers — **including secret values and credentials** (same as the global `--no-redaction` flag); parsed like `SUVE_DEBUG` |
+| `SUVE_TUI_FULL_REPAINT` | Force the `--tui` renderer to fully repaint on scroll (any non-empty value), fixing scroll corruption on browser-based terminals that mishandle scroll-region control sequences. Known cloud shells (AWS CloudShell, Google/Azure Cloud Shell) enable this automatically; set it for other affected terminals. See [Cloud Shell support](#cloud-shell-support) |
 
 ### Debugging
 
