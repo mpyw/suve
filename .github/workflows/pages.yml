@@ -60,14 +60,32 @@ jobs:
 
       - name: Configure Pages
         # enablement: true turns Pages on (source = GitHub Actions) on the first run.
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
         with:
           enablement: true
 
+      # actions/upload-pages-artifact internally pins actions/upload-artifact by
+      # tag, which this repo's "actions must be pinned to a full SHA" policy
+      # rejects. So build the same github-pages artifact by hand: tar the site the
+      # way upload-pages-artifact does, then upload it with the repo's SHA-pinned
+      # upload-artifact. deploy-pages consumes the "github-pages" artifact.
+      - name: Archive the site as a Pages artifact
+        run: |
+          tar \
+            --dereference --hard-dereference \
+            --directory .site/out \
+            -cvf "$RUNNER_TEMP/artifact.tar" \
+            --exclude=.git \
+            --exclude=.github \
+            .
+
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          path: .site/out
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
 
   deploy:
     name: Deploy to GitHub Pages
@@ -81,4 +99,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
