@@ -403,11 +403,11 @@ description = "Assemble, strictly build, and link-check the GitHub Pages site in
 run = '''
 python3 -m venv .site/venv
 .site/venv/bin/pip install --quiet --upgrade pip
-.site/venv/bin/pip install --quiet -r scripts/docs-requirements.txt
-.site/venv/bin/python scripts/test_docs_pipeline.py
-.site/venv/bin/python scripts/build_docs_site.py
+.site/venv/bin/pip install --quiet -r .github/scripts/docs-requirements.txt
+.site/venv/bin/python .github/scripts/test-docs-pipeline.py
+.site/venv/bin/python .github/scripts/build-docs-site.py
 DISABLE_MKDOCS_2_WARNING=true .site/venv/bin/mkdocs build --strict
-.site/venv/bin/python scripts/check_site_links.py
+.site/venv/bin/python .github/scripts/check-site-links.py
 '''
 
 [tasks.docs-serve]
@@ -415,8 +415,8 @@ description = "Assemble and serve the docs site locally at http://127.0.0.1:8000
 run = '''
 python3 -m venv .site/venv
 .site/venv/bin/pip install --quiet --upgrade pip
-.site/venv/bin/pip install --quiet -r scripts/docs-requirements.txt
-.site/venv/bin/python scripts/build_docs_site.py
+.site/venv/bin/pip install --quiet -r .github/scripts/docs-requirements.txt
+.site/venv/bin/python .github/scripts/build-docs-site.py
 DISABLE_MKDOCS_2_WARNING=true .site/venv/bin/mkdocs serve --strict
 '''
 
@@ -425,6 +425,6 @@ description = "Unit-test the docs-site pipeline (splitter + link checker)"
 run = '''
 python3 -m venv .site/venv
 .site/venv/bin/pip install --quiet --upgrade pip
-.site/venv/bin/pip install --quiet -r scripts/docs-requirements.txt
-.site/venv/bin/python scripts/test_docs_pipeline.py
+.site/venv/bin/pip install --quiet -r .github/scripts/docs-requirements.txt
+.site/venv/bin/python .github/scripts/test-docs-pipeline.py
 '''

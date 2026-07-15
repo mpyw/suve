@@ -11,10 +11,10 @@ on:
       - demo/**
       - gui/build/appicon.png
       - mkdocs.yml
-      - scripts/build_docs_site.py
-      - scripts/check_site_links.py
-      - scripts/test_docs_pipeline.py
-      - scripts/docs-requirements.txt
+      - .github/scripts/build-docs-site.py
+      - .github/scripts/check-site-links.py
+      - .github/scripts/test-docs-pipeline.py
+      - .github/scripts/docs-requirements.txt
       - .github/workflows/pages.yml
   # Build + validate (no deploy) on PRs that touch the site, to catch breakage early.
   pull_request:
@@ -24,10 +24,10 @@ on:
       - demo/**
       - gui/build/appicon.png
       - mkdocs.yml
-      - scripts/build_docs_site.py
-      - scripts/check_site_links.py
-      - scripts/test_docs_pipeline.py
-      - scripts/docs-requirements.txt
+      - .github/scripts/build-docs-site.py
+      - .github/scripts/check-site-links.py
+      - .github/scripts/test-docs-pipeline.py
+      - .github/scripts/docs-requirements.txt
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -62,19 +62,19 @@ jobs:
         run: |
           python3 -m venv .venv
           .venv/bin/pip install --quiet --upgrade pip
-          .venv/bin/pip install --quiet -r scripts/docs-requirements.txt
+          .venv/bin/pip install --quiet -r .github/scripts/docs-requirements.txt
 
       - name: Unit-test the pipeline
-        run: .venv/bin/python scripts/test_docs_pipeline.py
+        run: .venv/bin/python .github/scripts/test-docs-pipeline.py
 
       - name: Assemble the site source (fails on broken/unmapped links, collisions, missing assets)
-        run: .venv/bin/python scripts/build_docs_site.py
+        run: .venv/bin/python .github/scripts/build-docs-site.py
 
       - name: Build with MkDocs (strict — link/anchor/nav problems fail)
         run: .venv/bin/mkdocs build --strict
 
       - name: Validate rendered links, anchors and assets
-        run: .venv/bin/python scripts/check_site_links.py
+        run: .venv/bin/python .github/scripts/check-site-links.py
 
       # Package the VALIDATED output as the github-pages artifact here, so the
       # privileged deploy job ships exactly what was validated (no rebuild).

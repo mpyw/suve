@@ -16,7 +16,7 @@ site — an unmapped anchor, a missing asset, an output-path collision, an empty
 page slug, or a Git-LFS pointer left un-materialised — is collected and makes the
 script exit non-zero, so CI catches doc-restructuring breakage deterministically
 (no AI/human review). The rendered HTML is validated separately by
-scripts/check_site_links.py after the build.
+.github/scripts/check-site-links.py after the build.
 
 Run via `mise docs-build` / `mise docs-serve`, or directly; it is idempotent.
 """
@@ -28,7 +28,7 @@ import shutil
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]  # .github/scripts/<file> → repo root
 SRC = REPO / ".site" / "src"
 
 # Local assets referenced (by relative path) from the README, copied into the
@@ -54,6 +54,19 @@ SUMMARY_RE = re.compile(r"<summary(\s[^>]*)?>(.*?)</summary>", re.IGNORECASE)
 # definition, which would silently render as plain text; we detect that.
 REF_DEF_RE = re.compile(r"^ {0,3}\[([^\]]+)\]:\s+\S")
 REF_USE_RE = re.compile(r"\[([^\]]+)\]\[([^\]]*)\]")
+# Material's stylesheet forces `.md-typeset img { height: auto }`, which overrides
+# the README's inline width=/height= attributes (logos blow up to full size). Move
+# those attributes into an inline style, which wins over the stylesheet.
+# Match a full <img …> / <div …> open tag, tolerating '>' inside quoted attribute
+# values (so an alt="a > b" cannot truncate the tag mid-attribute).
+IMG_TAG_RE = re.compile(r"""<img\b(?:[^>"']|"[^"]*"|'[^']*')*>""", re.IGNORECASE)
+DIV_OPEN_RE = re.compile(r"""<div\b(?:[^>"']|"[^"]*"|'[^']*')*>""", re.IGNORECASE)
+# Attribute matchers use a non-name lookbehind so data-width / data-style / …
+# are not mistaken for the bare attribute.
+IMG_WIDTH_RE = re.compile(r'(?<![-\w])width\s*=\s*"(\d+)"', re.IGNORECASE)
+IMG_HEIGHT_RE = re.compile(r'(?<![-\w])height\s*=\s*"(\d+)"', re.IGNORECASE)
+HAS_STYLE_RE = re.compile(r'(?<![-\w])style\s*=', re.IGNORECASE)
+HAS_MARKDOWN_ATTR_RE = re.compile(r'(?<![-\w])markdown\s*=', re.IGNORECASE)
 
 
 def _load_slugify():
@@ -120,6 +133,49 @@ def heading_slug(raw: str) -> str:
 
 def section_filename(title: str) -> str:
     return heading_slug(title) + ".md"
+
+
+def size_img(tag: str) -> str:
+    """Move an <img>'s width=/height= attributes into an inline style so Material's
+    `height: auto` rule cannot override them. Leaves tags with an explicit style
+    (or no numeric dimensions) untouched."""
+    if HAS_STYLE_RE.search(tag):
+        return tag
+    dims = []
+    w = IMG_WIDTH_RE.search(tag)
+    h = IMG_HEIGHT_RE.search(tag)
+    if w:
+        dims.append(f"width:{w.group(1)}px")
+    if h:
+        dims.append(f"height:{h.group(1)}px")
+    if not dims:
+        return tag
+    style = f' style="{";".join(dims)}"'
+    if tag.endswith("/>"):
+        return tag[:-2].rstrip() + style + " />"
+    return tag[:-1].rstrip() + style + ">"
+
+
+def add_div_markdown(m: re.Match) -> str:
+    """Add markdown="1" to a <div> open tag that lacks it, so md_in_html renders
+    Markdown inside it."""
+    tag = m.group(0)
+    if HAS_MARKDOWN_ATTR_RE.search(tag):
+        return tag
+    return '<div markdown="1"' + tag[len("<div") :]
+
+
+def promote_headings(text: str) -> str:
+    """Shift every ATX heading up one level (## → #, ### → ##, …) outside code, so
+    a split section page has a single top-level <h1> and MkDocs does not synthesize
+    a second title from the nav. Slugs are text-derived, so anchors are unchanged."""
+    fences = Fences()
+    out: list[str] = []
+    for i, line in enumerate(text.splitlines(keepends=True), start=1):
+        if not fences.is_code(line, i):
+            line = re.sub(r"^(#{2,6})( )", lambda m: "#" * (len(m.group(1)) - 1) + m.group(2), line)
+        out.append(line)
+    return "".join(out)
 
 
 def apply_outside_code(line: str, fn) -> str:
@@ -254,7 +310,12 @@ def rewrite_links(
         return f'<summary{attrs} id="{heading_slug(inner)}">{inner}</summary>'
 
     def rewrite_prose(text: str) -> str:
+        # Honor inline <img> dimensions on every page (README and docs).
+        text = IMG_TAG_RE.sub(lambda m: size_img(m.group(0)), text)
         if from_readme:
+            # Let Markdown inside raw <div> wrappers (centered badges/links) render:
+            # md_in_html only processes it when the block is marked markdown="1".
+            text = DIV_OPEN_RE.sub(add_div_markdown, text)
             # README lives at the repo root; docs/ links become root-level siblings.
             text = re.sub(r"\]\(docs/([^)#]+)((?:#[^)]*)?)\)", r"](\1\2)", text)
             # Give each <details> summary an id so #anchor links to it resolve.
@@ -342,6 +403,10 @@ def main() -> int:
     for name, title, body in pages:
         claim(name, f"README section {title!r}")
         text = rewrite_links("".join(body), anchor_page, from_readme=True, err=err, duplicates=dups, label=name)
+        # Split section pages open at `## `; promote so each has a single <h1>
+        # (the home page already carries the README's own top-level title).
+        if name != "index.md":
+            text = promote_headings(text)
         (SRC / name).write_text(text, encoding="utf-8")
         nav.append((name, "Home" if name == "index.md" else title))
 

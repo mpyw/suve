@@ -4,7 +4,7 @@ site_url: https://mpyw.github.io/suve/
 repo_url: https://github.com/mpyw/suve
 repo_name: mpyw/suve
 
-# The source tree is assembled by scripts/build_docs_site.py (README split into
+# The source tree is assembled by .github/scripts/build-docs-site.py (README split into
 # per-section pages + docs/*.md), and the built site goes to .site/out. Neither
 # directory is committed; both are produced fresh by `mise docs-build` / CI.
 docs_dir: .site/src
@@ -18,7 +18,7 @@ exclude_docs: |
 # --strict (see the Pages workflow and `mise docs-build`), which turns these
 # warnings into a non-zero exit — so a doc restructuring that breaks a Markdown
 # link or cross-page #anchor fails CI deterministically. Raw-HTML links/assets
-# (which MkDocs does not validate) are covered by scripts/check_site_links.py.
+# (which MkDocs does not validate) are covered by .github/scripts/check-site-links.py.
 validation:
   nav:
     omitted_files: warn
@@ -54,13 +54,16 @@ theme:
     - search.highlight
 
 plugins:
+  # Converts GitHub callouts (> [!NOTE]/[!TIP]/…) into Material admonitions;
+  # runs before rendering.
+  - callouts
   - search
   - literate-nav:
       nav_file: SUMMARY.md
 
 markdown_extensions:
   # GitHub-compatible heading slugs, so the README's existing #anchor links keep
-  # resolving after the split (scripts/build_docs_site.py uses the same slugifier).
+  # resolving after the split (.github/scripts/build-docs-site.py uses the same slugifier).
   - toc:
       slugify: !!python/object/apply:pymdownx.slugs.slugify
         kwds:
@@ -71,6 +74,12 @@ markdown_extensions:
   - md_in_html
   - tables
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      # Render ```mermaid fenced blocks (e.g. the staging state diagram) as
+      # diagrams instead of code; Material loads mermaid.js for the .mermaid class.
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
