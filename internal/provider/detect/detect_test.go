@@ -41,6 +41,42 @@ func TestResolve(t *testing.T) {
 			// no aliases at all
 		},
 		{
+			name: "AWS_CONTAINER_CREDENTIALS_FULL_URI set (CloudShell/App Runner/EKS) -> AWS both, no fallback",
+			//nolint:gosec // G101: AWS env var name + placeholder URL, not a real credential
+			vars:          map[string]string{"AWS_CONTAINER_CREDENTIALS_FULL_URI": "http://localhost:1338/..."},
+			credsExist:    true, // must be ignored: env is active
+			wantParam:     aws,
+			wantSecret:    aws,
+			wantParamSet:  []provider.Provider{aws},
+			wantSecretSet: []provider.Provider{aws},
+		},
+		{
+			name:          "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI set (ECS) -> AWS both",
+			vars:          map[string]string{"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/v2/credentials/abc"},
+			wantParam:     aws,
+			wantSecret:    aws,
+			wantParamSet:  []provider.Provider{aws},
+			wantSecretSet: []provider.Provider{aws},
+		},
+		{
+			name: "AWS_WEB_IDENTITY_TOKEN_FILE set (IRSA/EKS) -> AWS both",
+			//nolint:gosec // G101: AWS env var name + placeholder path, not a real credential
+			vars:          map[string]string{"AWS_WEB_IDENTITY_TOKEN_FILE": "/var/run/secrets/token"},
+			wantParam:     aws,
+			wantSecret:    aws,
+			wantParamSet:  []provider.Provider{aws},
+			wantSecretSet: []provider.Provider{aws},
+		},
+		{
+			name: "AWS container creds + GoogleCloud -> secret ambiguous, param=AWS (ambient AWS is a real env signal)",
+			//nolint:gosec // G101: AWS env var name + placeholder URL, not a real credential
+			vars:          map[string]string{"AWS_CONTAINER_CREDENTIALS_FULL_URI": "http://localhost:1338/...", "GOOGLE_CLOUD_PROJECT": "p"},
+			wantParam:     aws,
+			wantSecret:    "",
+			wantParamSet:  []provider.Provider{aws},
+			wantSecretSet: []provider.Provider{aws, gcloud},
+		},
+		{
 			name:           "nothing set, credentials file present -> AWS fallback for both",
 			vars:           nil,
 			credsExist:     true,

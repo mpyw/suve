@@ -1,20 +1,31 @@
 // Package detect resolves which cloud provider should back the flat `param` /
 // `secret` command aliases (and, later, the GUI's initial provider selection),
 // based purely on environment variables. It performs no network calls and no
-// credential-chain resolution, so it is safe to run on every process start.
+// credential-chain resolution, so it is safe to run on every process start
+// (including on the shell-completion path, where speed matters).
 //
 // The rules (per service, param and secret decided independently):
 //
-//   - A provider is "active via env" when its address/identity env var is set:
-//     AWS     — AWS_ACCESS_KEY_ID | AWS_VAULT | AWS_PROFILE (both services)
-//     GoogleCloud     — GOOGLE_CLOUD_PROJECT (secret only)
-//     Azure   — AZURE_KEYVAULT_NAME (secret) / AZURE_APPCONFIG_NAME (param)
+//   - A provider is "active via env" when one of its address/identity/ambient
+//     env vars is set:
+//     AWS — AWS_ACCESS_KEY_ID | AWS_VAULT | AWS_PROFILE, or an ambient-credential
+//     marker set by AWS-managed compute: AWS_CONTAINER_CREDENTIALS_FULL_URI
+//     (CloudShell, App Runner, EKS Pod Identity), AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
+//     (ECS), or AWS_WEB_IDENTITY_TOKEN_FILE (IRSA / EKS). This is what makes the
+//     flat aliases work in AWS CloudShell, where none of the classic vars are set.
+//     GoogleCloud — GOOGLE_CLOUD_PROJECT (secret only)
+//     Azure — AZURE_KEYVAULT_NAME (secret) / AZURE_APPCONFIG_NAME (param)
 //   - A flat alias is exposed for a service only when exactly ONE provider is
 //     active for it. Zero or two-plus active means no alias — the user must use
 //     the explicit group (e.g. `suve aws secret`). There is no priority order.
 //   - AWS-only final fallback: when NO provider is active via env for any
 //     service, AWS is accepted via ~/.aws/credentials so the common "plain AWS"
 //     setup keeps working. If that file is absent too, nothing is aliased.
+//
+// Deliberately NOT detected: an EC2 instance profile with no credentials env var
+// and no shared file delivers credentials only through IMDS, which has no env
+// marker and would require a network probe. Running suve from a bare EC2 host is
+// rare; there the explicit `suve aws ...` group still works.
 package detect
 
 import (
@@ -88,7 +99,12 @@ func Resolve(env Environment) Result {
 
 	awsEnv := getenv("AWS_ACCESS_KEY_ID") != "" ||
 		getenv("AWS_VAULT") != "" ||
-		getenv("AWS_PROFILE") != ""
+		getenv("AWS_PROFILE") != "" ||
+		// Ambient credentials from AWS-managed compute (no classic env var):
+		// CloudShell / App Runner / EKS Pod Identity, ECS, and IRSA / EKS.
+		getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI") != "" ||
+		getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") != "" ||
+		getenv("AWS_WEB_IDENTITY_TOKEN_FILE") != ""
 	gcloudSecret := getenv("GOOGLE_CLOUD_PROJECT") != ""
 	azureSecret := getenv("AZURE_KEYVAULT_NAME") != ""
 	azureParam := getenv("AZURE_APPCONFIG_NAME") != ""
