@@ -957,19 +957,21 @@ Every backend shares one staging workflow, invoked as `suve <provider> stage <se
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| `add` | `--description=<TEXT>` | Stage a new entry |
-| `edit` | `--description=<TEXT>` | Stage a modification (a new version where the backend versions) |
+| `add` | `--description=<TEXT>`¹ | Stage a new entry |
+| `edit` | `--description=<TEXT>`¹ | Stage a modification (a new version where the backend versions) |
 | `delete` | AWS Secrets Manager: `--force`<br>`--recovery-window=<DAYS>` | Stage a deletion |
 | `status` | `--verbose` (`-v`) | Show staged changes |
 | `diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare staged vs the live backend |
-| `apply` | `--yes`<br>`--ignore-conflicts`¹ | Apply staged changes |
-| `reset` | `--all` | Unstage changes |
-| `tag` / `untag`² | `<KEY>=<VALUE>...` / `<KEY>...` | Stage tag additions / removals |
+| `apply` | `--yes`<br>`--ignore-conflicts`² | Apply staged changes |
+| `reset` | `--all` | Unstage; or `reset <name>#<VERSION>` / `<name>~N` restores that live version as the staged value³ |
+| `tag` / `untag` | `<KEY>=<VALUE>...` / `<KEY>...` | Stage tag additions / removals |
 | `export` / `import` | see [Export / Import Commands](#export--import-commands) | Portable snapshot files (per service or whole scope) |
 
-¹ Azure App Configuration is unversioned (last-write-wins), so its `apply` takes `--yes` only — there is no `--ignore-conflicts`.
+¹ Only where the backend stores a description (AWS, Google Cloud); Azure omits the flag. AWS Parameter Store staging additionally accepts its type flags (`--type`, `--secure`).
 
-² `tag` / `untag` are not available for Azure App Configuration staging.
+² `--ignore-conflicts` is ignored by Azure App Configuration, which is unversioned (last-write-wins) and has no modified-after conflict to skip.
+
+³ Restoring a version needs a versioned backend; on unversioned Azure App Configuration `reset` only unstages.
 
 ### Aggregate Stage Commands
 

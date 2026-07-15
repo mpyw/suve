@@ -89,6 +89,11 @@ class NavGroupTests(unittest.TestCase):
         readme = "## A\n```\n<!-- nav-group: G -->\n```\n## B\ny\n"
         self.assertEqual(self._groups(readme), [("index.md", None), ("a.md", None), ("b.md", None)])
 
+    def test_indented_marker_is_not_a_group(self):
+        # A four-space-indented marker is CommonMark indented code, not a directive.
+        readme = "## A\nx\n\n    <!-- nav-group: G -->\n\n## B\ny\n"
+        self.assertEqual(self._groups(readme), [("index.md", None), ("a.md", None), ("b.md", None)])
+
 
 class ComposeNavTests(unittest.TestCase):
     def test_doc_group_inserted_after_named_page_and_contiguous(self):
@@ -98,25 +103,42 @@ class ComposeNavTests(unittest.TestCase):
             ("license.md", "License", None),
         ]
         doc_entries = [
-            ("aws.md", "AWS Commands", "Provider Commands", "command-reference.md"),
-            ("azure.md", "Azure Commands", "Provider Commands", "command-reference.md"),
-            ("gcloud.md", "GCloud", "Provider Commands", "command-reference.md"),
-            ("staging-state-transitions.md", "Staging", None, None),
+            ("aws.md", "AWS Commands", "Command Details", "command-reference.md"),
+            ("gcloud.md", "GCloud", "Command Details", "command-reference.md"),
+            ("azure.md", "Azure Commands", "Command Details", "command-reference.md"),
+            ("staging-state-transitions.md", "Stage Lifecycle", "Command Details", "command-reference.md"),
         ]
         errors: list[str] = []
         nav = b.compose_nav(readme_nav, doc_entries, errors.append)
+        # Grouped docs are inserted after the anchor, contiguous, in input order.
         self.assertEqual(
             [n for n, _t, _g in nav],
-            ["index.md", "command-reference.md", "aws.md", "azure.md", "gcloud.md", "license.md", "staging-state-transitions.md"],
+            ["index.md", "command-reference.md", "aws.md", "gcloud.md", "azure.md", "staging-state-transitions.md", "license.md"],
         )
-        # The grouped docs stay contiguous so literate-nav renders one parent.
-        self.assertEqual([g for _n, _t, g in nav if g], ["Provider Commands"] * 3)
+        self.assertEqual([g for _n, _t, g in nav if g], ["Command Details"] * 4)
         self.assertEqual(errors, [])
 
     def test_missing_after_target_is_an_error(self):
         errors: list[str] = []
         b.compose_nav([("index.md", "Home", None)], [("aws.md", "AWS", "G", "nope.md")], errors.append)
         self.assertTrue(any("not in the nav" in e for e in errors))
+
+    def test_ungrouped_doc_appended_at_tail(self):
+        errors: list[str] = []
+        nav = b.compose_nav([("index.md", "Home", None)], [("x.md", "X", None, None)], errors.append)
+        self.assertEqual([n for n, _t, _g in nav], ["index.md", "x.md"])
+        self.assertEqual(errors, [])
+
+
+class DocNavConfigTests(unittest.TestCase):
+    def test_doc_nav_declares_canonical_group_and_order(self):
+        # main() orders grouped docs by this dict's key order (not alphabetical
+        # discovery order), so the declared order is the source of truth for the
+        # "Command Details" nav group: AWS, Google Cloud, Azure, then lifecycle.
+        self.assertEqual(list(b.DOC_NAV), ["aws.md", "gcloud.md", "azure.md", "staging-state-transitions.md"])
+        for cfg in b.DOC_NAV.values():
+            self.assertEqual(cfg["group"], "Command Details")
+            self.assertEqual(cfg["after"], "command-reference.md")
 
 
 class HeroTests(unittest.TestCase):

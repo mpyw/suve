@@ -72,7 +72,9 @@ EXTRA_CSS = HERE / "docs-extra.css"
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(.*)$")
 # A `<!-- nav-group: NAME -->` line sets the nav group for the H2 pages that
 # follow (sticky until the next marker); "none"/"-"/empty returns to top level.
-NAV_GROUP_RE = re.compile(r"^\s*<!--\s*nav-group:\s*(.*?)\s*-->\s*$", re.IGNORECASE)
+# Must be flush-left: an indented copy is CommonMark indented code, so it stays a
+# literal comment rather than silently changing the nav.
+NAV_GROUP_RE = re.compile(r"^<!--\s*nav-group:\s*(.*?)\s*-->\s*$", re.IGNORECASE)
 # The README's decorative banner heading (raw-HTML <h1>); rewritten to a
 # non-heading on the site so it gets no toc id/permalink.
 HERO_H1_RE = re.compile(r"<h1(\s[^>]*)?>(.*?)</h1>", re.IGNORECASE | re.DOTALL)

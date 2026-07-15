@@ -142,6 +142,7 @@ If only one version/spec is specified, it is compared against the **current** ve
 |--------|------|---------|-------------|
 | full spec | 2 | `my-secret#abc my-secret#def` | Both args include name and version |
 | full spec | 1 | `my-secret#abc` | Compare the specified version with current |
+| mixed | 2 | `my-secret#abc '~'` | First full, second specifier only |
 | partial spec | 2 | `my-secret '~'` | Name + specifier → compare with current |
 | partial spec | 3 | `my-secret '~2' '~'` | Name + two specifiers |
 
@@ -186,7 +187,9 @@ suve azure secret diff --output=json my-secret~ --vault-name my-vault
 ### Identical Version Warning
 
 > [!WARNING]
-> When the two versions have **identical content**, no diff is produced — a warning is printed to stderr with a hint to compare against the previous version (e.g. `suve azure secret diff my-secret~1`).
+> No diff is produced when the two sides have **identical content**; suve distinguishes two cases on stderr:
+> - **Same version on both sides** → `comparing identical versions`, plus a hint to compare against the previous version (e.g. `suve azure secret diff my-secret~1`).
+> - **Distinct versions that happen to match** → `versions differ but content is identical` (no hint).
 
 ### Partial Spec Format
 
