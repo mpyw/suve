@@ -1003,6 +1003,8 @@ Each backend is selected and authenticated from its own environment variables (a
 |----------|-------------|
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | Static credentials |
 | `AWS_PROFILE` | Shared-config profile to load |
+| `AWS_VAULT` | Set by [aws-vault](https://github.com/99designs/aws-vault); also marks AWS active for the bare aliases (see [Provider selection](#provider-selection)) |
+| `AWS_CONTAINER_CREDENTIALS_FULL_URI` / `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` / `AWS_WEB_IDENTITY_TOKEN_FILE` | Ambient credentials on AWS-managed compute (CloudShell, ECS/App Runner, EKS/IRSA); also mark AWS active — see [Cloud Shell support](#cloud-shell-support) |
 | `AWS_REGION` / `AWS_DEFAULT_REGION` | Region |
 
 #### Google Cloud

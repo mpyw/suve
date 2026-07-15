@@ -3,21 +3,31 @@
 fence/heading handling, link rewriting, fail-closed guards, and the link
 checker's URL resolution.
 
-Run: `python scripts/test_docs_pipeline.py` (used by the Pages workflow). These
+Run: `python .github/scripts/test-docs-pipeline.py` (used by the Pages workflow). These
 guard the behaviors most likely to break — or to wrongly pass — under a
 README/docs restructuring.
 """
 
 from __future__ import annotations
 
-import sys
+import importlib.util
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_HERE = Path(__file__).resolve().parent
 
-import build_docs_site as b  # noqa: E402
-import check_site_links as c  # noqa: E402
+
+def _load(mod_name: str, filename: str):
+    """Load a sibling script by path (their filenames use hyphens, so they can't
+    be imported by name)."""
+    spec = importlib.util.spec_from_file_location(mod_name, _HERE / filename)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+b = _load("build_docs_site", "build-docs-site.py")
+c = _load("check_site_links", "check-site-links.py")
 
 
 def resolve(page: str, url: str, existing: set[str]):
@@ -93,6 +103,30 @@ class RewriteTests(unittest.TestCase):
         self.assertIn("(getting-started.md#staging-workflow)", out)
         self.assertIn("(index.md)", out)
         self.assertEqual(errors, [])
+
+    def test_img_size_moved_to_style(self):
+        errors: list[str] = []
+        out = b.rewrite_links('<img src="x.png" height="16" alt="">\n', {}, from_readme=True, err=errors.append)
+        self.assertIn('style="height:16px"', out)
+
+    def test_img_with_gt_in_quoted_attr_not_corrupted(self):
+        errors: list[str] = []
+        out = b.rewrite_links('<img alt="a > b" width="10" src="x.png">\n', {}, from_readme=True, err=errors.append)
+        self.assertIn('alt="a > b"', out)  # attribute preserved intact
+        self.assertIn("width:10px", out)
+
+    def test_data_width_not_mistaken_for_width(self):
+        errors: list[str] = []
+        out = b.rewrite_links('<img data-width="9" src="x.png">\n', {}, from_readme=True, err=errors.append)
+        self.assertNotIn("style=", out)  # no bogus dimension applied
+
+    def test_div_gets_markdown_attr_once(self):
+        errors: list[str] = []
+        out = b.rewrite_links('<div align="center">\n', {}, from_readme=True, err=errors.append)
+        self.assertIn('<div markdown="1" align="center">', out)
+        # A div that already declares markdown is left alone.
+        out2 = b.rewrite_links('<div markdown="span">\n', {}, from_readme=True, err=errors.append)
+        self.assertEqual(out2.count("markdown="), 1)
 
     def test_summary_gets_an_id(self):
         errors: list[str] = []

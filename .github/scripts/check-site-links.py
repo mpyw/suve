@@ -27,7 +27,7 @@ import urllib.parse
 from html.parser import HTMLParser
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]  # .github/scripts/<file> → repo root
 OUT = REPO / ".site" / "out"
 
 # Pages excluded from checking. Empty: the resolver understands the site-base

@@ -1,0 +1,35 @@
+/* Extra site styles, copied into the assembled docs and wired via mkdocs.yml
+   extra_css. Kept minimal — overrides only what the Material defaults get wrong
+   for this project's content. Rules use CSS custom properties so they track the
+   light/dark theme. */
+
+/* Mermaid edge (transition) labels.
+
+   Material renders each mermaid diagram into a CLOSED shadow root
+   (attachShadow({mode:"closed"}) in the theme bundle), so descendant selectors
+   from page CSS can never reach the SVG — .edgeLabel/.labelBkg rules here are
+   silently inert. Custom properties DO inherit across the shadow boundary,
+   and Material's injected mermaid theme paints the edge-label background
+   (the HTML <span class="edgeLabel">/<p> inside the label's foreignObject) with
+   --md-mermaid-label-bg-color, which defaults to the opaque page background —
+   an invisible chip that still hides the arrow underneath.
+
+   Override just that variable, scoped to mermaid blocks, with a GitHub-like
+   semi-transparent chip: ~10% text colour over the page background at 0.8
+   alpha (the 8% + 72% mix weights leave 20% transparent). In the light scheme
+   this lands almost exactly on upstream mermaid's rgba(232,232,232,.8), and it
+   adapts to the slate scheme automatically. Browsers without color-mix() keep
+   Material's opaque default. */
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .md-typeset .mermaid {
+    --md-mermaid-label-bg-color: color-mix(
+      in srgb,
+      var(--md-default-fg-color) 8%,
+      var(--md-default-bg-color) 72%
+    );
+  }
+}
+
+/* Mermaid notes need no override: Material's injected theme already recolours
+   them (node surface = --md-mermaid-node-bg-color), so they track light/dark
+   out of the box. */
