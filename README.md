@@ -773,9 +773,7 @@ Any of these marks AWS active for the bare `param` / `secret` / `stage` aliases 
 
 > A bare **EC2 instance profile** delivers credentials only over IMDS, which sets no environment marker, so it is not auto-detected — use the explicit `suve aws ...` group there.
 
-**TUI rendering.** The `--tui` renderer relies on a terminal scroll-region optimization that some browser terminals (notably CloudShell's `xterm.js`) mishandle, corrupting the display while scrolling. suve detects the known cloud shells — `AWS_EXECUTION_ENV=CloudShell`, `CLOUD_SHELL=true` (Google), `AZUREPS_HOST_ENVIRONMENT=cloud-shell/…` (Azure) — and forces a clean full repaint on scroll there, leaving native terminals on the fast path untouched. If you hit scroll corruption in another browser-based terminal, set `SUVE_TUI_FULL_REPAINT=1` to opt into the same full-repaint behavior; resizing the terminal once also clears a corrupted frame.
-
-> Known limitation: a modal create/edit/tag form that is taller than the terminal can still corrupt while scrolling inside it (this path is not covered by `SUVE_TUI_FULL_REPAINT`). Resize the terminal once to clear it.
+**TUI rendering.** The `--tui` renderer relies on a terminal scroll-region optimization that some browser terminals (notably CloudShell's `xterm.js`) mishandle, corrupting the display while scrolling. suve detects the known cloud shells — `AWS_EXECUTION_ENV=CloudShell`, `CLOUD_SHELL=true` (Google), `AZUREPS_HOST_ENVIRONMENT=cloud-shell/…` (Azure) — and forces a clean full repaint on scroll there (lists, history, value/diff panes, staging, dialogs, and the create/edit/tag forms), leaving native terminals on the fast path untouched. If you hit scroll corruption in another browser-based terminal, set `SUVE_TUI_FULL_REPAINT=1` to opt into the same full-repaint behavior; resizing the terminal once also clears a corrupted frame.
 
 ### Feature support
 
