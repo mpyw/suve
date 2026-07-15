@@ -11,6 +11,18 @@ would break the many intra-README anchor links (`#provider-selection`, …) and
 the docs' `../README.md#…` links, so an anchor→page map is built from every
 heading and used to rewrite those links to the page each section landed on.
 
+Nav grouping: a `<!-- nav-group: NAME -->` comment in the README makes the H2
+sections that follow it nest under a link-less "NAME" parent in the left nav
+(a nested SUMMARY.md for literate-nav); `<!-- nav-group: none -->` (or an empty
+name) returns to the top level. The markers are GitHub-invisible HTML comments
+and are stripped from the built pages. docs/*.md pages default to the end of the
+nav, top-level; DOC_NAV can instead nest one under a group and slot it in after a
+named page (e.g. the provider references right after the Command Reference).
+
+Hero title: the README's decorative banner `<h1>` (the centered project title,
+purely for the repo's landing look) is turned into a `<p class="hero-title">` on
+the site so MkDocs' toc gives it no id/permalink — it is not a navigable heading.
+
 Fail-closed by design: anything that would silently produce a broken or wrong
 site — an unmapped anchor, a missing asset, an output-path collision, an empty
 page slug, or a Git-LFS pointer left un-materialised — is collected and makes the
@@ -36,6 +48,20 @@ SRC = REPO / ".site" / "src"
 # site so those links resolve. Each entry is a path relative to the repo root.
 ASSETS = ["demo", "gui/build/appicon.png"]
 
+# docs/*.md nav placement. By default a doc page is appended at the end of the
+# nav, top-level. An entry here instead nests the page under `group` and inserts
+# it right after the page named by `after` (a built README/doc page filename),
+# keeping the detailed provider references next to the Command Reference summary
+# tables. Same-group entries stay contiguous, so literate-nav renders one parent;
+# within a group they follow this dict's key order (not the alphabetical page
+# discovery order) — hence aws, gcloud, azure, the project's canonical order.
+DOC_NAV = {
+    "aws.md": {"group": "Command Details", "after": "command-reference.md"},
+    "gcloud.md": {"group": "Command Details", "after": "command-reference.md"},
+    "azure.md": {"group": "Command Details", "after": "command-reference.md"},
+    "staging-state-transitions.md": {"group": "Command Details", "after": "command-reference.md"},
+}
+
 # Committed stylesheet copied into the docs source at assets/docs-extra.css and
 # wired via mkdocs.yml extra_css.
 EXTRA_CSS = HERE / "docs-extra.css"
@@ -44,6 +70,21 @@ EXTRA_CSS = HERE / "docs-extra.css"
 # (CommonMark), and closes with a marker of the SAME character and >= the opening
 # length, on a line that is only that marker (+ optional trailing text on open).
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(.*)$")
+# A `<!-- nav-group: NAME -->` line sets the nav group for the H2 pages that
+# follow (sticky until the next marker); "none"/"-"/empty returns to top level.
+NAV_GROUP_RE = re.compile(r"^\s*<!--\s*nav-group:\s*(.*?)\s*-->\s*$", re.IGNORECASE)
+# The README's decorative banner heading (raw-HTML <h1>); rewritten to a
+# non-heading on the site so it gets no toc id/permalink.
+HERO_H1_RE = re.compile(r"<h1(\s[^>]*)?>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
+# Raw-HTML local asset refs (src=/href=) are NOT rewritten by MkDocs for
+# directory URLs, so on a split sub-page (served at /<name>/) a root-relative
+# "demo/x.gif" would 404. Prefix such refs with ../ on sub-pages (the home page
+# stays at the site root and is left as-is). Absolute/protocol/anchor/relative
+# refs are skipped.
+LOCAL_ASSET_RE = re.compile(
+    r'(\b(?:src|href)\s*=\s*")(?!https?:|ftp:|//|/|#|data:|mailto:|tel:|\.{1,2}/)([^"]+")',
+    re.IGNORECASE,
+)
 H2_RE = re.compile(r"^## +(.*\S)\s*$")
 HEADING_RE = re.compile(r"^(#{1,6}) +(.*\S)\s*$")
 MD_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]*\)")
@@ -229,16 +270,17 @@ def apply_outside_code(line: str, fn) -> str:
 
 
 def build_readme_pages(readme: str, err):
-    """Split the README into (filename, title, body) pages at each `## ` heading,
-    and build the anchor→filename map over every heading. The pre-first-section
-    content is the home page (index.md).
+    """Split the README into (filename, title, body, group) pages at each `## `
+    heading, and build the anchor→filename map over every heading. The
+    pre-first-section content is the home page (index.md). `group` is the
+    `<!-- nav-group: … -->` in effect for the page, or None for top-level.
 
     Returns (pages, anchor_page, duplicate_slugs). duplicate_slugs are slugs that
     occur on more than one heading/summary — a link to one is ambiguous after the
     split, so rewrite_links treats it as an error rather than guessing.
     """
     lines = readme.splitlines(keepends=True)
-    pages: list[tuple[str, str, list[str]]] = []
+    pages: list[tuple[str, str, list[str], str | None]] = []
     anchor_page: dict[str, str] = {}
     slug_counts: dict[str, int] = {}
 
@@ -250,6 +292,8 @@ def build_readme_pages(readme: str, err):
     current_name = "index.md"
     current_title = "Home"
     current_body: list[str] = []
+    current_group: str | None = None  # sticky nav group set by markers
+    page_group: str | None = None  # group assigned to the page being built
     fences = Fences()
 
     def note_slug(slug: str) -> None:
@@ -257,12 +301,18 @@ def build_readme_pages(readme: str, err):
         anchor_page.setdefault(slug, current_name)
 
     def flush():
-        pages.append((current_name, current_title, current_body))
+        pages.append((current_name, current_title, current_body, page_group))
 
     for i, line in enumerate(lines, start=1):
         if fences.is_code(line, i):
             current_body.append(line)
             continue
+
+        mg = NAV_GROUP_RE.match(line)
+        if mg:
+            name = mg.group(1).strip()
+            current_group = None if name.lower() in ("", "none", "-") else name
+            continue  # markers are stripped from the built pages
 
         m2 = H2_RE.match(line)
         if m2:
@@ -272,6 +322,7 @@ def build_readme_pages(readme: str, err):
             if current_name == ".md":
                 err(f"README section {current_title!r} slugifies to an empty page name")
             current_body = [line]
+            page_group = current_group
             note_slug(heading_slug(current_title))
             continue
 
@@ -326,9 +377,11 @@ def rewrite_links(
     err,
     duplicates: frozenset[str] = frozenset(),
     label: str = "",
+    sub_page: bool = False,
 ) -> str:
     """Rewrite cross-page links so they survive the split. Links inside fenced or
-    inline code are left untouched; an unmapped or ambiguous anchor is an error."""
+    inline code are left untouched; an unmapped or ambiguous anchor is an error.
+    sub_page prefixes raw-HTML local asset refs with ../ (see LOCAL_ASSET_RE)."""
 
     def map_anchor(anchor: str, whole: str) -> str:
         key = anchor.lower()
@@ -360,6 +413,10 @@ def rewrite_links(
             text = SUMMARY_RE.sub(add_summary_id, text)
             # Same-README anchors now live on whichever split page carries them.
             text = re.sub(r"\]\(#([^)\s]+)\)", lambda m: map_anchor(m.group(1), m.group(0)), text)
+            # A split sub-page is served one directory deep; fix its raw-HTML
+            # local asset refs (Markdown links are already handled by MkDocs).
+            if sub_page:
+                text = LOCAL_ASSET_RE.sub(r"\1../\2", text)
         else:
             # docs/*.md pages: rewrite their links back to the README, tolerating
             # ../README.md, ./README.md, and README.md spellings.
@@ -409,6 +466,37 @@ def discover_doc_pages(err) -> list[tuple[Path, str, str]]:
     return out
 
 
+def compose_nav(readme_nav, doc_entries, err):
+    """Assemble the final nav order. README pages keep their order; each doc page
+    is either appended at the end (top-level) or, per DOC_NAV, nested under a group
+    and inserted just after a named page — with same-group docs kept contiguous so
+    they render under one parent. A missing `after` target is a fail-closed error."""
+    nav = list(readme_nav)  # (name, title, group)
+
+    def insert_index(after_name: str, group: str | None) -> int:
+        for i, (n, _t, _g) in enumerate(nav):
+            if n == after_name:
+                j = i + 1
+                while j < len(nav) and nav[j][2] == group:  # skip contiguous same-group
+                    j += 1
+                return j
+        return -1
+
+    tail = []
+    for name, title, group, after in doc_entries:
+        if after is None:
+            tail.append((name, title, group))
+            continue
+        idx = insert_index(after, group)
+        if idx < 0:
+            err(f"DOC_NAV for {name}: 'after' page {after!r} is not in the nav")
+            tail.append((name, title, group))
+        else:
+            nav.insert(idx, (name, title, group))
+    nav.extend(tail)
+    return nav
+
+
 def is_lfs_pointer(path: Path) -> bool:
     try:
         with path.open("rb") as fh:
@@ -439,26 +527,48 @@ def main() -> int:
     anchor_page.setdefault("", "index.md")  # bare ../README.md -> home
     dups = frozenset(duplicates)
 
-    nav: list[tuple[str, str]] = []
-    for name, title, body in pages:
+    readme_nav: list[tuple[str, str, str | None]] = []
+    for name, title, body, group in pages:
         claim(name, f"README section {title!r}")
-        text = rewrite_links("".join(body), anchor_page, from_readme=True, err=err, duplicates=dups, label=name)
+        text = rewrite_links(
+            "".join(body), anchor_page, from_readme=True, err=err, duplicates=dups, label=name, sub_page=(name != "index.md")
+        )
         # Split section pages open at `## `; promote so each has a single <h1>
         # (the home page already carries the README's own top-level title).
         if name != "index.md":
             text = promote_headings(text)
+        else:
+            # The home page's only heading is the decorative banner <h1>; demote
+            # it to a styled paragraph so MkDocs' toc gives it no id/permalink.
+            text = HERO_H1_RE.sub(r'<p class="hero-title"\1>\2</p>', text)
         text = ensure_blank_before_lists(text)
         (SRC / name).write_text(text, encoding="utf-8")
-        nav.append((name, "Home" if name == "index.md" else title))
+        readme_nav.append((name, "Home" if name == "index.md" else title, group))
 
+    doc_entries: list[tuple[str, str, str | None, str | None]] = []
+    discovered_docs = set()
     for path, name, title in discover_doc_pages(err):
+        discovered_docs.add(name)
         claim(name, f"docs/{path.name}")
         text = rewrite_links(
             path.read_text(encoding="utf-8"), anchor_page, from_readme=False, err=err, duplicates=dups, label=f"docs/{path.name}"
         )
         text = ensure_blank_before_lists(text)
         (SRC / name).write_text(text, encoding="utf-8")
-        nav.append((name, title))
+        cfg = DOC_NAV.get(name, {})
+        doc_entries.append((name, title, cfg.get("group"), cfg.get("after")))
+
+    # Fail closed if a DOC_NAV entry points at a doc that no longer exists (rename).
+    for key in DOC_NAV:
+        if key not in discovered_docs:
+            err(f"DOC_NAV references {key!r}, which is not a docs/*.md page")
+
+    # Within a group, order docs by DOC_NAV declaration (canonical provider order),
+    # not the alphabetical discovery order; ungrouped docs keep discovery order after.
+    doc_order = list(DOC_NAV)
+    doc_entries.sort(key=lambda e: doc_order.index(e[0]) if e[0] in doc_order else len(doc_order))
+
+    nav = compose_nav(readme_nav, doc_entries, err)
 
     for asset in ASSETS:
         src = REPO / asset
@@ -484,9 +594,20 @@ def main() -> int:
     else:
         err(f"extra stylesheet not found: {EXTRA_CSS.relative_to(REPO)}")
 
-    # literate-nav reads this SUMMARY.md for page order/titles.
-    summary = "".join(f"- [{title}]({name})\n" for name, title in nav)
-    (SRC / "SUMMARY.md").write_text(summary, encoding="utf-8")
+    # literate-nav reads this SUMMARY.md for page order/titles. A page carrying a
+    # nav group nests under a link-less parent; consecutive same-group pages share
+    # one parent (README order keeps them adjacent).
+    summary_lines: list[str] = []
+    prev_group: str | None = None
+    for name, title, group in nav:
+        if group:
+            if group != prev_group:
+                summary_lines.append(f"- {group}\n")
+            summary_lines.append(f"    - [{title}]({name})\n")
+        else:
+            summary_lines.append(f"- [{title}]({name})\n")
+        prev_group = group
+    (SRC / "SUMMARY.md").write_text("".join(summary_lines), encoding="utf-8")
 
     if errors:
         print(f"build_docs_site: {len(errors)} error(s):", file=sys.stderr)

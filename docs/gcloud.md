@@ -3,7 +3,7 @@
 [<- Back to README](../README.md) | [AWS Commands](aws.md) | [Azure Commands](azure.md)
 
 > [!TIP]
-> Invoke as `suve gcloud secret` (`secrets`, `sm`); the group also answers to `gcp` / `google`, and `stage` to `stg`. <!-- naming-allow-gcp --> You can drop the `gcloud` prefix (`suve secret`) when Google Cloud is the only active secret provider — see [Provider selection](../README.md#provider-selection).
+> Invoke as `suve gcloud secret` (`secrets`, `sm`); the group also answers to `gcp` / `google`, and `stage` to `stg`. <!-- naming-allow-gcp --> You can drop the `gcloud` prefix (`suve secret`) when Google Cloud is the only active secret provider — see [Bare Aliases](../README.md#bare-aliases).
 
 Primary command: `gcloud secret`
 
@@ -13,57 +13,6 @@ Primary command: `gcloud secret`
 > Google Cloud secrets are integer-versioned (`1`, `2`, `3`, ... or `latest`) and have **no staging labels**.
 
 Google Cloud also supports the local **staging workflow** via `suve gcloud stage` (or the bare `suve stage` alias when Google Cloud is the only active staging backend). Because Google Cloud is secret-only, `gcloud stage` operates on secrets directly: `add`, `edit`, `delete`, `status`, `diff`, `apply`, `reset`, `tag`, `untag`, `export`, and `import`. Since Secret Manager versions are immutable, a staged `edit` applies as a new version, and there are no force / recovery-window delete options. `stage add` / `stage edit` accept `--description` (stored as the `description` annotation, applied on `stage apply`). See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
-
-## Authentication and Configuration
-
-| Setting | Flag | Environment variable |
-|---------|------|----------------------|
-| Project | `--project` | `GOOGLE_CLOUD_PROJECT` |
-
-Authentication uses **Application Default Credentials (ADC)**. The simplest way to set this up locally is:
-
-```bash
-gcloud auth application-default login
-```
-
-The project id can be supplied per-invocation with `--project` or globally via the `GOOGLE_CLOUD_PROJECT` environment variable:
-
-```bash
-# Via flag
-suve gcloud --project my-project secret list
-
-# Via environment variable
-export GOOGLE_CLOUD_PROJECT=my-project
-suve gcloud secret list
-```
-
-## TUI
-
-Launch the terminal UI with `suve gcloud --tui` (or bare `suve --tui` when Google Cloud is the only active provider). It consumes the same project scope as the CLI — `--project` or `GOOGLE_CLOUD_PROJECT` — and offers the Secret tab (Google Cloud has no param service). See [TUI mode](../README.md#tui-mode) for the keymap.
-
-## Version Specification
-
-Google Cloud secrets are integer-versioned. The version spec is:
-
-```
-<name>[#VERSION][~SHIFT]*
-```
-
-| Specifier | Description | Example |
-|-----------|-------------|---------|
-| `#VERSION` | Specific version by integer number | `#3` = version 3 |
-| `~` | One version ago | `~` = latest - 1 |
-| `~N` | N versions ago | `~2` = latest - 2 |
-
-Specifiers can be combined: `my-secret#5~2` means "version 5, then 2 back".
-
-> [!NOTE]
-> Unlike AWS Secrets Manager, Google Cloud Secret Manager has **no `:LABEL` syntax**. Versions are addressed only by integer number, `latest`, or shift.
-
-> [!TIP]
-> `~` without a number means `~1`. You can chain shifts: `~~` = `~1~1` = `~2`. Shift counts **all** versions (any state, newest first) — the same anchor `latest` uses — so a `~N` never skips disabled or destroyed versions.
-
----
 
 ## suve gcloud secret show
 
@@ -178,6 +127,15 @@ suve gcloud secret diff [options] <spec1> [spec2] | <name> <version1> [version2]
 
 If only one version/spec is specified, it is compared against the **latest** version.
 
+### Argument Formats
+
+| Format | Args | Example | Description |
+|--------|------|---------|-------------|
+| full spec | 2 | `my-secret#1 my-secret#2` | Both args include name and version |
+| full spec | 1 | `my-secret#1` | Compare the specified version with latest |
+| partial spec | 2 | `my-secret '#1'` | Name + specifier → compare with latest |
+| partial spec | 3 | `my-secret '#1' '#2'` | Name + two specifiers |
+
 ### Version Specifiers
 
 | Specifier | Description | Example |
@@ -185,6 +143,14 @@ If only one version/spec is specified, it is compared against the **latest** ver
 | `#VERSION` | Specific version by integer number | `#3` |
 | `~` | One version ago | `~` = latest - 1 |
 | `~N` | N versions ago | `~2` = latest - 2 |
+
+Specifiers can be combined: `my-secret#5~2` means "version 5, then 2 back".
+
+> [!NOTE]
+> Unlike AWS Secrets Manager, Google Cloud Secret Manager has **no `:LABEL` syntax**. Versions are addressed only by integer number, `latest`, or shift.
+
+> [!TIP]
+> `~` without a number means `~1`. You can chain shifts: `~~` = `~1~1` = `~2`. Shift counts **all** versions (any state, newest first) — the same anchor `latest` uses — so a `~N` never skips disabled or destroyed versions.
 
 **Options:**
 
@@ -194,7 +160,7 @@ If only one version/spec is specified, it is compared against the **latest** ver
 | `--no-pager` | - | `false` | Disable pager output |
 | `--output` | - | `text` | Output format: `text` (default) or `json` |
 
-**Examples:**
+### Examples
 
 ```bash
 # Compare previous with latest
@@ -210,8 +176,23 @@ suve gcloud secret diff --parse-json my-secret~
 suve gcloud secret diff --output=json my-secret~
 ```
 
-> [!TIP]
-> Use full spec format (embedding `#`/`~` within the name) to avoid shell quoting issues.
+### Identical Version Warning
+
+> [!WARNING]
+> When the two versions have **identical content**, no diff is produced — a warning is printed to stderr with a hint to compare against the previous version (e.g. `suve gcloud secret diff my-secret~1`).
+
+### Partial Spec Format
+
+> [!IMPORTANT]
+> In partial spec format, quote specifiers to prevent shell interpretation — `~` expands to `$HOME` and `#` starts a comment in bash/zsh. Full spec format (embedding `#`/`~` within the name) needs no quoting.
+
+```bash
+# Partial spec — quote the specifier
+suve gcloud secret diff my-secret '~'
+
+# Full spec — no quoting needed
+suve gcloud secret diff my-secret#1 my-secret#2
+```
 
 ---
 

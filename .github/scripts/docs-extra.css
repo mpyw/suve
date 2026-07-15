@@ -33,3 +33,22 @@
 /* Mermaid notes need no override: Material's injected theme already recolours
    them (node surface = --md-mermaid-node-bg-color), so they track light/dark
    out of the box. */
+
+/* The left sidebar repeats `site_name` ("suve") as a drawer header, duplicating
+   the site title already shown in the top header bar. Hide just that top-level
+   title; nested section titles are deeper .md-nav__title nodes and are left
+   alone by the direct-child selector. */
+.md-nav--primary > .md-nav__title {
+  display: none;
+}
+
+/* The home page's banner title: the README's decorative <h1>, demoted to a
+   non-heading <p class="hero-title"> on the site by build-docs-site.py so
+   MkDocs' toc gives it no id/permalink. Restore the large, heading-like look
+   (the surrounding <div align="center"> handles centering). */
+.md-typeset .hero-title {
+  margin: 0.5rem 0 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
