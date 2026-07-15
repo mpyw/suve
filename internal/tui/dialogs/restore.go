@@ -127,7 +127,7 @@ func (d *restoreForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case huh.StateNormal:
 	}
 
-	return d, cmd
+	return d, repaintFormScroll(d.form, msg, cmd)
 }
 
 func (d *restoreForm) submit() tea.Cmd {

@@ -515,7 +515,7 @@ func (d *entryForm) forwardToForm(msg tea.Msg) (Model, tea.Cmd) {
 	case huh.StateNormal:
 	}
 
-	return d, cmd
+	return d, repaintFormScroll(d.form, msg, cmd)
 }
 
 // multilineFieldKey returns the key of the focused multi-line field ("value" or

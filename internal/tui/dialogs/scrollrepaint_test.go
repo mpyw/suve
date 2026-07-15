@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	huh "charm.land/huh/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -67,4 +68,52 @@ func TestScrollViewportGatesOnOffsetChange(t *testing.T) {
 	assert.True(t, hasClearScreen(scrollViewport(&vp, tea.KeyPressMsg{Code: tea.KeyPgDown})),
 		"scrolling from the top must force a repaint in CloudShell")
 	assert.Positive(t, vp.YOffset(), "sanity: the viewport actually scrolled")
+}
+
+// TestFormKeyMayScroll pins the field-type-aware decision: a single-line Input
+// scrolls only when focus moves (so typing never repaints), while a multi-line
+// Text may scroll on any key.
+func TestFormKeyMayScroll(t *testing.T) {
+	t.Parallel()
+
+	inputForm := huh.NewForm(huh.NewGroup(huh.NewInput().Key("name")))
+	inputForm.Init()
+
+	textForm := huh.NewForm(huh.NewGroup(huh.NewText().Key("body")))
+	textForm.Init()
+
+	tab := tea.KeyPressMsg{Code: tea.KeyTab}
+	typing := tea.KeyPressMsg{Code: 'a', Text: "a"}
+
+	assert.True(t, formKeyMayScroll(inputForm, tab), "Input: a focus-move key can scroll")
+	assert.False(t, formKeyMayScroll(inputForm, typing), "Input: typing cannot scroll")
+	assert.True(t, formKeyMayScroll(textForm, tab), "Text: focus-move key can scroll")
+	assert.True(t, formKeyMayScroll(textForm, typing), "Text: typing can wrap-scroll")
+}
+
+// TestRepaintFormScroll pins the gating + ordering: on an affected terminal a
+// scroll-capable key forces a repaint (via tea.Sequence, so it lands after the
+// async focus move), while typing in an Input, a non-key message, or a native
+// terminal do not.
+func TestRepaintFormScroll(t *testing.T) {
+	t.Setenv("CLOUD_SHELL", "")
+	t.Setenv("AZUREPS_HOST_ENVIRONMENT", "")
+	t.Setenv("SUVE_TUI_FULL_REPAINT", "")
+
+	form := huh.NewForm(huh.NewGroup(huh.NewInput().Key("name")))
+	form.Init()
+
+	tab := tea.KeyPressMsg{Code: tea.KeyTab}
+	typing := tea.KeyPressMsg{Code: 'a', Text: "a"}
+
+	// Native terminal: never repaints, even on a focus-move key.
+	t.Setenv("AWS_EXECUTION_ENV", "")
+	assert.False(t, hasClearScreen(repaintFormScroll(form, tab, nil)), "native terminal: no repaint")
+
+	// CloudShell: focus-move key on an Input repaints; typing does not.
+	t.Setenv("AWS_EXECUTION_ENV", "CloudShell")
+	assert.True(t, hasClearScreen(repaintFormScroll(form, tab, nil)), "CloudShell: focus-move key repaints")
+	assert.False(t, hasClearScreen(repaintFormScroll(form, typing, nil)), "CloudShell: Input typing does not repaint")
+	assert.False(t, hasClearScreen(repaintFormScroll(form, tea.WindowSizeMsg{Width: 1, Height: 1}, nil)),
+		"CloudShell: a non-key message does not repaint")
 }
