@@ -44,7 +44,7 @@ class FenceTests(unittest.TestCase):
         readme = "intro\n```sh\n## not a heading\n~~~ inside the ``` fence\n```\n## Real Section\nbody\n"
         errors: list[str] = []
         pages, anchor_page, _dups = b.build_readme_pages(readme, errors.append)
-        self.assertEqual([n for n, _, _ in pages], ["index.md", "real-section.md"])
+        self.assertEqual([n for n, *_ in pages], ["index.md", "real-section.md"])
         self.assertIn("real-section", anchor_page)
         self.assertNotIn("not-a-heading", anchor_page)
         self.assertEqual(errors, [])
@@ -61,6 +61,90 @@ class FenceTests(unittest.TestCase):
         self.assertTrue(fences.is_code("## still code"))
         self.assertTrue(fences.is_code("```"))  # real close
         self.assertFalse(fences.is_code("## now a heading"))
+
+
+class NavGroupTests(unittest.TestCase):
+    def _groups(self, readme: str):
+        errors: list[str] = []
+        pages, _amap, _dups = b.build_readme_pages(readme, errors.append)
+        self.assertEqual(errors, [])
+        return [(name, group) for name, _title, _body, group in pages]
+
+    def test_marker_groups_following_sections_and_is_stripped(self):
+        readme = "intro\n<!-- nav-group: Basic Usage -->\n## Using CLI\nbody\n## Using TUI\nmore\n"
+        errors: list[str] = []
+        pages, _amap, _dups = b.build_readme_pages(readme, errors.append)
+        by_name = {name: (group, "".join(body)) for name, _t, body, group in pages}
+        self.assertIsNone(by_name["index.md"][0])
+        self.assertEqual(by_name["using-cli.md"][0], "Basic Usage")
+        self.assertEqual(by_name["using-tui.md"][0], "Basic Usage")
+        # The comment marker does not leak into any page body.
+        self.assertNotIn("nav-group", by_name["index.md"][1])
+
+    def test_none_marker_returns_to_top_level(self):
+        readme = "<!-- nav-group: G -->\n## A\nx\n<!-- nav-group: none -->\n## B\ny\n"
+        self.assertEqual(self._groups(readme), [("index.md", None), ("a.md", "G"), ("b.md", None)])
+
+    def test_marker_inside_fence_is_ignored(self):
+        readme = "## A\n```\n<!-- nav-group: G -->\n```\n## B\ny\n"
+        self.assertEqual(self._groups(readme), [("index.md", None), ("a.md", None), ("b.md", None)])
+
+    def test_indented_marker_is_not_a_group(self):
+        # A four-space-indented marker is CommonMark indented code, not a directive.
+        readme = "## A\nx\n\n    <!-- nav-group: G -->\n\n## B\ny\n"
+        self.assertEqual(self._groups(readme), [("index.md", None), ("a.md", None), ("b.md", None)])
+
+
+class ComposeNavTests(unittest.TestCase):
+    def test_doc_group_inserted_after_named_page_and_contiguous(self):
+        readme_nav = [
+            ("index.md", "Home", None),
+            ("command-reference.md", "Command Reference", None),
+            ("license.md", "License", None),
+        ]
+        doc_entries = [
+            ("aws.md", "AWS Commands", "Command Details", "command-reference.md"),
+            ("gcloud.md", "GCloud", "Command Details", "command-reference.md"),
+            ("azure.md", "Azure Commands", "Command Details", "command-reference.md"),
+            ("staging-state-transitions.md", "Stage Lifecycle", "Command Details", "command-reference.md"),
+        ]
+        errors: list[str] = []
+        nav = b.compose_nav(readme_nav, doc_entries, errors.append)
+        # Grouped docs are inserted after the anchor, contiguous, in input order.
+        self.assertEqual(
+            [n for n, _t, _g in nav],
+            ["index.md", "command-reference.md", "aws.md", "gcloud.md", "azure.md", "staging-state-transitions.md", "license.md"],
+        )
+        self.assertEqual([g for _n, _t, g in nav if g], ["Command Details"] * 4)
+        self.assertEqual(errors, [])
+
+    def test_missing_after_target_is_an_error(self):
+        errors: list[str] = []
+        b.compose_nav([("index.md", "Home", None)], [("aws.md", "AWS", "G", "nope.md")], errors.append)
+        self.assertTrue(any("not in the nav" in e for e in errors))
+
+    def test_ungrouped_doc_appended_at_tail(self):
+        errors: list[str] = []
+        nav = b.compose_nav([("index.md", "Home", None)], [("x.md", "X", None, None)], errors.append)
+        self.assertEqual([n for n, _t, _g in nav], ["index.md", "x.md"])
+        self.assertEqual(errors, [])
+
+
+class DocNavConfigTests(unittest.TestCase):
+    def test_doc_nav_declares_canonical_group_and_order(self):
+        # main() orders grouped docs by this dict's key order (not alphabetical
+        # discovery order), so the declared order is the source of truth for the
+        # "Command Details" nav group: AWS, Google Cloud, Azure, then lifecycle.
+        self.assertEqual(list(b.DOC_NAV), ["aws.md", "gcloud.md", "azure.md", "staging-state-transitions.md"])
+        for cfg in b.DOC_NAV.values():
+            self.assertEqual(cfg["group"], "Command Details")
+            self.assertEqual(cfg["after"], "command-reference.md")
+
+
+class HeroTests(unittest.TestCase):
+    def test_hero_h1_regex_demotes_to_styled_paragraph(self):
+        out = b.HERO_H1_RE.sub(r'<p class="hero-title"\1>\2</p>', "  <h1>suve</h1>\n")
+        self.assertEqual(out, '  <p class="hero-title">suve</p>\n')  # no heading -> no toc id
 
 
 class RewriteTests(unittest.TestCase):
@@ -127,6 +211,27 @@ class RewriteTests(unittest.TestCase):
         # A div that already declares markdown is left alone.
         out2 = b.rewrite_links('<div markdown="span">\n', {}, from_readme=True, err=errors.append)
         self.assertEqual(out2.count("markdown="), 1)
+
+    def test_subpage_local_asset_src_gets_dotdot_prefix(self):
+        errors: list[str] = []
+        out = b.rewrite_links(
+            '<img src="demo/x.gif"> <a href="https://z"> <img src="/root.png"> [md](y.md)\n',
+            {"": "index.md"},
+            from_readme=True,
+            err=errors.append,
+            sub_page=True,
+        )
+        self.assertIn('src="../demo/x.gif"', out)  # relative local ref fixed
+        self.assertIn('href="https://z"', out)  # absolute left alone
+        self.assertIn('src="/root.png"', out)  # root-absolute left alone
+        self.assertIn("[md](y.md)", out)  # Markdown link untouched (MkDocs handles it)
+        self.assertEqual(errors, [])
+
+    def test_home_page_local_asset_src_unprefixed(self):
+        errors: list[str] = []
+        out = b.rewrite_links('<img src="demo/x.gif">\n', {}, from_readme=True, err=errors.append, sub_page=False)
+        self.assertIn('src="demo/x.gif"', out)
+        self.assertNotIn("../demo", out)
 
     def test_summary_gets_an_id(self):
         errors: list[str] = []

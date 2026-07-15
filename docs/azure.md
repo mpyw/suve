@@ -3,7 +3,7 @@
 [<- Back to README](../README.md) | [AWS Commands](aws.md) | [Google Cloud Commands](gcloud.md)
 
 > [!TIP]
-> Invoke as `suve azure secret` (Key Vault; aliases `kv`, `keyvault`) and `suve azure param` (App Configuration; aliases `appconfig`, `ac`, `appcfg`); the group also answers to `az`, and `stage` to `stg`. You can drop the `azure` prefix when Azure is the only active provider for that service — see [Provider selection](../README.md#provider-selection).
+> Invoke as `suve azure secret` (Key Vault; aliases `kv`, `keyvault`) and `suve azure param` (App Configuration; aliases `appconfig`, `ac`, `appcfg`); the group also answers to `az`, and `stage` to `stg`. You can drop the `azure` prefix when Azure is the only active provider for that service — see [Bare Aliases](../README.md#bare-aliases).
 
 Azure splits into two services under `suve azure`:
 
@@ -19,64 +19,12 @@ Azure also supports the local **staging workflow** via `suve azure stage` (or th
 
 The two services keep distinct staging scopes, but provider-wide `azure stage status`/`diff`/`apply`/`reset` span both — each resolves its own scope and any service that is not configured (no `--store-name`/`--vault-name`) is skipped. See the [staging workflow](../README.md#staging-workflow) overview for the general flow.
 
-## Authentication and Configuration
-
-| Setting | Flag | Environment variable |
-|---------|------|----------------------|
-| Key Vault name (secret) | `--vault-name` | `AZURE_KEYVAULT_NAME` |
-| App Config store (param) | `--store-name` | `AZURE_APPCONFIG_NAME` |
-
-Authentication uses the **DefaultAzureCredential** chain (environment, managed identity, Azure CLI, ...). The simplest way to set this up locally is:
-
-```bash
-az login
-```
-
-The target resource is addressed by its **globally-unique name** — the Key Vault
-or App Configuration store — which is all suve needs; no subscription or resource
-group is required. Supply the name per-invocation or via an environment variable:
-
-```bash
-# Via flags
-suve azure secret list --vault-name my-vault
-
-# Via environment variables
-export AZURE_KEYVAULT_NAME=my-vault
-suve azure secret list
-```
-
-## TUI
-
-Launch the terminal UI with `suve azure --tui` (or bare `suve --tui` when Azure is the only active provider). It consumes the same scope as the CLI: `--vault-name` / `AZURE_KEYVAULT_NAME` for the Key Vault (Secret) tab and `--store-name` / `AZURE_APPCONFIG_NAME` (plus `--namespace` / `AZURE_APPCONFIG_NAMESPACE`) for the App Configuration (Param) tab. Each tab appears only when its store name is set — set either or both. `suve azure secret --tui` preselects Key Vault, `suve azure param --tui` preselects App Configuration. See [TUI mode](../README.md#tui-mode) for the keymap.
-
----
-
-# suve azure secret (Key Vault)
+## suve azure secret (Key Vault)
 
 Git-style access to Azure Key Vault secrets.
 
 > [!NOTE]
 > Key Vault secrets are versioned by **opaque ids** (e.g. a 32-character hex string) and have **no staging labels**. Set the vault with `--vault-name` or `AZURE_KEYVAULT_NAME`.
-
-## Version Specification
-
-```
-<name>[#VERSION][~SHIFT]*
-```
-
-| Specifier | Description | Example |
-|-----------|-------------|---------|
-| `#VERSION` | Specific version by opaque id | `#abc123...` |
-| `~` | One version ago | `~` = current - 1 |
-| `~N` | N versions ago | `~2` = current - 2 |
-
-> [!NOTE]
-> Key Vault has **no `:LABEL` syntax**. Versions are addressed only by opaque id or shift.
-
-> [!TIP]
-> `~` without a number means `~1`. You can chain shifts: `~~` = `~1~1` = `~2`.
-
----
 
 ## suve azure secret show
 
@@ -188,6 +136,16 @@ suve azure secret diff [options] <spec1> [spec2] | <name> <version1> [version2]
 
 If only one version/spec is specified, it is compared against the **current** version.
 
+### Argument Formats
+
+| Format | Args | Example | Description |
+|--------|------|---------|-------------|
+| full spec | 2 | `my-secret#abc my-secret#def` | Both args include name and version |
+| full spec | 1 | `my-secret#abc` | Compare the specified version with current |
+| mixed | 2 | `my-secret#abc '~'` | First full, second specifier only |
+| partial spec | 2 | `my-secret '~'` | Name + specifier → compare with current |
+| partial spec | 3 | `my-secret '~2' '~'` | Name + two specifiers |
+
 ### Version Specifiers
 
 | Specifier | Description | Example |
@@ -195,6 +153,12 @@ If only one version/spec is specified, it is compared against the **current** ve
 | `#VERSION` | Specific version by opaque id | `#abc123...` |
 | `~` | One version ago | `~` = current - 1 |
 | `~N` | N versions ago | `~2` = current - 2 |
+
+> [!NOTE]
+> Key Vault has **no `:LABEL` syntax**. Versions are addressed only by opaque id or shift.
+
+> [!TIP]
+> `~` without a number means `~1`. You can chain shifts: `~~` = `~1~1` = `~2`.
 
 **Options:**
 
@@ -204,7 +168,7 @@ If only one version/spec is specified, it is compared against the **current** ve
 | `--no-pager` | - | `false` | Disable pager output |
 | `--output` | - | `text` | Output format: `text` (default) or `json` |
 
-**Examples:**
+### Examples
 
 ```bash
 # Compare previous with current
@@ -218,6 +182,26 @@ suve azure secret diff --parse-json my-secret~ --vault-name my-vault
 
 # Output comparison as JSON
 suve azure secret diff --output=json my-secret~ --vault-name my-vault
+```
+
+### Identical Version Warning
+
+> [!WARNING]
+> No diff is produced when the two sides have **identical content**; suve distinguishes two cases on stderr:
+> - **Same version on both sides** → `comparing identical versions`, plus a hint to compare against the previous version (e.g. `suve azure secret diff my-secret~1`).
+> - **Distinct versions that happen to match** → `versions differ but content is identical` (no hint).
+
+### Partial Spec Format
+
+> [!IMPORTANT]
+> In partial spec format, quote specifiers to prevent shell interpretation — `~` expands to `$HOME` and `#` starts a comment in bash/zsh. Full spec format (embedding `#`/`~` within the name) needs no quoting.
+
+```bash
+# Partial spec — quote the specifier
+suve azure secret diff my-secret '~' --vault-name my-vault
+
+# Full spec — no quoting needed
+suve azure secret diff my-secret#abc my-secret#def --vault-name my-vault
 ```
 
 ---
@@ -453,7 +437,7 @@ suve azure secret untag my-api-key env team --vault-name my-vault
 
 ---
 
-# suve azure param (App Configuration)
+## suve azure param (App Configuration)
 
 Access to Azure App Configuration key-values.
 
