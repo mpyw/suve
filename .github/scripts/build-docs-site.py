@@ -72,6 +72,13 @@ IMG_WIDTH_RE = re.compile(r'(?<![-\w])width\s*=\s*"(\d+)"', re.IGNORECASE)
 IMG_HEIGHT_RE = re.compile(r'(?<![-\w])height\s*=\s*"(\d+)"', re.IGNORECASE)
 HAS_STYLE_RE = re.compile(r'(?<![-\w])style\s*=', re.IGNORECASE)
 HAS_MARKDOWN_ATTR_RE = re.compile(r'(?<![-\w])markdown\s*=', re.IGNORECASE)
+# Content wrapped in <!-- site:skip --> … <!-- /site:skip --> is GitHub-only: it
+# renders on the repo's README (e.g. a "Documentation" link back to this very
+# site, which would be self-referential here) but is dropped from the built site.
+SITE_SKIP_RE = re.compile(
+    r"[^\S\n]*<!--\s*site:skip\s*-->.*?<!--\s*/site:skip\s*-->[^\S\n]*\n?",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _load_slugify():
@@ -426,6 +433,8 @@ def main() -> int:
     SRC.mkdir(parents=True)
 
     readme = (REPO / "README.md").read_text(encoding="utf-8")
+    # Drop GitHub-only blocks (see SITE_SKIP_RE) before splitting into pages.
+    readme = SITE_SKIP_RE.sub("", readme)
     pages, anchor_page, duplicates = build_readme_pages(readme, err)
     anchor_page.setdefault("", "index.md")  # bare ../README.md -> home
     dups = frozenset(duplicates)
