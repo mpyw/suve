@@ -523,6 +523,13 @@ jobs:
           CGO_ENABLED=0 go build -o suve-cli ./cmd/suve
           file suve-cli
 
+      - name: Upload CLI binary artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: suve-cli-linux-amd64
+          path: suve-cli
+          retention-days: 7
+
       - name: Verify binary runs correctly
         run: |
           ./suve-cli --help

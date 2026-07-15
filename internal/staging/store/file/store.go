@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -77,6 +78,35 @@ var mintKeyFunc = keyprovider.Mint
 //
 //nolint:gochecknoglobals // process-wide one-time warning guard.
 var plaintextWarnOnce sync.Once
+
+// warnWriter is the sink for the one-time plaintext-storage warning. It defaults
+// to os.Stderr, which is correct for plain CLI use. A full-screen frontend that
+// owns the terminal (the TUI's alt-screen) redirects it via SetWarnWriter so a
+// raw mid-render write cannot corrupt its display, then surfaces the collected
+// text after it exits. warnWriterMu guards it against the store's async callers.
+//
+//nolint:gochecknoglobals // process-wide, deliberately mutable warning sink.
+var (
+	warnWriter   io.Writer = os.Stderr
+	warnWriterMu sync.Mutex
+)
+
+// SetWarnWriter redirects the one-time plaintext-storage warning to w and returns
+// the previous writer so the caller can restore it. A frontend that owns the
+// terminal (the TUI) swaps in a buffer for the program's lifetime, then restores
+// os.Stderr and flushes the buffer once the screen is back — preventing the raw
+// warning write from landing in the middle of an alt-screen frame (which
+// corrupts the display, e.g. in a keychain-less cloud shell where the plaintext
+// fallback always fires). Safe to call concurrently with the store's warners.
+func SetWarnWriter(w io.Writer) io.Writer {
+	warnWriterMu.Lock()
+	defer warnWriterMu.Unlock()
+
+	prev := warnWriter
+	warnWriter = w
+
+	return prev
+}
 
 // isInteractiveFunc reports whether the process is attached to an interactive
 // terminal. It gates the unencrypted-write guard: an interactive session keeps
@@ -283,10 +313,16 @@ func warnPlaintextOnce(cause error) {
 			msg += "\nwarning: " + cause.Error()
 		}
 
-		// Direct stderr write: this low-level store package intentionally
-		// avoids depending on the cli/output package.
-		//nolint:forbidigo // one-time operator warning to stderr.
-		fmt.Fprintln(os.Stderr, msg)
+		// Write through the redirectable sink (default os.Stderr) so a
+		// full-screen frontend can capture it instead of having it corrupt the
+		// display; this low-level store package still avoids depending on the
+		// cli/output package.
+		warnWriterMu.Lock()
+		w := warnWriter
+		warnWriterMu.Unlock()
+
+		//nolint:forbidigo // low-level store writes to its own sink, not cli/output
+		_, _ = fmt.Fprintln(w, msg)
 	})
 }
 

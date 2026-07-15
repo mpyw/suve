@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"sync"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/provider/azure"
 	"github.com/mpyw/suve/internal/provider/gcloud"
+	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/tui/components"
 )
 
@@ -42,12 +46,53 @@ func Run(ctx context.Context, scope provider.Scope, service string) error {
 		return err
 	}
 
+	// The staging store's plaintext-fallback warning writes straight to stderr;
+	// firing during the alt-screen (it always does in a keychain-less cloud
+	// shell) would corrupt the display. Capture it for the program's lifetime and
+	// replay it to stderr once the normal screen is restored.
+	warnings := &lockedBuffer{}
+	prevWarn := file.SetWarnWriter(warnings)
+
+	defer func() {
+		file.SetWarnWriter(prevWarn)
+
+		if s := warnings.String(); s != "" {
+			// Deliberate stderr write: replay the captured staging warning now
+			// that the alt-screen is closed and the normal screen is restored.
+			//nolint:forbidigo // one-off warning replay after the TUI exits
+			_, _ = fmt.Fprint(os.Stderr, s)
+		}
+	}()
+
 	// Alt-screen and mouse capture are requested through the model's returned
 	// tea.View (Bubble Tea v2 reads them there each frame), so the program needs
-	// only the context here.
+	// only the context here. Browser cloud-shell corruption is handled in the
+	// model via a continuous full-repaint loop (see cloudShellRepaintCmd).
 	_, err = tea.NewProgram(model, tea.WithContext(ctx)).Run()
 
 	return err
+}
+
+// lockedBuffer is a concurrency-safe bytes.Buffer: the staging store may emit its
+// plaintext warning from an async data-load goroutine while Run reads the
+// captured text after the program exits.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
 }
 
 // newModel builds the root app model for a launched scope and initial service,
