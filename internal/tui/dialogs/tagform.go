@@ -279,7 +279,7 @@ func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case huh.StateNormal:
 	}
 
-	return d, cmd
+	return d, repaintFormScroll(d.form, msg, cmd)
 }
 
 // InterceptEsc opts the form into the shell's discard guard (#790): the shell
