@@ -73,6 +73,7 @@ Load the matching skill under `.claude/skills/` before non-trivial work; each ho
 - **bug-fix-pr** — turning one filed bug into a fix PR: reproduce, fix at the cited site, add regression tests at every layer, run gates.
 - **feature-epic-breakdown** — planning a multi-PR feature or cross-cutting refactor as a layer-ordered epic with standalone sub-issues.
 - **docs-audit** — keeping docs in sync: sweep command tables/env-vars/paths against the real CLI, current-state-only, consistent terminology, aqua-registry tracking.
+- **docs-site-pages** — restructuring the README or the GitHub Pages site generated from it (left-nav, section reorg, per-provider docs): the `build-docs-site.py` split + literate-nav pipeline, its HTML-comment directives (`nav-group`/`site:skip`) and site-only transforms, the python-markdown gotchas GitHub hides, and the `mise docs-build` gate.
 - **release-highlights** — authoring the `## Highlights` section of a GitHub release: when a release earns one, the fixed format (bold lead + breaking-change note, `###` subsections, PR-referenced bullets), and prepending it to the auto-generated notes.
 - **collection-idioms** — writing/reviewing Go that builds or transforms slices/maps: prefer `samber/lo`, `lo/it`, and stdlib `slices`/`maps` utilities over hand-rolled `make`/`range`/`append`; keep explicit loops only for complex side effects/control flow.
 
