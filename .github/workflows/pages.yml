@@ -1,0 +1,129 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    # Only rebuild when something the site is generated from changes.
+    # (GitHub Actions does not support YAML anchors, so the list is repeated.)
+    paths:
+      - README.md
+      - docs/**
+      - demo/**
+      - gui/build/appicon.png
+      - mkdocs.yml
+      - scripts/build_docs_site.py
+      - scripts/check_site_links.py
+      - scripts/test_docs_pipeline.py
+      - scripts/docs-requirements.txt
+      - .github/workflows/pages.yml
+  # Build + validate (no deploy) on PRs that touch the site, to catch breakage early.
+  pull_request:
+    paths:
+      - README.md
+      - docs/**
+      - demo/**
+      - gui/build/appicon.png
+      - mkdocs.yml
+      - scripts/build_docs_site.py
+      - scripts/check_site_links.py
+      - scripts/test_docs_pipeline.py
+      - scripts/docs-requirements.txt
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+# Least privilege by default; the deploy job opts into the Pages write scopes.
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Silence the mkdocs-2/ProperDocs upgrade nag in the build log.
+  DISABLE_MKDOCS_2_WARNING: "true"
+
+jobs:
+  # Deterministic validation gate — runs on PRs and main, needs no Pages perms.
+  # It fails the build (no AI/human review) on any broken local link, missing
+  # anchor, output collision, missing asset, or unmapped README anchor.
+  validate:
+    name: Build & validate site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Demo GIFs / the app icon embedded in the README are tracked in Git LFS;
+          # fetch them so they ship in the site instead of as pointer files.
+          lfs: true
+
+      - name: Set up docs toolchain
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet --upgrade pip
+          .venv/bin/pip install --quiet -r scripts/docs-requirements.txt
+
+      - name: Unit-test the pipeline
+        run: .venv/bin/python scripts/test_docs_pipeline.py
+
+      - name: Assemble the site source (fails on broken/unmapped links, collisions, missing assets)
+        run: .venv/bin/python scripts/build_docs_site.py
+
+      - name: Build with MkDocs (strict — link/anchor/nav problems fail)
+        run: .venv/bin/mkdocs build --strict
+
+      - name: Validate rendered links, anchors and assets
+        run: .venv/bin/python scripts/check_site_links.py
+
+      # Package the VALIDATED output as the github-pages artifact here, so the
+      # privileged deploy job ships exactly what was validated (no rebuild).
+      # actions/upload-pages-artifact internally pins actions/upload-artifact by
+      # tag, which this repo's "actions must be pinned to a full SHA" policy
+      # rejects — so tar the site the way upload-pages-artifact does and upload it
+      # with the repo's SHA-pinned upload-artifact under the name deploy-pages
+      # expects. (Harmless on PRs: the deploy job is skipped and the artifact
+      # expires.)
+      - name: Archive the site as a Pages artifact
+        run: |
+          tar \
+            --dereference --hard-dereference \
+            --directory .site/out \
+            -cvf "$RUNNER_TEMP/artifact.tar" \
+            --exclude=.git \
+            --exclude=.github \
+            .
+
+      - name: Upload Pages artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  # Deploy from main only; the sole job with the Pages write scopes. It deploys
+  # the artifact produced (and validated) by the validate job — it does not
+  # rebuild, so what ships is exactly what passed the gate.
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        # enablement: true turns Pages on (source = GitHub Actions) on the first run.
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        with:
+          enablement: true
+
+      - name: Deploy
+        id: deployment
+        # Consumes the "github-pages" artifact uploaded by the validate job.
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

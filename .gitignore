@@ -61,3 +61,6 @@ Thumbs.db
 /cmd/suve/appicon.ico
 /cmd/suve/resource_windows_amd64.syso
 /cmd/suve/resource_windows_arm64.syso
+
+# Generated GitHub Pages site (assembled source, build output, and local venv)
+/.site/
