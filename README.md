@@ -119,6 +119,9 @@ npx @mpyw/suve --version
 
 The right prebuilt binary is pulled in automatically per platform: the self-contained GUI build on macOS/Windows, and the dependency-free CLI/TUI-only static build on Linux (so **`--gui` is not available via npm on Linux**).
 
+> [!TIP]
+> **Ideal for cloud shells.** AWS CloudShell, Google Cloud Shell, and Azure Cloud Shell all ship Node.js, so `npx @mpyw/suve …` runs suve with nothing to download or install — and the dependency-free CLI/TUI-only build is exactly what you want there (no GUI). Each shell's ambient credentials are auto-detected too; see [Cloud Shell support](#cloud-shell-support).
+
 <details>
 <summary><a href="https://www.linux.org/"><img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Tux.png" height="20" alt=""></a> Linux (.deb / .rpm)</summary>
 
