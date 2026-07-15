@@ -1,0 +1,84 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    # Only rebuild when something the site is generated from changes.
+    # (GitHub Actions does not support YAML anchors, so the list is repeated.)
+    paths:
+      - README.md
+      - docs/**
+      - mkdocs.yml
+      - scripts/build_docs_site.py
+      - scripts/docs-requirements.txt
+      - .github/workflows/pages.yml
+  # Build (but don't deploy) on PRs that touch the site, to catch breakage early.
+  pull_request:
+    paths:
+      - README.md
+      - docs/**
+      - mkdocs.yml
+      - scripts/build_docs_site.py
+      - scripts/docs-requirements.txt
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+# Least privilege: read the repo, write the Pages deployment via OIDC.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One in-flight Pages deployment at a time; don't cancel a running deploy.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Silence the mkdocs-2/ProperDocs upgrade nag in the build log.
+  DISABLE_MKDOCS_2_WARNING: "true"
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Demo GIFs / the app icon embedded in the README are tracked in Git LFS;
+          # fetch them so they ship in the site instead of as pointer files.
+          lfs: true
+
+      - name: Build the site
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet --upgrade pip
+          .venv/bin/pip install --quiet -r scripts/docs-requirements.txt
+          .venv/bin/python scripts/build_docs_site.py
+          .venv/bin/mkdocs build
+
+      - name: Configure Pages
+        # enablement: true turns Pages on (source = GitHub Actions) on the first run.
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: .site/out
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    # PRs only validate the build; deploy from main (or a manual dispatch on main).
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

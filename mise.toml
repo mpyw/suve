@@ -397,3 +397,23 @@ run = "HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-22 ru
 description = "Start the Ubuntu 24.04 desktop (webkit2gtk-4.1, requires XQuartz)"
 depends = ["x11-setup"]
 run = "HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-24 run --rm ubuntu-24"
+
+[tasks.docs-build]
+description = "Assemble and build the GitHub Pages site (MkDocs) into .site/out"
+run = '''
+python3 -m venv .site/venv
+.site/venv/bin/pip install --quiet --upgrade pip
+.site/venv/bin/pip install --quiet -r scripts/docs-requirements.txt
+.site/venv/bin/python scripts/build_docs_site.py
+DISABLE_MKDOCS_2_WARNING=true .site/venv/bin/mkdocs build
+'''
+
+[tasks.docs-serve]
+description = "Assemble and serve the docs site locally at http://127.0.0.1:8000"
+run = '''
+python3 -m venv .site/venv
+.site/venv/bin/pip install --quiet --upgrade pip
+.site/venv/bin/pip install --quiet -r scripts/docs-requirements.txt
+.site/venv/bin/python scripts/build_docs_site.py
+DISABLE_MKDOCS_2_WARNING=true .site/venv/bin/mkdocs serve
+'''

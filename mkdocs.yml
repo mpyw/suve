@@ -1,0 +1,60 @@
+site_name: suve
+site_description: Git-like CLI (and GUI/TUI) for multi-cloud secret and parameter management across AWS, Google Cloud, and Azure.
+site_url: https://mpyw.github.io/suve/
+repo_url: https://github.com/mpyw/suve
+repo_name: mpyw/suve
+
+# The source tree is assembled by scripts/build_docs_site.py (README split into
+# per-section pages + docs/*.md), and the built site goes to .site/out. Neither
+# directory is committed; both are produced fresh by `mise docs-build` / CI.
+docs_dir: .site/src
+site_dir: .site/out
+
+# literate-nav reads SUMMARY.md for the nav; keep it out of the built pages.
+exclude_docs: |
+  SUMMARY.md
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+plugins:
+  - search
+  - literate-nav:
+      nav_file: SUMMARY.md
+
+markdown_extensions:
+  # GitHub-compatible heading slugs, so the README's existing #anchor links keep
+  # resolving after the split (scripts/build_docs_site.py uses the same slugifier).
+  - toc:
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+      permalink: true
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true

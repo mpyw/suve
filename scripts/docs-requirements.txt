@@ -1,0 +1,6 @@
+# Pinned dependencies for building the GitHub Pages site (see mkdocs.yml and
+# scripts/build_docs_site.py). Installed by `mise docs-build`/`docs-serve` and by
+# the Pages workflow. mkdocs-material pulls in mkdocs, Python-Markdown, and
+# pymdown-extensions (the GitHub-compatible slugifier the site relies on).
+mkdocs-material==9.7.6
+mkdocs-literate-nav==0.6.3
