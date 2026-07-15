@@ -1,7 +1,6 @@
 name: Tag and Release
 
 # Show the target version in the run title, e.g. "Tag and Release v1.2.3".
-# This flow always releases everything (mode: Release All below).
 run-name: "Tag and Release ${{ inputs.version }}"
 
 on:
@@ -23,17 +22,7 @@ jobs:
 
   release:
     needs: [tag]
-    # release.yml mints OIDC tokens (npm trusted publishing / provenance), so its
-    # jobs request id-token: write. In a reusable-workflow call the callee's
-    # permissions can only be a subset of the caller job's, and the top-level
-    # `permissions: contents: write` block zeroes every unlisted scope
-    # (id-token: none) — which fails workflow validation at startup. Grant
-    # id-token here (only the release path needs it; the tag job does not).
-    permissions:
-      contents: write
-      id-token: write
     uses: ./.github/workflows/release.yml
     with:
       version: ${{ inputs.version }}
-      mode: Release All
     secrets: inherit

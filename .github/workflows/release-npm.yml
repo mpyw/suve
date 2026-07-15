@@ -1,0 +1,101 @@
+name: Release npm
+
+# Show the target version in the run title, e.g. "Release npm v1.2.3".
+run-name: "Release npm ${{ inputs.version }}"
+
+# npm trusted publishing (OIDC) matches on the workflow filename of the OIDC
+# token's workflow claim. This workflow must therefore only ever run directly
+# via workflow_dispatch — never as a reusable workflow_call — so the claim is
+# always release-npm.yml, the filename configured as the trusted publisher on
+# npmjs.com.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish to npm (e.g., v1.2.3) - GitHub release must already exist"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # ===========================================================================
+  # Validate that the tag exists before publishing
+  # ===========================================================================
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid version format '$VERSION'"
+            echo "Expected format: vX.Y.Z (e.g., v1.2.3)"
+            exit 1
+          fi
+          echo "Version format valid: $VERSION"
+
+      - name: Check tag exists
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git ls-remote --tags https://github.com/${{ github.repository }} | grep -q "refs/tags/${VERSION}$"; then
+            echo "Error: Tag '$VERSION' does not exist"
+            echo "Please create the tag first using the 'Tag' workflow"
+            exit 1
+          fi
+          echo "Tag exists: $VERSION"
+
+  # ===========================================================================
+  # Publish to npm: no rebuild. Publish from the tag's already-released
+  # binaries (downloaded from its GitHub Release), using the current tooling
+  # from this workflow's ref.
+  # ===========================================================================
+  publish-npm:
+    needs: [validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance / OIDC trusted publishing
+    steps:
+      # Default checkout ref = the ref this workflow runs on (current main), so
+      # .github/npm and the publish script are the current tooling — not the tag.
+      # This is the same effect as the release job's "restore npm tooling from
+      # the workflow ref" overlay: an older tag (created before npm support) can
+      # still be published with the current tooling.
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v6.0.0
+        with:
+          node-version: "22"
+
+      - name: Download released archives for the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.version }}
+        run: |
+          mkdir -p .github/releases
+          # Only the archives npm-publish.sh consumes: macOS/Windows self-contained
+          # builds and the Linux CLI-only static build.
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            -D .github/releases \
+            -p 'suve_*_darwin_*.tar.gz' \
+            -p 'suve_*_windows_*.zip' \
+            -p 'suve-cli_*_linux_*.tar.gz'
+          ls -la .github/releases
+
+      - name: Publish to npm
+        env:
+          TAG: ${{ inputs.version }}
+        run: |
+          # Tokenless OIDC trusted publishing (id-token: write); provenance auto.
+          # A recent npm is required for both. Each package must have a trusted
+          # publisher configured on npmjs.com (owner mpyw/suve, this workflow).
+          npm install -g npm@latest
+          .github/scripts/npm-publish.sh "${TAG#v}"
