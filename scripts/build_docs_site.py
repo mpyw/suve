@@ -231,6 +231,7 @@ def rewrite_links(
     from_readme: bool,
     err,
     duplicates: frozenset[str] = frozenset(),
+    label: str = "",
 ) -> str:
     """Rewrite cross-page links so they survive the split. Links inside fenced or
     inline code are left untouched; an unmapped or ambiguous anchor is an error."""
@@ -273,11 +274,13 @@ def rewrite_links(
 
     fences = Fences()
     out: list[str] = []
-    for line in body.splitlines(keepends=True):
-        if fences.is_code(line):
+    for i, line in enumerate(body.splitlines(keepends=True), start=1):
+        if fences.is_code(line, i):
             out.append(line)
             continue
         out.append(apply_outside_code(line, rewrite_prose))
+    if fences.open:
+        err(f"unclosed code fence in {label or 'page'} (opened at line {fences.open_line})")
     return "".join(out)
 
 
@@ -338,13 +341,15 @@ def main() -> int:
     nav: list[tuple[str, str]] = []
     for name, title, body in pages:
         claim(name, f"README section {title!r}")
-        text = rewrite_links("".join(body), anchor_page, from_readme=True, err=err, duplicates=dups)
+        text = rewrite_links("".join(body), anchor_page, from_readme=True, err=err, duplicates=dups, label=name)
         (SRC / name).write_text(text, encoding="utf-8")
         nav.append((name, "Home" if name == "index.md" else title))
 
     for path, name, title in discover_doc_pages(err):
         claim(name, f"docs/{path.name}")
-        text = rewrite_links(path.read_text(encoding="utf-8"), anchor_page, from_readme=False, err=err, duplicates=dups)
+        text = rewrite_links(
+            path.read_text(encoding="utf-8"), anchor_page, from_readme=False, err=err, duplicates=dups, label=f"docs/{path.name}"
+        )
         (SRC / name).write_text(text, encoding="utf-8")
         nav.append((name, title))
 

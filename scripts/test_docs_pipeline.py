@@ -99,6 +99,12 @@ class RewriteTests(unittest.TestCase):
         out = b.rewrite_links("<summary>Building From Source</summary>\n", {}, from_readme=True, err=errors.append)
         self.assertIn('id="building-from-source"', out)
 
+    def test_unclosed_fence_in_a_doc_page_is_an_error(self):
+        # docs/*.md are not split, so their fences are checked in rewrite_links.
+        errors: list[str] = []
+        b.rewrite_links("intro\n```sh\nnever closed\n", {}, from_readme=False, err=errors.append, label="docs/x.md")
+        self.assertTrue(any("unclosed code fence in docs/x.md" in e for e in errors))
+
 
 class GuardTests(unittest.TestCase):
     def test_reference_link_split_from_definition_is_an_error(self):

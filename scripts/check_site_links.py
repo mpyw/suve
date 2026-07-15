@@ -30,11 +30,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / ".site" / "out"
 
-# Pages whose links are theme-generated against the absolute site_url base rather
-# than relative to the page, so they are not meaningfully checkable here.
-SKIP_FILES = {"404.html"}
-
-NON_HTTP_SCHEMES = ("mailto:", "tel:", "data:", "javascript:")
+# Pages excluded from checking. Empty: the resolver understands the site-base
+# absolute links (/suve/…) that the 404 page uses, so it is validated too.
+SKIP_FILES: set[str] = set()
 
 # Local URL-bearing element/attribute pairs to validate. srcset attributes are
 # comma-separated candidate lists and handled specially.
@@ -101,11 +99,13 @@ def to_out_relpath(page_rel: str, url: str) -> tuple[str | None, str, bool]:
     s = urllib.parse.urlsplit(url)
     frag = urllib.parse.unquote(s.fragment)
 
-    if s.scheme in ("http", "https"):
+    # Absolute (http(s)://host/…) or protocol-relative (//host/…): only same-site,
+    # under the site base, is checkable.
+    if s.scheme in ("http", "https") or (not s.scheme and s.netloc):
         if SITE_HOST and s.netloc == SITE_HOST and s.path.startswith(SITE_BASE):
-            return _from_root(s.path[len(SITE_BASE) :]), frag, False
+            return _from_root(urllib.parse.unquote(s.path[len(SITE_BASE) :])), frag, False
         return None, frag, True
-    if s.scheme or s.netloc:  # other scheme (mailto:, …) or //host
+    if s.scheme:  # mailto:, tel:, data:, javascript:, …
         return None, frag, True
 
     path = urllib.parse.unquote(s.path)
