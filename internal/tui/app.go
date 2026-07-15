@@ -13,6 +13,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/cursor"
 	"charm.land/bubbles/v2/help"
@@ -28,7 +29,31 @@ import (
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/nav"
 	"github.com/mpyw/suve/internal/tui/styles"
+	"github.com/mpyw/suve/internal/tui/termquirk"
 )
+
+// cloudShellRepaintMsg drives the continuous full-repaint loop used in browser
+// cloud shells (see cloudShellRepaintCmd).
+type cloudShellRepaintMsg struct{}
+
+// cloudShellRepaintInterval is how often the TUI forces a full repaint in a
+// browser cloud shell. Fast enough that any transient corruption is wiped within
+// a frame or two, slow enough to stay readable.
+const cloudShellRepaintInterval = 120 * time.Millisecond
+
+// cloudShellRepaintCmd schedules the next full-repaint tick. In AWS/Google/Azure
+// browser cloud shells (xterm.js, often inside tmux) the terminal mishandles
+// Bubble Tea's incremental cell writes and corrupts the display on any content
+// change — the loading spinner, arriving data, or scrolling — where only a full
+// repaint (what a manual window resize triggers) clears it. #859's per-scroll
+// ClearScreen was too narrow: it never fired during loading and only on scroll.
+// This drives a full repaint continuously instead. Gated to affected terminals
+// so native terminals keep the optimized path.
+func cloudShellRepaintCmd() tea.Cmd {
+	return tea.Tick(cloudShellRepaintInterval, func(time.Time) tea.Msg {
+		return cloudShellRepaintMsg{}
+	})
+}
 
 // forceQuitKey is the one global escape that survives even while a page captures
 // text input: ctrl+c always quits, so a focused filter can never trap the user.
@@ -235,6 +260,10 @@ func (m *App) Init() tea.Cmd {
 		cmds = append(cmds, cmd)
 	}
 
+	if termquirk.ScrollNeedsFullRepaint() {
+		cmds = append(cmds, cloudShellRepaintCmd())
+	}
+
 	return tea.Batch(cmds...)
 }
 
@@ -258,6 +287,11 @@ func (m *App) fetchIdentityCmd() tea.Cmd {
 // bar.
 func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case cloudShellRepaintMsg:
+		// Continuous full repaint for browser cloud shells: clear the screen and
+		// arm the next tick. The tick is a 120ms timer, so batching (concurrent)
+		// vs sequencing is immaterial to ordering here.
+		return m, tea.Batch(tea.ClearScreen, cloudShellRepaintCmd())
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		// Give the help bar the terminal width so it can self-truncate its short

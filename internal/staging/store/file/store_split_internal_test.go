@@ -1,6 +1,7 @@
 package file
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -347,16 +348,37 @@ func TestNewWorkingStore_EncryptionCheckError(t *testing.T) {
 }
 
 // TestWarnPlaintextOnce_WithCause covers the branch that appends a non-nil
-// underlying cause to the one-time plaintext warning. It resets the package
-// once-guard (sync.Once cannot be copied, so it is reset to a fresh value rather
-// than saved/restored) so the warning body runs regardless of test ordering,
-// then leaves it fired — a valid terminal state, and the warning is a pure
-// stderr side effect no test asserts on.
+// underlying cause to the one-time plaintext warning, and pins that the warning
+// is written to the redirectable sink (SetWarnWriter) rather than straight to
+// os.Stderr — the seam the TUI uses to keep the warning out of its alt-screen.
+// It resets the package once-guard (sync.Once cannot be copied, so it is reset
+// to a fresh value rather than saved/restored) so the warning body runs
+// regardless of test ordering.
 //
 //nolint:paralleltest // mutates the package-level plaintextWarnOnce guard
-func TestWarnPlaintextOnce_WithCause(_ *testing.T) {
+func TestWarnPlaintextOnce_WithCause(t *testing.T) {
 	plaintextWarnOnce = sync.Once{}
 
-	// Must not panic; exercises the cause != nil message branch.
+	var buf bytes.Buffer
+
+	prev := SetWarnWriter(&buf)
+	defer SetWarnWriter(prev)
+
 	warnPlaintextOnce(errors.New("keychain unavailable"))
+
+	out := buf.String()
+	assert.Contains(t, out, "stored UNENCRYPTED", "the primary warning must reach the sink")
+	assert.Contains(t, out, "keychain unavailable", "the underlying cause must be appended")
+}
+
+// TestSetWarnWriter_SwapAndRestore pins that SetWarnWriter returns the previous
+// writer so a caller (tui.Run) can capture during a program and restore after.
+func TestSetWarnWriter_SwapAndRestore(t *testing.T) { //nolint:paralleltest // mutates package-level warnWriter
+	var a, b bytes.Buffer
+
+	orig := SetWarnWriter(&a)
+	defer SetWarnWriter(orig)
+
+	got := SetWarnWriter(&b)
+	assert.Same(t, &a, got, "SetWarnWriter must return the writer it replaced")
 }
