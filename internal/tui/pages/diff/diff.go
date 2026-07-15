@@ -29,6 +29,7 @@ import (
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/nav"
 	"github.com/mpyw/suve/internal/tui/styles"
+	"github.com/mpyw/suve/internal/tui/termquirk"
 )
 
 // scrollKey is a help-only binding advertising viewport scrolling (the diff
@@ -177,14 +178,24 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseWheelMsg:
-		var cmd tea.Cmd
-
-		m.vp, cmd = m.vp.Update(msg)
-
-		return m, cmd
+		return m, m.scrollViewport(msg)
 	default:
 		return m, nil
 	}
+}
+
+// scrollViewport forwards msg to the diff viewport and, when the viewport's
+// scroll offset actually changes on a terminal that mishandles Bubble Tea's
+// scroll-region optimization (CloudShell), forces a full repaint so the scroll
+// renders cleanly (see internal/tui/termquirk).
+func (m *Model) scrollViewport(msg tea.Msg) tea.Cmd {
+	before := m.vp.YOffset()
+
+	var cmd tea.Cmd
+
+	m.vp, cmd = m.vp.Update(msg)
+
+	return termquirk.RepaintOnScroll(m.vp.YOffset() != before, cmd)
 }
 
 // handleKey handles the page-local keys (mask toggle, back) and forwards the
@@ -205,11 +216,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 		return m, nil
 	}
 
-	var cmd tea.Cmd
-
-	m.vp, cmd = m.vp.Update(msg)
-
-	return m, cmd
+	return m, m.scrollViewport(msg)
 }
 
 // HelpKeyMap reports the diff page's context-aware bindings for the help bar:

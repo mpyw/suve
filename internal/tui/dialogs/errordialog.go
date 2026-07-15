@@ -61,11 +61,7 @@ func (d *errorDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		return d, nil
 	case tea.MouseWheelMsg:
-		var cmd tea.Cmd
-
-		d.vp, cmd = d.vp.Update(msg)
-
-		return d, cmd
+		return d, scrollViewport(&d.vp, msg)
 	case tea.MouseClickMsg:
 		if id, _, _, ok := d.hits.At(msg.X, msg.Y); ok && id == regionClose {
 			return d, canceledCmd
@@ -79,11 +75,7 @@ func (d *errorDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		// Any other key scrolls the message body (↑↓/j/k, pgup/pgdn, etc.); Esc is
 		// intercepted by the shell before it reaches here, so it still closes.
-		var cmd tea.Cmd
-
-		d.vp, cmd = d.vp.Update(msg)
-
-		return d, cmd
+		return d, scrollViewport(&d.vp, msg)
 	}
 
 	return d, nil

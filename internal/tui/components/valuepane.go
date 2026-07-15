@@ -74,12 +74,17 @@ func (p *ValuePane) Masked() bool { return p.masked }
 func (p *ValuePane) RawValue() string { return p.raw }
 
 // Update forwards a message (e.g. a wheel event) to the viewport for scrolling.
-func (p *ValuePane) Update(msg tea.Msg) tea.Cmd {
+// It also reports whether the viewport's scroll offset actually changed, so the
+// owning page can force a full repaint only on a real scroll (see
+// internal/tui/termquirk).
+func (p *ValuePane) Update(msg tea.Msg) (tea.Cmd, bool) {
+	before := p.vp.YOffset()
+
 	var cmd tea.Cmd
 
 	p.vp, cmd = p.vp.Update(msg)
 
-	return cmd
+	return cmd, p.vp.YOffset() != before
 }
 
 // HintSuffix is the "(x to reveal)" hint shown next to the Value label for a
