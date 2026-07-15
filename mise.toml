@@ -399,13 +399,15 @@ depends = ["x11-setup"]
 run = "HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-24 run --rm ubuntu-24"
 
 [tasks.docs-build]
-description = "Assemble and build the GitHub Pages site (MkDocs) into .site/out"
+description = "Assemble, strictly build, and link-check the GitHub Pages site into .site/out"
 run = '''
 python3 -m venv .site/venv
 .site/venv/bin/pip install --quiet --upgrade pip
 .site/venv/bin/pip install --quiet -r scripts/docs-requirements.txt
+.site/venv/bin/python scripts/test_docs_pipeline.py
 .site/venv/bin/python scripts/build_docs_site.py
-DISABLE_MKDOCS_2_WARNING=true .site/venv/bin/mkdocs build
+DISABLE_MKDOCS_2_WARNING=true .site/venv/bin/mkdocs build --strict
+.site/venv/bin/python scripts/check_site_links.py
 '''
 
 [tasks.docs-serve]
@@ -415,5 +417,14 @@ python3 -m venv .site/venv
 .site/venv/bin/pip install --quiet --upgrade pip
 .site/venv/bin/pip install --quiet -r scripts/docs-requirements.txt
 .site/venv/bin/python scripts/build_docs_site.py
-DISABLE_MKDOCS_2_WARNING=true .site/venv/bin/mkdocs serve
+DISABLE_MKDOCS_2_WARNING=true .site/venv/bin/mkdocs serve --strict
+'''
+
+[tasks.docs-test]
+description = "Unit-test the docs-site pipeline (splitter + link checker)"
+run = '''
+python3 -m venv .site/venv
+.site/venv/bin/pip install --quiet --upgrade pip
+.site/venv/bin/pip install --quiet -r scripts/docs-requirements.txt
+.site/venv/bin/python scripts/test_docs_pipeline.py
 '''

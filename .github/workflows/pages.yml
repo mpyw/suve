@@ -8,28 +8,33 @@ on:
     paths:
       - README.md
       - docs/**
+      - demo/**
+      - gui/build/appicon.png
       - mkdocs.yml
       - scripts/build_docs_site.py
+      - scripts/check_site_links.py
+      - scripts/test_docs_pipeline.py
       - scripts/docs-requirements.txt
       - .github/workflows/pages.yml
-  # Build (but don't deploy) on PRs that touch the site, to catch breakage early.
+  # Build + validate (no deploy) on PRs that touch the site, to catch breakage early.
   pull_request:
     paths:
       - README.md
       - docs/**
+      - demo/**
+      - gui/build/appicon.png
       - mkdocs.yml
       - scripts/build_docs_site.py
+      - scripts/check_site_links.py
+      - scripts/test_docs_pipeline.py
       - scripts/docs-requirements.txt
       - .github/workflows/pages.yml
   workflow_dispatch:
 
-# Least privilege: read the repo, write the Pages deployment via OIDC.
+# Least privilege by default; the deploy job opts into the Pages write scopes.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# One in-flight Pages deployment at a time; don't cancel a running deploy.
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: false
@@ -39,8 +44,11 @@ env:
   DISABLE_MKDOCS_2_WARNING: "true"
 
 jobs:
-  build:
-    name: Build site
+  # Deterministic validation gate — runs on PRs and main, needs no Pages perms.
+  # It fails the build (no AI/human review) on any broken local link, missing
+  # anchor, output collision, missing asset, or unmapped README anchor.
+  validate:
+    name: Build & validate site
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -50,13 +58,51 @@ jobs:
           # fetch them so they ship in the site instead of as pointer files.
           lfs: true
 
+      - name: Set up docs toolchain
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet --upgrade pip
+          .venv/bin/pip install --quiet -r scripts/docs-requirements.txt
+
+      - name: Unit-test the pipeline
+        run: .venv/bin/python scripts/test_docs_pipeline.py
+
+      - name: Assemble the site source (fails on broken/unmapped links, collisions, missing assets)
+        run: .venv/bin/python scripts/build_docs_site.py
+
+      - name: Build with MkDocs (strict — link/anchor/nav problems fail)
+        run: .venv/bin/mkdocs build --strict
+
+      - name: Validate rendered links, anchors and assets
+        run: .venv/bin/python scripts/check_site_links.py
+
+  # Deploy from main only; this is the sole job with the Pages write scopes.
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          lfs: true
+
       - name: Build the site
         run: |
           python3 -m venv .venv
           .venv/bin/pip install --quiet --upgrade pip
           .venv/bin/pip install --quiet -r scripts/docs-requirements.txt
           .venv/bin/python scripts/build_docs_site.py
-          .venv/bin/mkdocs build
+          .venv/bin/mkdocs build --strict
+          .venv/bin/python scripts/check_site_links.py
 
       - name: Configure Pages
         # enablement: true turns Pages on (source = GitHub Actions) on the first run.
@@ -87,16 +133,6 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build
-    # PRs only validate the build; deploy from main (or a manual dispatch on main).
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

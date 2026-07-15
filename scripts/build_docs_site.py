@@ -2,16 +2,21 @@
 """Assemble the MkDocs source tree for the GitHub Pages site.
 
 The site is generated from the repo's existing Markdown — README.md plus
-docs/*.md — WITHOUT committing anything: this script writes a throwaway source
-tree under .site/src that `mkdocs build` (see mkdocs.yml) turns into .site/out.
+docs/**/*.md — WITHOUT committing anything: this writes a throwaway source tree
+under .site/src that `mkdocs build` (see mkdocs.yml) turns into .site/out.
 
 Because the README is large, it is split into one page per top-level `## `
 section (the content before the first section becomes the home page). Splitting
 would break the many intra-README anchor links (`#provider-selection`, …) and
 the docs' `../README.md#…` links, so an anchor→page map is built from every
-heading and used to rewrite those links to the page each section landed on. The
-heading slugs use the same GitHub-compatible slugifier MkDocs is configured with
-(pymdownx.slugs.slugify), so the rewritten anchors resolve.
+heading and used to rewrite those links to the page each section landed on.
+
+Fail-closed by design: anything that would silently produce a broken or wrong
+site — an unmapped anchor, a missing asset, an output-path collision, an empty
+page slug, or a Git-LFS pointer left un-materialised — is collected and makes the
+script exit non-zero, so CI catches doc-restructuring breakage deterministically
+(no AI/human review). The rendered HTML is validated separately by
+scripts/check_site_links.py after the build.
 
 Run via `mise docs-build` / `mise docs-serve`, or directly; it is idempotent.
 """
@@ -26,23 +31,21 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / ".site" / "src"
 
-# Local assets referenced (by relative path) from the README intro, copied into
-# the site so those links resolve. Each entry is a path relative to the repo root.
+# Local assets referenced (by relative path) from the README, copied into the
+# site so those links resolve. Each entry is a path relative to the repo root.
 ASSETS = ["demo", "gui/build/appicon.png"]
 
-# The docs/*.md pages, in nav order, as (source filename, nav title).
-DOC_PAGES = [
-    ("aws.md", "AWS commands"),
-    ("azure.md", "Azure commands"),
-    ("gcloud.md", "Google Cloud commands"),
-    ("staging-state-transitions.md", "Staging state transitions"),
-]
-
-FENCE_RE = re.compile(r"^\s*(```|~~~)")
+# A fenced code block opens with ``` or ~~~ (>=3), indented at most 3 spaces
+# (CommonMark), and closes with a marker of the SAME character and >= the opening
+# length, on a line that is only that marker (+ optional trailing text on open).
+FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})\s*(.*)$")
 H2_RE = re.compile(r"^## +(.*\S)\s*$")
 HEADING_RE = re.compile(r"^(#{1,6}) +(.*\S)\s*$")
 MD_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 HTML_TAG_RE = re.compile(r"<[^>]+>")
+# Inline code spans: a run of N backticks, content, then N backticks. Used to
+# avoid rewriting links that live inside inline code.
+CODE_SPAN_RE = re.compile(r"(`+)(?:.*?)\1")
 # A <details> summary is not a heading, so MkDocs (and GitHub) give it no anchor.
 # We map its text and inject a matching id so #anchor links to it still resolve.
 SUMMARY_RE = re.compile(r"<summary(\s[^>]*)?>(.*?)</summary>", re.IGNORECASE)
@@ -68,6 +71,32 @@ def _load_slugify():
 _SLUGIFY = _load_slugify()
 
 
+class Fences:
+    """Tracks fenced-code state so headings/links inside code are ignored,
+    honoring the opening marker's character and length (mixed ```/~~~ safe)."""
+
+    def __init__(self) -> None:
+        self._char = ""
+        self._len = 0
+
+    def is_code(self, line: str) -> bool:
+        """Feed the next line; return True if it is a fence marker or inside a
+        fenced block (i.e. not ordinary prose)."""
+        m = FENCE_RE.match(line)
+        if not self._char:
+            if m:
+                self._char = m.group(1)[0]
+                self._len = len(m.group(1))
+                return True
+            return False
+        # Inside a fence: only a closing marker of the same char, >= the opening
+        # length, with nothing but the marker on the line, ends it.
+        if m and m.group(1)[0] == self._char and len(m.group(1)) >= self._len and not m.group(2).strip():
+            self._char = ""
+            self._len = 0
+        return True
+
+
 def heading_slug(raw: str) -> str:
     """Slug for a heading's raw Markdown text, mirroring how MkDocs slugifies the
     rendered heading: strip HTML tags, reduce Markdown links to their text, drop
@@ -82,7 +111,19 @@ def section_filename(title: str) -> str:
     return heading_slug(title) + ".md"
 
 
-def build_readme_pages(readme: str):
+def apply_outside_code(line: str, fn) -> str:
+    """Apply fn to the parts of line that are NOT inside inline code spans."""
+    out: list[str] = []
+    pos = 0
+    for m in CODE_SPAN_RE.finditer(line):
+        out.append(fn(line[pos : m.start()]))
+        out.append(m.group(0))  # inline code, left verbatim
+        pos = m.end()
+    out.append(fn(line[pos:]))
+    return "".join(out)
+
+
+def build_readme_pages(readme: str, err):
     """Split the README into (filename, title, body) pages at each `## ` heading,
     and build the anchor→filename map over every heading. The pre-first-section
     content is the home page (index.md)."""
@@ -93,33 +134,33 @@ def build_readme_pages(readme: str):
     current_name = "index.md"
     current_title = "Home"
     current_body: list[str] = []
-    in_fence = False
+    fences = Fences()
 
     def flush():
         pages.append((current_name, current_title, current_body))
 
     for line in lines:
-        if FENCE_RE.match(line):
-            in_fence = not in_fence
+        if fences.is_code(line):
             current_body.append(line)
             continue
 
-        if not in_fence:
-            m2 = H2_RE.match(line)
-            if m2:
-                flush()
-                current_title = m2.group(1)
-                current_name = section_filename(current_title)
-                current_body = [line]
-                anchor_page[heading_slug(current_title)] = current_name
-                continue
+        m2 = H2_RE.match(line)
+        if m2:
+            flush()
+            current_title = m2.group(1)
+            current_name = section_filename(current_title)
+            if current_name == ".md":
+                err(f"README section {current_title!r} slugifies to an empty page name")
+            current_body = [line]
+            anchor_page.setdefault(heading_slug(current_title), current_name)
+            continue
 
-            mh = HEADING_RE.match(line)
-            if mh:
-                anchor_page.setdefault(heading_slug(mh.group(2)), current_name)
+        mh = HEADING_RE.match(line)
+        if mh:
+            anchor_page.setdefault(heading_slug(mh.group(2)), current_name)
 
-            for ms in SUMMARY_RE.finditer(line):
-                anchor_page.setdefault(heading_slug(ms.group(2)), current_name)
+        for ms in SUMMARY_RE.finditer(line):
+            anchor_page.setdefault(heading_slug(ms.group(2)), current_name)
 
         current_body.append(line)
 
@@ -127,14 +168,14 @@ def build_readme_pages(readme: str):
     return pages, anchor_page
 
 
-def rewrite_links(body: str, anchor_page: dict[str, str], *, from_readme: bool, warn) -> str:
-    """Rewrite cross-page links so they survive the split. Links inside fenced code
-    are left untouched."""
+def rewrite_links(body: str, anchor_page: dict[str, str], *, from_readme: bool, err) -> str:
+    """Rewrite cross-page links so they survive the split. Links inside fenced or
+    inline code are left untouched; an unmapped anchor is a hard error."""
 
     def map_anchor(anchor: str, whole: str) -> str:
-        page = anchor_page.get(anchor)
+        page = anchor_page.get(anchor.lower())
         if page is None:
-            warn(f"unmapped anchor #{anchor} in {whole!r}")
+            err(f"unmapped anchor #{anchor} in {whole!r}")
             return whole
         return f"]({page}#{anchor})"
 
@@ -144,79 +185,128 @@ def rewrite_links(body: str, anchor_page: dict[str, str], *, from_readme: bool, 
             return m.group(0)
         return f'<summary{attrs} id="{heading_slug(inner)}">{inner}</summary>'
 
-    def rewrite_line(line: str) -> str:
+    def rewrite_prose(text: str) -> str:
         if from_readme:
             # README lives at the repo root; docs/ links become root-level siblings.
-            line = re.sub(r"\]\(docs/([^)]+)\)", r"](\1)", line)
+            text = re.sub(r"\]\(docs/([^)#]+)((?:#[^)]*)?)\)", r"](\1\2)", text)
             # Give each <details> summary an id so #anchor links to it resolve.
-            line = SUMMARY_RE.sub(add_summary_id, line)
+            text = SUMMARY_RE.sub(add_summary_id, text)
             # Same-README anchors now live on whichever split page carries them.
-            line = re.sub(r"\]\(#([\w-]+)\)", lambda m: map_anchor(m.group(1), m.group(0)), line)
+            text = re.sub(r"\]\(#([^)\s]+)\)", lambda m: map_anchor(m.group(1), m.group(0)), text)
         else:
-            # docs/*.md pages: rewrite their links back to the README.
-            line = re.sub(
-                r"\]\(\.\./README\.md#([\w-]+)\)",
+            # docs/*.md pages: rewrite their links back to the README, tolerating
+            # ../README.md, ./README.md, and README.md spellings.
+            text = re.sub(
+                r"\]\((?:\.\./|\./)?README\.md#([^)\s]+)\)",
                 lambda m: map_anchor(m.group(1), m.group(0)),
-                line,
+                text,
             )
-            line = re.sub(r"\]\(\.\./README\.md\)", "](index.md)", line)
-        return line
+            text = re.sub(r"\]\((?:\.\./|\./)?README\.md\)", "](index.md)", text)
+        return text
 
+    fences = Fences()
     out: list[str] = []
-    in_fence = False
     for line in body.splitlines(keepends=True):
-        if FENCE_RE.match(line):
-            in_fence = not in_fence
+        if fences.is_code(line):
             out.append(line)
             continue
-        out.append(line if in_fence else rewrite_line(line))
+        out.append(apply_outside_code(line, rewrite_prose))
     return "".join(out)
 
 
+def first_heading_title(text: str, fallback: str) -> str:
+    fences = Fences()
+    for line in text.splitlines(keepends=True):
+        if fences.is_code(line):
+            continue
+        mh = HEADING_RE.match(line)
+        if mh:
+            return HTML_TAG_RE.sub("", MD_LINK_RE.sub(r"\1", mh.group(2))).strip() or fallback
+    return fallback
+
+
+def discover_doc_pages(err) -> list[tuple[Path, str, str]]:
+    """Every docs/**/*.md, as (source path, flat output filename, nav title).
+    Flattening keeps README's `docs/X.md` links working as root-level `X.md`."""
+    docs_dir = REPO / "docs"
+    out: list[tuple[Path, str, str]] = []
+    for path in sorted(docs_dir.rglob("*.md")):
+        rel = path.relative_to(docs_dir)
+        if len(rel.parts) > 1:
+            err(f"nested docs file not supported (flatten it or extend the script): docs/{rel}")
+            continue
+        title = first_heading_title(path.read_text(encoding="utf-8"), rel.stem)
+        out.append((path, rel.name, title))
+    return out
+
+
+def is_lfs_pointer(path: Path) -> bool:
+    try:
+        with path.open("rb") as fh:
+            return fh.read(46).startswith(b"version https://git-lfs")
+    except OSError:
+        return False
+
+
 def main() -> int:
-    warnings: list[str] = []
-    warn = warnings.append
+    errors: list[str] = []
+    err = errors.append
+    claimed: dict[str, str] = {}  # output filename -> what claimed it (collision guard)
+
+    def claim(name: str, who: str) -> None:
+        if name in claimed:
+            err(f"output collision: {who} and {claimed[name]} both map to {name}")
+        else:
+            claimed[name] = who
 
     if SRC.exists():
         shutil.rmtree(SRC)
     SRC.mkdir(parents=True)
 
     readme = (REPO / "README.md").read_text(encoding="utf-8")
-    pages, anchor_page = build_readme_pages(readme)
-
-    # Home is always reachable even if the README ever loses its intro.
-    anchor_page.setdefault("", "index.md")
+    pages, anchor_page = build_readme_pages(readme, err)
+    anchor_page.setdefault("", "index.md")  # bare ../README.md -> home
 
     nav: list[tuple[str, str]] = []
     for name, title, body in pages:
-        text = rewrite_links("".join(body), anchor_page, from_readme=True, warn=warn)
+        claim(name, f"README section {title!r}")
+        text = rewrite_links("".join(body), anchor_page, from_readme=True, err=err)
         (SRC / name).write_text(text, encoding="utf-8")
         nav.append((name, "Home" if name == "index.md" else title))
 
-    for filename, title in DOC_PAGES:
-        body = (REPO / "docs" / filename).read_text(encoding="utf-8")
-        text = rewrite_links(body, anchor_page, from_readme=False, warn=warn)
-        (SRC / filename).write_text(text, encoding="utf-8")
-        nav.append((filename, title))
+    for path, name, title in discover_doc_pages(err):
+        claim(name, f"docs/{path.name}")
+        text = rewrite_links(path.read_text(encoding="utf-8"), anchor_page, from_readme=False, err=err)
+        (SRC / name).write_text(text, encoding="utf-8")
+        nav.append((name, title))
 
     for asset in ASSETS:
         src = REPO / asset
         dst = SRC / asset
         if src.is_dir():
             shutil.copytree(src, dst)
+            for f in src.rglob("*"):
+                if f.is_file() and is_lfs_pointer(f):
+                    err(f"asset is an un-materialised Git-LFS pointer: {f.relative_to(REPO)}")
         elif src.is_file():
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
+            if is_lfs_pointer(src):
+                err(f"asset is an un-materialised Git-LFS pointer: {asset}")
         else:
-            warn(f"asset not found: {asset}")
+            err(f"asset not found: {asset}")
 
     # literate-nav reads this SUMMARY.md for page order/titles.
     summary = "".join(f"- [{title}]({name})\n" for name, title in nav)
     (SRC / "SUMMARY.md").write_text(summary, encoding="utf-8")
 
-    print(f"assembled {len(pages)} README pages + {len(DOC_PAGES)} doc pages into {SRC.relative_to(REPO)}")
-    for w in warnings:
-        print(f"  warning: {w}", file=sys.stderr)
+    if errors:
+        print(f"build_docs_site: {len(errors)} error(s):", file=sys.stderr)
+        for e in errors:
+            print(f"  - {e}", file=sys.stderr)
+        return 1
+
+    print(f"assembled {len(pages)} README pages + {len(nav) - len(pages)} doc pages into {SRC.relative_to(REPO)}")
     return 0
 
 

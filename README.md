@@ -927,8 +927,8 @@ Unversioned key-value store. `#`, `~`, and `:` are valid key characters — the 
 | [`suve azure param create`](docs/azure.md#suve-azure-param-create) | `--namespace`/`--ns` | Create a new key |
 | [`suve azure param update`](docs/azure.md#suve-azure-param-update) | `--namespace`/`--ns`<br>`--yes` | Update an existing key |
 | [`suve azure param delete`](docs/azure.md#suve-azure-param-delete) | `--namespace`/`--ns`<br>`--yes` | Delete a key |
-| [`suve azure param tag`](docs/azure.md#suve-azure-param-tag) | `--namespace`/`--ns` | Add or update tags (GET-merge-PUT) |
-| [`suve azure param untag`](docs/azure.md#suve-azure-param-untag) | `--namespace`/`--ns` | Remove tags |
+| [`suve azure param tag`](docs/azure.md#suve-azure-param-tag--untag) | `--namespace`/`--ns` | Add or update tags (GET-merge-PUT) |
+| [`suve azure param untag`](docs/azure.md#suve-azure-param-tag--untag) | `--namespace`/`--ns` | Remove tags |
 
 #### Namespaces
 

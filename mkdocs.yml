@@ -14,6 +14,22 @@ site_dir: .site/out
 exclude_docs: |
   SUMMARY.md
 
+# Promote every link/anchor/nav problem to a warning; the build runs with
+# --strict (see the Pages workflow and `mise docs-build`), which turns these
+# warnings into a non-zero exit — so a doc restructuring that breaks a Markdown
+# link or cross-page #anchor fails CI deterministically. Raw-HTML links/assets
+# (which MkDocs does not validate) are covered by scripts/check_site_links.py.
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
 theme:
   name: material
   icon:
