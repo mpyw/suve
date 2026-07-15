@@ -10,6 +10,11 @@ repo_name: mpyw/suve
 docs_dir: .site/src
 site_dir: .site/out
 
+# Small style overrides (see .github/scripts/docs-extra.css); the assembler copies
+# the file into the docs source at assets/docs-extra.css.
+extra_css:
+  - assets/docs-extra.css
+
 # literate-nav reads SUMMARY.md for the nav; keep it out of the built pages.
 exclude_docs: |
   SUMMARY.md

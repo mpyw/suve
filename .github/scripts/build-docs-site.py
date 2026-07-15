@@ -28,12 +28,17 @@ import shutil
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]  # .github/scripts/<file> → repo root
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[1]  # .github/scripts/<file> → repo root
 SRC = REPO / ".site" / "src"
 
 # Local assets referenced (by relative path) from the README, copied into the
 # site so those links resolve. Each entry is a path relative to the repo root.
 ASSETS = ["demo", "gui/build/appicon.png"]
+
+# Committed stylesheet copied into the docs source at assets/docs-extra.css and
+# wired via mkdocs.yml extra_css.
+EXTRA_CSS = HERE / "docs-extra.css"
 
 # A fenced code block opens with ``` or ~~~ (>=3), indented at most 3 spaces
 # (CommonMark), and closes with a marker of the SAME character and >= the opening
@@ -163,6 +168,32 @@ def add_div_markdown(m: re.Match) -> str:
     if HAS_MARKDOWN_ATTR_RE.search(tag):
         return tag
     return '<div markdown="1"' + tag[len("<div") :]
+
+
+BULLET_RE = re.compile(r"^[-*+] ")
+# A flush-left line that is NOT a paragraph (so a following list is already fine):
+# blank, a list item, heading, table row, blockquote, or raw HTML.
+NON_PARAGRAPH_RE = re.compile(r"^([-*+] |#{1,6} |\||>|<|\d+[.)] |\s*$)")
+
+
+def ensure_blank_before_lists(text: str) -> str:
+    """Insert the blank line Python-Markdown needs before a bullet list that opens
+    directly under a paragraph. GitHub renders such a list without the blank line;
+    MkDocs would otherwise fold the bullets into the paragraph as literal text."""
+    fences = Fences()
+    out: list[str] = []
+    prev_paragraph = False
+    for i, line in enumerate(text.splitlines(keepends=True), start=1):
+        if fences.is_code(line, i):
+            out.append(line)
+            prev_paragraph = False
+            continue
+        if prev_paragraph and BULLET_RE.match(line):
+            out.append("\n")
+        out.append(line)
+        # The next line is "under a paragraph" only if this one is flush-left prose.
+        prev_paragraph = bool(line.strip()) and not NON_PARAGRAPH_RE.match(line)
+    return "".join(out)
 
 
 def promote_headings(text: str) -> str:
@@ -407,6 +438,7 @@ def main() -> int:
         # (the home page already carries the README's own top-level title).
         if name != "index.md":
             text = promote_headings(text)
+        text = ensure_blank_before_lists(text)
         (SRC / name).write_text(text, encoding="utf-8")
         nav.append((name, "Home" if name == "index.md" else title))
 
@@ -415,6 +447,7 @@ def main() -> int:
         text = rewrite_links(
             path.read_text(encoding="utf-8"), anchor_page, from_readme=False, err=err, duplicates=dups, label=f"docs/{path.name}"
         )
+        text = ensure_blank_before_lists(text)
         (SRC / name).write_text(text, encoding="utf-8")
         nav.append((name, title))
 
@@ -433,6 +466,14 @@ def main() -> int:
                 err(f"asset is an un-materialised Git-LFS pointer: {asset}")
         else:
             err(f"asset not found: {asset}")
+
+    # Copy the extra stylesheet into the docs source (wired via mkdocs extra_css).
+    if EXTRA_CSS.is_file():
+        css_dst = SRC / "assets" / "docs-extra.css"
+        css_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(EXTRA_CSS, css_dst)
+    else:
+        err(f"extra stylesheet not found: {EXTRA_CSS.relative_to(REPO)}")
 
     # literate-nav reads this SUMMARY.md for page order/titles.
     summary = "".join(f"- [{title}]({name})\n" for name, title in nav)
