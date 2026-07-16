@@ -97,7 +97,8 @@ The right prebuilt binary is pulled in automatically per platform: the self-cont
 > [!TIP]
 > **Ideal for cloud shells.** AWS CloudShell, Google Cloud Shell, and Azure Cloud Shell all ship Node.js, so `npx @mpyw/suve …` runs suve with nothing to download or install — and the dependency-free CLI/TUI-only build is exactly what you want there (no GUI). Each shell's ambient credentials are auto-detected too; see [Cloud Shell support](#cloud-shell-support).
 
-### <a href="https://curl.se/"><img src="https://cdn.simpleicons.org/curl" height="28" alt=""></a> Using curl or wget (macOS/Linux)
+<details>
+<summary><a href="https://curl.se/"><img src="https://cdn.simpleicons.org/curl" height="20" alt=""></a> Using curl or wget (macOS/Linux)</summary>
 
 No package manager? Install the latest release straight from GitHub Releases with whichever downloader your host already has:
 
@@ -132,6 +133,8 @@ curl -fsSL "$BASE" | sh -s -- --rpm                          # native .rpm via d
 > curl -fsSLO https://raw.githubusercontent.com/mpyw/suve/main/scripts/install.sh
 > less install.sh && sh install.sh
 > ```
+
+</details>
 
 <details>
 <summary><a href="https://www.linux.org/"><img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Tux.png" height="20" alt=""></a> Manual .deb / .rpm install (without the script)</summary>
