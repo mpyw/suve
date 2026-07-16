@@ -98,9 +98,48 @@ The right prebuilt binary is pulled in automatically per platform: the self-cont
 > **Ideal for cloud shells.** AWS CloudShell, Google Cloud Shell, and Azure Cloud Shell all ship Node.js, so `npx @mpyw/suve …` runs suve with nothing to download or install — and the dependency-free CLI/TUI-only build is exactly what you want there (no GUI). Each shell's ambient credentials are auto-detected too; see [Cloud Shell support](#cloud-shell-support).
 
 <details>
-<summary><a href="https://www.linux.org/"><img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Tux.png" height="20" alt=""></a> Linux (.deb / .rpm)</summary>
+<summary><a href="https://curl.se/"><img src="https://cdn.simpleicons.org/curl" height="20" alt=""></a> Using curl or wget (macOS/Linux)</summary>
 
-Download packages from [GitHub Releases](https://github.com/mpyw/suve/releases):
+No package manager? Install the latest release straight from GitHub Releases with whichever downloader your host already has:
+
+```bash
+# curl
+curl -fsSL https://raw.githubusercontent.com/mpyw/suve/main/scripts/install.sh | sh
+
+# wget
+wget -qO- https://raw.githubusercontent.com/mpyw/suve/main/scripts/install.sh | sh
+```
+
+The script detects your OS and CPU architecture, downloads the matching release asset over HTTPS, **verifies its SHA-256 against the release's `checksums.txt`**, and installs the `suve` binary to `/usr/local/bin` (using `sudo` if that directory needs elevation, or falling back to `~/.local/bin` when no `sudo` is available). On Linux it auto-selects the build: the GUI build when a system WebKit2GTK (4.1 or 4.0) is detected, otherwise the dependency-free CLI/TUI-only static build.
+
+Everything below is optional — pick the line you want (swap `curl -fsSL` for `wget -qO-` if that's what you have):
+
+```bash
+BASE=https://raw.githubusercontent.com/mpyw/suve/main/scripts/install.sh
+
+curl -fsSL "$BASE" | VERSION=1.9.2 sh                        # pin a specific version
+curl -fsSL "$BASE" | sh -s -- --cli                          # force CLI/TUI-only
+curl -fsSL "$BASE" | sh -s -- --gui                          # force the GUI build
+curl -fsSL "$BASE" | SUVE_INSTALL_DIR="$HOME/.local/bin" sh  # install to a custom dir
+curl -fsSL "$BASE" | sh -s -- --deb                          # native .deb via apt (Debian/Ubuntu)
+curl -fsSL "$BASE" | sh -s -- --rpm                          # native .rpm via dnf (Fedora/RHEL)
+```
+
+`--deb` / `--rpm` install a **native package** instead of a bare binary — tracked by `apt`/`dnf` for clean upgrade/removal, with GUI dependencies resolved for you. They also default to auto (GUI when WebKit2GTK is already present, else CLI-only); add `--gui`/`--cli` to force a build.
+
+> [!TIP]
+> Prefer to read before you run? Download, inspect, then execute:
+> ```bash
+> curl -fsSLO https://raw.githubusercontent.com/mpyw/suve/main/scripts/install.sh
+> less install.sh && sh install.sh
+> ```
+
+</details>
+
+<details>
+<summary><a href="https://www.linux.org/"><img src="https://upload.wikimedia.org/wikipedia/commons/a/af/Tux.png" height="20" alt=""></a> Manual .deb / .rpm install (without the script)</summary>
+
+Prefer to do it by hand? The `--deb` / `--rpm` flags above are just a wrapper around downloading the package from [GitHub Releases](https://github.com/mpyw/suve/releases) and handing it to your package manager:
 
 **Debian/Ubuntu (.deb):**
 
@@ -111,11 +150,11 @@ export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Ubuntu 24.04+
 
 # CLI/TUI-only (recommended, no GUI dependencies)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli_${VERSION}-1_${ARCH}.deb"
-sudo dpkg -i "suve-cli_${VERSION}-1_${ARCH}.deb"
+sudo apt install "./suve-cli_${VERSION}-1_${ARCH}.deb"
 
-# Full version (CLI/TUI + GUI, requires GTK3 and WebKit2GTK)
+# Full version (CLI/TUI + GUI; apt resolves GTK3 and WebKit2GTK)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
-sudo dpkg -i "suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
+sudo apt install "./suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
 ```
 
 **Note:** Ubuntu 22.04/Debian uses webkit2gtk-4.0 (default). Ubuntu 24.04+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
@@ -129,11 +168,11 @@ export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Fedora 40+
 
 # CLI/TUI-only (recommended, no GUI dependencies)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli-${VERSION}-1.${ARCH}.rpm"
-sudo rpm -i "suve-cli-${VERSION}-1.${ARCH}.rpm"
+sudo dnf install "./suve-cli-${VERSION}-1.${ARCH}.rpm"
 
-# Full version (CLI/TUI + GUI, requires GTK3 and WebKit2GTK)
+# Full version (CLI/TUI + GUI; dnf resolves GTK3 and WebKit2GTK)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
-sudo rpm -i "suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
+sudo dnf install "./suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 ```
 
 **Note:** Fedora 39 and earlier uses webkit2gtk-4.0 (default). Fedora 40+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).

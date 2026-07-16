@@ -212,6 +212,16 @@ class RewriteTests(unittest.TestCase):
         out2 = b.rewrite_links('<div markdown="span">\n', {}, from_readme=True, err=errors.append)
         self.assertEqual(out2.count("markdown="), 1)
 
+    def test_details_gets_markdown_attr_once(self):
+        # Without markdown="1", md_in_html leaves inline `code`/**bold**/tables
+        # inside a <details> as literal text on the site (GitHub renders them).
+        errors: list[str] = []
+        out = b.rewrite_links("<details>\n", {}, from_readme=True, err=errors.append)
+        self.assertIn('<details markdown="1">', out)
+        # An existing markdown attribute is preserved, not doubled.
+        out2 = b.rewrite_links('<details markdown="1" open>\n', {}, from_readme=True, err=errors.append)
+        self.assertEqual(out2.count("markdown="), 1)
+
     def test_subpage_local_asset_src_gets_dotdot_prefix(self):
         errors: list[str] = []
         out = b.rewrite_links(

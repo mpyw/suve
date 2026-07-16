@@ -109,6 +109,7 @@ REF_USE_RE = re.compile(r"\[([^\]]+)\]\[([^\]]*)\]")
 # values (so an alt="a > b" cannot truncate the tag mid-attribute).
 IMG_TAG_RE = re.compile(r"""<img\b(?:[^>"']|"[^"]*"|'[^']*')*>""", re.IGNORECASE)
 DIV_OPEN_RE = re.compile(r"""<div\b(?:[^>"']|"[^"]*"|'[^']*')*>""", re.IGNORECASE)
+DETAILS_OPEN_RE = re.compile(r"""<details\b(?:[^>"']|"[^"]*"|'[^']*')*>""", re.IGNORECASE)
 # Attribute matchers use a non-name lookbehind so data-width / data-style / …
 # are not mistaken for the bare attribute.
 IMG_WIDTH_RE = re.compile(r'(?<![-\w])width\s*=\s*"(\d+)"', re.IGNORECASE)
@@ -218,6 +219,16 @@ def add_div_markdown(m: re.Match) -> str:
     if HAS_MARKDOWN_ATTR_RE.search(tag):
         return tag
     return '<div markdown="1"' + tag[len("<div") :]
+
+
+def add_details_markdown(m: re.Match) -> str:
+    """Add markdown="1" to a <details> open tag that lacks it. Without it,
+    md_in_html leaves the block's inner Markdown (inline `code`, **bold**,
+    tables) as literal text — GitHub renders it, the site would not."""
+    tag = m.group(0)
+    if HAS_MARKDOWN_ATTR_RE.search(tag):
+        return tag
+    return '<details markdown="1"' + tag[len("<details") :]
 
 
 BULLET_RE = re.compile(r"^[-*+] ")
@@ -409,6 +420,7 @@ def rewrite_links(
             # Let Markdown inside raw <div> wrappers (centered badges/links) render:
             # md_in_html only processes it when the block is marked markdown="1".
             text = DIV_OPEN_RE.sub(add_div_markdown, text)
+            text = DETAILS_OPEN_RE.sub(add_details_markdown, text)
             # README lives at the repo root; docs/ links become root-level siblings.
             text = re.sub(r"\]\(docs/([^)#]+)((?:#[^)]*)?)\)", r"](\1\2)", text)
             # Give each <details> summary an id so #anchor links to it resolve.
