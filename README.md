@@ -10,7 +10,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
   <!-- site:skip -->
-  <p><a href="https://mpyw.me/suve"><strong>📖 Documentation</strong></a></p>
+  <p><a href="https://mpyw.me/suve"><img src="https://github.com/user-attachments/assets/69d90557-eacd-4480-8834-cf7f5f28d341" alt="Documentation on GitHub Pages" width="480"></a></p>
   <!-- /site:skip -->
 </div>
 
