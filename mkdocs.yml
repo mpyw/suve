@@ -37,6 +37,10 @@ validation:
 
 theme:
   name: material
+  # The app icon (copied into the docs source by build-docs-site.py via ASSETS)
+  # doubles as the header logo and the browser-tab favicon.
+  logo: gui/build/appicon.png
+  favicon: gui/build/appicon.png
   icon:
     repo: fontawesome/brands/github
   palette:

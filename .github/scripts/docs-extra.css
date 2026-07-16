@@ -52,3 +52,11 @@
   font-weight: 700;
   line-height: 1.25;
 }
+
+/* Because the home page has no in-content <h1> (its banner is .hero-title, not a
+   heading), Material synthesizes a page-title <h1>Home</h1> from the nav entry —
+   a bare, id-less heading. Every other page has a real content heading (which
+   carries an id), so hiding id-less <h1>s drops just that synthesized "Home". */
+.md-typeset h1:not([id]) {
+  display: none;
+}
