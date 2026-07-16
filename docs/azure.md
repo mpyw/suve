@@ -1,6 +1,8 @@
 # Azure Commands (Key Vault + App Configuration)
 
+<!-- site:skip -->
 [<- Back to README](../README.md) | [AWS Commands](aws.md) | [Google Cloud Commands](gcloud.md)
+<!-- /site:skip -->
 
 > [!TIP]
 > Invoke as `suve azure secret` (Key Vault; aliases `kv`, `keyvault`) and `suve azure param` (App Configuration; aliases `appconfig`, `ac`, `appcfg`); the group also answers to `az`, and `stage` to `stg`. You can drop the `azure` prefix when Azure is the only active provider for that service — see [Bare Aliases](../README.md#bare-aliases).

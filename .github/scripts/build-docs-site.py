@@ -552,8 +552,12 @@ def main() -> int:
     for path, name, title in discover_doc_pages(err):
         discovered_docs.add(name)
         claim(name, f"docs/{path.name}")
+        # Drop GitHub-only blocks (see SITE_SKIP_RE) here too, so a docs page can
+        # keep a "Back to README" / sibling-doc nav row for GitHub that the site,
+        # which has its own left-nav, omits.
+        raw = SITE_SKIP_RE.sub("", path.read_text(encoding="utf-8"))
         text = rewrite_links(
-            path.read_text(encoding="utf-8"), anchor_page, from_readme=False, err=err, duplicates=dups, label=f"docs/{path.name}"
+            raw, anchor_page, from_readme=False, err=err, duplicates=dups, label=f"docs/{path.name}"
         )
         text = ensure_blank_before_lists(text)
         (SRC / name).write_text(text, encoding="utf-8")

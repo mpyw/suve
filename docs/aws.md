@@ -1,6 +1,8 @@
 # AWS Commands (Parameter Store + Secrets Manager)
 
+<!-- site:skip -->
 [<- Back to README](../README.md) | [Google Cloud Commands](gcloud.md) | [Azure Commands](azure.md)
+<!-- /site:skip -->
 
 > [!TIP]
 > AWS is invoked as `suve aws param` (`ssm`, `ps`), `suve aws secret` (`sm`, `secretsmanager`), and `suve aws stage` (`stg`).

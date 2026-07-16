@@ -1,6 +1,8 @@
 # Stage Lifecycle
 
+<!-- site:skip -->
 > [Back to README](../README.md#staging-workflow)
+<!-- /site:skip -->
 
 This document describes the state machine that governs staging operations in suve. The staging system uses a Redux-like pattern with pure reducer functions for predictable state transitions.
 
