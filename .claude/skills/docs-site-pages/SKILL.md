@@ -36,6 +36,12 @@ The site renders with python-markdown (mkdocs), stricter than GitHub's CommonMar
 - **Blank line before a list or table.** A list/table directly under a paragraph line is folded into it: bullets become literal text, and a heading placed right after a table row with no blank line becomes an extra one-cell **table row** (a real PR #869 bug — the "Behavior & Diagnostics" heading was swallowed by the preceding Staging table).
 - **Nested list = 4-space indent.** GitHub nests at 2 spaces; python-markdown needs 4. Inside a blockquote, count the indent *after* the `> `.
 - **Exactly one `<h1>` per page.** Multiple `<h1>` (a page title plus `# service` dividers) breaks Material's "on this page" ToC — it renders empty (real PR #869 bug on the Azure page). Use one `<h1>` (the title) with `##`/`###` below.
+- **A page with *no* in-content `<h1>` gets a synthesized title.** The home page's banner is `.hero-title` (a styled `<p>`, deliberately not a heading), so Material synthesizes a bare, id-less `<h1>Home</h1>` from the nav entry. It is not in the source (so `site:skip` can't touch it); hide it with CSS — every real page heading carries an `id`, so `.md-typeset h1:not([id]) { display: none }` in `docs-extra.css` drops just the synthesized title.
+
+## Site chrome (mkdocs.yml + docs-extra.css)
+
+- **Logo & favicon** come from the app icon `gui/build/appicon.png` — copied into the source tree by `build-docs-site.py`'s `ASSETS`, then wired as `theme.logo` / `theme.favicon` (paths relative to `docs_dir`).
+- **`docs-extra.css`** (committed at `.github/scripts/`, copied to `assets/` and wired via `extra_css`) holds the small overrides: hide the redundant sidebar site title (`.md-nav--primary > .md-nav__title`), style `.hero-title`, hide the synthesized home `<h1>`, and the mermaid edge-label tweak. `mkdocs.yml` also sets `navigation.expand` so nav groups open by default.
 - `--strict` will **not** catch these — they produce valid HTML, just wrong structure. **Verify the rendered HTML** (`curl` the served page, or read `.site/out/<page>/index.html`) after any structural change, not just the source Markdown.
 
 ## Editorial conventions for a restructure
