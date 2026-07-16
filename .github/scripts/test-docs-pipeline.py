@@ -259,6 +259,17 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
 
+class SiteSkipTests(unittest.TestCase):
+    def test_site_skip_block_is_dropped(self):
+        # Applied to both the README and each docs page: a GitHub-only nav row is
+        # removed for the site (which has its own left-nav).
+        s = "keep\n\n<!-- site:skip -->\n[<- Back to README](../README.md)\n<!-- /site:skip -->\n\nmore\n"
+        out = b.SITE_SKIP_RE.sub("", s)
+        self.assertNotIn("Back to README", out)
+        self.assertIn("keep", out)
+        self.assertIn("more", out)
+
+
 class ResolveTests(unittest.TestCase):
     def test_directory_url_maps_to_index(self):
         self.assertEqual(resolve("command-reference/index.html", "../aws/", {"aws/index.html"}), "aws/index.html")
