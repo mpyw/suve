@@ -10,7 +10,9 @@ on:
       - docs/**
       - demo/**
       - gui/build/appicon.png
+      - social-preview.png
       - mkdocs.yml
+      - .github/scripts/overrides/**
       - .github/scripts/build-docs-site.py
       - .github/scripts/check-site-links.py
       - .github/scripts/test-docs-pipeline.py
@@ -23,7 +25,9 @@ on:
       - docs/**
       - demo/**
       - gui/build/appicon.png
+      - social-preview.png
       - mkdocs.yml
+      - .github/scripts/overrides/**
       - .github/scripts/build-docs-site.py
       - .github/scripts/check-site-links.py
       - .github/scripts/test-docs-pipeline.py
