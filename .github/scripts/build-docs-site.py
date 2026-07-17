@@ -46,7 +46,9 @@ SRC = REPO / ".site" / "src"
 
 # Local assets referenced (by relative path) from the README, copied into the
 # site so those links resolve. Each entry is a path relative to the repo root.
-ASSETS = ["demo", "gui/build/appicon.png"]
+# social-preview.png is not linked from the README; it is copied so the OG/Twitter
+# card image wired in the theme override (see mkdocs.yml theme.custom_dir) resolves.
+ASSETS = ["demo", "gui/build/appicon.png", "social-preview.png"]
 
 # docs/*.md nav placement. By default a doc page is appended at the end of the
 # nav, top-level. An entry here instead nests the page under `group` and inserts

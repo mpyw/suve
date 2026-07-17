@@ -1,0 +1,43 @@
+{#-
+  Theme override wired via mkdocs.yml `theme.custom_dir`. It injects Open Graph /
+  Twitter Card meta tags into every page's <head> so links to the site unfurl with
+  a preview card. The image is the repo's social-preview.png (1280x640), copied
+  into the site by .github/scripts/build-docs-site.py (ASSETS).
+-#}
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {#- Per-page title (home page keeps the bare site name), site description as the
+      default, and any page-level `description:` front matter as an override. -#}
+  {% set og_title = config.site_name %}
+  {% if page and page.title and not page.is_homepage %}
+    {% set og_title = (page.title | striptags) ~ " · " ~ config.site_name %}
+  {% endif %}
+  {% set og_description = config.site_description %}
+  {% if page and page.meta and page.meta.description %}
+    {% set og_description = page.meta.description %}
+  {% endif %}
+  {#- site_url ends with a trailing slash, so this yields an absolute image URL. -#}
+  {% set og_image = config.site_url ~ "social-preview.png" %}
+  {% set og_image_alt = config.site_name ~ " — " ~ config.site_description %}
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_description }}">
+  <meta property="og:image" content="{{ og_image }}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="{{ og_image_alt }}">
+  {% if page and page.canonical_url %}
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  {% endif %}
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ og_title }}">
+  <meta name="twitter:description" content="{{ og_description }}">
+  <meta name="twitter:image" content="{{ og_image }}">
+  <meta name="twitter:image:alt" content="{{ og_image_alt }}">
+{% endblock %}

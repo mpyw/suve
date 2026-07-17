@@ -37,6 +37,10 @@ validation:
 
 theme:
   name: material
+  # Committed template override (extends base.html) that injects Open Graph /
+  # Twitter Card meta tags so links to the site unfurl with a preview card; the
+  # card image is social-preview.png, copied into the site by build-docs-site.py.
+  custom_dir: .github/scripts/overrides
   # The app icon (copied into the docs source by build-docs-site.py via ASSETS)
   # doubles as the header logo and the browser-tab favicon.
   logo: gui/build/appicon.png
