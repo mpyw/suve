@@ -117,7 +117,7 @@ Everything below is optional — pick the line you want (swap `curl -fsSL` for `
 ```bash
 BASE=https://raw.githubusercontent.com/mpyw/suve/main/scripts/install.sh
 
-curl -fsSL "$BASE" | VERSION=1.9.2 sh                        # pin a specific version
+curl -fsSL "$BASE" | VERSION=0.0.0 sh                        # pin a specific version
 curl -fsSL "$BASE" | sh -s -- --cli                          # force CLI/TUI-only
 curl -fsSL "$BASE" | sh -s -- --gui                          # force the GUI build
 curl -fsSL "$BASE" | SUVE_INSTALL_DIR="$HOME/.local/bin" sh  # install to a custom dir
