@@ -533,8 +533,8 @@ func shortName(resourceName string) string {
 // lastSegment returns the substring after the final '/', or the whole string
 // when there is no '/'.
 func lastSegment(s string) string {
-	if i := strings.LastIndex(s, "/"); i >= 0 {
-		return s[i+1:]
+	if _, after, found := strings.CutLast(s, "/"); found {
+		return after
 	}
 
 	return s

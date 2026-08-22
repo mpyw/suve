@@ -84,7 +84,7 @@ func existingSecretStore() *providermock.Store {
 // TestApp_StagingAdd covers StagingAdd for the param and secret services: a
 // create against a name the provider store reports as not-found is staged and
 // surfaces through StagingStatus as an "create" operation. The secret case also
-// exercises the serviceStrategyScoped secret branch + getEditStrategyScoped.
+// exercises the serviceStrategyScoped secret branch + strategyAsScoped[EditStrategy].
 //
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingAdd(t *testing.T) {
@@ -128,7 +128,7 @@ func TestApp_StagingAdd(t *testing.T) {
 
 // TestApp_StagingEdit covers StagingEdit: an update against an existing item is
 // staged (value must differ from the provider's current value or the edit would
-// auto-skip). Exercises getEditStrategyScoped + serviceStrategyScoped.
+// auto-skip). Exercises strategyAsScoped[EditStrategy] + serviceStrategyScoped.
 //
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingEdit(t *testing.T) {
@@ -169,7 +169,7 @@ func TestApp_StagingEdit(t *testing.T) {
 }
 
 // TestApp_StagingDelete covers StagingDelete: a delete against an existing item
-// is staged. Exercises getDeleteStrategyScoped + serviceStrategyScoped.
+// is staged. Exercises strategyAsScoped[DeleteStrategy] + serviceStrategyScoped.
 //
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingDelete(t *testing.T) {
@@ -258,7 +258,7 @@ func TestApp_StagingAddRemoveTag(t *testing.T) {
 
 // TestApp_StagingDiff covers StagingDiff: after staging an update via the write
 // binding, the diff resolves the provider's current value through the
-// registry-backed strategy (getDiffStrategyScoped) and reports a normal entry.
+// registry-backed strategy (strategyAsScoped[DiffStrategy]) and reports a normal entry.
 //
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingDiff(t *testing.T) {

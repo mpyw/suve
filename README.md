@@ -191,7 +191,7 @@ go install github.com/mpyw/suve/cmd/suve@latest
 </details>
 
 <details>
-<summary><a href="https://go.dev/"><img src="https://cdn.simpleicons.org/go" height="20" alt=""></a> Using <code>go tool</code> (CLI/TUI only, Go 1.25+)</summary>
+<summary><a href="https://go.dev/"><img src="https://cdn.simpleicons.org/go" height="20" alt=""></a> Using <code>go tool</code> (CLI/TUI only, Go 1.27+)</summary>
 
 ```bash
 # Add to go.mod as a tool dependency
@@ -208,7 +208,7 @@ go tool suve param show /my/param
 
 For platforms without pre-built packages (e.g., Arch Linux) or if you need the latest development version with GUI:
 
-Requires Go 1.25+.
+Requires Go 1.27+.
 
 ```bash
 git clone https://github.com/mpyw/suve.git

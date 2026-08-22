@@ -419,43 +419,46 @@ func withReleasesAPIURL(t *testing.T, u string) {
 func TestFetchLatestRelease_Valid(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
 	var gotAccept string
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// NewTestServer serves over an in-memory network (no loopback listener) and
+	// closes itself via t.Cleanup. Its Client() call is what starts that network
+	// and assigns srv.URL, so the client must be taken BEFORE srv.URL is read.
+	srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAccept = r.Header.Get("Accept")
 
 		_, _ = w.Write([]byte(`{"tag_name": "v9.9.9"}`))
 	}))
-	t.Cleanup(srv.Close)
+	client := srv.Client()
 
 	withReleasesAPIURL(t, srv.URL)
 
-	got, err := fetchLatestRelease(context.Background(), srv.Client())
+	got, err := fetchLatestRelease(context.Background(), client)
 	require.NoError(t, err)
 	assert.Equal(t, "v9.9.9", got)
 	assert.Equal(t, "application/vnd.github+json", gotAccept, "request must advertise the GitHub JSON media type")
 }
 
 func TestFetchLatestRelease_Non200(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
-	t.Cleanup(srv.Close)
+	client := srv.Client()
 
 	withReleasesAPIURL(t, srv.URL)
 
-	_, err := fetchLatestRelease(context.Background(), srv.Client())
+	_, err := fetchLatestRelease(context.Background(), client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unexpected status: 404")
 }
 
 func TestFetchLatestRelease_MalformedJSON(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{not json`))
 	}))
-	t.Cleanup(srv.Close)
+	client := srv.Client()
 
 	withReleasesAPIURL(t, srv.URL)
 
-	_, err := fetchLatestRelease(context.Background(), srv.Client())
+	_, err := fetchLatestRelease(context.Background(), client)
 	require.Error(t, err)
 }
 
@@ -468,7 +471,11 @@ func TestFetchLatestRelease_RequestBuildError(t *testing.T) { //nolint:parallelt
 }
 
 func TestFetchLatestRelease_NetworkError(t *testing.T) { //nolint:paralleltest // mutates the process-wide releasesAPIURL seam
-	// A server closed before the request forces client.Do to fail.
+	// A server closed before the request forces client.Do to fail. This stays on
+	// NewServer (real loopback) deliberately: the failure under test is a refused
+	// connection to an address that WAS listening, and http.DefaultClient cannot
+	// dial a NewTestServer's in-memory network at all — the request would fail for
+	// the wrong reason, passing even without the Close.
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	url := srv.URL
 	srv.Close()
@@ -480,6 +487,9 @@ func TestFetchLatestRelease_NetworkError(t *testing.T) { //nolint:paralleltest /
 }
 
 func TestNotice_EndToEnd_RealFetch(t *testing.T) {
+	// This exercises Notice, which builds its OWN real-network http.Client, so the
+	// server must listen on real loopback: a NewTestServer's in-memory network is
+	// reachable only through that server's own Client().
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"tag_name": "v9.9.9"}`))
 	}))

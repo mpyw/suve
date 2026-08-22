@@ -100,7 +100,7 @@ func waitGcloudSecretReadable(t *testing.T, name, want string) {
 			return
 		}
 
-		time.Sleep(50 * time.Millisecond) //nolint:mnd // poll interval
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	t.Fatalf("gcloud secret %q never became readable+listable as %q within %s", name, want, tuiWaitTimeout)

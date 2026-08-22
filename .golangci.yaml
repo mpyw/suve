@@ -9,7 +9,11 @@ linters:
   default: all
   disable:
     # Struct/interface style - too verbose or not idiomatic
+    # exhaustruct_v5 supersedes exhaustruct as of golangci-lint v2.13.0 and is
+    # enabled by `default: all` under the NEW name, so both keys must stay listed
+    # or the linter silently comes back.
     - exhaustruct      # Requires all struct fields
+    - exhaustruct_v5   # Requires all struct fields
     - ireturn          # Interface returns are idiomatic Go
     - varnamelen       # Short names in small scopes are fine
     - inamedparam      # Interface named params not always needed
@@ -18,7 +22,10 @@ linters:
     - err113           # Dynamic errors are acceptable in CLI tools
     # Wrapping/formatting - handled by other tools or not useful
     - wrapcheck        # Internal packages don't need wrapping
+    # wsl_v5 supersedes wsl as of golangci-lint v2.13.0; same both-keys rule as
+    # exhaustruct above.
     - wsl              # Whitespace - pure style preference
+    - wsl_v5           # Whitespace - pure style preference
     # Code organization - too opinionated
     - gochecknoinits   # init() is sometimes needed
     - funcorder        # Function order is contextual
@@ -78,6 +85,23 @@ linters:
         linters:
           - tparallel
   settings:
+    modernize:
+      disable:
+        # embedlit rewrites Outer{Embedded: Embedded{F: v}} into Outer{F: v},
+        # using go1.27's "a struct literal key may be any field selector" rule.
+        # The resulting promoted-field keys crash the SSA builder in
+        # x/tools/go/ssa v0.40.0 ("panic: unexpected expr: *ast.KeyValueExpr"),
+        # which is what goroutinectx v0.7.5 — a required CI step — is built
+        # against, and v0.7.5 is its newest release. golangci-lint 2.13.1
+        # (x/tools v0.49.0) handles the same code fine, so this can be re-enabled
+        # once goroutinectx ships with a newer x/tools.
+        - embedlit
+        # newexpr rewrites lo.ToPtr(x) into go1.26's new(x). This repo
+        # standardizes on samber/lo for pointer helpers, and the analyzer fires
+        # on only some call sites (e.g. 2 of the 7 in azure/appconfig/client.go),
+        # so honoring it would leave new(...) and lo.ToPtr(...) interleaved in the
+        # same function. Migrating wholesale is a deliberate, separate decision.
+        - newexpr
     usetesting:
       # Allow os.MkdirTemp - needed for daemon tests with socket paths (~104-108 byte limit)
       os-mkdir-temp: false

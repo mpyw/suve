@@ -320,7 +320,7 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 		return nil, err
 	}
 
-	strategy, err := a.getApplyStrategyScoped(sc, service)
+	strategy, err := a.strategyAsScoped[staging.ApplyStrategy](sc, service)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +502,7 @@ func (a *App) editStrategyForNamespace(sc provider.Scope, service, namespace str
 		return strategy, literal, nil
 	}
 
-	strategy, err := a.getEditStrategyScoped(sc, service)
+	strategy, err := a.strategyAsScoped[staging.EditStrategy](sc, service)
 	if err != nil {
 		return nil, "", err
 	}
@@ -564,7 +564,7 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 		strategy, err = a.appConfigParamStrategyForNamespaceScoped(sc, namespace)
 	} else {
 		namespace = ""
-		strategy, err = a.getDeleteStrategyScoped(sc, service)
+		strategy, err = a.strategyAsScoped[staging.DeleteStrategy](sc, service)
 	}
 
 	if err != nil {
@@ -801,7 +801,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		return nil, err
 	}
 
-	strategy, err := a.getDiffStrategyScoped(sc, service)
+	strategy, err := a.strategyAsScoped[staging.DiffStrategy](sc, service)
 	if err != nil {
 		return nil, err
 	}
@@ -1220,7 +1220,7 @@ func (a *App) importReAnchorResolverScoped(sc provider.Scope, service string) (s
 		}, nil
 	}
 
-	strategy, err := a.getApplyStrategyScoped(sc, service)
+	strategy, err := a.strategyAsScoped[staging.ApplyStrategy](sc, service)
 	if err != nil {
 		return nil, err
 	}

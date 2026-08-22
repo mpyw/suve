@@ -1,6 +1,6 @@
 module github.com/mpyw/suve/gui
 
-go 1.25.11
+go 1.27.0
 
 require github.com/mpyw/suve v0.0.0
 

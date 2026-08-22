@@ -52,8 +52,7 @@ func dtoContract() []any {
 func jsonFieldNames(t reflect.Type) []string {
 	var names []string
 
-	for i := range t.NumField() {
-		field := t.Field(i)
+	for field := range t.Fields() {
 		if field.PkgPath != "" {
 			continue // unexported
 		}

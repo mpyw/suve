@@ -2,7 +2,7 @@
 #
 # Consumed both locally (`mise install`) and in CI (jdx/mise-action reads this
 # file). Keep the versions here in sync with what the project actually targets:
-#   - `go` matches the directive in go.mod / gui/go.mod (Go 1.25).
+#   - `go` matches the directive in go.mod / gui/go.mod (Go 1.27).
 #   - `golangci-lint` matches the version pinned by the lint jobs.
 #   - the wails CLI is pinned to the same release as the wailsapp/wails/v2
 #     library in gui/go.mod, so the bindings it regenerates (via `wails dev` in
@@ -11,14 +11,14 @@
 # Pinned to the exact go.mod directive so CI's carve-out jobs (which read the
 # version from go.mod via setup-go) and the mise jobs compile with the same
 # Go patch release.
-go = "1.25.11"
+go = "1.27.0"
 node = "24"
-golangci-lint = "2.12.2"
+golangci-lint = "2.13.1"
 goreleaser = "2"
 nfpm = "2.41.1"
 "go:github.com/wailsapp/wails/v2/cmd/wails" = "2.13.0"
 # Reports production dead code; run via the `deadcode` task (deadcode lint gate).
-"go:golang.org/x/tools/cmd/deadcode" = "0.48.0"
+"go:golang.org/x/tools/cmd/deadcode" = "0.49.0"
 
 # =============================================================================
 # Tasks (run with `mise run <task>`, or `mise <task>` — no name collides with a

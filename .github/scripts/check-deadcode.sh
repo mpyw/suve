@@ -25,7 +25,7 @@ ALLOWLIST=".github/deadcode-allow.txt"
 if command -v deadcode >/dev/null 2>&1; then
   deadcode_cmd="deadcode"
 else
-  deadcode_cmd="go run golang.org/x/tools/cmd/deadcode@v0.48.0"
+  deadcode_cmd="go run golang.org/x/tools/cmd/deadcode@v0.49.0"
 fi
 
 # Each finding is "path/file.go:LINE:COL: unreachable func: Name". Strip the

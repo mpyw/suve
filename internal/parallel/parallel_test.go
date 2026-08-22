@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -74,80 +75,84 @@ func TestExecuteMap(t *testing.T) {
 		assert.Empty(t, results)
 	})
 
+	// Inside a synctest bubble time is virtual: the clock only advances once EVERY
+	// goroutine is durably blocked, so all three workers are guaranteed to have
+	// reached the sleep before any of them wakes. The observed concurrency is
+	// therefore exact (3 entries, well under DefaultLimit) rather than the "at
+	// least 2" a wall-clock sleep could only ever assert without flaking, and the
+	// sleep costs no real time.
+	//
+	// The workers sleep with time.Sleep, not synctest.Sleep: the latter appends a
+	// synctest.Wait, which may not be called concurrently by multiple goroutines
+	// in the same bubble. Virtual time comes from the bubble, not from the helper.
 	t.Run("actually parallel", func(t *testing.T) {
 		t.Parallel()
 
-		entries := map[int]string{
-			1: "a",
-			2: "b",
-			3: "c",
-		}
-
-		var (
-			running       atomic.Int32
-			maxConcurrent int32
-		)
-
-		results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ int, _ string) (bool, error) {
-			current := running.Add(1)
-			// Update maxConcurrent if current is higher
-			for {
-				oldMax := atomic.LoadInt32(&maxConcurrent)
-				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
-					break
-				}
+		synctest.Test(t, func(t *testing.T) {
+			entries := map[int]string{
+				1: "a",
+				2: "b",
+				3: "c",
 			}
 
-			time.Sleep(10 * time.Millisecond)
-			running.Add(-1)
+			var running, maxConcurrent atomic.Int32
 
-			return true, nil
+			results := parallel.ExecuteMap(t.Context(), entries, func(_ context.Context, _ int, _ string) (bool, error) {
+				trackMax(running.Add(1), &maxConcurrent)
+				time.Sleep(10 * time.Millisecond)
+				running.Add(-1)
+
+				return true, nil
+			})
+
+			require.Len(t, results, 3)
+			assert.Equal(t, int32(3), maxConcurrent.Load(), "every entry under the limit runs concurrently")
 		})
-
-		require.Len(t, results, 3)
-		// Should have run at least 2 concurrently
-		assert.GreaterOrEqual(t, maxConcurrent, int32(2))
 	})
+}
+
+// trackMax raises maxConcurrent to current when current is the new high-water
+// mark, retrying until the CAS lands so a concurrent raise is never lost.
+func trackMax(current int32, maxConcurrent *atomic.Int32) {
+	for {
+		oldMax := maxConcurrent.Load()
+		if current <= oldMax || maxConcurrent.CompareAndSwap(oldMax, current) {
+			return
+		}
+	}
 }
 
 func TestExecuteMapWithLimit(t *testing.T) {
 	t.Parallel()
 
+	// The bubble's clock makes the observed concurrency exact, so this asserts the
+	// limit is REACHED as well as never exceeded — a plain `<= 2` would also pass
+	// if the pool never got past one worker.
 	t.Run("respects limit", func(t *testing.T) {
 		t.Parallel()
 
-		entries := map[int]string{
-			1: "a",
-			2: "b",
-			3: "c",
-			4: "d",
-			5: "e",
-		}
-
-		var (
-			maxConcurrent int32
-			running       atomic.Int32
-		)
-
-		results := parallel.ExecuteMapWithLimit(t.Context(), entries, 2, func(_ context.Context, _ int, _ string) (bool, error) {
-			current := running.Add(1)
-
-			for {
-				oldMax := atomic.LoadInt32(&maxConcurrent)
-				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
-					break
-				}
+		synctest.Test(t, func(t *testing.T) {
+			entries := map[int]string{
+				1: "a",
+				2: "b",
+				3: "c",
+				4: "d",
+				5: "e",
 			}
 
-			time.Sleep(20 * time.Millisecond)
-			running.Add(-1)
+			var running, maxConcurrent atomic.Int32
 
-			return true, nil
+			results := parallel.ExecuteMapWithLimit(t.Context(), entries, 2, func(_ context.Context, _ int, _ string) (bool, error) {
+				trackMax(running.Add(1), &maxConcurrent)
+				time.Sleep(20 * time.Millisecond)
+				running.Add(-1)
+
+				return true, nil
+			})
+
+			require.Len(t, results, 5)
+			assert.Equal(t, int32(2), maxConcurrent.Load(), "the pool saturates the limit but never exceeds it")
 		})
-
-		require.Len(t, results, 5)
-		// Should not exceed limit of 2
-		assert.LessOrEqual(t, maxConcurrent, int32(2))
 	})
 
 	t.Run("non-positive limit falls back to default without deadlocking", func(t *testing.T) {
@@ -157,28 +162,24 @@ func TestExecuteMapWithLimit(t *testing.T) {
 			t.Run(fmt.Sprintf("limit=%d", limit), func(t *testing.T) {
 				t.Parallel()
 
-				entries := map[int]string{1: "a", 2: "b", 3: "c"}
-
 				// A non-positive limit used to deadlock on errgroup's zero-capacity
-				// semaphore; guard with a timeout so a regression fails instead of
-				// hanging the suite.
-				done := make(chan map[int]*parallel.Result[string], 1)
+				// semaphore. A synctest bubble fails the test as soon as its
+				// goroutines are all blocked with no way to make progress, so the
+				// regression is caught immediately — no watchdog goroutine, result
+				// channel or wall-clock timeout needed to keep it from hanging the
+				// suite.
+				synctest.Test(t, func(t *testing.T) {
+					entries := map[int]string{1: "a", 2: "b", 3: "c"}
 
-				go func() {
-					done <- parallel.ExecuteMapWithLimit(t.Context(), entries, limit, func(_ context.Context, _ int, value string) (string, error) {
+					results := parallel.ExecuteMapWithLimit(t.Context(), entries, limit, func(_ context.Context, _ int, value string) (string, error) {
 						return value, nil
 					})
-				}()
 
-				select {
-				case results := <-done:
 					require.Len(t, results, 3)
 					assert.Equal(t, "a", results[1].Value)
 					assert.Equal(t, "b", results[2].Value)
 					assert.Equal(t, "c", results[3].Value)
-				case <-time.After(5 * time.Second):
-					t.Fatalf("ExecuteMapWithLimit deadlocked with limit %d", limit)
-				}
+				})
 			})
 		}
 	})
@@ -186,35 +187,26 @@ func TestExecuteMapWithLimit(t *testing.T) {
 	t.Run("limit of 1 is sequential", func(t *testing.T) {
 		t.Parallel()
 
-		entries := map[int]string{
-			1: "a",
-			2: "b",
-			3: "c",
-		}
-
-		var (
-			maxConcurrent int32
-			running       atomic.Int32
-		)
-
-		results := parallel.ExecuteMapWithLimit(t.Context(), entries, 1, func(_ context.Context, _ int, _ string) (bool, error) {
-			current := running.Add(1)
-
-			for {
-				oldMax := atomic.LoadInt32(&maxConcurrent)
-				if current <= oldMax || atomic.CompareAndSwapInt32(&maxConcurrent, oldMax, current) {
-					break
-				}
+		synctest.Test(t, func(t *testing.T) {
+			entries := map[int]string{
+				1: "a",
+				2: "b",
+				3: "c",
 			}
 
-			time.Sleep(5 * time.Millisecond)
-			running.Add(-1)
+			var running, maxConcurrent atomic.Int32
 
-			return true, nil
+			results := parallel.ExecuteMapWithLimit(t.Context(), entries, 1, func(_ context.Context, _ int, _ string) (bool, error) {
+				trackMax(running.Add(1), &maxConcurrent)
+				time.Sleep(5 * time.Millisecond)
+				running.Add(-1)
+
+				return true, nil
+			})
+
+			require.Len(t, results, 3)
+			assert.Equal(t, int32(1), maxConcurrent.Load())
 		})
-
-		require.Len(t, results, 3)
-		assert.Equal(t, int32(1), maxConcurrent)
 	})
 }
 

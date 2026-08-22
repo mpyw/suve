@@ -212,8 +212,7 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 		// misleading "wrong passphrase" error. With no encrypted state yet, the
 		// tool stays usable via the documented plaintext fallback (e.g. on
 		// headless CI without a keyring), warning the user once.
-		var kcErr *keyprovider.KeychainUnavailableError
-		if errors.As(err, &kcErr) {
+		if _, ok := errors.AsType[*keyprovider.KeychainUnavailableError](err); ok {
 			guardErr, checkErr := s.guardKeyLossWithEncryptedState(err)
 			if checkErr != nil {
 				return nil, checkErr

@@ -16,7 +16,7 @@ func TestPrompter_PromptForEncrypt_WithPassphrase(t *testing.T) {
 	t.Parallel()
 
 	// Simulate user entering "secret\nsecret\n"
-	stdin := strings.NewReader("secret\nsecret\n")
+	stdin := strings.NewReader("secret\nsecret\n") //nolint:dupword // the passphrase is deliberately repeated: entry + confirmation
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 

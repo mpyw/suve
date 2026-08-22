@@ -577,14 +577,18 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 	}
 }
 
-// strategyAsScoped resolves the service strategy for an already-snapshotted scope
-// and narrows it to the requested staging strategy interface T. The concrete
-// *AWSParamStrategy / *AWSSecretStrategy satisfy every staging strategy interface, so
-// this succeeds for the Edit, Apply and Diff interfaces (which FullStrategy
-// embeds) as well as for DeleteStrategy (which it does not embed but the concrete
-// types implement). It is a free function because Go methods cannot declare type
-// parameters (#560).
-func strategyAsScoped[T any](a *App, sc provider.Scope, service string) (T, error) {
+// strategyAsScoped resolves the service strategy for an already-snapshotted
+// scope (#560) and narrows it to the requested staging strategy interface T. The
+// concrete *AWSParamStrategy / *AWSSecretStrategy satisfy every staging strategy
+// interface, so this succeeds for the Edit, Apply and Diff interfaces (which
+// FullStrategy embeds) as well as for DeleteStrategy (which it does not embed
+// but the concrete types implement).
+//
+// Callers instantiate T at the call site, so no per-interface wrapper method is
+// needed:
+//
+//	strategy, err := a.strategyAsScoped[staging.EditStrategy](sc, service)
+func (a *App) strategyAsScoped[T any](sc provider.Scope, service string) (T, error) {
 	var zero T
 
 	strategy, err := a.serviceStrategyScoped(sc, service)
@@ -598,22 +602,6 @@ func strategyAsScoped[T any](a *App, sc provider.Scope, service string) (T, erro
 	}
 
 	return narrowed, nil
-}
-
-func (a *App) getEditStrategyScoped(sc provider.Scope, service string) (staging.EditStrategy, error) {
-	return strategyAsScoped[staging.EditStrategy](a, sc, service)
-}
-
-func (a *App) getDeleteStrategyScoped(sc provider.Scope, service string) (staging.DeleteStrategy, error) {
-	return strategyAsScoped[staging.DeleteStrategy](a, sc, service)
-}
-
-func (a *App) getApplyStrategyScoped(sc provider.Scope, service string) (staging.ApplyStrategy, error) {
-	return strategyAsScoped[staging.ApplyStrategy](a, sc, service)
-}
-
-func (a *App) getDiffStrategyScoped(sc provider.Scope, service string) (staging.DiffStrategy, error) {
-	return strategyAsScoped[staging.DiffStrategy](a, sc, service)
 }
 
 // =============================================================================
