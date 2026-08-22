@@ -171,8 +171,7 @@ func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 	}
 
 	if msg.err != nil {
-		var storeErr *data.StoreUnavailableError
-		if errors.As(msg.err, &storeErr) {
+		if storeErr, ok := errors.AsType[*data.StoreUnavailableError](msg.err); ok {
 			m.stagedErr = storeErr.Error()
 		} else {
 			m.stagedErr = "staged status unavailable"

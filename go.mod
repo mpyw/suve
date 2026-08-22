@@ -1,6 +1,6 @@
 module github.com/mpyw/suve
 
-go 1.25.11
+go 1.27.0
 
 require (
 	charm.land/bubbles/v2 v2.1.1

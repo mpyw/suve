@@ -216,8 +216,7 @@ func (s *Store) getFullHistory(ctx context.Context, name string) ([]types.Parame
 			NextToken:      token,
 		})
 		if err != nil {
-			var notFound *types.ParameterNotFound
-			if errors.As(err, &notFound) {
+			if _, ok := errors.AsType[*types.ParameterNotFound](err); ok {
 				return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 			}
 
@@ -295,8 +294,7 @@ func (s *Store) Create(
 
 	out, err := s.client.PutParameter(ctx, input)
 	if err != nil {
-		var exists *types.ParameterAlreadyExists
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[*types.ParameterAlreadyExists](err); ok {
 			return domain.Version{}, fmt.Errorf("%w: %s", provider.ErrAlreadyExists, name)
 		}
 
@@ -338,8 +336,7 @@ func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOpt
 		Name: aws.String(name),
 	})
 	if err != nil {
-		var notFound *types.ParameterNotFound
-		if errors.As(err, &notFound) {
+		if _, ok := errors.AsType[*types.ParameterNotFound](err); ok {
 			return fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 		}
 

@@ -148,8 +148,7 @@ func (s *Store) listAllVersions(ctx context.Context, name string) ([]types.Secre
 			NextToken:         token,
 		})
 		if err != nil {
-			var notFound *types.ResourceNotFoundException
-			if errors.As(err, &notFound) {
+			if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
 				return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 			}
 
@@ -246,8 +245,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 
 	out, err := s.client.GetSecretValue(ctx, input)
 	if err != nil {
-		var notFound *types.ResourceNotFoundException
-		if errors.As(err, &notFound) {
+		if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
 			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 		}
 
@@ -364,8 +362,7 @@ func (s *Store) Create(
 
 	created, err := s.client.CreateSecret(ctx, input)
 	if err != nil {
-		var exists *types.ResourceExistsException
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[*types.ResourceExistsException](err); ok {
 			return domain.Version{}, fmt.Errorf("%w: %s", provider.ErrAlreadyExists, name)
 		}
 
@@ -406,8 +403,7 @@ func (s *Store) Put(
 	}
 
 	// Already exists: update the value (new version) and metadata in one call.
-	var exists *types.ResourceExistsException
-	if !errors.As(err, &exists) {
+	if _, ok := errors.AsType[*types.ResourceExistsException](err); !ok {
 		return domain.Version{}, fmt.Errorf("failed to create secret: %w", err)
 	}
 
@@ -460,8 +456,7 @@ func (s *Store) Delete(ctx context.Context, name string, opts ...provider.Delete
 
 	_, err := s.client.DeleteSecret(ctx, input)
 	if err != nil {
-		var notFound *types.ResourceNotFoundException
-		if errors.As(err, &notFound) {
+		if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
 			return fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 		}
 
@@ -490,8 +485,7 @@ func (s *Store) Describe(ctx context.Context, name string) (*domain.Entry, error
 		SecretId: aws.String(name),
 	})
 	if err != nil {
-		var notFound *types.ResourceNotFoundException
-		if errors.As(err, &notFound) {
+		if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
 			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 		}
 

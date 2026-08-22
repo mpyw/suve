@@ -20,7 +20,10 @@ import (
 
 // newGoogleCloudStore creates a working staging store keyed by the given Google
 // Cloud project, matching the scope the `gcloud stage` commands resolve.
-func newGoogleCloudStore(project string) *file.Store {
+// The project parameter is kept even though every caller currently passes the
+// same "suve-e2e" value: it is what ties the store to a scope, and hardcoding it
+// here would hide that seam from the tests that document it.
+func newGoogleCloudStore(project string) *file.Store { //nolint:unparam // scope seam, see above
 	s, err := file.NewWorkingStore(provider.GoogleCloudScope(project))
 	if err != nil {
 		panic(err)
