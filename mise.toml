@@ -14,7 +14,10 @@
 go = "1.27.0"
 node = "24"
 golangci-lint = "2.13.1"
-goreleaser = "2"
+# Pinned exactly: goreleaser 2.18.0 attests every build artifact, which breaks
+# the per-arch `build` jobs in .github/workflows/release.yml. Keep in sync
+# with GORELEASER_VERSION there.
+goreleaser = "2.17.1"
 nfpm = "2.41.1"
 "go:github.com/wailsapp/wails/v2/cmd/wails" = "2.13.0"
 # Reports production dead code; run via the `deadcode` task (deadcode lint gate).
