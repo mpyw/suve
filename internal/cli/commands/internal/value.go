@@ -48,10 +48,10 @@ func ValueStdinFlag() cli.Flag {
 	}
 }
 
-// Stdin returns the command's configured reader, falling back to os.Stdin when
+// ValueStdin returns the command's configured reader, falling back to os.Stdin when
 // none is set. The production app leaves Reader unset, so this preserves the
 // real stdin there while letting tests inject a reader through cmd.Root().Reader.
-func Stdin(cmd *cli.Command) io.Reader {
+func ValueStdin(cmd *cli.Command) io.Reader {
 	if r := cmd.Root().Reader; r != nil {
 		return r
 	}
@@ -59,11 +59,11 @@ func Stdin(cmd *cli.Command) io.Reader {
 	return os.Stdin
 }
 
-// interactiveReader reports whether r is a terminal, i.e. whether it is safe to
+// interactiveValueReader reports whether r is a terminal, i.e. whether it is safe to
 // fall back to $EDITOR. os.Stdin is a terminal in an interactive shell but not
 // under a pipe or CI, so this prevents the editor fallback from hanging in a
 // non-interactive session. A nil reader (unset) is treated as non-interactive.
-func interactiveReader(r io.Reader) bool {
+func interactiveValueReader(r io.Reader) bool {
 	f, ok := r.(terminal.Fder)
 
 	return ok && terminal.IsTTY(f.Fd())
@@ -126,7 +126,7 @@ func ResolveValue(ctx context.Context, src ValueSource) (value string, proceed b
 			return "", false, fmt.Errorf("failed to read value from stdin: %w", rerr)
 		}
 
-		return trimTrailingNewline(string(data)), true, nil
+		return trimValueTrailingNewline(string(data)), true, nil
 
 	case src.HasArg:
 		return src.Arg, true, nil
@@ -138,7 +138,7 @@ func ResolveValue(ctx context.Context, src ValueSource) (value string, proceed b
 			// under a pipe or in CI would hang forever. Only fall back to it when
 			// stdin is a TTY; otherwise fail with an actionable error. Tests inject
 			// a non-blocking OpenEditor and are therefore exempt from this guard.
-			if !interactiveReader(src.Stdin) {
+			if !interactiveValueReader(src.Stdin) {
 				return "", false, ErrValueRequired
 			}
 
@@ -154,10 +154,10 @@ func ResolveValue(ctx context.Context, src ValueSource) (value string, proceed b
 	}
 }
 
-// trimTrailingNewline removes a single trailing newline (CRLF or LF), matching
+// trimValueTrailingNewline removes a single trailing newline (CRLF or LF), matching
 // the trailing-newline handling of the external editor so that
 // `printf '%s\n' secret | ... --value-stdin` and an editor session behave alike.
-func trimTrailingNewline(s string) string {
+func trimValueTrailingNewline(s string) string {
 	s = strings.TrimSuffix(s, "\r\n")
 	s = strings.TrimSuffix(s, "\n")
 

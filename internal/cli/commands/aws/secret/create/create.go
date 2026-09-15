@@ -74,7 +74,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		FromStdin: cmd.Bool(internal.FlagValueStdin),
 		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
 		Arg:       args.Get(1),
-		Stdin:     internal.Stdin(cmd),
+		Stdin:     internal.ValueStdin(cmd),
 	})
 	if err != nil {
 		return err

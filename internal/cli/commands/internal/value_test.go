@@ -28,13 +28,13 @@ func TestStdin(t *testing.T) {
 
 		r := strings.NewReader("injected")
 		cmd := &cli.Command{Reader: r}
-		assert.Same(t, r, cliinternal.Stdin(cmd))
+		assert.Same(t, r, cliinternal.ValueStdin(cmd))
 	})
 
 	t.Run("falls back to os.Stdin when no reader is set", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Same(t, os.Stdin, cliinternal.Stdin(&cli.Command{}))
+		assert.Same(t, os.Stdin, cliinternal.ValueStdin(&cli.Command{}))
 	})
 }
 
