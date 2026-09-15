@@ -28,6 +28,8 @@ import (
 // =============================================================================
 
 // fullMockStrategy implements all staging interfaces for testing.
+//
+//declscope:package // package-wide mock shared with the per-command test files (tag_test.go, ...)
 type fullMockStrategy struct {
 	service              staging.Service
 	hasDeleteOptions     bool

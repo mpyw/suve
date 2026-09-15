@@ -13,9 +13,9 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// confirmer prompts the user to confirm an action. *confirm.Prompter satisfies
+// applyConfirmer prompts the user to confirm an action. *confirm.Prompter satisfies
 // this interface; it is kept small so the apply flow stays testable.
-type confirmer interface {
+type applyConfirmer interface {
 	Confirm(message string, skip bool) (bool, error)
 }
 
@@ -27,7 +27,7 @@ type ApplyRunner struct {
 	UseCase     *stagingusecase.ApplyUseCase
 	Store       store.ReadWriteOperator
 	Parser      staging.Parser
-	Confirmer   confirmer
+	Confirmer   applyConfirmer
 	SkipConfirm bool
 	Stdout      io.Writer
 	Stderr      io.Writer
