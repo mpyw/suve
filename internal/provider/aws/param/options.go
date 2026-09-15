@@ -1,3 +1,7 @@
+// The functional-option types and the fold helpers that param.go applies
+// to SDK inputs: param.go's working parts, split out for readability.
+//declscope:namespace param
+
 package param
 
 import (

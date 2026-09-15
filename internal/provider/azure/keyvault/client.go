@@ -1,3 +1,7 @@
+// Adapts the concrete SDK client to the Client port that keyvault.go
+// declares: one unit with keyvault.go, split out for readability.
+//declscope:namespace keyvault
+
 package keyvault
 
 import (
