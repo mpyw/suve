@@ -1,3 +1,9 @@
+//declscope:namespace browser
+//
+// Update dispatches the whole page from here: 39 of the Model's methods.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share browser.go's namespace rather than each claiming their own.
+
 package browser
 
 import (

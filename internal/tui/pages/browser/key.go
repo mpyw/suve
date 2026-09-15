@@ -1,3 +1,9 @@
+//declscope:namespace browser
+//
+// The key bindings are dispatched by update.go and listed by help.go.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share browser.go's namespace rather than each claiming their own.
+
 // key.go holds the browser's key bindings. update.go dispatches on them and
 // help.go lists them, so they belong to neither.
 

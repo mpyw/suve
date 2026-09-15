@@ -1,3 +1,9 @@
+//declscope:namespace browser
+//
+// The tea.Cmd constructors and their result messages are the Model's own.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share browser.go's namespace rather than each claiming their own.
+
 package browser
 
 import (
