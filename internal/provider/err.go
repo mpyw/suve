@@ -15,4 +15,9 @@ var (
 	// represent as text (e.g. an AWS Secrets Manager SecretBinary secret).
 	// Callers must not treat such an entry as an empty-string value.
 	ErrBinaryValue = errors.New("binary value is not supported")
+	// ErrUnsupportedKind indicates the provider does not offer the requested
+	// store kind (e.g. GoogleCloud has no param store).
+	ErrUnsupportedKind = errors.New("provider: unsupported store kind")
+	// ErrNoFactory indicates no factory is registered for a provider.
+	ErrNoFactory = errors.New("provider: no factory registered for provider")
 )
