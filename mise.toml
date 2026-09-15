@@ -8,7 +8,7 @@
 #     library in gui/go.mod, so the bindings it regenerates (via `wails dev` in
 #     the generate-gui-bindings task) match the library.
 [tools]
-"github:mpyw/declscope" = "0.2.0"
+"github:mpyw/declscope" = "0.3.3"
 # Pinned to the exact go.mod directive so CI's carve-out jobs (which read the
 # version from go.mod via setup-go) and the mise jobs compile with the same
 # Go patch release.
