@@ -100,7 +100,7 @@ func (p *ValuePane) View() string {
 // the same string display() feeds the viewport, so it tracks the mask/reveal and
 // JSON-formatting state exactly.
 func (p *ValuePane) ContentHeight() int {
-	content := p.display()
+	content := p.render()
 	if content == "" {
 		return 0
 	}
@@ -110,14 +110,14 @@ func (p *ValuePane) ContentHeight() int {
 
 // syncContent recomputes the viewport content for the current mask state.
 func (p *ValuePane) syncContent() {
-	p.vp.SetContent(p.display())
+	p.vp.SetContent(p.render())
 }
 
-// display returns the string shown in the viewport: a mask that reveals neither
+// render returns the string shown in the viewport: a mask that reveals neither
 // the value nor (beyond the cap) its length when masked; else the JSON-formatted
 // value when the (revealed) value parses as JSON — always pretty-printed like
 // the GUI (#732) — else the raw value.
-func (p *ValuePane) display() string {
+func (p *ValuePane) render() string {
 	if p.masked {
 		return MaskValue(p.raw)
 	}

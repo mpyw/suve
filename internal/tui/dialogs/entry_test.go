@@ -192,31 +192,31 @@ func TestEntryForm_TypeSelectGating(t *testing.T) {
 
 	awsParam, _ := newEntry(t, awsParamCap(), false)
 	require.True(t, awsParam.staged, "AWS param defaults to staged")
-	assert.True(t, awsParam.showType(), "staged mode still offers the Type select")
+	assert.True(t, awsParam.offersType(), "staged mode still offers the Type select")
 	assert.Contains(t, awsParam.View(), "Type", "the staged form draws the Type row (default mode)")
 
 	awsParam.staged = false
 	require.NotNil(t, awsParam.rebuildForm())
-	assert.True(t, awsParam.showType(), "immediate mode offers the Type select")
+	assert.True(t, awsParam.offersType(), "immediate mode offers the Type select")
 	assert.Contains(t, awsParam.View(), "Type", "immediate form draws the Type row")
 
 	appConfig, _ := newEntry(t, appConfigCap(), false)
-	assert.False(t, appConfig.showType(), "App Configuration is untyped in either mode")
+	assert.False(t, appConfig.offersType(), "App Configuration is untyped in either mode")
 	appConfig.staged = false
 	require.NotNil(t, appConfig.rebuildForm())
-	assert.False(t, appConfig.showType(), "App Configuration is untyped in either mode")
+	assert.False(t, appConfig.offersType(), "App Configuration is untyped in either mode")
 
 	secret, _ := newEntry(t, awsSecretCap(), false)
-	assert.False(t, secret.showType(), "secret has no value type in either mode")
+	assert.False(t, secret.offersType(), "secret has no value type in either mode")
 	secret.staged = false
 	require.NotNil(t, secret.rebuildForm())
-	assert.False(t, secret.showType(), "secret has no value type in either mode")
+	assert.False(t, secret.offersType(), "secret has no value type in either mode")
 
 	// A staged-only surface (the staging review page's edit) hides the Type select:
 	// the write is always a staged edit that preserves the existing type, and the
 	// dialog cannot seed the entry's current type.
 	stagedOnly := newStagedOnlyEntry(t, awsParamCap())
-	assert.False(t, stagedOnly.showType(), "a staged-only edit hides the Type select")
+	assert.False(t, stagedOnly.offersType(), "a staged-only edit hides the Type select")
 	assert.NotContains(t, stagedOnly.View(), "Type", "a staged-only edit draws no Type row")
 }
 

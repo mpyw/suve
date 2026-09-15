@@ -175,7 +175,7 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 	return d, cmd
 }
 
-// showType reports whether the typed-param Type select is offered: only the AWS
+// offersType reports whether the typed-param Type select is offered: only the AWS
 // SSM param service has a value type (App Configuration is untyped; secret has
 // none) — parity with the GUI's ParamTypeOptions. It does NOT depend on the mode
 // toggle, so the select is reachable for a staged create and flows through to
@@ -186,7 +186,7 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 // the write is always a staged edit, which preserves the existing type rather
 // than taking a new one, and the dialog cannot seed the entry's current type — so
 // a Type control there could neither be honored nor shown accurately.
-func (d *entryForm) showType() bool {
+func (d *entryForm) offersType() bool {
 	return d.svcCap.Service == serviceParam && !d.svcCap.HasNamespaces && !d.stagedOnly
 }
 
@@ -218,7 +218,7 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 		fields = append(fields, d.namespaceField())
 	}
 
-	if d.showType() {
+	if d.offersType() {
 		fields = append(fields, huh.NewSelect[string]().Key("type").Title("Type").
 			Options(huh.NewOptions(paramtype.Options()...)...).Value(&d.valueType))
 	}
@@ -530,7 +530,7 @@ func (d *entryForm) submit() tea.Cmd {
 	// explicit type" so the staged edit preserves the existing type instead of
 	// forcing the select's default and downgrading it.
 	valueType := ""
-	if d.showType() {
+	if d.offersType() {
 		valueType = d.valueType
 	}
 

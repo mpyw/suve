@@ -96,13 +96,13 @@ func (l *EntryList) SelectedRow() (ListRow, bool) {
 // selection visible. It reports whether the viewport actually scrolled (the
 // offset changed), so callers can force a full repaint only when a scroll-region
 // optimization would otherwise fire (see internal/tui/termquirk).
-func (l *EntryList) Move(delta int) bool {
+func (l *EntryList) Move(delta int) (scrolled bool) {
 	if len(l.rows) == 0 {
 		return false
 	}
 
 	before := l.offset
-	l.selected = clamp(l.selected+delta, 0, len(l.rows)-1)
+	l.selected = clamp(l.selected+delta, len(l.rows)-1)
 	l.ensureVisible()
 
 	return l.offset != before
@@ -111,13 +111,13 @@ func (l *EntryList) Move(delta int) bool {
 // SelectIndex selects a specific index (clamped) and keeps it visible. It reports
 // whether the offset changed (a click on a partially-visible row scrolls it fully
 // into view), so callers can force a full repaint only then (see termquirk).
-func (l *EntryList) SelectIndex(i int) bool {
+func (l *EntryList) SelectIndex(i int) (scrolled bool) {
 	if len(l.rows) == 0 {
 		return false
 	}
 
 	before := l.offset
-	l.selected = clamp(i, 0, len(l.rows)-1)
+	l.selected = clamp(i, len(l.rows)-1)
 	l.ensureVisible()
 
 	return l.offset != before
@@ -127,9 +127,9 @@ func (l *EntryList) SelectIndex(i int) bool {
 // scrolling), clamped so it never scrolls past the ends. It reports whether the
 // offset actually changed (false when already clamped at an end), so callers can
 // force a full repaint only on a real scroll (see internal/tui/termquirk).
-func (l *EntryList) Scroll(delta int) bool {
+func (l *EntryList) Scroll(delta int) (scrolled bool) {
 	before := l.offset
-	l.offset = clamp(l.offset+delta, 0, l.maxOffset())
+	l.offset = clamp(l.offset+delta, l.maxOffset())
 
 	return l.offset != before
 }
@@ -325,7 +325,7 @@ func (l *EntryList) ensureVisible() {
 		l.offset = minOffset
 	}
 
-	l.offset = clamp(l.offset, 0, l.maxOffset())
+	l.offset = clamp(l.offset, l.maxOffset())
 }
 
 // clampSelection keeps the selection within the current rows.
@@ -336,5 +336,5 @@ func (l *EntryList) clampSelection() {
 		return
 	}
 
-	l.selected = clamp(l.selected, 0, len(l.rows)-1)
+	l.selected = clamp(l.selected, len(l.rows)-1)
 }
