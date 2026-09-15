@@ -14,39 +14,6 @@ import (
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-//declscope:package // a fixture several test files share
-type mockServiceStrategy struct {
-	service          staging.Service
-	serviceName      string
-	itemName         string
-	hasDeleteOptions bool
-}
-
-func (m *mockServiceStrategy) Service() staging.Service { return m.service }
-func (m *mockServiceStrategy) ServiceName() string      { return m.serviceName }
-func (m *mockServiceStrategy) ItemName() string         { return m.itemName }
-func (m *mockServiceStrategy) HasDeleteOptions() bool   { return m.hasDeleteOptions }
-
-//declscope:package // a fixture several test files share
-func newParamStrategy() *mockServiceStrategy {
-	return &mockServiceStrategy{
-		service:          staging.ServiceParam,
-		serviceName:      "SSM Parameter Store",
-		itemName:         "parameter",
-		hasDeleteOptions: false,
-	}
-}
-
-//declscope:package // a fixture several test files share
-func newSecretStrategy() *mockServiceStrategy {
-	return &mockServiceStrategy{
-		service:          staging.ServiceSecret,
-		serviceName:      "Secrets Manager",
-		itemName:         "secret",
-		hasDeleteOptions: true,
-	}
-}
-
 func TestStatusUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 
