@@ -1,3 +1,8 @@
+//declscope:namespace mutator
+//
+// These are the secret-mutator tests: the same subject as mutator_test.go,
+// whose tempStagingStore helper they share.
+
 package data_test
 
 import (

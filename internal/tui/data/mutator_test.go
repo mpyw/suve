@@ -20,6 +20,8 @@ import (
 )
 
 // awsParamCap returns the AWS param capability from the neutral matrix.
+//
+//declscope:package // capability fixture shared with stagingservice_test.go
 func awsParamCap(t *testing.T) capability.ServiceCapability {
 	t.Helper()
 
@@ -42,6 +44,8 @@ func awsParamCap(t *testing.T) capability.ServiceCapability {
 
 // azureParamCap returns the Azure App Configuration param capability (the
 // namespaced param service) from the neutral matrix.
+//
+//declscope:package // capability fixture shared with stagingservice_test.go
 func azureParamCap(t *testing.T) capability.ServiceCapability {
 	t.Helper()
 

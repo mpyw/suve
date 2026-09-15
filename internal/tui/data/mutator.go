@@ -17,19 +17,6 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// WriteOutcome carries the semantic result of a mutation the UI must voice.
-// Skipped is set when a staged edit equalled the live value (nothing staged);
-// Unstaged when an edit-back-to-base or a delete-of-staged-create auto-unstaged
-// the entry (EditOutput.Skipped/Unstaged, DeleteOutput.Unstaged); Updated when
-// an immediate create fell back to update because the entry already existed
-// (the create-or-update/upsert branch), so the status voices an update rather
-// than a create — matching the GUI (ParamSet) and CLI (`param set`).
-type WriteOutcome struct {
-	Skipped  bool
-	Unstaged bool
-	Updated  bool
-}
-
 // Mutator is the write-path seam the mutation dialogs depend on. Every method is
 // provider-neutral and routes to either the direct param/secret use cases
 // (immediate) or the internal/usecase/staging use cases (staged), per the staged
@@ -57,27 +44,6 @@ type Mutator interface {
 	// staged restore); it errors when the provider offers none.
 	Restore(ctx context.Context, name string) (WriteOutcome, error)
 }
-
-// ErrRestoreUnsupported is returned by Restore when the resolved store does not
-// implement provider.Restorer (the capability gate should prevent reaching it).
-var ErrRestoreUnsupported = stringError("restore is not supported by this provider")
-
-// stringError is a small sentinel error type for the data seam.
-type stringError string
-
-func (e stringError) Error() string { return string(e) }
-
-// StrategyBuilder builds the provider-specific staging strategy over a resolved
-// provider.Store. The returned FullStrategy satisfies staging.EditStrategy and
-// (via the concrete type) staging.DeleteStrategy, matching the GUI's
-// serviceStrategyScoped narrowing.
-type StrategyBuilder func(store provider.Store) staging.FullStrategy
-
-// StagingStoreResolver resolves (and caches, upstream) the on-disk staging store
-// for the mutator's service. It is nil when the service has no staging workflow.
-// Deferring resolution to the first staged write keeps dialog open off the
-// keychain.
-type StagingStoreResolver func() (store.ReadWriteOperator, error)
 
 // =============================================================================
 // Param mutator
@@ -136,7 +102,7 @@ func (m *paramMutator) Create(
 
 	if staged {
 		return m.stageEntry(
-			ctx, StagedKey{Name: key.Name, Namespace: ns}, value, description, stagedValueType(typeLabel), stageOpCreate,
+			ctx, StagedKey{Name: key.Name, Namespace: ns}, value, description, mutatorStagedValueType(typeLabel), mutatorStageOpCreate,
 		)
 	}
 
@@ -186,7 +152,7 @@ func (m *paramMutator) Update(
 
 	if staged {
 		return m.stageEntry(
-			ctx, StagedKey{Name: key.Name, Namespace: ns}, value, description, stagedValueType(typeLabel), stageOpEdit,
+			ctx, StagedKey{Name: key.Name, Namespace: ns}, value, description, mutatorStagedValueType(typeLabel), mutatorStageOpEdit,
 		)
 	}
 
@@ -293,14 +259,14 @@ func (m *paramMutator) stageStrategy(
 }
 
 func (m *paramMutator) stageEntry(
-	ctx context.Context, key StagedKey, value, description string, valueType domain.ValueType, op stageOp,
+	ctx context.Context, key StagedKey, value, description string, valueType domain.ValueType, op mutatorStageOp,
 ) (WriteOutcome, error) {
 	strategy, st, err := m.stageStrategy(ctx, key.Namespace)
 	if err != nil {
 		return WriteOutcome{}, err
 	}
 
-	return stageEntry(ctx, strategy, st, key, value, description, valueType, op)
+	return mutatorStageEntry(ctx, strategy, st, key, value, description, valueType, op)
 }
 
 func (m *paramMutator) stageDelete(
@@ -311,7 +277,7 @@ func (m *paramMutator) stageDelete(
 		return WriteOutcome{}, err
 	}
 
-	return stageDelete(ctx, strategy, st, key, force, recoveryWindow)
+	return mutatorStageDelete(ctx, strategy, st, key, force, recoveryWindow)
 }
 
 func (m *paramMutator) stageAddTag(ctx context.Context, key StagedKey, tagKey, tagValue string) (WriteOutcome, error) {
@@ -320,7 +286,7 @@ func (m *paramMutator) stageAddTag(ctx context.Context, key StagedKey, tagKey, t
 		return WriteOutcome{}, err
 	}
 
-	return stageAddTag(ctx, strategy, st, key, tagKey, tagValue)
+	return mutatorStageAddTag(ctx, strategy, st, key, tagKey, tagValue)
 }
 
 func (m *paramMutator) stageRemoveTag(ctx context.Context, key StagedKey, tagKey string) (WriteOutcome, error) {
@@ -329,7 +295,7 @@ func (m *paramMutator) stageRemoveTag(ctx context.Context, key StagedKey, tagKey
 		return WriteOutcome{}, err
 	}
 
-	return stageRemoveTag(ctx, strategy, st, key, tagKey)
+	return mutatorStageRemoveTag(ctx, strategy, st, key, tagKey)
 }
 
 // =============================================================================
@@ -363,7 +329,7 @@ func (m *secretMutator) Create(
 	if staged {
 		return m.stage(func(strategy staging.FullStrategy, st store.ReadWriteOperator) (WriteOutcome, error) {
 			// Secrets have no value-type axis, so no value type is staged.
-			return stageEntry(ctx, strategy, st, key, value, description, "", stageOpCreate)
+			return mutatorStageEntry(ctx, strategy, st, key, value, description, "", mutatorStageOpCreate)
 		})
 	}
 
@@ -379,7 +345,7 @@ func (m *secretMutator) Update(
 	if staged {
 		return m.stage(func(strategy staging.FullStrategy, st store.ReadWriteOperator) (WriteOutcome, error) {
 			// Secrets have no value-type axis, so no value type is staged.
-			return stageEntry(ctx, strategy, st, key, value, description, "", stageOpEdit)
+			return mutatorStageEntry(ctx, strategy, st, key, value, description, "", mutatorStageOpEdit)
 		})
 	}
 
@@ -394,7 +360,7 @@ func (m *secretMutator) Delete(
 ) (WriteOutcome, error) {
 	if staged {
 		return m.stage(func(strategy staging.FullStrategy, st store.ReadWriteOperator) (WriteOutcome, error) {
-			return stageDelete(ctx, strategy, st, key, force, recoveryWindow)
+			return mutatorStageDelete(ctx, strategy, st, key, force, recoveryWindow)
 		})
 	}
 
@@ -415,7 +381,7 @@ func (m *secretMutator) AddTag(
 ) (WriteOutcome, error) {
 	if staged {
 		return m.stage(func(strategy staging.FullStrategy, st store.ReadWriteOperator) (WriteOutcome, error) {
-			return stageAddTag(ctx, strategy, st, key, tagKey, tagValue)
+			return mutatorStageAddTag(ctx, strategy, st, key, tagKey, tagValue)
 		})
 	}
 
@@ -429,7 +395,7 @@ func (m *secretMutator) RemoveTag(
 ) (WriteOutcome, error) {
 	if staged {
 		return m.stage(func(strategy staging.FullStrategy, st store.ReadWriteOperator) (WriteOutcome, error) {
-			return stageRemoveTag(ctx, strategy, st, key, tagKey)
+			return mutatorStageRemoveTag(ctx, strategy, st, key, tagKey)
 		})
 	}
 
@@ -467,15 +433,15 @@ func (m *secretMutator) stage(
 // Shared staged-write helpers
 // =============================================================================
 
-// stageOp selects the entry transition a staged write performs.
-type stageOp int
+// mutatorStageOp selects the entry transition a staged write performs.
+type mutatorStageOp int
 
 const (
-	stageOpCreate stageOp = iota
-	stageOpEdit
+	mutatorStageOpCreate mutatorStageOp = iota
+	mutatorStageOpEdit
 )
 
-// stagedValueType maps a Type display label to the value type to stage. The
+// mutatorStagedValueType maps a Type display label to the value type to stage. The
 // dialog passes an empty label when it presents no Type control (a secret, an App
 // Configuration setting, or the staging-review edit that cannot seed the current
 // type); an empty value means "no explicit type", which the staging apply treats
@@ -483,7 +449,7 @@ const (
 // an edit from a surface with no Type control never downgrades a staged
 // SecureString. A non-empty label (an offered Type select) is mapped through
 // paramtype.Parse so the chosen type is stored and applied.
-func stagedValueType(typeLabel string) domain.ValueType {
+func mutatorStagedValueType(typeLabel string) domain.ValueType {
 	if typeLabel == "" {
 		return ""
 	}
@@ -491,19 +457,19 @@ func stagedValueType(typeLabel string) domain.ValueType {
 	return paramtype.Parse(typeLabel)
 }
 
-// stageEntry stages a create or edit and maps the use-case outcome (Skipped/
+// mutatorStageEntry stages a create or edit and maps the use-case outcome (Skipped/
 // Unstaged for edit) onto the neutral WriteOutcome. valueType carries the AWS SSM
 // param value type (String / SecureString / StringList) into the staging store so
 // a staged SecureString create/edit applies as SecureString; an empty value
 // preserves the existing type on edit (and applies plaintext on create). It is
 // empty for providers with no value-type axis (secret, App Configuration).
-func stageEntry(
+func mutatorStageEntry(
 	ctx context.Context, strategy staging.FullStrategy, st store.ReadWriteOperator,
-	key StagedKey, value, description string, valueType domain.ValueType, op stageOp,
+	key StagedKey, value, description string, valueType domain.ValueType, op mutatorStageOp,
 ) (WriteOutcome, error) {
 	entryKey := staging.EntryKey{Name: key.Name, Namespace: key.Namespace}
 
-	if op == stageOpCreate {
+	if op == mutatorStageOpCreate {
 		uc := &stagingusecase.AddUseCase{Strategy: strategy, Store: st}
 		_, err := uc.Execute(ctx, stagingusecase.AddInput{
 			Key: entryKey, Value: value, Description: description, ValueType: valueType,
@@ -524,14 +490,14 @@ func stageEntry(
 	return WriteOutcome{Skipped: out.Skipped, Unstaged: out.Unstaged}, nil
 }
 
-// stageDelete stages a delete and reports the auto-unstage outcome.
-func stageDelete(
+// mutatorStageDelete stages a delete and reports the auto-unstage outcome.
+func mutatorStageDelete(
 	ctx context.Context, strategy staging.FullStrategy, st store.ReadWriteOperator,
 	key StagedKey, force bool, recoveryWindow int,
 ) (WriteOutcome, error) {
 	deleteStrategy, ok := any(strategy).(staging.DeleteStrategy)
 	if !ok {
-		return WriteOutcome{}, stringError("staging strategy does not support delete")
+		return WriteOutcome{}, errors.New("staging strategy does not support delete")
 	}
 
 	uc := &stagingusecase.DeleteUseCase{Strategy: deleteStrategy, Store: st}
@@ -548,8 +514,8 @@ func stageDelete(
 	return WriteOutcome{Unstaged: out.Unstaged}, nil
 }
 
-// stageAddTag stages a tag add/update.
-func stageAddTag(
+// mutatorStageAddTag stages a tag add/update.
+func mutatorStageAddTag(
 	ctx context.Context, strategy staging.FullStrategy, st store.ReadWriteOperator,
 	key StagedKey, tagKey, tagValue string,
 ) (WriteOutcome, error) {
@@ -563,8 +529,8 @@ func stageAddTag(
 	return WriteOutcome{}, err
 }
 
-// stageRemoveTag stages a tag removal.
-func stageRemoveTag(
+// mutatorStageRemoveTag stages a tag removal.
+func mutatorStageRemoveTag(
 	ctx context.Context, strategy staging.FullStrategy, st store.ReadWriteOperator,
 	key StagedKey, tagKey string,
 ) (WriteOutcome, error) {
