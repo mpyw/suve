@@ -1,4 +1,9 @@
 // Package secret provides CLI commands for AWS Secrets Manager.
+//
+// command.go はパッケージの主題である secret コマンドグループの組み立てで、
+// 兄弟ファイルが共有する語彙もここに置く。core とする。
+//
+//declscope:core
 package secret
 
 import (
@@ -12,6 +17,8 @@ import (
 )
 
 // nounSecret is the command name / noun used across the Secrets Manager commands.
+//
+//declscope:package // tag.go / untag.go もコマンドの名詞に使う
 const nounSecret = "secret"
 
 // Command returns the secret command with all subcommands.

@@ -1,3 +1,6 @@
+// log.go の logPresenter と整形ヘルパを直接検証する白箱テスト。
+//declscope:namespace log
+
 package param
 
 import (
@@ -37,7 +40,7 @@ func TestTruncateRunes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := truncateRunes(tt.in, tt.maxLen)
+			got := logTruncateRunes(tt.in, tt.maxLen)
 			assert.Equal(t, tt.want, got)
 			assert.True(t, utf8.ValidString(got), "result must be valid UTF-8")
 		})
@@ -76,11 +79,11 @@ func TestRenderOnelineDateHonorsTZ(t *testing.T) {
 func TestSanitizeControl(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "a␤b", sanitizeControl("a\nb"))
-	assert.Equal(t, "a␤b␤c", sanitizeControl("a\nb\tc"))
+	assert.Equal(t, "a␤b", logSanitizeControl("a\nb"))
+	assert.Equal(t, "a␤b␤c", logSanitizeControl("a\nb\tc"))
 	// Each control char maps individually, so CRLF becomes two markers.
-	assert.Equal(t, "a␤␤b", sanitizeControl("a\r\nb"))
-	assert.Equal(t, "plain text", sanitizeControl("plain text"))
+	assert.Equal(t, "a␤␤b", logSanitizeControl("a\r\nb"))
+	assert.Equal(t, "plain text", logSanitizeControl("plain text"))
 	// Multi-byte, non-control content is left untouched.
-	assert.Equal(t, "日本語", sanitizeControl("日本語"))
+	assert.Equal(t, "日本語", logSanitizeControl("日本語"))
 }

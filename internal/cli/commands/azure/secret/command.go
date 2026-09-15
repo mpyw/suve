@@ -5,6 +5,11 @@
 // so this group exposes the read/write/tag commands (show, log, list, diff,
 // create, update, delete, tag, untag) reusing the generic command scaffolding
 // via Azure-specific presenters and the shared internal/usecase/azure use cases.
+//
+// command.go はパッケージの主題である azure secret コマンドグループの組み立てで、
+// 兄弟ファイルが共有する語彙・ヘルパもここに置く。core とする。
+//
+//declscope:core
 package secret
 
 import (
@@ -19,9 +24,13 @@ import (
 )
 
 // nounSecret is the command name / noun used across the Key Vault secret commands.
+//
+//declscope:package // tag.go / untag.go もコマンドの名詞に使う
 const nounSecret = "secret"
 
 // argsUsageName is the shared ArgsUsage for single-secret commands.
+//
+//declscope:package // delete / restore / log が単一シークレットコマンドの ArgsUsage に使う
 const argsUsageName = "<name>"
 
 // Command returns the "azure secret" subcommand group.
@@ -69,6 +78,8 @@ AZURE_KEYVAULT_NAME environment variable.`,
 // It is handed to provider.Reader.Resolve via the use cases.
 //
 // Examples: {ID:"abc"} -> "#abc"; {Shift:2} -> "~2"; {} -> "" (current).
+//
+//declscope:package // diff / show が Resolve に渡す suffix を再構成するのに使う
 func specSuffix(spec *azurekvversion.Spec) string {
 	var b strings.Builder
 
