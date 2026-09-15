@@ -1,4 +1,4 @@
-// delete.go の非公開関数を外部テストへ公開する export シム。
+// An export shim: it opens delete.go's private functions to the black-box tests.
 //declscope:namespace delete
 
 package delete

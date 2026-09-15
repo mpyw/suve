@@ -5,9 +5,9 @@
 // Cloud-shaped outputs: integer versions, no ARN, no staging labels. The
 // per-version state (enabled/disabled/destroyed) is surfaced where the provider
 // supplies it via the neutral Version.State.
-// gcloud.go はパッケージ名を冠した共有部分（共通エラーと spec suffix の再構成）で、
-// gcloud.ErrSecretNotFound -> GcloudErrSecretNotFound のような stutter を避ける
-// ため core とする。
+// gcloud.go holds what the package shares under the package's own name: the
+// common errors, and the spec suffix it rebuilds. Core, so that
+// gcloud.ErrSecretNotFound does not have to become GcloudErrSecretNotFound.
 //
 //declscope:core
 package gcloud
@@ -30,7 +30,7 @@ var ErrSecretNotFound = errors.New("secret not found")
 //
 // Examples: {Version:3} -> "#3"; {Shift:2} -> "~2"; {} -> "" (latest).
 //
-//declscope:package // diff が Resolve に渡す suffix を再構成するのに使う
+//declscope:package // diff rebuilds the suffix it passes to Resolve
 func specSuffix(spec *gcloudversion.Spec) string {
 	var b strings.Builder
 

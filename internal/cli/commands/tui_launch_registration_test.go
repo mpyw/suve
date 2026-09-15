@@ -1,4 +1,4 @@
-// tui.go の RegisterTUIFlag / RegisterTUIDescription を検証する白箱テスト。
+// White-box tests for tui.go's RegisterTUIFlag and RegisterTUIDescription.
 //declscope:namespace tui
 
 //nolint:testpackage // white-box: drives the process-wide App through RegisterTUIFlag/RegisterTUIDescription

@@ -1,6 +1,6 @@
-// client.go はこのパッケージの主役: 各プロバイダの store / strategy / scope を
-// 組み立てる配線で、全コマンドがここを通る。internal.ParamStore ->
-// ClientParamStore のような stutter を避けるため core とする。
+// client.go is this package's subject: the wiring that assembles each
+// provider's store, strategy and scope, which every command goes through. Core,
+// so that internal.ParamStore does not have to become ClientParamStore.
 //declscope:core
 
 package internal

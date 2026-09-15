@@ -1,4 +1,4 @@
-// apply.go の gatherServices を直接検証する白箱テスト。
+// White-box tests for apply.go's gatherServices.
 //declscope:namespace apply
 
 package apply

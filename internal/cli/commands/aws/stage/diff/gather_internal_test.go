@@ -1,4 +1,4 @@
-// diff.go の gatherServices を直接検証する白箱テスト。
+// White-box tests for diff.go's gatherServices.
 //declscope:namespace diff
 
 package diff

@@ -1,4 +1,4 @@
-// pager.go の非公開関数を直接検証する白箱テスト。
+// White-box tests for pager.go's private functions.
 //declscope:namespace pager
 
 package pager

@@ -14,7 +14,7 @@ import (
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-//declscope:package // 複数のテストファイルが共有するフィクスチャ
+//declscope:package // a fixture several test files share
 type mockServiceStrategy struct {
 	service          staging.Service
 	serviceName      string
@@ -27,7 +27,7 @@ func (m *mockServiceStrategy) ServiceName() string      { return m.serviceName }
 func (m *mockServiceStrategy) ItemName() string         { return m.itemName }
 func (m *mockServiceStrategy) HasDeleteOptions() bool   { return m.hasDeleteOptions }
 
-//declscope:package // 複数のテストファイルが共有するフィクスチャ
+//declscope:package // a fixture several test files share
 func newParamStrategy() *mockServiceStrategy {
 	return &mockServiceStrategy{
 		service:          staging.ServiceParam,
@@ -37,7 +37,7 @@ func newParamStrategy() *mockServiceStrategy {
 	}
 }
 
-//declscope:package // 複数のテストファイルが共有するフィクスチャ
+//declscope:package // a fixture several test files share
 func newSecretStrategy() *mockServiceStrategy {
 	return &mockServiceStrategy{
 		service:          staging.ServiceSecret,

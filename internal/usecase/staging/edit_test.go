@@ -16,7 +16,7 @@ import (
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-//declscope:package // 複数のテストファイルが共有するフィクスチャ
+//declscope:package // a fixture several test files share
 type mockEditStrategy struct {
 	*mockParser
 
@@ -32,7 +32,7 @@ func (m *mockEditStrategy) FetchCurrentValue(_ context.Context, _ string) (*stag
 	return m.fetchResult, nil
 }
 
-//declscope:package // 複数のテストファイルが共有するフィクスチャ
+//declscope:package // a fixture several test files share
 func newMockEditStrategy() *mockEditStrategy {
 	return &mockEditStrategy{
 		mockParser: newMockParser(),
@@ -45,7 +45,7 @@ func newMockEditStrategy() *mockEditStrategy {
 
 // newMockEditStrategyNotFound creates a mock that returns ResourceNotFoundError.
 //
-//declscope:package // 複数のテストファイルが共有するフィクスチャ
+//declscope:package // a fixture several test files share
 func newMockEditStrategyNotFound() *mockEditStrategy {
 	return &mockEditStrategy{
 		mockParser: newMockParser(),

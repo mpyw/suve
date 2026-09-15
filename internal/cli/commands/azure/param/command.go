@@ -8,8 +8,8 @@
 // reuses the generic command scaffolding (show,
 // list, diff, create, update, delete, tag, untag) via App Configuration
 // presenters and the shared internal/usecase/azure use cases.
-// command.go はパッケージの主題である azure param コマンドグループの組み立てで、
-// 兄弟ファイルが共有する語彙もここに置く。core とする。
+// command.go is this package's subject: the azure param command group it
+// assembles, together with the vocabulary its sibling files share. Hence core.
 //
 //declscope:core
 package param
@@ -24,7 +24,7 @@ import (
 
 // argsUsageKey is the ArgsUsage string shared by the single-key commands.
 //
-//declscope:package // delete / show / log が単一キーコマンドの ArgsUsage に使う
+//declscope:package // delete, show and log use it for a single-key command's ArgsUsage
 const argsUsageKey = "<key>"
 
 // Command returns the "azure param" subcommand group.

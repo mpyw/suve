@@ -14,7 +14,7 @@ import (
 // writes tags via a GET-merge-PUT with an ETag precondition (azappconfig/v2), so
 // the value and any other tags are preserved.
 //
-//declscope:package // untag.go の UntagCommand も同じ Tagger を組み立てる
+//declscope:package // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return cliinternal.AzureAppConfigStore(ctx)
 }

@@ -1,4 +1,4 @@
-// output.go の非公開関数を直接検証する白箱テスト。
+// White-box tests for output.go's private functions.
 //declscope:namespace output
 
 package output

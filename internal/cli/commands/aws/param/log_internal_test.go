@@ -1,4 +1,4 @@
-// log.go の logPresenter と整形ヘルパを直接検証する白箱テスト。
+// White-box tests for log.go's logPresenter and its formatting helpers.
 //declscope:namespace log
 
 package param

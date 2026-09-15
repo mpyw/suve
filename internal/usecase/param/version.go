@@ -17,7 +17,7 @@ import (
 //	{Version:5, Shift:2} -> "#5~2"
 //	{}                   -> ""  (latest)
 //
-//declscope:package // diff / show が Resolve に渡す suffix を再構成するのに使う
+//declscope:package // diff and show rebuild the suffix they pass to Resolve
 func versionSpecSuffix(spec *awsparamversion.Spec) string {
 	var b strings.Builder
 
@@ -37,7 +37,7 @@ func versionSpecSuffix(spec *awsparamversion.Spec) string {
 // parseVersion converts a provider version id ("3") to the int64 version number
 // used by the SSM-facing usecase outputs. A non-numeric or empty id yields 0.
 //
-//declscope:package // create / diff / log / show / update が version id の変換に使う
+//declscope:package // create, diff, log, show and update convert a version id with it
 func parseVersion(id string) int64 {
 	v, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {

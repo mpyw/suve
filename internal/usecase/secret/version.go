@@ -20,7 +20,7 @@ import (
 //	{Label:"AWSCURRENT", Shift:1}-> ":AWSCURRENT~1"
 //	{}                           -> ""  (current/latest)
 //
-//declscope:package // diff / show が Resolve に渡す suffix を再構成するのに使う
+//declscope:package // diff and show rebuild the suffix they pass to Resolve
 func versionSpecSuffix(spec *awssecretversion.Spec) string {
 	var b strings.Builder
 
@@ -46,7 +46,7 @@ func versionSpecSuffix(spec *awssecretversion.Spec) string {
 // secret usecases surface provider metadata (like the Secrets Manager ARN) that
 // the neutral domain.Entry keeps in its Extra bag.
 //
-//declscope:package // show / log が Extra フィールドの取り出しに使う
+//declscope:package // show and log read the Extra fields with it
 func versionExtraValue(entry *domain.Entry, label string) string {
 	for _, f := range entry.Extra {
 		if f.Label == label {
@@ -61,7 +61,7 @@ func versionExtraValue(entry *domain.Entry, label string) string {
 // Manager staging labels for stable output. An empty slice yields nil so that
 // callers omit the field entirely (matching the pre-migration behavior).
 //
-//declscope:package // show / log が staging label の整形に使う
+//declscope:package // show and log format the staging label with it
 func versionStages(labels []string) []string {
 	if len(labels) == 0 {
 		return nil

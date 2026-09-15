@@ -1,6 +1,6 @@
-// shift.go は parse.go の一部品: <shift> 節 (~ / ~N) の解析だけを受け持ち、
-// parse.go からのみ呼ばれる。装置としては version spec parser の一部なので
-// namespace を parse に合流する。
+// shift.go is a part of parse.go: it reads the <shift> clause (~ and ~N) and
+// nothing else, and parse.go is its only caller. It is one piece of the version
+// spec parser, so it joins parse's namespace.
 //declscope:namespace parse
 
 package version

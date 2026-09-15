@@ -16,7 +16,7 @@ import (
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-//declscope:package // 複数のテストファイルが共有するフィクスチャ
+//declscope:package // a fixture several test files share
 type mockParser struct {
 	*mockServiceStrategy
 
@@ -40,7 +40,7 @@ func (m *mockParser) ParseSpec(input string) (string, bool, error) {
 	return input, false, nil
 }
 
-//declscope:package // 複数のテストファイルが共有するフィクスチャ
+//declscope:package // a fixture several test files share
 func newMockParser() *mockParser {
 	return &mockParser{
 		mockServiceStrategy: newParamStrategy(),

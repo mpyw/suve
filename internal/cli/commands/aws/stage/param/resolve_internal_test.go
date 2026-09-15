@@ -1,4 +1,4 @@
-// command.go の resolveValueType を直接検証する白箱テスト。
+// White-box tests for command.go's resolveValueType.
 //declscope:namespace command
 
 package param

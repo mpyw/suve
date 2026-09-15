@@ -1,4 +1,4 @@
-// shift.go は parse に合流しているので、その白箱テストも同じ namespace に置く。
+// shift.go joins parse's namespace, so its white-box tests go there too.
 //declscope:namespace parse
 
 package version

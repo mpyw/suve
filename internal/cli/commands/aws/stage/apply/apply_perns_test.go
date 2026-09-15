@@ -1,4 +1,4 @@
-// apply_test.go のモック群を共有する、namespace 別 apply の追加テスト。
+// Further tests for apply by namespace, sharing apply_test.go's mocks.
 //declscope:namespace apply
 
 package apply_test

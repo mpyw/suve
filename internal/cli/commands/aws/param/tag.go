@@ -12,7 +12,7 @@ import (
 
 // newTagger builds the SSM Parameter Store provider.Tagger.
 //
-//declscope:package // untag.go の UntagCommand も同じ Tagger を組み立てる
+//declscope:package // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return cliinternal.ParamStore(ctx)
 }
