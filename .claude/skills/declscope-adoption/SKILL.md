@@ -3,12 +3,18 @@ description: Adopt declscope on an existing Go codebase and drive its diagnostic
 license: MIT
 metadata:
     github-path: skills/declscope-adoption
-    github-ref: refs/tags/v0.3.0
+    github-ref: refs/tags/v0.3.2
     github-repo: https://github.com/mpyw/declscope
-    github-tree-sha: 06a0d0508348d6baf54c1bb1a748bdbb0928704d
+    github-tree-sha: 3291467765b4ce0c2447be0073dc123e7dc29941
 name: declscope-adoption
 ---
 # Adopting declscope
+
+Written against **declscope 0.3.2**. Check the version first, since one behaviour described here changed in 0.3.0.
+
+```bash
+declscope -V=full
+```
 
 declscope reports two things. **Read them separately.**
 
@@ -119,12 +125,9 @@ cp -r repo /tmp/try-a   # and measure there
 
 ## Known gaps
 
-| | |
-| --- | --- |
-| [#64](https://github.com/mpyw/declscope/issues/64) | Inflections are generated in one direction, so `storing.go` is not carried by `store*` |
-| [#65](https://github.com/mpyw/declscope/issues/65) | A `doc.go` with no declarations counts toward the namespace count, which turns `ondemand` on |
+[#64](https://github.com/mpyw/declscope/issues/64) is open. Inflections are generated only in the lengthening direction, so a `storing.go` is never carried by `store*`. The vocabulary entry above covers it in one line.
 
-Both have a workaround above. Nine packages in one repository were reported solely because of the second.
+Fixed in 0.3.0: a `doc.go` holding only a package comment used to count toward the namespace count and turn `ondemand` on. Nine packages in one repository reported for that reason alone. On 0.3.0 those reports are gone, and any `//declscope:core` written to work around it can come out.
 
 ## Order of work
 
