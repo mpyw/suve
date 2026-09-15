@@ -1,3 +1,6 @@
+// In-package tests of client.go's config-loading internals.
+//declscope:namespace client
+
 package infra
 
 import (

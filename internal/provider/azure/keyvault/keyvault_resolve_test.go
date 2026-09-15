@@ -1,3 +1,7 @@
+// Resolve-focused tests of keyvault.go, using the mock client that
+// keyvault_test.go declares.
+//declscope:namespace keyvault
+
 package keyvault_test
 
 import (

@@ -1,3 +1,7 @@
+// Further tests of secret.go, using the mock client that secret_test.go
+// declares.
+//declscope:namespace secret
+
 package secret_test
 
 import (

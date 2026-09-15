@@ -1,3 +1,6 @@
+// In-package tests of secret.go's unexported version-index helpers.
+//declscope:namespace secret
+
 package secret
 
 import (
