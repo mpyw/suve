@@ -237,7 +237,7 @@ func (s *GoogleCloudSecretStrategy) FetchVersion(ctx context.Context, input stri
 		return "", "", err
 	}
 
-	ref, err := s.store.Resolve(ctx, spec.Name, gcloudSecretSpecSuffix(spec))
+	ref, err := s.store.Resolve(ctx, spec.Name, googleCloudSecretSpecSuffix(spec))
 	if err != nil {
 		return "", "", err
 	}
@@ -250,10 +250,10 @@ func (s *GoogleCloudSecretStrategy) FetchVersion(ctx context.Context, input stri
 	return entry.Value, "#" + entry.Version.ID, nil
 }
 
-// gcloudSecretSpecSuffix reconstructs the version-spec suffix (the part after the
+// googleCloudSecretSpecSuffix reconstructs the version-spec suffix (the part after the
 // name) so that name+suffix re-parses to an equivalent spec, as
 // provider.Reader.Resolve expects.
-func gcloudSecretSpecSuffix(spec *gcloudversion.Spec) string {
+func googleCloudSecretSpecSuffix(spec *gcloudversion.Spec) string {
 	var b strings.Builder
 
 	if spec.Absolute.Version != nil {

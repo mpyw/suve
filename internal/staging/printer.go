@@ -10,8 +10,8 @@ import (
 	"github.com/mpyw/suve/internal/timeutil"
 )
 
-// maxValueDisplayLength is the maximum length of a value shown in status output.
-const maxValueDisplayLength = 100
+// printerMaxValueDisplayLength is the maximum length of a value shown in status output.
+const printerMaxValueDisplayLength = 100
 
 // EntryPrinter prints staged entries to the given writer.
 type EntryPrinter struct {
@@ -56,8 +56,8 @@ func (p *EntryPrinter) PrintEntry(key EntryKey, entry Entry, verbose, showDelete
 	case OperationCreate, OperationUpdate:
 		if entry.Value != nil {
 			value := lo.FromPtr(entry.Value)
-			if len(value) > maxValueDisplayLength {
-				value = value[:maxValueDisplayLength] + "..."
+			if len(value) > printerMaxValueDisplayLength {
+				value = value[:printerMaxValueDisplayLength] + "..."
 			}
 
 			output.Printf(p.Writer, "  %s %s\n", pal.FieldLabel("Value:"), value)

@@ -224,7 +224,7 @@ func (s *AzureKeyVaultSecretStrategy) FetchVersion(ctx context.Context, input st
 		return "", "", err
 	}
 
-	ref, err := s.store.Resolve(ctx, spec.Name, azureKVSpecSuffix(spec))
+	ref, err := s.store.Resolve(ctx, spec.Name, azureKeyVaultSecretSpecSuffix(spec))
 	if err != nil {
 		return "", "", err
 	}
@@ -237,9 +237,9 @@ func (s *AzureKeyVaultSecretStrategy) FetchVersion(ctx context.Context, input st
 	return entry.Value, "#" + entry.Version.ID, nil
 }
 
-// azureKVSpecSuffix reconstructs the version-spec suffix (the part after the
+// azureKeyVaultSecretSpecSuffix reconstructs the version-spec suffix (the part after the
 // name) so that name+suffix re-parses to an equivalent spec.
-func azureKVSpecSuffix(spec *azurekvversion.Spec) string {
+func azureKeyVaultSecretSpecSuffix(spec *azurekvversion.Spec) string {
 	var b strings.Builder
 
 	if spec.Absolute.ID != nil {
