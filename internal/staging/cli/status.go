@@ -47,7 +47,8 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	if opts.Name != "" {
 		printer := &staging.EntryPrinter{Writer: r.Stdout}
 		for _, entry := range result.Entries {
-			printer.PrintEntry(staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}, stagingEntryFromStatus(entry), opts.Verbose, entry.ShowDeleteOptions)
+			key := staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}
+			printer.PrintEntry(key, stagingEntryFromStatus(entry), opts.Verbose, entry.ShowDeleteOptions)
 		}
 
 		for _, tagEntry := range result.TagEntries {
@@ -75,7 +76,8 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	})
 
 	for _, entry := range entries {
-		printer.PrintEntry(staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}, stagingEntryFromStatus(entry), opts.Verbose, entry.ShowDeleteOptions)
+		key := staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}
+		printer.PrintEntry(key, stagingEntryFromStatus(entry), opts.Verbose, entry.ShowDeleteOptions)
 	}
 
 	// Print tag entries, sorted by (name, namespace). Like entries, the same App
