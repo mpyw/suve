@@ -7,21 +7,9 @@ package components
 import (
 	"strings"
 
-	"charm.land/lipgloss/v2"
-
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
-
-// AWSIdentity carries the async-resolved AWS caller identity shown in the
-// status bar. It is a plain data struct (no SDK types) so the status bar never
-// depends on the AWS provider package; the launch layer fills it via an
-// injected fetcher.
-type AWSIdentity struct {
-	Account string
-	Region  string
-	Profile string
-}
 
 // StatusBar renders the fixed top line: the provider and its scope. Provider
 // and scope never change for the process lifetime (they are fixed at launch),
@@ -43,7 +31,7 @@ func (s StatusBar) View(width int) string {
 	segs := s.scopeSegments()
 
 	parts := make([]string, 0, 1+len(segs))
-	parts = append(parts, s.Styles.StatusValue.Render(providerLabel(s.Scope.Provider)))
+	parts = append(parts, s.Styles.StatusValue.Render(statusBarProviderLabel(s.Scope.Provider)))
 	parts = append(parts, segs...)
 
 	line := s.Styles.StatusBar.Render("suve") + s.Styles.StatusKey.Render("  ") +
@@ -103,8 +91,8 @@ func (s StatusBar) kvSegments(key, value string) []string {
 	return []string{s.Styles.StatusKey.Render(key+":") + s.Styles.StatusValue.Render(value)}
 }
 
-// providerLabel maps a provider to its status-bar label.
-func providerLabel(p provider.Provider) string {
+// statusBarProviderLabel maps a provider to its status-bar label.
+func statusBarProviderLabel(p provider.Provider) string {
 	switch p {
 	case provider.ProviderAWS:
 		return "aws"
@@ -115,13 +103,4 @@ func providerLabel(p provider.Provider) string {
 	default:
 		return string(p)
 	}
-}
-
-// truncate clamps a (possibly styled) line to width display columns.
-func truncate(line string, width int) string {
-	if width <= 0 || lipgloss.Width(line) <= width {
-		return line
-	}
-
-	return lipgloss.NewStyle().MaxWidth(width).Render(line)
 }

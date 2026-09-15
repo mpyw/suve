@@ -1,3 +1,8 @@
+//declscope:namespace history
+//
+// In-package tests of the history table in history.go (the file-stem
+// namespace would be historyInternal, which names no unit of its own).
+
 package components
 
 import (
@@ -9,10 +14,10 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// windowRowSpan returns the number of rendered lines the window currently draws
+// historyWindowRowSpan returns the number of rendered lines the window currently draws
 // for row idx, derived from window()'s parallel rowOf slice. It is the ground
 // truth for "how much of a row is on-screen" without hard-coding line offsets.
-func windowRowSpan(t *HistoryTable, idx int) int {
+func historyWindowRowSpan(t *HistoryTable, idx int) int {
 	_, rowOf := t.window()
 
 	n := 0
@@ -26,9 +31,9 @@ func windowRowSpan(t *HistoryTable, idx int) int {
 	return n
 }
 
-// windowLinesForRow returns the rendered lines the window currently draws for
+// historyWindowLinesForRow returns the rendered lines the window currently draws for
 // row idx, in order, so a test can compare them against rowLines(idx).
-func windowLinesForRow(t *HistoryTable, idx int) []string {
+func historyWindowLinesForRow(t *HistoryTable, idx int) []string {
 	lines, rowOf := t.window()
 
 	var out []string
@@ -42,11 +47,11 @@ func windowLinesForRow(t *HistoryTable, idx int) []string {
 	return out
 }
 
-// valuedRows builds n version rows that each carry a (non-secret) value, so each
+// valuedHistoryRows builds n version rows that each carry a (non-secret) value, so each
 // renders as two lines (header + value). Non-secret keeps reveal state out of the
 // picture: the value line is present and identical whether or not the table is
 // revealed.
-func valuedRows(n int) []HistoryEntry {
+func valuedHistoryRows(n int) []HistoryEntry {
 	rows := make([]HistoryEntry, n)
 	for i := range rows {
 		rows[i] = HistoryEntry{
@@ -82,7 +87,7 @@ func TestHistoryTableSelectLastRowFullyVisible(t *testing.T) {
 	t.Parallel()
 
 	tbl := NewHistoryTable(styles.New())
-	rows := valuedRows(8)
+	rows := valuedHistoryRows(8)
 	// Give the last row a Key Vault tag line so it is a 3-line row — the worst case.
 	rows[len(rows)-1].TagsLine = "env=prod"
 	tbl.SetRows(rows)
@@ -92,7 +97,7 @@ func TestHistoryTableSelectLastRowFullyVisible(t *testing.T) {
 	tbl.SelectIndex(last)
 
 	want := tbl.rowLines(last)
-	got := windowLinesForRow(&tbl, last)
+	got := historyWindowLinesForRow(&tbl, last)
 	assert.Equal(t, want, got, "selecting the last row must show all of its rendered lines (header, value, tag)")
 	assert.Len(t, got, len(want), "the selected row must be fully, not partially, visible")
 }
@@ -105,7 +110,7 @@ func TestHistoryTableScrollReachesBottom(t *testing.T) {
 	t.Parallel()
 
 	tbl := NewHistoryTable(styles.New())
-	tbl.SetRows(valuedRows(8))
+	tbl.SetRows(valuedHistoryRows(8))
 	tbl.SetSize(40, 6)
 
 	// A big wheel delta clamps to maxOffset.
@@ -113,7 +118,7 @@ func TestHistoryTableScrollReachesBottom(t *testing.T) {
 
 	last := tbl.Len() - 1
 	want := tbl.rowLines(last)
-	got := windowLinesForRow(&tbl, last)
+	got := historyWindowLinesForRow(&tbl, last)
 	assert.Equal(t, want, got, "wheel-scrolling to the bottom must fully reveal the last row")
 
 	// The offset the fix produces is strictly larger than the old rows-minus-lines
@@ -130,12 +135,12 @@ func TestHistoryTableBottomRowsReachableHalfScreen(t *testing.T) {
 	const n = 10
 
 	tbl := NewHistoryTable(styles.New())
-	tbl.SetRows(valuedRows(n)) // 20 rendered lines
-	tbl.SetSize(40, 6)         // fits ~3 rows
+	tbl.SetRows(valuedHistoryRows(n)) // 20 rendered lines
+	tbl.SetSize(40, 6)                // fits ~3 rows
 
 	for i := range n {
 		tbl.SelectIndex(i)
-		assert.Equalf(t, len(tbl.rowLines(i)), windowRowSpan(&tbl, i),
+		assert.Equalf(t, len(tbl.rowLines(i)), historyWindowRowSpan(&tbl, i),
 			"selecting row %d must keep all its lines visible", i)
 	}
 }
@@ -147,13 +152,13 @@ func TestHistoryTableKeyboardWalkKeepsSelectionVisible(t *testing.T) {
 	t.Parallel()
 
 	tbl := NewHistoryTable(styles.New())
-	tbl.SetRows(valuedRows(9))
+	tbl.SetRows(valuedHistoryRows(9))
 	tbl.SetSize(40, 6)
 
 	for range tbl.Len() - 1 {
 		tbl.Move(1)
 		sel := tbl.Selected()
-		assert.Equalf(t, len(tbl.rowLines(sel)), windowRowSpan(&tbl, sel),
+		assert.Equalf(t, len(tbl.rowLines(sel)), historyWindowRowSpan(&tbl, sel),
 			"row %d must be fully visible after moving down onto it", sel)
 	}
 }
@@ -182,5 +187,5 @@ func TestHistoryTableSingleLineWheel(t *testing.T) {
 	assert.Equal(t, tbl.maxOffset(), tbl.offset, "a large wheel clamps to maxOffset")
 
 	last := tbl.Len() - 1
-	assert.Equal(t, tbl.rowLines(last), windowLinesForRow(&tbl, last), "the last single-line row is reachable")
+	assert.Equal(t, tbl.rowLines(last), historyWindowLinesForRow(&tbl, last), "the last single-line row is reachable")
 }

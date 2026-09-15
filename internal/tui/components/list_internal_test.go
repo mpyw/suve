@@ -1,3 +1,8 @@
+//declscope:namespace list
+//
+// In-package tests of the entry list in list.go (the file-stem namespace
+// would be listInternal, which names no unit of its own).
+
 package components
 
 import (

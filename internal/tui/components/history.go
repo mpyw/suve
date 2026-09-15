@@ -7,8 +7,8 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// comparePickCount is the number of history rows a diff compares (exactly two).
-const comparePickCount = 2
+// historyComparePickCount is the number of history rows a diff compares (exactly two).
+const historyComparePickCount = 2
 
 // HistoryEntry is one presentation-ready version row. Badges (state or staging
 // labels) and the per-version tag line are precomputed by the page so the
@@ -164,22 +164,22 @@ func (t *HistoryTable) TogglePick() {
 	}
 
 	i := t.selected
-	if pos := indexOf(t.picks, i); pos >= 0 {
+	if pos := historyIndexOf(t.picks, i); pos >= 0 {
 		t.picks = append(t.picks[:pos], t.picks[pos+1:]...)
 
 		return
 	}
 
 	t.picks = append(t.picks, i)
-	if len(t.picks) > comparePickCount {
-		t.picks = t.picks[len(t.picks)-comparePickCount:]
+	if len(t.picks) > historyComparePickCount {
+		t.picks = t.picks[len(t.picks)-historyComparePickCount:]
 	}
 }
 
 // PickedVersions returns the two picked row indices in selection order and true
 // when exactly two rows are marked (ready to diff).
 func (t *HistoryTable) PickedVersions() (int, int, bool) {
-	if len(t.picks) != comparePickCount {
+	if len(t.picks) != historyComparePickCount {
 		return 0, 0, false
 	}
 
@@ -267,7 +267,7 @@ func (t *HistoryTable) valueLine(row HistoryEntry) (string, bool) {
 		return "", false
 	}
 
-	value := flattenValue(row.Value)
+	value := flattenHistoryValue(row.Value)
 	if row.Secret && !t.revealed {
 		value = MaskValue(value)
 	}
@@ -275,9 +275,9 @@ func (t *HistoryTable) valueLine(row HistoryEntry) (string, bool) {
 	return t.styles.PageHint.Render(truncate("     "+value, t.width)), true
 }
 
-// flattenValue collapses a (possibly multi-line) value onto a single line so the
+// flattenHistoryValue collapses a (possibly multi-line) value onto a single line so the
 // history value fits one row; newlines and tabs become single spaces.
-func flattenValue(value string) string {
+func flattenHistoryValue(value string) string {
 	replacer := strings.NewReplacer("\n", " ", "\r", " ", "\t", " ")
 
 	return replacer.Replace(value)
@@ -291,7 +291,7 @@ func (t *HistoryTable) renderRow(idx int) string {
 	marker := "  "
 
 	switch {
-	case t.compare && indexOf(t.picks, idx) >= 0:
+	case t.compare && historyIndexOf(t.picks, idx) >= 0:
 		marker = t.styles.StatusValue.Render("◉ ")
 	case idx == t.selected && t.focused:
 		marker = t.styles.Selection.Render("▸ ")
@@ -401,8 +401,8 @@ func (t *HistoryTable) ensureVisible() {
 	t.offset = clamp(t.offset, 0, t.maxOffset())
 }
 
-// indexOf returns the position of v in xs, or -1.
-func indexOf(xs []int, v int) int {
+// historyIndexOf returns the position of v in xs, or -1.
+func historyIndexOf(xs []int, v int) int {
 	for i, x := range xs {
 		if x == v {
 			return i
