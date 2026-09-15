@@ -1,3 +1,6 @@
+// apply_test.go のモック群を共有する、namespace 別 apply の追加テスト。
+//declscope:namespace apply
+
 package apply_test
 
 import (

@@ -1,3 +1,6 @@
+// command.go の resolveValueType を直接検証する白箱テスト。
+//declscope:namespace command
+
 package param
 
 import (

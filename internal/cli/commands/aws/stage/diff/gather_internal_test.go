@@ -1,3 +1,6 @@
+// diff.go の gatherServices を直接検証する白箱テスト。
+//declscope:namespace diff
+
 package diff
 
 import (

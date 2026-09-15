@@ -1,3 +1,6 @@
+// diff_test.go のモック群を共有する、namespace 別 diff の追加テスト。
+//declscope:namespace diff
+
 package diff_test
 
 import (

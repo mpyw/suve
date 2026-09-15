@@ -1,3 +1,6 @@
+// timeutil.go の非公開関数を直接検証する白箱テスト。
+//declscope:namespace timeutil
+
 package timeutil
 
 import (

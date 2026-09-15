@@ -1,3 +1,6 @@
+// apply.go の gatherServices を直接検証する白箱テスト。
+//declscope:namespace apply
+
 package apply
 
 import (

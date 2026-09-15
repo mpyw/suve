@@ -1,3 +1,6 @@
+// pager.go の非公開関数を直接検証する白箱テスト。
+//declscope:namespace pager
+
 package pager
 
 import (
