@@ -3,6 +3,8 @@ package param_test
 import "errors"
 
 // Test sentinel errors for consistent error testing.
+//
+//declscope:package // 各ユースケースのテストファイルが共有するフィクスチャ
 var (
 	errAWS              = errors.New("aws error")
 	errGetParameter     = errors.New("get parameter error")

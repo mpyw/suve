@@ -81,7 +81,7 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	// truncation/reverse): AWS Secrets Manager names it with the AWSCURRENT
 	// staging label; Google Cloud and Azure Key Vault have no such label, so the
 	// newest version is the current one.
-	currentVersion := currentVersionID(versions)
+	currentVersion := logCurrentVersionID(versions)
 
 	// Apply date filters BEFORE the count limit: -n must return up to N versions
 	// that match --since/--until, not N newest-then-filtered to fewer (#351).
@@ -121,7 +121,7 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 
 		return LogEntry{
 			VersionID:    v.ID,
-			VersionStage: stages(v.StagingLabels),
+			VersionStage: versionStages(v.StagingLabels),
 			State:        v.State,
 			Value:        value,
 			CreatedDate:  v.Created,
@@ -140,12 +140,12 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	}, nil
 }
 
-// currentVersionID returns the id of the current version. AWS Secrets Manager
+// logCurrentVersionID returns the id of the current version. AWS Secrets Manager
 // marks it with the AWSCURRENT staging label (membership, not position, so it
 // stays correct even when the version carries extra custom labels, #317). Google
 // Cloud and Azure Key Vault have no staging labels, so the newest version (first
 // in the newest-first history) is the current one. versions must be non-empty.
-func currentVersionID(versions []domain.Version) string {
+func logCurrentVersionID(versions []domain.Version) string {
 	for _, v := range versions {
 		if slices.Contains(v.StagingLabels, "AWSCURRENT") {
 			return v.ID

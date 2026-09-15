@@ -8,6 +8,11 @@
 // ids; App Configuration has none), so decoupling the use cases from the spec
 // type lets a single package serve both CLI groups. The CLI presenters own the
 // typed spec and hand the suffix here.
+// azure.go はパッケージ名を冠した共有部分（共通エラー）で、
+// azure.ErrEntryNotFound -> AzureErrEntryNotFound のような stutter を避ける
+// ため core とする。
+//
+//declscope:core
 package azure
 
 import "errors"

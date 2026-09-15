@@ -51,7 +51,7 @@ type ShowUseCase struct {
 // (surfaced via the entry's Extra metadata) are provided by the adapter behind
 // provider.Reader.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
-	ref, err := u.Reader.Resolve(ctx, input.Spec.Name, specSuffix(input.Spec))
+	ref, err := u.Reader.Resolve(ctx, input.Spec.Name, versionSpecSuffix(input.Spec))
 	if err != nil {
 		return nil, err
 	}
@@ -63,10 +63,10 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 
 	output := &ShowOutput{
 		Name:         entry.Name,
-		ARN:          extraValue(entry, "ARN"),
+		ARN:          versionExtraValue(entry, "ARN"),
 		Value:        entry.Value,
 		VersionID:    entry.Version.ID,
-		VersionStage: stages(entry.Version.StagingLabels),
+		VersionStage: versionStages(entry.Version.StagingLabels),
 		State:        entry.Version.State,
 		Description:  entry.Description,
 		CreatedDate:  entry.Version.Created,

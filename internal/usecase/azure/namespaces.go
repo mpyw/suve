@@ -12,12 +12,12 @@ import (
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 )
 
-// NamespaceLister is the App-Config-specific extension that lists per-(key,
+// NamespacesLister is the App-Config-specific extension that lists per-(key,
 // namespace) rows honoring the store's configured --namespace filter. Only the
 // Azure App Configuration store implements it (via ListWithNamespacesScoped);
 // callers type-assert the resolved store to reach it. The neutral
 // provider.Reader.List contract is untouched.
-type NamespaceLister interface {
+type NamespacesLister interface {
 	ListWithNamespacesScoped(ctx context.Context) ([]appconfig.KeyNamespace, error)
 }
 
@@ -46,7 +46,7 @@ type ListNamespacesOutput struct {
 
 // ListNamespacesUseCase lists App Configuration settings with their namespaces.
 type ListNamespacesUseCase struct {
-	Lister NamespaceLister
+	Lister NamespacesLister
 }
 
 // Execute runs the namespace-aware list use case. The store applies the
