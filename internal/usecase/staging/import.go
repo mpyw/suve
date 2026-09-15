@@ -20,24 +20,6 @@ const (
 	ImportOpReadWorking ImportOp = "read-working"
 )
 
-// ReAnchorResolver resolves the ApplyStrategy that can fetch a resource's
-// current LastModified in the TARGET (current) scope, for a service and
-// namespace. It mirrors the apply/conflict resolver so a cross-scope import can
-// re-base each staged item's conflict-detection timestamp against the scope it
-// is imported INTO rather than the foreign scope it was exported FROM. For
-// namespace-agnostic providers the namespace is always empty.
-type ReAnchorResolver func(svc staging.Service, namespace string) (staging.ApplyStrategy, error)
-
-// EnvelopeReader reads a single service's staged state from an import source
-// (typically a per-service envelope file). Adapters bind the source path, scope
-// validation, and passphrase; the use case only supplies the service. For a
-// missing file in the directory/global case the adapter returns an empty state
-// with a nil error (an absent service is skipped, not an error).
-type EnvelopeReader interface {
-	// ReadState returns the decoded state for svc.
-	ReadState(ctx context.Context, svc staging.Service) (*staging.State, error)
-}
-
 // ImportInput holds input for the import use case.
 type ImportInput struct {
 	// Service filters the import to a specific service. Empty means all services.

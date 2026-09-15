@@ -36,6 +36,7 @@ func (w *recordingWriter) WriteEnvelope(_ context.Context, svc staging.Service, 
 	return nil
 }
 
+//declscope:package // 複数のテストファイルが共有するフィクスチャ
 func stageEntry(t *testing.T, s *testutil.MockStore, svc staging.Service, name, value string) {
 	t.Helper()
 
