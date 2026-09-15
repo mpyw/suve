@@ -1,3 +1,6 @@
+// In-package tests of param.go's unexported mapping helpers.
+//declscope:namespace param
+
 package param
 
 import (

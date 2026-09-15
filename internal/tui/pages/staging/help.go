@@ -1,3 +1,9 @@
+//declscope:namespace staging
+//
+// The help text reads the Model's state to decide what to show.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share staging.go's namespace rather than each claiming their own.
+
 package staging
 
 import (

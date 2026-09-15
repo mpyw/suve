@@ -1,3 +1,6 @@
+// In-package tests of the setting-selector internals in client.go.
+//declscope:namespace appconfig
+
 package appconfig
 
 import (

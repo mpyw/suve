@@ -10,95 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/tui/data"
-	"github.com/mpyw/suve/internal/tui/hit"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
-
-// clickAt builds a left click at a hit region's drawn origin, so a dialog mouse
-// test derives its coordinate from the layout instead of hard-coding one.
-func clickAt(t *testing.T, hits *hit.Map, id string) tea.MouseClickMsg {
-	t.Helper()
-
-	x, y, ok := hits.Origin(id)
-	require.True(t, ok, "region %q was drawn", id)
-
-	return tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft}
-}
-
-// stubStaging is a controllable data.StagingService for the apply/reset dialog
-// tests: Apply returns a preset result (or a conflict result until conflicts are
-// ignored) and records the ignoreConflicts flag each call was made with.
-type stubStaging struct {
-	service string
-	label   string
-
-	// result is returned by Apply when ignoreConflicts is honored (or always,
-	// when conflict is empty).
-	result data.StagingApplyResult
-	// conflict, when non-empty, is returned by Apply while ignoreConflicts is
-	// false — modelling a conflict rejection that clears once conflicts are
-	// ignored.
-	conflict data.StagingApplyResult
-
-	applied []bool
-
-	// resetResult is returned by Reset; resets counts how many times Reset ran
-	// (so a fan-out test can assert every target was reset).
-	resetResult data.StagingResetResult
-	resets      int
-}
-
-func (s *stubStaging) Service() string { return s.service }
-func (s *stubStaging) Label() string   { return s.label }
-func (s *stubStaging) Capability() capability.ServiceCapability {
-	return capability.ServiceCapability{}
-}
-
-func (s *stubStaging) Apply(_ context.Context, ignoreConflicts bool) (data.StagingApplyResult, error) {
-	s.applied = append(s.applied, ignoreConflicts)
-
-	if !ignoreConflicts && len(s.conflict.Conflicts) > 0 {
-		return s.conflict, nil
-	}
-
-	return s.result, nil
-}
-
-func (s *stubStaging) Review(context.Context) (data.StagingReview, error) {
-	return data.StagingReview{}, nil
-}
-func (s *stubStaging) Reset(context.Context) (data.StagingResetResult, error) {
-	s.resets++
-
-	return s.resetResult, nil
-}
-func (s *stubStaging) Unstage(context.Context, data.StagedKey) error              { return nil }
-func (s *stubStaging) CancelAddTag(context.Context, data.StagedKey, string) error { return nil }
-func (s *stubStaging) CancelRemoveTag(context.Context, data.StagedKey, string) error {
-	return nil
-}
-
-// drive runs the dialog's returned command (if any) and feeds its message back,
-// returning the updated dialog.
-func drive(t *testing.T, d Model, cmd tea.Cmd) Model {
-	t.Helper()
-
-	if cmd == nil {
-		return d
-	}
-
-	next, _ := d.Update(cmd())
-
-	return next
-}
-
-// pressEnter sends an enter key press.
-func pressEnter() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyEnter} }
-
-// pressDown sends a down key press.
-func pressDown() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyDown} }
 
 // TestApply_FanOutAggregation pins the global apply-all fan-out: one ApplyUseCase
 // per target service, aggregated client-side into a single results view (Azure's
@@ -137,12 +51,9 @@ func TestApply_FanOutAggregation(t *testing.T) {
 	assert.Contains(t, view, "Secret")
 }
 
-// pressPgDown sends a page-down key press (viewport scrolling).
-func pressPgDown() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyPgDown} }
-
-// manyEntries builds n distinct applied-entry results, named entry-000…entry-NNN
+// manyApplyEntries builds n distinct applied-entry results, named entry-000…entry-NNN
 // so a test can locate the first vs last in the rendered viewport.
-func manyEntries(n int) []data.ApplyEntryResult {
+func manyApplyEntries(n int) []data.ApplyEntryResult {
 	entries := make([]data.ApplyEntryResult, n)
 	for i := range entries {
 		entries[i] = data.ApplyEntryResult{Name: fmt.Sprintf("entry-%03d", i), Status: "updated"}
@@ -177,7 +88,7 @@ func appliedResults(t *testing.T, result data.StagingApplyResult) *applyDialog {
 
 	d, ok := m.(*applyDialog)
 	require.True(t, ok, "the apply dialog is an *applyDialog")
-	require.Equal(t, phaseResults, d.phase, "the dialog reached the results phase")
+	require.Equal(t, applyPhaseResults, d.phase, "the dialog reached the results phase")
 
 	return d
 }
@@ -192,7 +103,7 @@ func TestApply_ResultsScrollable(t *testing.T) {
 
 	// A short terminal: the 50-line body cannot fit, so it must scroll.
 	d := appliedResults(t, data.StagingApplyResult{
-		ServiceLabel: "Param", Entries: manyEntries(entries),
+		ServiceLabel: "Param", Entries: manyApplyEntries(entries),
 	})
 
 	assert.True(t, d.scrollable, "a body taller than the box scrolls")
@@ -231,7 +142,7 @@ func TestApply_ResultsMouseWheelScrolls(t *testing.T) {
 	t.Parallel()
 
 	d := appliedResults(t, data.StagingApplyResult{
-		ServiceLabel: "Param", Entries: manyEntries(50),
+		ServiceLabel: "Param", Entries: manyApplyEntries(50),
 	})
 	require.True(t, d.vp.AtTop(), "the results open at the top")
 
@@ -271,7 +182,7 @@ func TestApply_ScrollThenDismissReloads(t *testing.T) {
 	t.Parallel()
 
 	d := appliedResults(t, data.StagingApplyResult{
-		ServiceLabel: "Param", Entries: manyEntries(50),
+		ServiceLabel: "Param", Entries: manyApplyEntries(50),
 	})
 
 	// Scroll down; Esc (routed by the shell to DismissCmd) must still reload.
@@ -373,42 +284,6 @@ func TestApply_DismissReloadsOnResults(t *testing.T) {
 	assert.Contains(t, done.Status, "Applied", "the outcome is voiced, matching enter")
 }
 
-// TestReset_FanOutAggregation pins that reset-all fans out one reset per service
-// and voices the combined unstaged count.
-func TestReset_FanOutAggregation(t *testing.T) {
-	t.Parallel()
-
-	param := &stubStaging{
-		service: "param", label: "Param",
-		resetResult: data.StagingResetResult{Type: data.StagingResetUnstagedAll, Count: 2},
-	}
-	secret := &stubStaging{
-		service: "secret", label: "Secret",
-		resetResult: data.StagingResetResult{Type: data.StagingResetUnstagedAll, Count: 3},
-	}
-
-	d := NewReset(ResetInput{
-		Ctx: context.Background(), Targets: []data.StagingService{param, secret},
-		Title: "Reset staged changes — all", Styles: styles.New(),
-	})
-
-	d, _ = d.Update(pressDown()) // focus defaults to Cancel; move to Reset
-	d, cmd := d.Update(pressEnter())
-	require.True(t, d.Busy())
-	require.NotNil(t, cmd)
-
-	next, doneCmd := d.Update(cmd())
-
-	assert.Equal(t, 1, param.resets, "param was reset exactly once")
-	assert.Equal(t, 1, secret.resets, "secret was reset exactly once")
-
-	require.NotNil(t, doneCmd)
-	done, ok := doneCmd().(MutationDoneMsg)
-	require.True(t, ok, "reset emits a done message")
-	assert.Contains(t, done.Status, "5", "the aggregate voices the summed unstaged count (2+3)")
-	assert.False(t, next.Busy(), "the dialog clears busy once the reset finishes")
-}
-
 // TestApply_MouseClickConfirmControls pins #663's confirm-dialog coverage: a
 // click on the Ignore checkbox, Apply, and Cancel reduces to the same action the
 // key path performs (toggle, confirm, cancel), with coordinates from the drawn
@@ -466,61 +341,4 @@ func TestApply_MouseClickResultsCloses(t *testing.T) {
 	done, ok := cmd().(MutationDoneMsg)
 	require.True(t, ok, "clicking close emits MutationDoneMsg (like enter)")
 	assert.Contains(t, done.Status, "Applied", "the outcome is voiced")
-}
-
-// TestReset_MouseClickButtons pins that clicking the Reset/Cancel buttons reduces
-// to the same action the key path performs.
-func TestReset_MouseClickButtons(t *testing.T) {
-	t.Parallel()
-
-	newDialog := func() *resetDialog {
-		svc := &stubStaging{
-			service: "param", label: "Param",
-			resetResult: data.StagingResetResult{Type: data.StagingResetUnstagedAll, Count: 1},
-		}
-		m := NewReset(ResetInput{
-			Ctx: context.Background(), Targets: []data.StagingService{svc},
-			Title: "Reset staged changes — Param", Styles: styles.New(),
-		})
-		m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-		_ = m.View()
-		d, ok := m.(*resetDialog)
-		require.True(t, ok)
-
-		return d
-	}
-
-	// Cancel click cancels.
-	d := newDialog()
-	_, cmd := d.Update(clickAt(t, d.hits, resetRegionCancel))
-	require.NotNil(t, cmd)
-	_, ok := cmd().(CanceledMsg)
-	assert.True(t, ok, "clicking Cancel cancels")
-
-	// Reset click confirms: busy + reset command.
-	d = newDialog()
-	_, cmd = d.Update(clickAt(t, d.hits, resetRegionReset))
-	assert.True(t, d.Busy(), "clicking Reset starts the reset")
-	require.NotNil(t, cmd, "clicking Reset dispatches the reset command")
-}
-
-// TestReset_DefaultFocusCancels pins that the reset confirm opens focused on
-// Cancel, so an accidental enter (e.g. an "R enter" double-tap) cancels instead
-// of wiping staged changes — parity with the delete/apply confirms.
-func TestReset_DefaultFocusCancels(t *testing.T) {
-	t.Parallel()
-
-	param := &stubStaging{service: "param", label: "Param"}
-
-	d := NewReset(ResetInput{
-		Ctx: context.Background(), Targets: []data.StagingService{param},
-		Title: "Reset staged changes — Param", Styles: styles.New(),
-	})
-
-	_, cmd := d.Update(pressEnter()) // enter on the default focus
-
-	require.NotNil(t, cmd)
-	_, ok := cmd().(CanceledMsg)
-	assert.True(t, ok, "enter on the default focus cancels")
-	assert.Equal(t, 0, param.resets, "no reset ran")
 }

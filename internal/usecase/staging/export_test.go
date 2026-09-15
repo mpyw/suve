@@ -36,6 +36,7 @@ func (w *recordingWriter) WriteEnvelope(_ context.Context, svc staging.Service, 
 	return nil
 }
 
+//declscope:package // a fixture several test files share
 func stageEntry(t *testing.T, s *testutil.MockStore, svc staging.Service, name, value string) {
 	t.Helper()
 

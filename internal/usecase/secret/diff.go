@@ -53,7 +53,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 
 // resolveAndGet resolves a spec to a version ref and fetches the entry.
 func (u *DiffUseCase) resolveAndGet(ctx context.Context, spec *awssecretversion.Spec) (*domain.Entry, error) {
-	ref, err := u.Reader.Resolve(ctx, spec.Name, specSuffix(spec))
+	ref, err := u.Reader.Resolve(ctx, spec.Name, versionSpecSuffix(spec))
 	if err != nil {
 		return nil, err
 	}

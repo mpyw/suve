@@ -16,10 +16,10 @@ import (
 	"github.com/mpyw/suve/internal/usecase/azure"
 )
 
-// namespaceJSONItem is one row of `--output=json` for the namespace-aware
+// namespaceListJSONItem is one row of `--output=json` for the namespace-aware
 // listing. Namespace is the raw label ("" for the null namespace, matching the
 // GUI's per-entry namespace), NOT the "(NULL)" display form used in text.
-type namespaceJSONItem struct {
+type namespaceListJSONItem struct {
 	Namespace string  `json:"namespace"`
 	Name      string  `json:"name"`
 	Value     *string `json:"value,omitempty"`
@@ -122,15 +122,15 @@ func (r *ListRunner) keyOnlyEntriesFromNamespaced(opts ListOptions) func(context
 			return nil, err
 		}
 
-		return collapseToKeyOnly(result.Entries), nil
+		return collapseToKeyOnlyList(result.Entries), nil
 	}
 }
 
-// collapseToKeyOnly reduces per-(key, namespace) rows to the deduped, sorted
+// collapseToKeyOnlyList reduces per-(key, namespace) rows to the deduped, sorted
 // key-only rows the --hide-namespace listing shows, carrying each key's value.
 // A key that resolves to different values across namespaces cannot be shown as
 // one value, so it becomes an error row rather than an arbitrary pick.
-func collapseToKeyOnly(rows []azure.ListNamespacesEntry) []genericlist.Entry {
+func collapseToKeyOnlyList(rows []azure.ListNamespacesEntry) []genericlist.Entry {
 	type collapsed struct {
 		value     string
 		ambiguous bool
@@ -160,16 +160,16 @@ func collapseToKeyOnly(rows []azure.ListNamespacesEntry) []genericlist.Entry {
 	return lo.Map(names, func(name string, _ int) genericlist.Entry {
 		c := byName[name]
 		if c.ambiguous {
-			return genericlist.Entry{Name: name, Error: errAmbiguousValue}
+			return genericlist.Entry{Name: name, Error: errAmbiguousListValue}
 		}
 
 		return genericlist.Entry{Name: name, Value: lo.ToPtr(c.value)}
 	})
 }
 
-// errAmbiguousValue marks a key whose value differs across the namespaces a
+// errAmbiguousListValue marks a key whose value differs across the namespaces a
 // wildcard --namespace matched, so --hide-namespace cannot show one value.
-var errAmbiguousValue = errors.New("value differs across namespaces; drop --hide-namespace to see each")
+var errAmbiguousListValue = errors.New("value differs across namespaces; drop --hide-namespace to see each")
 
 // runNamespaced renders the NAMESPACE column (text: <namespace>TAB<key>[TAB<value>];
 // json: {namespace, name, value?}). The null namespace shows as "(NULL)" in text
@@ -183,8 +183,8 @@ func (r *ListRunner) runNamespaced(ctx context.Context, opts ListOptions) error 
 	}
 
 	if opts.Output == output.FormatJSON {
-		items := lo.Map(result.Entries, func(e azure.ListNamespacesEntry, _ int) namespaceJSONItem {
-			return namespaceJSONItem{Namespace: e.Namespace, Name: e.Name, Value: e.Value}
+		items := lo.Map(result.Entries, func(e azure.ListNamespacesEntry, _ int) namespaceListJSONItem {
+			return namespaceListJSONItem{Namespace: e.Namespace, Name: e.Name, Value: e.Value}
 		})
 
 		return output.WriteJSON(r.Stdout, items)
@@ -284,7 +284,7 @@ EXAMPLES:
 			}
 			// Only the App Configuration store implements the namespace extension;
 			// a store that does not keep the NAMESPACE column off entirely.
-			if lister, ok := store.(azure.NamespaceLister); ok {
+			if lister, ok := store.(azure.NamespacesLister); ok {
 				runner.Namespace = &azure.ListNamespacesUseCase{Lister: lister}
 			}
 

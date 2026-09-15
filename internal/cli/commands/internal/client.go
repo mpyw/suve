@@ -1,3 +1,8 @@
+// client.go is this package's subject: the wiring that assembles each
+// provider's store, strategy and scope, which every command goes through. Core,
+// so that internal.ParamStore does not have to become ClientParamStore.
+//declscope:core
+
 package internal
 
 import (

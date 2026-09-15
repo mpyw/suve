@@ -16,6 +16,7 @@ import (
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
+//declscope:package // a fixture several test files share
 type mockApplyStrategy struct {
 	*mockServiceStrategy
 
@@ -48,6 +49,7 @@ func (m *mockApplyStrategy) FetchLastModified(_ context.Context, name string) (t
 	return time.Now(), nil
 }
 
+//declscope:package // a fixture several test files share
 func newMockApplyStrategy() *mockApplyStrategy {
 	return &mockApplyStrategy{
 		mockServiceStrategy: newParamStrategy(),

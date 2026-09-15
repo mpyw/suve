@@ -1,3 +1,7 @@
+// Adapts the concrete SDK client to the Client port that secret.go
+// declares: one unit with secret.go, split out for readability.
+//declscope:namespace secret
+
 package secret
 
 import (

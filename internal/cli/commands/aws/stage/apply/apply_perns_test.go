@@ -1,3 +1,6 @@
+// Further tests for apply by namespace, sharing apply_test.go's mocks.
+//declscope:namespace apply
+
 package apply_test
 
 import (

@@ -1,13 +1,25 @@
+// The strategy contract (Parser, ApplyStrategy, FullStrategy, ...) is the other
+// half of the package's core: every provider strategy file implements it and
+// every caller spells it as staging.X, so no file prefix fits these names.
+//declscope:core
+
 package staging
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/samber/lo"
+
+	"github.com/mpyw/suve/internal/provider"
 )
 
 // itemNameSecret is the display item name shared by the secret staging
 // strategies (AWS Secrets Manager, Google Cloud Secret Manager, Azure Key
 // Vault). Centralizing it avoids repeating the literal across strategies.
+//
+//declscope:package // shared by design across the per-provider secret strategy files
 const itemNameSecret = "secret"
 
 // ResourceNotFoundError indicates a resource was not found in AWS.
@@ -159,3 +171,42 @@ type FullStrategy interface {
 // StrategyFactory creates a FullStrategy for a given context.
 // Used to defer AWS client initialization until command execution.
 type StrategyFactory func(ctx context.Context) (FullStrategy, error)
+
+// ErrServiceNotConfigured is returned by a ScopeResolver when the active scope
+// does not name this service's backing resource (e.g. no Azure Key Vault while
+// only App Configuration is configured). A single-service command treats it as
+// a fatal usage error (with the resolver's descriptive message); a provider-wide
+// command treats it as "skip this service" — an unconfigured service can hold no
+// staged state, since staging is keyed by the resource name.
+var ErrServiceNotConfigured = errors.New("staging service not configured")
+
+// ApplyStrategyResolver resolves the ApplyStrategy for a given namespace. It
+// mirrors the per-namespace resolution the apply path uses so a namespaced
+// provider (Azure App Configuration) probes each entry against the remote state
+// of its OWN namespace rather than the default one.
+type ApplyStrategyResolver func(namespace string) (ApplyStrategy, error)
+
+// KindToService maps a provider Kind to the equivalent staging Service.
+func KindToService(k provider.Kind) Service {
+	switch k {
+	case provider.KindParam:
+		return ServiceParam
+	case provider.KindSecret:
+		return ServiceSecret
+	default:
+		return Service(k)
+	}
+}
+
+// SupportedServices returns the staging Services supported by the given scope,
+// in the scope's stable kind order. This is the registry-driven iteration
+// source that replaces hardcoded {ServiceParam, ServiceSecret} loops.
+func SupportedServices(scope provider.Scope) []Service {
+	kinds := scope.SupportedKinds()
+
+	services := lo.Map(kinds, func(k provider.Kind, _ int) Service {
+		return KindToService(k)
+	})
+
+	return services
+}

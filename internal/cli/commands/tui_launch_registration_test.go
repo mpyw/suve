@@ -1,3 +1,6 @@
+// White-box tests for tui.go's RegisterTUIFlag and RegisterTUIDescription.
+//declscope:namespace tui
+
 //nolint:testpackage // white-box: drives the process-wide App through RegisterTUIFlag/RegisterTUIDescription
 package commands
 
@@ -23,8 +26,8 @@ func hasTUIFlag(c *cli.Command) bool {
 	return false
 }
 
-// findGroup returns the top-level command with the given name, or nil.
-func findGroup(name string) *cli.Command {
+// findTUIGroup returns the top-level command with the given name, or nil.
+func findTUIGroup(name string) *cli.Command {
 	for _, group := range App.Commands {
 		if group.Name == name {
 			return group
@@ -65,7 +68,7 @@ func TestRegisterTUIFlag_RegistersEverywhere(t *testing.T) {
 	} {
 		name := groupName(p)
 
-		group := findGroup(name)
+		group := findTUIGroup(name)
 		require.NotNilf(t, group, "the %s provider group must exist", name)
 		assert.Truef(t, hasTUIFlag(group), "--tui is registered on the %s group", name)
 	}
@@ -80,7 +83,7 @@ func TestRegisterTUIFlag_RegistersEverywhere(t *testing.T) {
 func assertAzureSubgroupsHaveTUI(t *testing.T) {
 	t.Helper()
 
-	azure := findGroup(groupName(provider.ProviderAzure))
+	azure := findTUIGroup(groupName(provider.ProviderAzure))
 	require.NotNil(t, azure, "the azure provider group must exist")
 
 	var sawParam, sawSecret bool

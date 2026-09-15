@@ -63,7 +63,7 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 		FromStdin: cmd.Bool(cliinternal.FlagValueStdin),
 		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the key, arg 1 is the optional value
 		Arg:       args.Get(1),
-		Stdin:     cliinternal.Stdin(cmd),
+		Stdin:     cliinternal.ValueStdin(cmd),
 	})
 	if err != nil {
 		return err

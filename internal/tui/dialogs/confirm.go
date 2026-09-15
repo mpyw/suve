@@ -19,6 +19,9 @@ var confirmExecuteKey = key.NewBinding(key.WithKeys("enter"))
 // confirmResult is what a key press did to the mode-confirm popup.
 type confirmResult int
 
+// The delete/entry/tag dialogs switch on these results, so they are shared.
+//
+//declscope:package
 const (
 	// confirmNone: the key changed the selection or was ignored — stay open.
 	confirmNone confirmResult = iota
@@ -34,6 +37,8 @@ const (
 // field that never reached the toggle. The owning dialog holds one, routes keys to
 // Update while it is open, and renders View in place of its form/controls (the app
 // shell frames and centers it, so it reads as a compact popup).
+//
+//declscope:package
 type modeConfirm struct {
 	title  string
 	staged bool
@@ -41,6 +46,8 @@ type modeConfirm struct {
 
 // newModeConfirm builds the popup seeded with the dialog's title and current mode
 // (staged by default when the service supports staging).
+//
+//declscope:package
 func newModeConfirm(title string, staged bool) modeConfirm {
 	return modeConfirm{title: title, staged: staged}
 }

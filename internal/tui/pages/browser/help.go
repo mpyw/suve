@@ -1,3 +1,9 @@
+//declscope:namespace browser
+//
+// The help text reads the Model's focus and width to decide what to show.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share browser.go's namespace rather than each claiming their own.
+
 package browser
 
 import (

@@ -9,7 +9,7 @@ import (
 	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
-// specSuffix reconstructs the version-spec suffix (the part after the name)
+// versionSpecSuffix reconstructs the version-spec suffix (the part after the name)
 // from a parsed spec, so that name+suffix re-parses to an equivalent spec. It
 // is handed to provider.Reader.Resolve, which re-parses name+suffix internally.
 //
@@ -19,7 +19,9 @@ import (
 //	{Shift:2}                    -> "~2"
 //	{Label:"AWSCURRENT", Shift:1}-> ":AWSCURRENT~1"
 //	{}                           -> ""  (current/latest)
-func specSuffix(spec *awssecretversion.Spec) string {
+//
+//declscope:package // diff and show rebuild the suffix they pass to Resolve
+func versionSpecSuffix(spec *awssecretversion.Spec) string {
 	var b strings.Builder
 
 	switch {
@@ -39,11 +41,13 @@ func specSuffix(spec *awssecretversion.Spec) string {
 	return b.String()
 }
 
-// extraValue returns the value of the display-only Extra field with the given
+// versionExtraValue returns the value of the display-only Extra field with the given
 // label (e.g. "ARN"), or "" when the entry has no such field. It is how the
 // secret usecases surface provider metadata (like the Secrets Manager ARN) that
 // the neutral domain.Entry keeps in its Extra bag.
-func extraValue(entry *domain.Entry, label string) string {
+//
+//declscope:package // show and log read the Extra fields with it
+func versionExtraValue(entry *domain.Entry, label string) string {
 	for _, f := range entry.Extra {
 		if f.Label == label {
 			return f.Value
@@ -53,10 +57,12 @@ func extraValue(entry *domain.Entry, label string) string {
 	return ""
 }
 
-// stages returns a deterministically sorted copy of a version's AWS Secrets
+// versionStages returns a deterministically sorted copy of a version's AWS Secrets
 // Manager staging labels for stable output. An empty slice yields nil so that
 // callers omit the field entirely (matching the pre-migration behavior).
-func stages(labels []string) []string {
+//
+//declscope:package // show and log format the staging label with it
+func versionStages(labels []string) []string {
 	if len(labels) == 0 {
 		return nil
 	}

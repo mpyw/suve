@@ -1,3 +1,8 @@
+// The shared command-building machinery (CommandConfig, the runners and
+// builders) is the unit this package is named for; a "command" prefix on these
+// names would only stutter at the cli.X call sites.
+//declscope:core
+
 // Package cli provides shared runners and command builders for stage commands.
 package cli
 
@@ -17,6 +22,8 @@ import (
 
 // Flag names, flag usages, command names, and arg-usage strings shared across
 // sibling stage command builders.
+//
+//declscope:package // shared by design with the per-command files (export.go, import.go, ...)
 const (
 	flagYes                = "yes"
 	usageSkipConfirm       = "Skip confirmation prompt"

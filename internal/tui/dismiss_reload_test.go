@@ -1,3 +1,11 @@
+//declscope:namespace app
+//
+// White-box tests of the App's pushDialog/dismiss-reload path.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: pushes a dialog through the real pushDialog so it is wrapped in dialogAdapter
 package tui
 

@@ -1,3 +1,9 @@
+//declscope:namespace staging
+//
+// The Model's tests, which reach its fields directly.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share staging.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: exercises the unexported reducer, rows, and geometry
 package staging
 

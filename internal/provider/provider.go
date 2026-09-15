@@ -1,3 +1,9 @@
+// This file is the seam's contract: every name it declares (Store, Reader,
+// VersionRef, WriteOption, ...) is the package's own vocabulary, read as
+// provider.Store or provider.Reader at the call site. Prefixing them with a
+// unit name would only stutter, so the file is the package's core namespace.
+//declscope:core
+
 // Package provider defines the provider-neutral storage seam: the interfaces
 // and opaque reference types that every backend (AWS SSM, AWS Secrets Manager,
 // and future providers) implements.
@@ -70,6 +76,28 @@ func (DeleteOptionMarker) deleteOption() {}
 // Restore to recover). Providers without the concept ignore it.
 type ForceDelete struct{ DeleteOptionMarker }
 
+// Provider identifies a cloud provider backend.
+type Provider string
+
+const (
+	// ProviderAWS is the Amazon Web Services provider.
+	ProviderAWS Provider = "aws"
+	// ProviderGoogleCloud is the Google Cloud Platform provider.
+	ProviderGoogleCloud Provider = "googlecloud"
+	// ProviderAzure is the Microsoft Azure provider.
+	ProviderAzure Provider = "azure"
+)
+
+// Kind selects a store kind within a provider (some providers offer only one).
+type Kind string
+
+const (
+	// KindParam selects a parameter store (e.g. AWS SSM Parameter Store).
+	KindParam Kind = "param"
+	// KindSecret selects a secret store (e.g. AWS Secrets Manager).
+	KindSecret Kind = "secret"
+)
+
 // Reader provides read access to a provider's entries.
 type Reader interface {
 	// Resolve parses a provider-specific version spec string (e.g. "#3~1",
@@ -131,4 +159,11 @@ type Restorer interface {
 type Describer interface {
 	// Describe returns an entry's metadata without fetching its value.
 	Describe(ctx context.Context, name string) (*domain.Entry, error)
+}
+
+// Factory builds a Store for a scope + kind. It returns ErrUnsupportedKind if
+// the provider does not offer that kind (e.g. GoogleCloud has no param store).
+type Factory interface {
+	// Store builds a Store for the given scope and kind.
+	Store(ctx context.Context, scope Scope, kind Kind) (Store, error)
 }

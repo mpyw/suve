@@ -1,3 +1,9 @@
+//declscope:namespace browser
+//
+// Mouse handling is one branch of Update, kept apart only for its size.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share browser.go's namespace rather than each claiming their own.
+
 package browser
 
 import (

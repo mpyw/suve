@@ -1,3 +1,8 @@
+// The scope/store plumbing (AWSScopeResolver, WorkingStore) is part of the
+// package's shared command-building layer; WorkingStore is spelled from outside
+// the package, so a file prefix cannot fit it.
+//declscope:core
+
 package cli
 
 import (
@@ -40,6 +45,8 @@ func awsTarget(profile, accountID, region string) string {
 }
 
 // resolveScope runs the resolver, defaulting to AWS when nil.
+//
+//declscope:package // export.go resolves the scope without opening the working store
 func resolveScope(ctx context.Context, resolver staging.ScopeResolver) (staging.ResolvedScope, error) {
 	if resolver == nil {
 		resolver = AWSScopeResolver

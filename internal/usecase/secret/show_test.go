@@ -28,6 +28,7 @@ func showStore(entry *domain.Entry) *providermock.Store {
 	}
 }
 
+//declscope:package // a fixture diff's tests share
 func mustParseSpec(t *testing.T, s string) *awssecretversion.Spec {
 	t.Helper()
 

@@ -1,3 +1,6 @@
+// In-package tests of the core Store's key resolution.
+//declscope:core
+
 package file
 
 import (

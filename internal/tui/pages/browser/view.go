@@ -1,3 +1,9 @@
+//declscope:namespace browser
+//
+// The Model renders itself from here, and the row helpers serve only that.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share browser.go's namespace rather than each claiming their own.
+
 package browser
 
 import (

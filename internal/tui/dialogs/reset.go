@@ -14,8 +14,8 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// statusNothingStaged is the voiced result when a reset finds no staged changes.
-const statusNothingStaged = "Nothing staged."
+// resetStatusNothingStaged is the voiced result when a reset finds no staged changes.
+const resetStatusNothingStaged = "Nothing staged."
 
 // resetControl identifies a focusable row in the reset confirmation.
 type resetControl int
@@ -215,10 +215,6 @@ func (d *resetDialog) View() string {
 	return b.String()
 }
 
-// buttonGap is the column gap between two side-by-side confirm buttons (the
-// "    " separator), used to place the second button's hit region.
-const buttonGap = 4
-
 func (d *resetDialog) resetRow(c resetControl, label string) string {
 	if resetControl(d.focus) == c {
 		return d.styles.StatusValue.Render("▸ " + label)
@@ -240,7 +236,7 @@ func resetSummary(results []data.StagingResetResult) string {
 	}
 
 	if total == 0 {
-		return statusNothingStaged
+		return resetStatusNothingStaged
 	}
 
 	return "Unstaged " + strconv.Itoa(total) + " staged change(s)."
@@ -252,7 +248,7 @@ func resetTypeStatus(r data.StagingResetResult) string {
 	case data.StagingResetUnstagedAll:
 		return "Unstaged " + strconv.Itoa(r.Count) + " staged change(s)."
 	case data.StagingResetNothingStaged:
-		return statusNothingStaged
+		return resetStatusNothingStaged
 	case data.StagingResetUnstaged:
 		return "Unstaged the staged change."
 	case data.StagingResetUnstagedTag:

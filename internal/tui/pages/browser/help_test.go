@@ -1,3 +1,9 @@
+//declscope:namespace browser
+//
+// help.go's tests, which reach the Model's fields directly.
+// One Bubble Tea Model is one unit however many files hold it, so these
+// files share browser.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: exercises the unexported focus/capability gating of the page KeyMap
 package browser
 

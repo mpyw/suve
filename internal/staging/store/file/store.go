@@ -1,3 +1,8 @@
+// The Store is the unit this package is named for (package file = the
+// file-based store); file.StoreSetWarnWriter-style prefixes would only stutter,
+// and EnvAllowPlaintext / SetWarnWriter are spelled from outside the package.
+//declscope:core
+
 // Package file provides file-based staging storage.
 // This package implements StateIO interface for drain/persist commands.
 //
@@ -519,6 +524,8 @@ func (s *Store) writeFile(path string, state *staging.State) error {
 // one — never a truncated/corrupt file, which would fail decryption on the next
 // read and feed the error-swallowing overwrite paths. The file is owner-only
 // (0600), matching os.CreateTemp's default.
+//
+//declscope:package // the envelope writer shares the store's atomic-write helper
 func writeFileAtomic(path string, data []byte) error {
 	dir := filepath.Dir(path)
 

@@ -1,3 +1,6 @@
+// White-box tests for apply.go's gatherServices.
+//declscope:namespace apply
+
 package apply
 
 import (

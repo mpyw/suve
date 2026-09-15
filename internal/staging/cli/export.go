@@ -21,11 +21,11 @@ import (
 	usestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// envelopeWriteTarget adapts file.WriteEnvelopeFile to the export use case's
+// exportEnvelopeTarget adapts file.WriteEnvelopeFile to the export use case's
 // EnvelopeWriter port. It binds the destination path resolver, the scope (kept
 // in the plaintext header), and the passphrase, so the use case only supplies
 // the service and its state.
-type envelopeWriteTarget struct {
+type exportEnvelopeTarget struct {
 	scope      provider.Scope
 	passphrase string
 	// pathFor resolves the per-service destination path. For a service-specific
@@ -35,7 +35,7 @@ type envelopeWriteTarget struct {
 }
 
 // WriteEnvelope writes svc's state to its resolved destination path.
-func (t *envelopeWriteTarget) WriteEnvelope(_ context.Context, svc staging.Service, state *staging.State) error {
+func (t *exportEnvelopeTarget) WriteEnvelope(_ context.Context, svc staging.Service, state *staging.State) error {
 	return file.WriteEnvelopeFile(t.pathFor(svc), t.scope, svc, state, t.passphrase)
 }
 
@@ -249,7 +249,7 @@ func exportAction(service staging.Service, resolver staging.ScopeResolver) func(
 
 		uc := &usestaging.ExportUseCase{
 			Working: working,
-			Target: &envelopeWriteTarget{
+			Target: &exportEnvelopeTarget{
 				scope:      scope,
 				passphrase: pass,
 				pathFor:    pathFor,

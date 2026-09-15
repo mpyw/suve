@@ -34,10 +34,10 @@ func renderPane(frame lipgloss.Style, st styles.Styles, title, body string, widt
 	}
 
 	rows := make([]string, 0, innerH+1)
-	rows = append(rows, normalizeLine(st.PaneTitle.Render(title), innerW))
+	rows = append(rows, normalizePaneLine(st.PaneTitle.Render(title), innerW))
 
-	for _, line := range splitLimit(body, innerH) {
-		rows = append(rows, normalizeLine(line, innerW))
+	for _, line := range splitPaneBody(body, innerH) {
+		rows = append(rows, normalizePaneLine(line, innerW))
 	}
 
 	for len(rows) < innerH+1 {
@@ -86,8 +86,8 @@ func PaneContentTop() int { return paneBorderRows/2 + panePadY + paneTitleRows }
 // PaneContentTop for why hit-testing pages derive origins from these helpers.
 func PaneContentLeft() int { return paneBorderCols/2 + panePadX }
 
-// splitLimit splits body into at most limit lines.
-func splitLimit(body string, limit int) []string {
+// splitPaneBody splits body into at most limit lines.
+func splitPaneBody(body string, limit int) []string {
 	if body == "" {
 		return nil
 	}
@@ -100,9 +100,9 @@ func splitLimit(body string, limit int) []string {
 	return lines
 }
 
-// normalizeLine truncates or space-pads a (possibly styled) line to exactly
+// normalizePaneLine truncates or space-pads a (possibly styled) line to exactly
 // width display columns, so a row of content never re-wraps inside the border.
-func normalizeLine(line string, width int) string {
+func normalizePaneLine(line string, width int) string {
 	w := lipgloss.Width(line)
 	if w == width {
 		return line

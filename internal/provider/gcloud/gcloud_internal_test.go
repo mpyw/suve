@@ -1,3 +1,6 @@
+// In-package tests of gcloud.go's gRPC debug internals.
+//declscope:namespace gcloud
+
 package gcloud
 
 import (

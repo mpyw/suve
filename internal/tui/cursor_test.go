@@ -1,3 +1,11 @@
+//declscope:namespace app
+//
+// White-box tests of the App's cursor scanning and dialog wiring.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: drives the real App/dialog wiring and the unexported cursor scanner
 package tui
 

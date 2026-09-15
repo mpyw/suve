@@ -1,3 +1,6 @@
+// White-box tests for command.go's resolveValueType.
+//declscope:namespace command
+
 package param
 
 import (

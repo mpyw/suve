@@ -6,6 +6,11 @@
 // (show, log, list, diff, create, update, delete, tag, untag) and the staging
 // commands reuse the same generic scaffolding as their AWS counterparts via
 // Google Cloud-specific presenters, use cases, and staging strategy.
+//
+// command.go is this package's subject: the gcloud command group it assembles,
+// together with the vocabulary and hooks its sibling files share. Hence core.
+//
+//declscope:core
 package gcloud
 
 import (
@@ -18,6 +23,8 @@ import (
 )
 
 // nounSecret is the command name / noun used across the Google Cloud secret commands.
+//
+//declscope:package // tag.go, untag.go and stage.go name their commands with it
 const nounSecret = "secret"
 
 // Command returns the gcloud command with the secret subcommand group.
@@ -63,6 +70,8 @@ func FlatSecretCommand(name string) *cli.Command {
 
 // projectFlags returns the shared --project flag (a fresh slice per call so
 // each command owns its flag instance).
+//
+//declscope:package // stage.go builds the --project flag with it too
 func projectFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -74,6 +83,8 @@ func projectFlags() []cli.Flag {
 
 // resolveProject stashes the resolved project id (from --project or
 // GOOGLE_CLOUD_PROJECT) into the context for the subcommands.
+//
+//declscope:package // stage.go uses it as the Before hook that resolves the project
 func resolveProject(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 	project := cmd.String("project")
 	if project == "" {

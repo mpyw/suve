@@ -1,3 +1,12 @@
+//declscope:namespace app
+//
+// Run builds the App's config and runs the program, and newModel returns
+// the App itself; the launch path and the model are one unit.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 package tui
 
 import (

@@ -7,7 +7,7 @@ import (
 	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
-// specSuffix reconstructs the version-spec suffix (the part after the name)
+// versionSpecSuffix reconstructs the version-spec suffix (the part after the name)
 // from a parsed spec, so that name+suffix re-parses to an equivalent spec. It
 // is handed to provider.Reader.Resolve, which re-parses name+suffix internally.
 //
@@ -16,7 +16,9 @@ import (
 //	{Shift:2}            -> "~2"
 //	{Version:5, Shift:2} -> "#5~2"
 //	{}                   -> ""  (latest)
-func specSuffix(spec *awsparamversion.Spec) string {
+//
+//declscope:package // diff and show rebuild the suffix they pass to Resolve
+func versionSpecSuffix(spec *awsparamversion.Spec) string {
 	var b strings.Builder
 
 	if spec.Absolute.Version != nil {
@@ -34,6 +36,8 @@ func specSuffix(spec *awsparamversion.Spec) string {
 
 // parseVersion converts a provider version id ("3") to the int64 version number
 // used by the SSM-facing usecase outputs. A non-numeric or empty id yields 0.
+//
+//declscope:package // create, diff, log, show and update convert a version id with it
 func parseVersion(id string) int64 {
 	v, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
