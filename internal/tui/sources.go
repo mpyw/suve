@@ -1,3 +1,13 @@
+//declscope:namespace app
+//
+// sourceFactory is the App's source/mutator seam, consumed only by the
+// launch path in run.go. The file split is for readability, not a
+// boundary.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 package tui
 
 import (

@@ -1,3 +1,6 @@
+// White-box tests for output.go's private functions.
+//declscope:namespace output
+
 package output
 
 import (

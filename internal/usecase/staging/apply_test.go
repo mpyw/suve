@@ -16,46 +16,6 @@ import (
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-type mockApplyStrategy struct {
-	*mockServiceStrategy
-
-	applyErrors      map[string]error
-	lastModified     map[string]time.Time
-	fetchModifiedErr error
-}
-
-func (m *mockApplyStrategy) Apply(_ context.Context, name string, _ staging.Entry) error {
-	if err, ok := m.applyErrors[name]; ok {
-		return err
-	}
-
-	return nil
-}
-
-func (m *mockApplyStrategy) ApplyTags(_ context.Context, _ string, _ staging.TagEntry) error {
-	return nil
-}
-
-func (m *mockApplyStrategy) FetchLastModified(_ context.Context, name string) (time.Time, error) {
-	if m.fetchModifiedErr != nil {
-		return time.Time{}, m.fetchModifiedErr
-	}
-
-	if t, ok := m.lastModified[name]; ok {
-		return t, nil
-	}
-
-	return time.Now(), nil
-}
-
-func newMockApplyStrategy() *mockApplyStrategy {
-	return &mockApplyStrategy{
-		mockServiceStrategy: newParamStrategy(),
-		applyErrors:         make(map[string]error),
-		lastModified:        make(map[string]time.Time),
-	}
-}
-
 func TestApplyUseCase_Execute_Empty(t *testing.T) {
 	t.Parallel()
 

@@ -261,7 +261,7 @@ func (s *AWSParamStrategy) FetchVersion(ctx context.Context, input string) (valu
 		return "", "", err
 	}
 
-	ref, err := s.store.Resolve(ctx, spec.Name, paramSpecSuffix(spec))
+	ref, err := s.store.Resolve(ctx, spec.Name, awsParamSpecSuffix(spec))
 	if err != nil {
 		return "", "", err
 	}
@@ -274,9 +274,9 @@ func (s *AWSParamStrategy) FetchVersion(ctx context.Context, input string) (valu
 	return entry.Value, "#" + entry.Version.ID, nil
 }
 
-// paramSpecSuffix reconstructs the version-spec suffix (the part after the name)
+// awsParamSpecSuffix reconstructs the version-spec suffix (the part after the name)
 // so that name+suffix re-parses to an equivalent spec, as provider.Reader.Resolve expects.
-func paramSpecSuffix(spec *awsparamversion.Spec) string {
+func awsParamSpecSuffix(spec *awsparamversion.Spec) string {
 	var b strings.Builder
 
 	if spec.Absolute.Version != nil {

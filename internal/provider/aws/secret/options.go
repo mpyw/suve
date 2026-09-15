@@ -1,3 +1,7 @@
+// The functional-option types and the fold helpers that secret.go applies
+// to SDK inputs: secret.go's working parts, split out for readability.
+//declscope:namespace secret
+
 package secret
 
 import (

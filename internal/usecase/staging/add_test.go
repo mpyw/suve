@@ -16,35 +16,6 @@ import (
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-type mockParser struct {
-	*mockServiceStrategy
-
-	parsedName string
-	parseErr   error
-}
-
-func (m *mockParser) ParseName(input string) (string, error) {
-	if m.parseErr != nil {
-		return "", m.parseErr
-	}
-
-	if m.parsedName != "" {
-		return m.parsedName, nil
-	}
-
-	return input, nil
-}
-
-func (m *mockParser) ParseSpec(input string) (string, bool, error) {
-	return input, false, nil
-}
-
-func newMockParser() *mockParser {
-	return &mockParser{
-		mockServiceStrategy: newParamStrategy(),
-	}
-}
-
 func TestAddUseCase_Execute(t *testing.T) {
 	t.Parallel()
 

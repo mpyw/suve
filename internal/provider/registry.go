@@ -5,41 +5,6 @@ import (
 	"fmt"
 )
 
-// Provider identifies a cloud provider backend.
-type Provider string
-
-const (
-	// ProviderAWS is the Amazon Web Services provider.
-	ProviderAWS Provider = "aws"
-	// ProviderGoogleCloud is the Google Cloud Platform provider.
-	ProviderGoogleCloud Provider = "googlecloud"
-	// ProviderAzure is the Microsoft Azure provider.
-	ProviderAzure Provider = "azure"
-)
-
-// Kind selects a store kind within a provider (some providers offer only one).
-type Kind string
-
-const (
-	// KindParam selects a parameter store (e.g. AWS SSM Parameter Store).
-	KindParam Kind = "param"
-	// KindSecret selects a secret store (e.g. AWS Secrets Manager).
-	KindSecret Kind = "secret"
-)
-
-// Factory builds a Store for a scope + kind. It returns ErrUnsupportedKind if
-// the provider does not offer that kind (e.g. GoogleCloud has no param store).
-type Factory interface {
-	// Store builds a Store for the given scope and kind.
-	Store(ctx context.Context, scope Scope, kind Kind) (Store, error)
-}
-
-// ErrUnsupportedKind is returned when a provider does not offer the requested store kind.
-var ErrUnsupportedKind = fmt.Errorf("provider: unsupported store kind")
-
-// ErrNoFactory is returned when no factory is registered for a provider.
-var ErrNoFactory = fmt.Errorf("provider: no factory registered for provider")
-
 // Registry maps a Provider to its Factory, replacing direct infra.NewXClient calls.
 type Registry struct{ factories map[Provider]Factory }
 

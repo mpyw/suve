@@ -5,20 +5,11 @@ import (
 	"errors"
 	"unicode/utf8"
 
-	"github.com/samber/lo"
-
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/transition"
 )
-
-// ErrValueNotUTF8 is returned when a value to be staged is not valid UTF-8.
-// The staging state stores values as UTF-8 strings (mirroring jsonutil, which
-// refuses to format invalid UTF-8 to avoid U+FFFD coercion), so binary values
-// cannot be staged. This covers every ingestion path: positional argv, the
-// $EDITOR fallback, and provider prefill.
-var ErrValueNotUTF8 = errors.New("value is not valid UTF-8: binary values cannot be staged")
 
 // AddInput holds input for the add use case. Key identifies the item by name and
 // (Azure App Configuration) namespace; the namespace is empty for the
@@ -112,44 +103,4 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 	}
 
 	return &AddOutput{Name: name}, nil
-}
-
-// DraftInput holds input for getting draft (staged create) value.
-type DraftInput struct {
-	Key staging.EntryKey
-}
-
-// DraftOutput holds the draft value if any.
-type DraftOutput struct {
-	Value    string
-	IsStaged bool
-}
-
-// Draft returns the currently staged create value (draft) for re-editing.
-func (u *AddUseCase) Draft(ctx context.Context, input DraftInput) (*DraftOutput, error) {
-	service := u.Strategy.Service()
-
-	// Parse and validate name
-	name, err := u.Strategy.ParseName(input.Key.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	stagedEntry, err := u.Store.GetEntry(ctx, service, staging.EntryKey{Name: name, Namespace: input.Key.Namespace})
-	if err != nil {
-		if errors.Is(err, staging.ErrNotStaged) {
-			return &DraftOutput{IsStaged: false}, nil
-		}
-
-		return nil, err
-	}
-
-	if stagedEntry.Operation == staging.OperationCreate {
-		return &DraftOutput{
-			Value:    lo.FromPtr(stagedEntry.Value),
-			IsStaged: true,
-		}, nil
-	}
-
-	return &DraftOutput{IsStaged: false}, nil
 }

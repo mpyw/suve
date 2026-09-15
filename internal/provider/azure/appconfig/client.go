@@ -1,3 +1,7 @@
+// Adapts the concrete SDK client to the Client port that appconfig.go
+// declares: one unit with appconfig.go, split out for readability.
+//declscope:namespace appconfig
+
 package appconfig
 
 import (

@@ -1,3 +1,6 @@
+// White-box tests for diff.go's gatherServices.
+//declscope:namespace diff
+
 package diff
 
 import (

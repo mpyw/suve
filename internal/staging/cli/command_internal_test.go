@@ -1,3 +1,6 @@
+// In-package tests of the core CommandConfig plumbing.
+//declscope:core
+
 package cli
 
 import (
@@ -11,7 +14,6 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/staging"
-	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // hasDescriptionFlag reports whether the built command registers a --description
@@ -95,15 +97,4 @@ func TestCommandConfig_StrategyForAdapters(t *testing.T) {
 	require.NotNil(t, apply)
 	_, err = apply("dev")
 	require.ErrorIs(t, err, sentinel)
-}
-
-func TestDiffEntryDisplayName(t *testing.T) {
-	t.Parallel()
-
-	// The null/default namespace yields the bare name.
-	assert.Equal(t, "app/k", diffEntryDisplayName(stagingusecase.DiffEntry{Name: "app/k"}))
-
-	// A named namespace is appended so a key staged under several namespaces is
-	// unambiguous in the diff.
-	assert.Equal(t, "app/k [dev]", diffEntryDisplayName(stagingusecase.DiffEntry{Name: "app/k", Namespace: "dev"}))
 }

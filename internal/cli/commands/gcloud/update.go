@@ -78,7 +78,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		FromStdin: cmd.Bool(cliinternal.FlagValueStdin),
 		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
 		Arg:       args.Get(1),
-		Stdin:     cliinternal.Stdin(cmd),
+		Stdin:     cliinternal.ValueStdin(cmd),
 		// Without --yes we prompt for confirmation on the same stdin below;
 		// reading the value from stdin would leave nothing for that prompt.
 		ConfirmRequired: !skipConfirm,
@@ -110,7 +110,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		prompter := &confirm.Prompter{
-			Stdin:  cliinternal.Stdin(cmd),
+			Stdin:  cliinternal.ValueStdin(cmd),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 		}

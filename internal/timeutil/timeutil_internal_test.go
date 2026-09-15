@@ -1,3 +1,6 @@
+// White-box tests for timeutil.go's private functions.
+//declscope:namespace timeutil
+
 package timeutil
 
 import (

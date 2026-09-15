@@ -1,3 +1,8 @@
+// The long help texts are the command builders' working parts: every function
+// here is consumed by command.go alone, so the file joins the core namespace
+// instead of standing as a unit of its own.
+//declscope:core
+
 package cli
 
 import "fmt"

@@ -1,5 +1,14 @@
 //go:build e2e
 
+//declscope:namespace app
+//
+// NewE2EModel hands the App model (run.go's newModel) to the e2e suite,
+// so this file belongs to the same unit.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 package tui
 
 import (

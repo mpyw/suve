@@ -1,3 +1,6 @@
+// In-package tests of the core executor; shares fixtures with the reducer tests.
+//declscope:core
+
 package transition
 
 import (

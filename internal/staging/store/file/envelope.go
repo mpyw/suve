@@ -58,9 +58,9 @@ var (
 	ErrUnsupportedEnvelopeVersion = errors.New("unsupported export file version")
 )
 
-// aadDomain is a domain-separation prefix for the envelope AAD, so the bound
+// envelopeAADDomain is a domain-separation prefix for the envelope AAD, so the bound
 // bytes can never be confused with any other AES-GCM associated data.
-const aadDomain = "suve/staging/export-envelope\x00"
+const envelopeAADDomain = "suve/staging/export-envelope\x00"
 
 // associatedData returns the canonical AES-GCM associated data that binds the
 // envelope header (version/provider/scope/service) to the encrypted payload.
@@ -71,7 +71,7 @@ const aadDomain = "suve/staging/export-envelope\x00"
 func (e *Envelope) associatedData() []byte {
 	var buf bytes.Buffer
 
-	buf.WriteString(aadDomain)
+	buf.WriteString(envelopeAADDomain)
 
 	var num [8]byte
 
@@ -91,11 +91,11 @@ func (e *Envelope) associatedData() []byte {
 	return buf.Bytes()
 }
 
-// encodePayload marshals a single-service state into the base64 payload. With an
+// encodeEnvelopePayload marshals a single-service state into the base64 payload. With an
 // empty passphrase the state JSON is stored as plaintext (base64 only, no
 // encryption); otherwise it is encrypted with the passphrase-based (v1) format,
 // binding aad (the canonical envelope header) to the ciphertext.
-func encodePayload(state *staging.State, passphrase string, aad []byte) (string, error) {
+func encodeEnvelopePayload(state *staging.State, passphrase string, aad []byte) (string, error) {
 	// staging.State implements json.Marshaler (MarshalJSON), emitting its
 	// EntryKey-keyed maps as arrays of (name, namespace) records, so the static
 	// errchkjson "unsupported map key" warning is a false positive here.
@@ -132,7 +132,7 @@ func WriteEnvelopeFile(path string, scope provider.Scope, svc staging.Service, s
 
 	// The header is bound to the ciphertext as AAD, so it must be filled in
 	// before the payload is encoded.
-	payload, err := encodePayload(state.ExtractService(svc), passphrase, env.associatedData())
+	payload, err := encodeEnvelopePayload(state.ExtractService(svc), passphrase, env.associatedData())
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func (e *Envelope) DecodeState(passphrase string) (*staging.State, error) {
 	// entries, mirroring the provider-mismatch guard: applying them would push a
 	// namespaced item to a provider that ignores namespaces.
 	if !e.namespaceAllowed() {
-		if key, found := firstNamespacedKey(scoped); found {
+		if key, found := envelopeFirstNamespacedKey(scoped); found {
 			return nil, fmt.Errorf(
 				"%w: provider %q is namespace-agnostic but the payload carries item %q under namespace %q",
 				ErrInvalidEnvelope, e.Provider, key.Name, key.Namespace)
@@ -271,9 +271,9 @@ func (e *Envelope) namespaceAllowed() bool {
 	return e.Provider == string(provider.ProviderAzure) && e.Service == string(staging.ServiceParam)
 }
 
-// firstNamespacedKey returns the first entry or tag key in state that carries a
+// envelopeFirstNamespacedKey returns the first entry or tag key in state that carries a
 // non-empty namespace, for reporting a namespace-agnostic violation.
-func firstNamespacedKey(state *staging.State) (staging.EntryKey, bool) {
+func envelopeFirstNamespacedKey(state *staging.State) (staging.EntryKey, bool) {
 	for _, entries := range state.Entries {
 		for key := range entries {
 			if key.Namespace != "" {

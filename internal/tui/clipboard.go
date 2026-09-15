@@ -1,3 +1,12 @@
+//declscope:namespace app
+//
+// The clipboard seam lets app.go's copy path be stubbed in tests. It is
+// part of the App, filed separately only for readability.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 package tui
 
 import (

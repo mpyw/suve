@@ -18,14 +18,6 @@ const (
 	ExportOpClear ExportOp = "clear"
 )
 
-// EnvelopeWriter writes a single service's staged state to an export target
-// (typically a per-service envelope file). Adapters bind the destination path,
-// scope, and passphrase; the use case only supplies the service and its state.
-type EnvelopeWriter interface {
-	// WriteEnvelope serializes state (scoped to svc) to the export target.
-	WriteEnvelope(ctx context.Context, svc staging.Service, state *staging.State) error
-}
-
 // ExportInput holds input for the export use case.
 type ExportInput struct {
 	// Service filters the export to a specific service. Empty means all services

@@ -1,3 +1,11 @@
+//declscope:namespace app
+//
+// White-box tests of the App's copy wiring and the setClipboard seam.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: exercises the app's copy wiring and the setClipboard seam
 package tui
 

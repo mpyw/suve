@@ -1,4 +1,10 @@
 // Package commands provides the command-line interface for suve.
+//
+// app.go is this package's subject: the application itself, and the command
+// tree it assembles. Version cannot be renamed, since goreleaser's ldflags name
+// it. Hence core.
+//
+//declscope:core
 package commands
 
 import (
@@ -292,6 +298,8 @@ func aliasDescription(det detect.Result) string {
 }
 
 // groupName maps a provider to its command-group name for user-facing messages.
+//
+//declscope:package // tui.go names the group the same way in its launch error
 func groupName(p provider.Provider) string {
 	switch p {
 	case provider.ProviderAWS:

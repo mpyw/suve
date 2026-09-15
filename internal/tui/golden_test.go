@@ -1,3 +1,11 @@
+//declscope:namespace app
+//
+// The shared golden/teatest harness every App test in this package uses.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: shares the tui package's golden/teatest harness
 package tui
 

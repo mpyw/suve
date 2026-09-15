@@ -41,7 +41,7 @@ type ShowUseCase struct {
 
 // Execute runs the show use case.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
-	ref, err := u.Reader.Resolve(ctx, input.Spec.Name, specSuffix(input.Spec))
+	ref, err := u.Reader.Resolve(ctx, input.Spec.Name, versionSpecSuffix(input.Spec))
 	if err != nil {
 		return nil, err
 	}

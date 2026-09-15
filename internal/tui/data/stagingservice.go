@@ -1,3 +1,9 @@
+//declscope:namespace stage
+//
+// The TUI staging seam is one unit across two files: stage.go holds the
+// read-side probe and the staged-key/store types, and this file holds the
+// review/apply/reset service, so both share the "stage" namespace.
+
 package data
 
 import (
@@ -60,12 +66,6 @@ type StagedTagRow struct {
 	Removes []TagRemoval
 }
 
-// TagRemoval is a staged tag removal: the key and its current remote value.
-type TagRemoval struct {
-	Key   string
-	Value string
-}
-
 // StagingReview is the full staged picture for one service — entries (as diffs)
 // plus independent tag changes.
 type StagingReview struct {
@@ -91,29 +91,6 @@ func (r StagingReview) AutoUnstaged() []StagedKey {
 	return lo.FilterMap(r.Entries, func(e StagedDiffRow, _ int) (StagedKey, bool) {
 		return StagedKey{Name: e.Name, Namespace: e.Namespace}, e.Type == StagedDiffAutoUnstaged
 	})
-}
-
-// ApplyEntryResult is one entry's apply outcome.
-type ApplyEntryResult struct {
-	Name      string
-	Namespace string
-	// Status is "created" / "updated" / "deleted" / "failed".
-	Status string
-	// Error is the cloud-write failure (empty on success).
-	Error string
-	// UnstageError is set when the cloud write succeeded but the entry could not
-	// be cleared from staging afterwards — the page must always surface it.
-	UnstageError string
-}
-
-// ApplyTagResult is one item's tag-apply outcome.
-type ApplyTagResult struct {
-	Name         string
-	Namespace    string
-	Adds         []Tag
-	Removes      []string
-	Error        string
-	UnstageError string
 }
 
 // StagingApplyResult is the aggregated result of applying a service's staged
@@ -259,22 +236,22 @@ func (s *stagingService) Review(ctx context.Context) (StagingReview, error) {
 			return StagedTagRow{
 				Name:      t.Name,
 				Namespace: t.Namespace,
-				Adds:      mapToTags(t.Add),
-				Removes: sortedRemovals(lo.MapToSlice(t.Remove, func(k, v string) TagRemoval {
+				Adds:      mapToStagedTags(t.Add),
+				Removes: sortedStagedRemovals(lo.MapToSlice(t.Remove, func(k, v string) TagRemoval {
 					return TagRemoval{Key: k, Value: v}
 				})),
 			}
 		}),
 	}
 
-	slices.SortFunc(review.Entries, func(a, b StagedDiffRow) int { return compareKey(a.Name, a.Namespace, b.Name, b.Namespace) })
-	slices.SortFunc(review.Tags, func(a, b StagedTagRow) int { return compareKey(a.Name, a.Namespace, b.Name, b.Namespace) })
+	slices.SortFunc(review.Entries, func(a, b StagedDiffRow) int { return compareStagedKeys(a.Name, a.Namespace, b.Name, b.Namespace) })
+	slices.SortFunc(review.Tags, func(a, b StagedTagRow) int { return compareStagedKeys(a.Name, a.Namespace, b.Name, b.Namespace) })
 
 	return review, nil
 }
 
-// compareKey orders two (name, namespace) pairs deterministically.
-func compareKey(aName, aNS, bName, bNS string) int {
+// compareStagedKeys orders two (name, namespace) pairs deterministically.
+func compareStagedKeys(aName, aNS, bName, bNS string) int {
 	if c := strings.Compare(aName, bName); c != 0 {
 		return c
 	}
@@ -315,7 +292,7 @@ func (s *stagingService) newApplyResult(out *stagingusecase.ApplyOutput) Staging
 			entry := ApplyEntryResult{
 				Name:      r.Name,
 				Namespace: r.Namespace,
-				Status:    applyStatusLabel(r.Status),
+				Status:    stagingApplyStatusLabel(r.Status),
 			}
 			if r.Status == stagingusecase.ApplyResultFailed && r.Error != nil {
 				entry.Error = r.Error.Error()
@@ -331,7 +308,7 @@ func (s *stagingService) newApplyResult(out *stagingusecase.ApplyOutput) Staging
 			tag := ApplyTagResult{
 				Name:      r.Name,
 				Namespace: r.Namespace,
-				Adds:      mapToTags(r.AddTags),
+				Adds:      mapToStagedTags(r.AddTags),
 				Removes:   r.RemoveTag.Values(),
 			}
 			if r.Error != nil {
@@ -422,17 +399,17 @@ func (s *stagingService) editStagedTag(ctx context.Context, key StagedKey, edit 
 	return res.Store.StageTag(ctx, s.service, entryKey, *tag)
 }
 
-// mapToTags renders a tag map as a slice of neutral Tags sorted by key, so the
+// mapToStagedTags renders a tag map as a slice of neutral Tags sorted by key, so the
 // page (and its goldens) render staged tags in a stable order.
-func mapToTags(m map[string]string) []Tag {
+func mapToStagedTags(m map[string]string) []Tag {
 	tags := lo.MapToSlice(m, func(k, v string) Tag { return Tag{Key: k, Value: v} })
 	slices.SortFunc(tags, func(a, b Tag) int { return strings.Compare(a.Key, b.Key) })
 
 	return tags
 }
 
-// sortedRemovals sorts tag removals by key for a stable render order.
-func sortedRemovals(rs []TagRemoval) []TagRemoval {
+// sortedStagedRemovals sorts tag removals by key for a stable render order.
+func sortedStagedRemovals(rs []TagRemoval) []TagRemoval {
 	slices.SortFunc(rs, func(a, b TagRemoval) int { return strings.Compare(a.Key, b.Key) })
 
 	return rs
@@ -472,8 +449,8 @@ func stagingResetType(t stagingusecase.ResetResultType) StagingResetType {
 	}
 }
 
-// applyStatusLabel maps an apply status enum onto its display verb.
-func applyStatusLabel(s stagingusecase.ApplyResultStatus) string {
+// stagingApplyStatusLabel maps an apply status enum onto its display verb.
+func stagingApplyStatusLabel(s stagingusecase.ApplyResultStatus) string {
 	switch s {
 	case stagingusecase.ApplyResultCreated:
 		return "created"

@@ -1,3 +1,6 @@
+// Further tests for diff by namespace, sharing diff_test.go's mocks.
+//declscope:namespace diff
+
 package diff_test
 
 import (

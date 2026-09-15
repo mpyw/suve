@@ -1,3 +1,8 @@
+// The entry/tag state definitions are part of the machine this package is
+// named for (transition.EntryState, transition.StagedTags read naturally, and
+// StagedTags is spelled from outside the package, so a file prefix cannot fit).
+//declscope:core
+
 package transition
 
 import (

@@ -1,7 +1,6 @@
 package staging_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -15,39 +14,6 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 	usecasestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
-
-type mockEditStrategy struct {
-	*mockParser
-
-	fetchResult *staging.EditFetchResult
-	fetchErr    error
-}
-
-func (m *mockEditStrategy) FetchCurrentValue(_ context.Context, _ string) (*staging.EditFetchResult, error) {
-	if m.fetchErr != nil {
-		return nil, m.fetchErr
-	}
-
-	return m.fetchResult, nil
-}
-
-func newMockEditStrategy() *mockEditStrategy {
-	return &mockEditStrategy{
-		mockParser: newMockParser(),
-		fetchResult: &staging.EditFetchResult{
-			Value:        "aws-value",
-			LastModified: time.Now(),
-		},
-	}
-}
-
-// newMockEditStrategyNotFound creates a mock that returns ResourceNotFoundError.
-func newMockEditStrategyNotFound() *mockEditStrategy {
-	return &mockEditStrategy{
-		mockParser: newMockParser(),
-		fetchErr:   &staging.ResourceNotFoundError{Err: errors.New("resource not found")},
-	}
-}
 
 func TestEditUseCase_Execute(t *testing.T) {
 	t.Parallel()

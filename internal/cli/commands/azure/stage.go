@@ -14,15 +14,15 @@ import (
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
-// nounSecret is the command / item name used across the Key Vault stage subgroup.
-const nounSecret = "secret"
+// stageNounSecret is the command / item name used across the Key Vault stage subgroup.
+const stageNounSecret = "secret"
 
 // keyVaultStageConfig is the staging config for Azure Key Vault secrets. The
 // ScopeResolver keys on-disk staging state by the resolved vault.
 func keyVaultStageConfig() stgcli.CommandConfig {
 	return stgcli.CommandConfig{
-		CommandName:   nounSecret,
-		ItemName:      nounSecret,
+		CommandName:   stageNounSecret,
+		ItemName:      stageNounSecret,
 		Factory:       cliinternal.AzureKeyVaultSecretStrategyFactory,
 		ParserFactory: staging.AzureKeyVaultSecretParserFactory,
 		ScopeResolver: cliinternal.AzureKeyVaultStagingScopeResolver,
@@ -92,7 +92,7 @@ func appConfigStageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 // --vault-name flag and resolves it into the context for the scope resolver.
 func keyVaultStageGroup() *cli.Command {
 	return &cli.Command{
-		Name:    nounSecret,
+		Name:    stageNounSecret,
 		Aliases: []string{"kv", "keyvault"},
 		Usage:   "Staging operations for Azure Key Vault secrets",
 		Flags: []cli.Flag{

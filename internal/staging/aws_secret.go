@@ -95,7 +95,7 @@ func (s *AWSSecretStrategy) applyUpdate(ctx context.Context, name string, entry 
 }
 
 func (s *AWSSecretStrategy) applyDelete(ctx context.Context, name string, entry Entry) error {
-	opts := deleteOptions(entry.DeleteOptions)
+	opts := awsSecretDeleteOptions(entry.DeleteOptions)
 
 	if err := s.store.Delete(ctx, name, opts...); err != nil {
 		// Already deleted is considered success.
@@ -109,8 +109,8 @@ func (s *AWSSecretStrategy) applyDelete(ctx context.Context, name string, entry 
 	return nil
 }
 
-// deleteOptions translates staged delete options into provider delete options.
-func deleteOptions(o *DeleteOptions) []provider.DeleteOption {
+// awsSecretDeleteOptions translates staged delete options into provider delete options.
+func awsSecretDeleteOptions(o *DeleteOptions) []provider.DeleteOption {
 	if o == nil {
 		return nil
 	}
@@ -257,7 +257,7 @@ func (s *AWSSecretStrategy) FetchVersion(ctx context.Context, input string) (val
 		return "", "", err
 	}
 
-	ref, err := s.store.Resolve(ctx, spec.Name, secretSpecSuffix(spec))
+	ref, err := s.store.Resolve(ctx, spec.Name, awsSecretSpecSuffix(spec))
 	if err != nil {
 		return "", "", err
 	}
@@ -270,9 +270,9 @@ func (s *AWSSecretStrategy) FetchVersion(ctx context.Context, input string) (val
 	return entry.Value, "#" + awssecretversion.TruncateVersionID(entry.Version.ID), nil
 }
 
-// secretSpecSuffix reconstructs the version-spec suffix (the part after the name)
+// awsSecretSpecSuffix reconstructs the version-spec suffix (the part after the name)
 // so that name+suffix re-parses to an equivalent spec, as provider.Reader.Resolve expects.
-func secretSpecSuffix(spec *awssecretversion.Spec) string {
+func awsSecretSpecSuffix(spec *awssecretversion.Spec) string {
 	var b strings.Builder
 
 	switch {

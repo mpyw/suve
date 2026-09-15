@@ -1,3 +1,12 @@
+//declscope:namespace app
+//
+// Constructs the pages the App owns. This is app.go's wiring, not a
+// layer under it.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 package tui
 
 import (

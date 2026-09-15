@@ -1,3 +1,12 @@
+//declscope:namespace app
+//
+// providermock fixtures shared by the golden suites that drive the App;
+// part of the App's test harness.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: builds the app with providermock-backed sources and shares the vt harness
 package tui
 

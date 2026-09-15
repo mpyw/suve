@@ -1,3 +1,8 @@
+// The staged-state model (State, Entry, Service, ...) is the unit this package
+// is named for; a "stage" prefix on these names would only stutter at the
+// staging.X call sites.
+//declscope:core
+
 // Package staging provides staging functionality for AWS parameter and secret changes.
 package staging
 

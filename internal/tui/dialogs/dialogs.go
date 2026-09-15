@@ -8,9 +8,18 @@
 // writes to the direct param/secret use cases. The app shell owns the dialog
 // stack and dismissal; a dialog reports Busy() so the shell suppresses dismissal
 // while an operation is in flight.
+//
+// This file is the package's core. The contract and messages here are the
+// shared vocabulary every dialog builds on, so the file carries no namespace
+// prefix and its declarations are shared package-wide.
+//
+//declscope:core
+//declscope:package
 package dialogs
 
 import (
+	"time"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
@@ -111,3 +120,15 @@ func doneCmd(service, status string, staged bool) tea.Cmd {
 		return MutationDoneMsg{Service: service, Status: status, Staged: staged}
 	}
 }
+
+// NowFunc is the clock the delete dialog's "recoverable until" date is computed
+// from. It is an exported package variable so a golden can pin the date
+// deterministically.
+//
+//nolint:gochecknoglobals // swappable clock seam for the recoverable-until date
+var NowFunc = time.Now
+
+// stringError is a small sentinel error type for dialog validation.
+type stringError string
+
+func (e stringError) Error() string { return string(e) }

@@ -1,3 +1,9 @@
+// The Source seam and its neutral display types (Item, Detail, HistoryRow, ...)
+// are the unit this package is named for: the other files implement or feed
+// them, and every caller spells them as data.X, so no file prefix fits these
+// names.
+//declscope:core
+
 // Package data is the TUI's read-path data seam. It exposes a small, provider-
 // neutral Source interface that the browser and diff pages depend on, plus
 // concrete implementations backed by the internal/usecase/{param,secret} use
@@ -24,6 +30,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -626,4 +633,81 @@ func formatDate(t *time.Time) string {
 	}
 
 	return timeutil.FormatDate(*t)
+}
+
+// =============================================================================
+// Shared seam types
+//
+// These types are shared across the seam files (mutator.go, stage.go,
+// stagingservice.go) and their consumers; they live here because their names
+// are package-wide vocabulary rather than any one file's.
+// =============================================================================
+
+// WriteOutcome carries the semantic result of a mutation the UI must voice.
+// Skipped is set when a staged edit equalled the live value (nothing staged);
+// Unstaged when an edit-back-to-base or a delete-of-staged-create auto-unstaged
+// the entry (EditOutput.Skipped/Unstaged, DeleteOutput.Unstaged); Updated when
+// an immediate create fell back to update because the entry already existed
+// (the create-or-update/upsert branch), so the status voices an update rather
+// than a create — matching the GUI (ParamSet) and CLI (`param set`).
+type WriteOutcome struct {
+	Skipped  bool
+	Unstaged bool
+	Updated  bool
+}
+
+// ErrRestoreUnsupported is returned by Restore when the resolved store does not
+// implement provider.Restorer (the capability gate should prevent reaching it).
+var ErrRestoreUnsupported = stringError("restore is not supported by this provider")
+
+// stringError is a small sentinel error type for the data seam.
+type stringError string
+
+func (e stringError) Error() string { return string(e) }
+
+// StrategyBuilder builds the provider-specific staging strategy over a resolved
+// provider.Store. The returned FullStrategy satisfies staging.EditStrategy and
+// (via the concrete type) staging.DeleteStrategy, matching the GUI's
+// serviceStrategyScoped narrowing.
+type StrategyBuilder func(store provider.Store) staging.FullStrategy
+
+// StoreUnavailableError marks a StagingProbe failure that comes from CONSTRUCTING
+// the on-disk staging store (a keychain hard-fail / key-loss while encrypted state
+// exists), as opposed to a transient status read. This class of failure is
+// persistent and actionable, so the browser surfaces it on the error line, while
+// keeping ordinary probe read errors quiet (badges just do not show). The epic
+// requires a key-loss to be visible on the read path, not only the write path.
+type StoreUnavailableError struct{ Err error }
+
+func (e *StoreUnavailableError) Error() string { return e.Err.Error() }
+
+func (e *StoreUnavailableError) Unwrap() error { return e.Err }
+
+// TagRemoval is a staged tag removal: the key and its current remote value.
+type TagRemoval struct {
+	Key   string
+	Value string
+}
+
+// ApplyEntryResult is one entry's apply outcome.
+type ApplyEntryResult struct {
+	Name      string
+	Namespace string
+	// Status is "created" / "updated" / "deleted" / "failed".
+	Status string
+	// Error is the cloud-write failure (empty on success).
+	Error string
+	// UnstageError is set when the cloud write succeeded but the entry could not
+	// be cleared from staging afterwards — the page must always surface it.
+	UnstageError string
+}
+
+// ApplyTagResult is one item's tag-apply outcome.
+type ApplyTagResult struct {
+	Name         string
+	Namespace    string
+	Adds         []Tag
+	Removes      []string
+	Error        string
+	UnstageError string
 }

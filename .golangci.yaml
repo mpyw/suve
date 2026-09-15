@@ -84,6 +84,14 @@ linters:
       - path: "e2e/"
         linters:
           - tparallel
+      # testpackage skips *_internal_test.go by default. This file cannot use
+      # that suffix: declscope derives a file's namespace from its stem, and
+      # the declarations under test are private to "import", which only
+      # import_test.go derives. (A //declscope:namespace directive cannot spell
+      # it either -- import is a Go keyword. mpyw/declscope#76.)
+      - path: "internal/staging/cli/import_test\\.go"
+        linters:
+          - testpackage
   settings:
     modernize:
       disable:

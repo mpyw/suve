@@ -1,3 +1,6 @@
+// shift.go joins parse's namespace, so its white-box tests go there too.
+//declscope:namespace parse
+
 package version
 
 import (

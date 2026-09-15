@@ -7,15 +7,9 @@ import (
 	"github.com/mpyw/suve/internal/parallel"
 )
 
-// ApplyStrategyResolver resolves the ApplyStrategy for a given namespace. It
-// mirrors the per-namespace resolution the apply path uses so a namespaced
-// provider (Azure App Configuration) probes each entry against the remote state
-// of its OWN namespace rather than the default one.
-type ApplyStrategyResolver func(namespace string) (ApplyStrategy, error)
-
-// lastModifiedResults maps each probed EntryKey to its fetched last-modified
+// conflictLastModifiedResults maps each probed EntryKey to its fetched last-modified
 // time (or the fetch error).
-type lastModifiedResults = map[EntryKey]*parallel.Result[time.Time]
+type conflictLastModifiedResults = map[EntryKey]*parallel.Result[time.Time]
 
 // CheckConflicts checks if remote resources were modified after staging.
 // Returns the set of EntryKeys that have conflicts.
@@ -66,8 +60,8 @@ func CheckEntryAndTagConflicts(
 ) map[EntryKey]struct{} {
 	conflicts := make(map[EntryKey]struct{})
 
-	toCheckCreate, toCheckModified := classifyEntries(entries)
-	toCheckTags := tagsWithBase(tags)
+	toCheckCreate, toCheckModified := classifyConflictEntries(entries)
+	toCheckTags := conflictTagsWithBase(tags)
 
 	if len(toCheckCreate) == 0 && len(toCheckModified) == 0 && len(toCheckTags) == 0 {
 		return conflicts
@@ -76,11 +70,11 @@ func CheckEntryAndTagConflicts(
 	// Merge the key sets so each remote is fetched exactly once, then share the
 	// results across the create, modified and tag comparisons below.
 	keys := make(map[EntryKey]struct{}, len(toCheckCreate)+len(toCheckModified)+len(toCheckTags))
-	addKeys(keys, toCheckCreate)
-	addKeys(keys, toCheckModified)
-	addKeys(keys, toCheckTags)
+	addConflictKeys(keys, toCheckCreate)
+	addConflictKeys(keys, toCheckModified)
+	addConflictKeys(keys, toCheckTags)
 
-	results := fetchLastModified(ctx, resolve, keys)
+	results := fetchConflictLastModified(ctx, resolve, keys)
 
 	// Create: conflict if the resource now exists (someone else created it).
 	for key := range toCheckCreate {
@@ -92,16 +86,16 @@ func CheckEntryAndTagConflicts(
 
 	// Update/Delete and tag changes: conflict if the remote was modified after
 	// the staged base time.
-	markModifiedAfterBase(toCheckModified, func(e Entry) time.Time { return *e.BaseModifiedAt }, results, conflicts)
-	markModifiedAfterBase(toCheckTags, func(t TagEntry) time.Time { return *t.BaseModifiedAt }, results, conflicts)
+	markConflictsModifiedAfterBase(toCheckModified, func(e Entry) time.Time { return *e.BaseModifiedAt }, results, conflicts)
+	markConflictsModifiedAfterBase(toCheckTags, func(t TagEntry) time.Time { return *t.BaseModifiedAt }, results, conflicts)
 
 	return conflicts
 }
 
-// classifyEntries splits entries into those checked for a Create conflict (the
+// classifyConflictEntries splits entries into those checked for a Create conflict (the
 // resource now exists) and those checked for a modified-after-base conflict.
 // Entries without a check type (Update/Delete lacking BaseModifiedAt) are dropped.
-func classifyEntries(entries map[EntryKey]Entry) (create, modified map[EntryKey]Entry) {
+func classifyConflictEntries(entries map[EntryKey]Entry) (create, modified map[EntryKey]Entry) {
 	create = make(map[EntryKey]Entry)
 	modified = make(map[EntryKey]Entry)
 
@@ -117,9 +111,9 @@ func classifyEntries(entries map[EntryKey]Entry) (create, modified map[EntryKey]
 	return create, modified
 }
 
-// tagsWithBase returns the tag changes that carry a BaseModifiedAt and can
+// conflictTagsWithBase returns the tag changes that carry a BaseModifiedAt and can
 // therefore be conflict-checked; the rest are never conflicts.
-func tagsWithBase(tags map[EntryKey]TagEntry) map[EntryKey]TagEntry {
+func conflictTagsWithBase(tags map[EntryKey]TagEntry) map[EntryKey]TagEntry {
 	toCheck := make(map[EntryKey]TagEntry)
 
 	for key, tag := range tags {
@@ -131,17 +125,17 @@ func tagsWithBase(tags map[EntryKey]TagEntry) map[EntryKey]TagEntry {
 	return toCheck
 }
 
-// addKeys copies the keys of src into dst.
-func addKeys[V any](dst map[EntryKey]struct{}, src map[EntryKey]V) {
+// addConflictKeys copies the keys of src into dst.
+func addConflictKeys[V any](dst map[EntryKey]struct{}, src map[EntryKey]V) {
 	for key := range src {
 		dst[key] = struct{}{}
 	}
 }
 
-// fetchLastModified fetches each key's remote last-modified time in parallel,
+// fetchConflictLastModified fetches each key's remote last-modified time in parallel,
 // resolving the strategy for the key's own namespace so a namespaced provider
 // probes each entry against the right remote.
-func fetchLastModified(ctx context.Context, resolve ApplyStrategyResolver, keys map[EntryKey]struct{}) lastModifiedResults {
+func fetchConflictLastModified(ctx context.Context, resolve ApplyStrategyResolver, keys map[EntryKey]struct{}) conflictLastModifiedResults {
 	return parallel.ExecuteMap(ctx, keys, func(ctx context.Context, key EntryKey, _ struct{}) (time.Time, error) {
 		strategy, err := resolve(key.Namespace)
 		if err != nil {
@@ -152,7 +146,7 @@ func fetchLastModified(ctx context.Context, resolve ApplyStrategyResolver, keys 
 	})
 }
 
-// markModifiedAfterBase adds to conflicts every key whose remote was modified
+// markConflictsModifiedAfterBase adds to conflicts every key whose remote was modified
 // strictly after its staged base time. A fetch error or a zero time (the remote
 // no longer exists) is skipped — the apply will fail on its own. base extracts
 // each item's staged base time.
@@ -160,10 +154,10 @@ func fetchLastModified(ctx context.Context, resolve ApplyStrategyResolver, keys 
 // Strict After: on second-granular providers (e.g. Azure Key Vault) an
 // out-of-band write in the same wall-clock second compares as equal and escapes
 // detection. See docs/staging-state-transitions.md.
-func markModifiedAfterBase[V any](
+func markConflictsModifiedAfterBase[V any](
 	items map[EntryKey]V,
 	base func(V) time.Time,
-	results lastModifiedResults,
+	results conflictLastModifiedResults,
 	conflicts map[EntryKey]struct{},
 ) {
 	for key, item := range items {

@@ -1,3 +1,8 @@
+// This package's subject is the Secrets Manager version spec itself, and
+// spec.go holds its definition and the Parse API. Core, so that Parse does not
+// have to become SpecParse. version.go stays a helper for display.
+//declscope:core
+
 package awssecretversion
 
 import (

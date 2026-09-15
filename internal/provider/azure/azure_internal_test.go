@@ -1,3 +1,6 @@
+// In-package tests of azure.go's debug-logging internals.
+//declscope:namespace azure
+
 package azure
 
 import (

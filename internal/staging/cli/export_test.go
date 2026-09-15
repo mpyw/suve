@@ -1,3 +1,8 @@
+// The fixtures here (setupExportImportEnv, the round-trip configs, ...) are
+// shared with import_test.go: export and import are round-tripped by one test
+// suite, so the whole file is declared package-wide.
+//declscope:package
+
 package cli_test
 
 import (

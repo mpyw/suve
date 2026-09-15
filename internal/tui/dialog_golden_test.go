@@ -1,3 +1,11 @@
+//declscope:namespace app
+//
+// Golden tests hosting the App's dialogs through the shared vt harness.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: hosts the dialogs standalone and shares the vt golden harness
 package tui
 

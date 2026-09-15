@@ -36,16 +36,6 @@ func (w *recordingWriter) WriteEnvelope(_ context.Context, svc staging.Service, 
 	return nil
 }
 
-func stageEntry(t *testing.T, s *testutil.MockStore, svc staging.Service, name, value string) {
-	t.Helper()
-
-	require.NoError(t, s.StageEntry(t.Context(), svc, staging.EntryKey{Name: name}, staging.Entry{
-		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(value),
-		StagedAt:  time.Now(),
-	}))
-}
-
 // concurrentStager is an EnvelopeWriter that, on its first write, stages an
 // extra entry into the working store — standing in for another process staging
 // during the slow envelope encryption/write window (the export TOCTOU).

@@ -11,6 +11,8 @@ import (
 )
 
 // newTagger builds the SSM Parameter Store provider.Tagger.
+//
+//declscope:package // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return cliinternal.ParamStore(ctx)
 }
@@ -31,24 +33,6 @@ EXAMPLES:
    suve param tag /app/config env=staging                  Update existing tag`,
 		Noun:       "parameter",
 		UsageError: "usage: suve param tag <name> <key=value> [key=value]",
-		NewTagger:  newTagger,
-	})
-}
-
-// UntagCommand returns the SSM Parameter Store untag command.
-func UntagCommand() *cli.Command {
-	return generictag.UntagCommand(generictag.Config{
-		Usage:     "Remove tags from a parameter",
-		ArgsUsage: "<name> <key>...",
-		Description: `Remove one or more tags from an existing parameter.
-
-Specify the tag keys to remove. Non-existent keys are silently ignored.
-
-EXAMPLES:
-   suve param untag /app/config deprecated              Remove single tag
-   suve param untag /app/config env team                Remove multiple tags`,
-		Noun:       "parameter",
-		UsageError: "usage: suve param untag <name> <key> [key]",
 		NewTagger:  newTagger,
 	})
 }

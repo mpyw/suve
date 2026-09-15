@@ -1,3 +1,12 @@
+//declscope:namespace app
+//
+// The page contract is what the App drives; this file and app.go are two
+// halves of one shell.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 package tui
 
 import (

@@ -1,3 +1,9 @@
+//declscope:namespace diff
+//
+// These branch tests drive the same diff Model as diff_test.go — one subject,
+// one namespace. The file stem would otherwise claim a "diffBranches"
+// namespace that names no unit of its own.
+
 //nolint:testpackage // white-box: drives NewStatic and the unexported handleKey/error-render paths
 package diff
 
