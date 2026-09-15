@@ -1,3 +1,8 @@
+// The executor is the effectful half of the machine (the reducer computes, the
+// executor persists — see docs/staging-state-transitions.md), and its exported
+// entry points (EntryExecuteOptions, Load*) are spelled from outside the package.
+//declscope:core
+
 package transition
 
 import (

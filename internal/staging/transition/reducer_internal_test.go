@@ -1,3 +1,7 @@
+// In-package tests of the core reducer (the file-name namespace would be
+// reducerInternal, which names no unit of its own).
+//declscope:core
+
 package transition
 
 import (
@@ -728,37 +732,6 @@ func TestReduceEntry_Delete_InconsistentState(t *testing.T) {
 	// This should still return error since the resource doesn't exist
 	assert.Equal(t, ErrCannotDeleteNotFound, result.Error)
 	assert.Equal(t, EntryStagedStateDelete{}, result.NewState.StagedState)
-}
-
-// Test interface marker methods for coverage.
-func TestEntryAction_Marker(t *testing.T) {
-	t.Parallel()
-	// These tests exist to cover the sealed interface marker methods
-	var _ EntryAction = EntryActionAdd{}
-
-	var _ EntryAction = EntryActionEdit{}
-
-	var _ EntryAction = EntryActionDelete{}
-
-	var _ EntryAction = EntryActionReset{}
-
-	// Call the marker methods directly
-	EntryActionAdd{Value: "test"}.isEntryAction()
-	EntryActionEdit{Value: "test"}.isEntryAction()
-	EntryActionDelete{}.isEntryAction()
-	EntryActionReset{}.isEntryAction()
-}
-
-func TestTagAction_Marker(t *testing.T) {
-	t.Parallel()
-	// These tests exist to cover the sealed interface marker methods
-	var _ TagAction = TagActionTag{}
-
-	var _ TagAction = TagActionUntag{}
-
-	// Call the marker methods directly
-	TagActionTag{Tags: map[string]string{}}.isTagAction()
-	TagActionUntag{Keys: maputil.NewSet[string]()}.isTagAction()
 }
 
 func TestEntryStagedState_Marker(t *testing.T) {

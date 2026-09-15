@@ -1,3 +1,8 @@
+// The pure reducers ARE the transitions this package is named for:
+// transition.EntryTransitionResult and the ErrCannot* sentinels are its public
+// vocabulary, and a "reducer" prefix would only stutter at every call site.
+//declscope:core
+
 package transition
 
 import "errors"
