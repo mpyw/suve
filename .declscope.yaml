@@ -9,13 +9,15 @@ rules:
     exported: true
 
 exclude:
-  # The TUI pages are Bubble Tea models: one Model per page, its state in one
-  # struct and its behaviour spread over update / view / cmds / mouse files.
-  # browser holds 45 fields and 81 methods across seven files, and every pair
-  # of those files references the other, so the file boundaries organise the
-  # code without dividing it into units. declscope has nothing to check there
-  # that is not already one unit.
+  # Two pages are each one Bubble Tea Model: the state in one struct and the
+  # behaviour spread over update / view / mouse / cmds files that all reference
+  # one another. browser holds 45 fields and 81 methods across seven files.
+  # The file boundaries organise that code without dividing it into units, so
+  # there is nothing here for declscope to check that is not already one unit.
   #
-  # This is a statement about the layout, not a suppression. Removing the line
-  # reports what it always reported, and anything outside the TUI is checked.
-  - "internal/tui/**"
+  # Only these two. The rest of internal/tui is checked: dialogs is a hub
+  # reading its parts, the root is mostly tests sitting outside their subject's
+  # namespace, and data / components are ordinary renames. Excluding the whole
+  # tree would have thrown away 639 tractable diagnostics to avoid 519.
+  - "internal/tui/pages/browser/**"
+  - "internal/tui/pages/staging/**"
