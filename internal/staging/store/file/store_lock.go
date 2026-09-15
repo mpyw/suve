@@ -1,3 +1,8 @@
+// The advisory locking is the Store's own read-modify-write serialization: it
+// locks the Store's fields (stateDir / stateFilePath) and store.go calls
+// s.lock() around every cycle, so the two files are one device.
+//declscope:core
+
 package file
 
 import (

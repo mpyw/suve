@@ -1,3 +1,6 @@
+// In-package tests of the crypt package's single unit.
+//declscope:namespace crypt
+
 package crypt
 
 import (

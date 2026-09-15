@@ -1,3 +1,6 @@
+// In-package tests of the core Store's plaintext consent guard.
+//declscope:core
+
 package file
 
 import (

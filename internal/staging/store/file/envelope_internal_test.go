@@ -1,3 +1,7 @@
+// In-package tests of the envelope (the file-name namespace envelopeInternal
+// names no unit of its own).
+//declscope:namespace envelope
+
 package file
 
 import (
@@ -12,8 +16,8 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
 
-// singleParamState builds a single-service (param) state with one create entry.
-func singleParamState(name, value string) *staging.State {
+// singleParamEnvelopeState builds a single-service (param) state with one create entry.
+func singleParamEnvelopeState(name, value string) *staging.State {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: name}] = staging.Entry{
 		Operation: staging.OperationCreate,
@@ -35,7 +39,7 @@ func encryptedEnvelope(t *testing.T, passphrase string) Envelope {
 		Service:  "param",
 	}
 
-	payload, err := encodePayload(singleParamState("/app/config", "secret-value"), passphrase, env.associatedData())
+	payload, err := encodeEnvelopePayload(singleParamEnvelopeState("/app/config", "secret-value"), passphrase, env.associatedData())
 	require.NoError(t, err)
 
 	env.Payload = payload

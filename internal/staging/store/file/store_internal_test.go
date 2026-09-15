@@ -1,3 +1,7 @@
+// In-package tests of the core Store (the file-name namespace storeInternal
+// names no unit of its own).
+//declscope:core
+
 package file
 
 import (
