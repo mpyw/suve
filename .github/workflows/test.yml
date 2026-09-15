@@ -430,7 +430,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Set up mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
 
       - name: Run declscope
         run: declscope ./...
