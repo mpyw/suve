@@ -1,3 +1,11 @@
+//declscope:namespace app
+//
+// White-box tests of app.go's pure helpers; the subject is the App.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: exercises app.go pure helpers, mouse routing, and renderTooSmall
 package tui
 

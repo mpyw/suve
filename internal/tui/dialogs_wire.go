@@ -1,3 +1,12 @@
+//declscope:namespace app
+//
+// dialogAdapter wraps every dialog the App pushes; the adapter and the
+// App's dialog stack are one mechanism.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 package tui
 
 import (

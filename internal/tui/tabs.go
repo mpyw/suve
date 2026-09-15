@@ -1,3 +1,11 @@
+//declscope:namespace app
+//
+// Tab layout for the App's tab bar, read only by app.go.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 package tui
 
 import (

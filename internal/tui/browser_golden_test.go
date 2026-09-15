@@ -1,3 +1,12 @@
+//declscope:namespace app
+//
+// Golden tests that drive the whole App on the browser tab through the
+// shared vt harness.
+//
+// The top level of internal/tui holds one device — the app shell — and
+// every separable unit lives in a subpackage, so these files share
+// app.go's namespace rather than each claiming their own.
+
 //nolint:testpackage // white-box: shares the vt harness and drives the app with providermock sources
 package tui
 
