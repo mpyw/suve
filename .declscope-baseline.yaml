@@ -1,0 +1,2144 @@
+# declscope baseline
+#
+# Violations recorded here are suppressed; new ones are still reported.
+# Regenerate with:
+#
+#     declscope baseline ./...
+#
+# Do not edit by hand. An entry disappears when its violation is fixed, so the
+# diff of a regeneration is the record of what was cleaned up.
+packages:
+  github.com/mpyw/suve/cmd/suve:
+    boundary:
+      guiStub:
+        - registerGUIDescription
+        - registerGUIFlag
+    qualify:
+      guiStub:
+        - registerGUIDescription
+        - registerGUIFlag
+  github.com/mpyw/suve/internal/cli/commands:
+    boundary:
+      app:
+        - debugFlag
+        - enableDebug
+        - groupName
+        - noRedactionFlag
+      completion:
+        - isShellCompletionInvocation
+      debugInternal:
+        - appName
+      tuiLaunch:
+        - nounParam
+        - tuiFlagName
+        - tuiService
+    qualify:
+      app:
+        - Version
+        - aliasDescription
+        - aliasTarget
+        - baseUsage
+        - debugFlag
+        - enableDebug
+        - envBoolLenient
+        - envDebugEnabled
+        - envNoRedactionEnabled
+        - fallbackNote
+        - flatCommand
+        - flatStageCommand
+        - groupName
+        - noRedactionFlag
+      debugInternal:
+        - appName
+        - runProbe
+      tuiLaunch:
+        - RegisterTUIDescription
+        - RegisterTUIFlag
+        - activeTUIProviders
+        - ambiguousProviderMessage
+        - attachTUIFlag
+        - hydrateTUIScope
+        - launchTUI
+        - launchTUIBare
+        - noActiveProviderMessage
+        - nounParam
+        - requireTUITTY
+        - tuiFlagName
+        - tuiGroupProvider
+        - tuiScope
+        - tuiService
+        - uniqueTUIProvider
+        - validateTUIScope
+      tuiLaunchRegistration:
+        - assertAzureSubgroupsHaveTUI
+        - findGroup
+        - hasTUIFlag
+  github.com/mpyw/suve/internal/cli/commands/aws/param:
+    boundary:
+      log:
+        - logPresenter
+        - logPresenter.result
+        - sanitizeControl
+        - truncateRunes
+    qualify:
+      log:
+        - sanitizeControl
+        - truncateRunes
+      tag:
+        - UntagCommand
+  github.com/mpyw/suve/internal/cli/commands/aws/secret:
+    boundary:
+      command:
+        - nounSecret
+    qualify:
+      command:
+        - nounSecret
+      tag:
+        - UntagCommand
+  github.com/mpyw/suve/internal/cli/commands/aws/secret/delete:
+    boundary:
+      delete:
+        - validateDeleteFlags
+  github.com/mpyw/suve/internal/cli/commands/aws/stage/apply:
+    boundary:
+      apply:
+        - gatherServices
+        - workingStoreResolver
+  github.com/mpyw/suve/internal/cli/commands/aws/stage/apply_test:
+    boundary:
+      apply:
+        - mockStrategy.applyFunc
+        - newParamStrategy
+  github.com/mpyw/suve/internal/cli/commands/aws/stage/diff:
+    boundary:
+      diff:
+        - gatherServices
+        - workingStoreResolver
+  github.com/mpyw/suve/internal/cli/commands/aws/stage/diff_test:
+    boundary:
+      diff:
+        - storeReturning
+  github.com/mpyw/suve/internal/cli/commands/aws/stage/param:
+    boundary:
+      command:
+        - resolveValueType
+        - valueTypeFlags
+  github.com/mpyw/suve/internal/cli/commands/azure:
+    qualify:
+      stage:
+        - nounSecret
+  github.com/mpyw/suve/internal/cli/commands/azure/param:
+    boundary:
+      command:
+        - argsUsageKey
+    qualify:
+      command:
+        - argsUsageKey
+      list:
+        - collapseToKeyOnly
+        - errAmbiguousValue
+        - namespaceJSONItem
+      tag:
+        - UntagCommand
+  github.com/mpyw/suve/internal/cli/commands/azure/secret:
+    boundary:
+      command:
+        - argsUsageName
+        - nounSecret
+        - specSuffix
+    qualify:
+      command:
+        - argsUsageName
+        - nounSecret
+        - specSuffix
+      tag:
+        - UntagCommand
+  github.com/mpyw/suve/internal/cli/commands/gcloud:
+    boundary:
+      command:
+        - nounSecret
+        - projectFlags
+        - resolveProject
+    qualify:
+      command:
+        - nounSecret
+        - projectFlags
+        - resolveProject
+      tag:
+        - UntagCommand
+  github.com/mpyw/suve/internal/cli/commands/internal:
+    qualify:
+      client:
+        - AWSParamStrategyFactory
+        - AWSSecretStrategyFactory
+        - AzureAppConfigNamespace
+        - AzureAppConfigParamStrategyFactory
+        - AzureAppConfigStagingScopeResolver
+        - AzureAppConfigStore
+        - AzureKeyVaultSecretStrategyFactory
+        - AzureKeyVaultStagingScopeResolver
+        - AzureKeyVaultStore
+        - GoogleCloudSecretStore
+        - GoogleCloudSecretStrategyFactory
+        - GoogleCloudStagingScopeResolver
+        - ParamStore
+        - SecretStore
+        - WithAzureAppConfigNamespace
+        - WithAzureStoreName
+        - WithAzureVaultName
+        - WithGoogleCloudProject
+        - azureScopeContextKey
+        - azureScopeCtx
+        - azureScopeFromContext
+        - gcloudProjectContextKey
+        - gcloudProjectFromContext
+        - registry
+        - storeForKind
+        - storeScope
+      valueinput:
+        - ErrValueRequired
+        - ErrValueStdinNeedsYes
+        - FlagValueStdin
+        - ResolveValue
+        - Stdin
+        - ValueSource
+        - ValueStdinFlag
+        - interactiveReader
+        - trimTrailingNewline
+  github.com/mpyw/suve/internal/cli/output:
+    boundary:
+      output:
+        - colorDiff
+  github.com/mpyw/suve/internal/cli/pager:
+    boundary:
+      pager:
+        - fitsInTerminal
+  github.com/mpyw/suve/internal/maputil:
+    qualify:
+      maputil:
+        - SortedKeys
+        - SortedNames
+  github.com/mpyw/suve/internal/provider:
+    qualify:
+      errors:
+        - ErrAlreadyExists
+        - ErrBinaryValue
+        - ErrNotFound
+      provider:
+        - DeleteOption
+        - DeleteOptionMarker
+        - Describer
+        - ForceDelete
+        - NewVersionRef
+        - Reader
+        - Restorer
+        - Store
+        - Tagger
+        - VersionRef
+        - WriteOption
+        - WriteOptionMarker
+        - Writer
+      registry:
+        - ErrNoFactory
+        - ErrUnsupportedKind
+        - Factory
+        - Kind
+        - KindParam
+        - KindSecret
+        - Provider
+        - ProviderAWS
+        - ProviderAzure
+        - ProviderGoogleCloud
+  github.com/mpyw/suve/internal/provider/aws/infra:
+    boundary:
+      client:
+        - debugLogger
+        - debugLogger.cfg
+        - findProfileByAccountID
+        - getAWSConfigPath
+        - parseAWSConfigProfiles
+  github.com/mpyw/suve/internal/provider/aws/param:
+    boundary:
+      options:
+        - applyWriteOptions
+      param:
+        - mapDomainToType
+        - mapTypeToDomain
+    qualify:
+      options:
+        - AllowedPattern
+        - DataType
+        - Policies
+        - Tier
+      param:
+        - Client
+        - New
+        - Store
+        - mapDomainToType
+        - mapTypeToDomain
+  github.com/mpyw/suve/internal/provider/aws/secret:
+    boundary:
+      options:
+        - applyCreateOptions
+        - applyDeleteOptions
+        - applyUpdateOptions
+        - rotationInput
+        - rotationOption
+      secret:
+        - baseIndex
+        - sortNewestFirst
+    qualify:
+      options:
+        - KMSKeyID
+        - RecoveryWindow
+        - RotationRules
+        - rotationInput
+        - rotationOption
+      secret:
+        - Client
+        - New
+        - Store
+        - baseIndex
+        - mapTags
+        - sortNewestFirst
+      secretInternal:
+        - baseList
+  github.com/mpyw/suve/internal/provider/azure:
+    boundary:
+      azure:
+        - enableDebugLogging
+  github.com/mpyw/suve/internal/provider/azure/appconfig:
+    boundary:
+      client:
+        - listSettingSelector
+    qualify:
+      appconfig:
+        - Client
+        - KeyNamespace
+        - New
+        - Store
+        - cloneTags
+        - isAlreadyExists
+        - isNotFound
+        - isPreconditionFailed
+        - mapError
+        - mapTags
+        - tagWriteMaxAttempts
+      client:
+        - Wrap
+        - listSettingSelector
+  github.com/mpyw/suve/internal/provider/azure/keyvault:
+    qualify:
+      client:
+        - Wrap
+      keyvault:
+        - Client
+        - New
+        - Store
+        - boolLabel
+        - enabledLabel
+        - isNotFound
+        - mapError
+        - mapTags
+        - secretName
+        - secretVersion
+        - sortNewestFirst
+        - toSecretVersion
+        - versionID
+  github.com/mpyw/suve/internal/provider/azure/keyvault_test:
+    boundary:
+      keyvault:
+        - mockClient
+        - mockClient.deleteFunc
+        - mockClient.getFunc
+        - mockClient.listFunc
+        - mockClient.listVersFunc
+        - mockClient.setFunc
+        - mockClient.updateFunc
+        - notFound
+        - secretID
+        - updParams
+        - updResp
+  github.com/mpyw/suve/internal/provider/gcloud:
+    boundary:
+      gcloud:
+        - debugDialOptions
+        - debugGRPCDialOptions
+        - debugUnaryInterceptor
+        - grpcStatus
+        - resourceHint
+  github.com/mpyw/suve/internal/provider/gcloud/secret:
+    qualify:
+      client:
+        - Wrap
+      secret:
+        - Client
+        - New
+        - Store
+        - descriptionAnnotation
+        - lastSegment
+        - mapError
+        - mapLabels
+        - shortName
+        - sortNewestFirst
+        - stateLabel
+        - toTime
+        - versionInt
+        - versionNumber
+  github.com/mpyw/suve/internal/provider/gcloud/secret_test:
+    boundary:
+      secret:
+        - mockClient
+        - mockClient.accessFunc
+        - mockClient.addFunc
+        - mockClient.createFunc
+        - mockClient.getFunc
+        - mockClient.getVerFunc
+        - mockClient.listFunc
+        - mockClient.listVerFunc
+        - mockClient.updateFunc
+        - newStore
+        - versionName
+  github.com/mpyw/suve/internal/staging:
+    boundary:
+      service:
+        - itemNameSecret
+    qualify:
+      awsParam:
+        - paramSpecSuffix
+      awsSecret:
+        - deleteOptions
+        - secretSpecSuffix
+      azureKeyvaultSecret:
+        - azureKVSpecSuffix
+      conflict:
+        - ApplyStrategyResolver
+        - addKeys
+        - classifyEntries
+        - fetchLastModified
+        - lastModifiedResults
+        - markModifiedAfterBase
+        - tagsWithBase
+      gcloudSecret:
+        - GoogleCloudSecretParserFactory
+        - GoogleCloudSecretStrategy
+        - NewGoogleCloudSecretStrategy
+      printer:
+        - maxValueDisplayLength
+      scope:
+        - ErrServiceNotConfigured
+        - KindToService
+        - SupportedServices
+      service:
+        - ApplyStrategy
+        - DeleteStrategy
+        - DiffStrategy
+        - EditFetchResult
+        - EditStrategy
+        - FetchResult
+        - FullStrategy
+        - Parser
+        - ParserFactory
+        - ResetStrategy
+        - ResourceNotFoundError
+        - StrategyFactory
+        - itemNameSecret
+      stage:
+        - DeleteOptions
+        - Entry
+        - EntryKey
+        - ErrDuplicateRecord
+        - ErrStateVersionTooNew
+        - ErrStateVersionTooOld
+        - NewEmptyState
+        - Operation
+        - OperationCreate
+        - OperationDelete
+        - OperationUpdate
+        - Service
+        - ServiceParam
+        - ServiceSecret
+        - SortedEntryKeys
+        - State
+        - TagEntry
+        - entryRecord
+        - hasKey
+        - mergeTagEntry
+        - stateJSON
+        - stateVersion
+        - tagRecord
+  github.com/mpyw/suve/internal/staging/cli:
+    boundary:
+      command:
+        - CommandConfig.applyStrategyFor
+        - CommandConfig.description
+        - CommandConfig.diffStrategyFor
+        - CommandConfig.namespaceFor
+        - flagAllowScopeMismatch
+        - flagForce
+        - flagMerge
+        - flagOverwrite
+        - flagPassphraseStdin
+        - flagYes
+        - usagePassphraseStdin
+        - usageSkipConfirm
+      diff:
+        - diffEntryDisplayName
+      export:
+        - confirmExportOverwrite
+        - exportFlags
+        - exportPassphrase
+      help:
+        - addDescription
+        - applyDescription
+        - deleteDescription
+        - diffDescription
+        - editDescription
+        - resetDescription
+        - statusDescription
+        - tagDescription
+        - untagDescription
+      import:
+        - importFlags
+        - importPassphrase
+        - newReAnchorResolver
+        - reAnchorSpec
+        - reAnchorSpec.factory
+        - reAnchorSpec.strategyForNamespace
+      scope:
+        - resolveScope
+        - workingStore
+    qualify:
+      apply:
+        - confirmer
+      command:
+        - argsUsageName
+        - cmdNamePush
+        - flagAllowScopeMismatch
+        - flagForce
+        - flagMerge
+        - flagOverwrite
+        - flagPassphraseStdin
+        - flagYes
+        - tagAction
+        - usagePassphraseStdin
+        - usageSkipConfirm
+      commandInternal:
+        - hasDescriptionFlag
+      export:
+        - envelopeWriteTarget
+      exportImportInternal:
+        - errReader
+        - fakeTTY
+        - mockTTY
+        - runWithCmd
+        - stubFullStrategy
+      help:
+        - addDescription
+        - applyDescription
+        - deleteDescription
+        - diffDescription
+        - editDescription
+        - resetDescription
+        - statusDescription
+        - tagDescription
+        - untagDescription
+      import:
+        - anyEncrypted
+        - envelopeReadSource
+        - globalReAnchorSpecs
+        - newReAnchorResolver
+        - presentEnvelope
+        - reAnchorSpec
+      scope:
+        - WorkingStore
+        - awsTarget
+        - workingStore
+      status:
+        - toStagingEntry
+      tag:
+        - UntagOptions
+        - UntagRunner
+  github.com/mpyw/suve/internal/staging/cli_test:
+    boundary:
+      cli:
+        - fullMockStrategy
+        - fullMockStrategy.fetchCurrentErr
+        - fullMockStrategy.fetchCurrentVal
+        - fullMockStrategy.service
+      export:
+        - fixedResolver
+        - paramExportImportConfig
+        - runLeafCmd
+        - secretExportImportConfig
+        - setupExportImportEnv
+        - stageEntry
+        - workingState
+  github.com/mpyw/suve/internal/staging/store/file:
+    boundary:
+      envelope:
+        - Envelope.associatedData
+        - encodePayload
+      store:
+        - Store.isSplit
+        - Store.key
+        - Store.passphrase
+        - Store.plaintextFallback
+        - Store.servicePath
+        - Store.stateDir
+        - Store.stateFilePath
+        - fileMu
+        - initializeStateMaps
+        - isInteractiveFunc
+        - lookupEnvFunc
+        - mintKeyFunc
+        - plaintextConsentGranted
+        - plaintextWarnOnce
+        - resolveKeyFunc
+        - updateMidHook
+        - userHomeDirFunc
+        - warnPlaintextOnce
+        - writeFileAtomic
+      storeInternal:
+        - updateTestEntry
+      storeKeyInternal:
+        - newTestKey
+      storeLock:
+        - Store.lock
+        - Store.lockPath
+      storePlaintextGuardInternal:
+        - nonEmptyState
+    qualify:
+      envelope:
+        - aadDomain
+        - encodePayload
+        - firstNamespacedKey
+      envelopeInternal:
+        - encryptedEnvelope
+        - singleParamState
+      store:
+        - EnvAllowPlaintext
+        - ErrPlaintextConsentRequired
+        - SetWarnWriter
+        - baseDirName
+        - fileExists
+        - fileMu
+        - initializeStateMaps
+        - isFileEncrypted
+        - isInteractiveFunc
+        - lookupEnvFunc
+        - mintKeyFunc
+        - plaintextConsentGranted
+        - plaintextWarnOnce
+        - resolveKeyFunc
+        - scopeDir
+        - stagingDir
+        - updateMidHook
+        - userHomeDirFunc
+        - warnPlaintextOnce
+        - warnWriter
+        - warnWriterMu
+        - writeFileAtomic
+      storeInternal:
+        - errorReader
+        - strPtr
+        - updateTestEntry
+      storeKeyInternal:
+        - newTestKey
+      storeLock:
+        - lock
+        - lockFileName
+        - lockPath
+      storePlaintextGuardInternal:
+        - nonEmptyState
+        - setAllowPlaintextEnv
+        - setInteractive
+      storeSplitInternal:
+        - makeReadOnly
+        - newSplitStore
+  github.com/mpyw/suve/internal/staging/store/file/internal/crypt:
+    boundary:
+      crypt:
+        - newCipherFunc
+        - newGCMFunc
+        - randReader
+        - saltLen
+  github.com/mpyw/suve/internal/staging/transition:
+    boundary:
+      action:
+        - EntryActionAdd.isEntryAction
+        - EntryActionDelete.isEntryAction
+        - EntryActionEdit.isEntryAction
+        - EntryActionReset.isEntryAction
+        - TagActionTag.isTagAction
+        - TagActionUntag.isTagAction
+      executorInternal:
+        - testExistingValue
+      state:
+        - EntryStagedStateCreate.isEntryStagedState
+        - EntryStagedStateDelete.isEntryStagedState
+        - EntryStagedStateNotStaged.isEntryStagedState
+        - EntryStagedStateUpdate.isEntryStagedState
+    qualify:
+      executor:
+        - EntryExecuteOptions
+        - LoadEntryState
+        - LoadEntryStateWithMetadata
+        - LoadStagedTags
+      executorInternal:
+        - errMock
+        - testCurrentValue
+        - testExistingValue
+      reducer:
+        - EntryTransitionResult
+        - ErrCannotAddToDelete
+        - ErrCannotAddToExisting
+        - ErrCannotAddToUpdate
+        - ErrCannotDeleteNotFound
+        - ErrCannotDeleteStagedUpdateNotFound
+        - ErrCannotEditDelete
+        - ErrCannotTagDelete
+        - ErrCannotTagNotFound
+        - ErrCannotUntagDelete
+        - ErrCannotUntagNotFound
+        - ReduceEntry
+        - ReduceTag
+        - TagTransitionResult
+        - reduceAdd
+        - reduceDelete
+        - reduceEdit
+        - reduceTag
+        - reduceUntag
+      state:
+        - StagedTags
+  github.com/mpyw/suve/internal/staging_test:
+    boundary:
+      awsSecret:
+        - secretNotFound
+  github.com/mpyw/suve/internal/timeutil:
+    boundary:
+      timeutil:
+        - loadLocation
+  github.com/mpyw/suve/internal/tui:
+    boundary:
+      app:
+        - App.activePageCapturesInput
+        - App.applyTargetLine
+        - App.dialogs
+        - App.height
+        - App.helpKeyMap
+        - App.helpView
+        - App.pageBodyTop
+        - App.pages
+        - App.pushDialog
+        - App.renderTooSmall
+        - App.width
+        - appendKV
+        - applyTitle
+        - awsIdentityFixture
+        - clipStatus
+        - cloudShellRepaintCmd
+        - cloudShellRepaintMsg
+        - config
+        - config.fetchIdentity
+        - config.identity
+        - config.mutatorFor
+        - config.runCtx
+        - config.scope
+        - config.service
+        - config.sourceFor
+        - config.stagingFor
+        - dialog
+        - fakeDialog
+        - fakeDialog.got
+        - identityFetcher
+        - keyPress
+        - minHeight
+        - minWidth
+        - newApp
+        - resetTitle
+        - specialKey
+        - targetTitle
+        - updateApp
+      browserFixtures:
+        - awsParamDiffSource
+        - awsParamJSONSource
+        - awsParamSecureStringDiffSource
+        - awsParamSource
+        - awsSecretSource
+        - azureAppConfigSource
+        - azureKVSource
+        - gcloudSecretSource
+        - secureStringDiffOldValue
+        - secureStringDiffValue
+        - sourceForShape
+        - staticProbe
+        - staticProbe.deleteKeys
+        - staticProbe.entryCount
+        - staticProbe.entryKeys
+        - staticProbe.keys
+        - staticProbe.tagKeys
+      browserGolden:
+        - browserTermHeight
+        - browserTermWidth
+        - captureBrowserKeys
+        - goldenEnv
+      clipboard:
+        - copyToClipboard
+        - setClipboard
+      cursor:
+        - App.screenCursor
+      dialogGolden:
+        - capMutator
+        - capMutator.cap
+        - captureDialogWithKeys
+        - dialogGolden
+        - goldenCap
+        - hostQuitMsg
+        - keyDownMsg
+        - keyEnterMsg
+        - keyRightMsg
+        - newDialogHost
+      dialogsWire:
+        - dialogAdapter
+        - dialogAdapter.m
+      golden:
+        - goldenTermHeight
+        - goldenTermWidth
+        - renderVisibleScreen
+        - renderVisibleScreenSize
+      page:
+        - newPlaceholderPage
+        - page
+        - page.capturesInput
+      pagesWire:
+        - copyable
+        - initPage
+        - newBrowserPage
+        - newDiffPage
+        - newStagingPage
+        - newStaticDiffPage
+      run:
+        - registry
+      sources:
+        - capabilityFor
+        - newSourceFactory
+        - sourceFactory.mutatorFor
+        - sourceFactory.sourceFor
+        - sourceFactory.stagingService
+      stagingGolden:
+        - goldenStaging
+        - goldenStaging.applyResult
+        - goldenStaging.label
+        - goldenStaging.service
+        - stagingApp
+        - waitFor
+        - waitForInBuf
+        - waitRenderHeight
+        - waitRenderWidth
+      tabs:
+        - buildTabs
+        - initialTabIndex
+        - stagingService
+    qualify:
+      app:
+        - awsIdentityErrMsg
+        - awsIdentityFixture
+        - awsIdentityMsg
+        - clipStatus
+        - cloudShellRepaintCmd
+        - cloudShellRepaintInterval
+        - cloudShellRepaintMsg
+        - columnForTab
+        - composedHelp
+        - config
+        - dialog
+        - escInterceptor
+        - fakeDialog
+        - forceQuitKey
+        - helpMapper
+        - identityFetcher
+        - keyPress
+        - minHeight
+        - minWidth
+        - numberedTabJump
+        - placeholderNotice
+        - requireShellGolden
+        - resetTitle
+        - separatorHeight
+        - specialKey
+        - stagingTabTitle
+        - statusBarHeight
+        - tabBarHeight
+        - targetTitle
+      appHelpers:
+        - recordingPage
+      browserFixtures:
+        - appConfigStore
+        - awsParamDiffSource
+        - awsParamJSONSource
+        - awsParamSecureStringDiffSource
+        - awsParamSource
+        - awsParamStore
+        - awsSecretSource
+        - awsSecretStore
+        - azureAppConfigSource
+        - azureAppConfigStore
+        - azureKVSource
+        - azureKVStore
+        - capFor
+        - fxT1
+        - fxT2
+        - fxT3
+        - gcloudSecretSource
+        - gcloudSecretStore
+        - secureStringDiffOldValue
+        - secureStringDiffValue
+        - sourceForShape
+        - specID
+        - staticProbe
+      browserGolden:
+        - awsParamStagedBannerApp
+        - browserTermHeight
+        - browserTermWidth
+        - captureBrowserAfterKeys
+        - captureBrowserKeys
+        - captureUntil
+        - diffGolden
+        - diffHost
+        - diffReq
+        - goldenEnv
+        - newDiffHost
+        - settledScreen
+        - stagedSelectedKey
+      cloudshellRepaint:
+        - clearScreenType
+        - drainBatch
+      cursor:
+        - applyMsg
+        - drainCmd
+        - indexReverseSGR
+        - openTextDialog
+        - requireCaretOnScreen
+        - sgrHasReverse
+        - typeKey
+      dialogGolden:
+        - capMutator
+        - captureDialog
+        - captureDialogSize
+        - captureDialogWithKeys
+        - captureDialogWithKeysSize
+        - dialogHost
+        - goldenCap
+        - hostQuitMsg
+        - keyDownMsg
+        - keyEnterMsg
+        - keyRightMsg
+        - minGoldenHeight
+        - minGoldenWidth
+        - newDialogHost
+      dialogsWire:
+        - dialogAdapter
+      dismissReload:
+        - reloadlessDialog
+        - resultsPhaseApply
+      entryformInteraction:
+        - recordingEntryMutator
+      golden:
+        - renderVisibleScreen
+        - renderVisibleScreenSize
+      help:
+        - fullDescs
+        - shortDescs
+        - shortKeys
+      pagesWire:
+        - browserPage
+        - copyable
+        - diffPage
+        - initPage
+        - newBrowserPage
+        - newDiffPage
+        - newStagingPage
+        - newStaticDiffPage
+        - stagingPage
+      run:
+        - awsIdentityFetcher
+        - ensureResolvable
+        - lockedBuffer
+        - newModel
+        - registry
+      sources:
+        - capabilityFor
+        - errUnknownService
+        - lazyStagingProbe
+        - newSourceFactory
+        - parserFor
+        - sourceFactory
+        - stringError
+      stagingGolden:
+        - captureStaging
+        - captureStagingKeys
+        - goldenStaging
+        - secretStagedValue
+        - secureStringCreateStagingApp
+        - secureStringCreateStagingFixture
+        - secureStringCreateValue
+        - secureStringParamValue
+        - secureStringStagingApp
+        - secureStringStagingFixture
+        - settledAppScreen
+        - stagingApp
+        - stagingFixture
+        - waitFor
+        - waitForInBuf
+        - waitRenderHeight
+        - waitRenderWidth
+      tabs:
+        - initialTabIndex
+        - serviceAvailable
+        - serviceParam
+        - serviceSecret
+        - stagingService
+      tagformInteraction:
+        - recordingMutator
+  github.com/mpyw/suve/internal/tui/components:
+    boundary:
+      entrylist:
+        - EntryList.height
+        - EntryList.maxOffset
+        - EntryList.offset
+        - EntryList.rowLines
+        - EntryList.window
+        - clamp
+        - renderBadges
+      historytable:
+        - HistoryTable.height
+        - HistoryTable.maxOffset
+        - HistoryTable.offset
+        - HistoryTable.rowLines
+        - HistoryTable.window
+      historytableInternal:
+        - valuedRows
+      statusbar:
+        - truncate
+    qualify:
+      entrylist:
+        - ListRow
+        - clamp
+        - renderBadges
+      entrylistInternal:
+        - listWindowRowSpan
+        - valuedListRows
+      historytable:
+        - HistoryEntry
+        - comparePickCount
+        - flattenValue
+        - indexOf
+      historytableInternal:
+        - valuedRows
+        - windowLinesForRow
+        - windowRowSpan
+      pane:
+        - normalizeLine
+        - splitLimit
+      scrollReportInternal:
+        - singleLineRows
+      statusbar:
+        - AWSIdentity
+        - providerLabel
+        - truncate
+      tabbar:
+        - Tab
+        - tabGap
+      valuepane:
+        - MaskValue
+        - maskBullet
+        - maskWidth
+        - maxMaskWidth
+  github.com/mpyw/suve/internal/tui/data:
+    qualify:
+      data:
+        - Detail
+        - DiffContent
+        - HistoryRow
+        - Item
+        - ListParams
+        - ListResult
+        - MetaRow
+        - NewParamSource
+        - NewSecretSource
+        - Source
+        - StoreResolver
+        - Tag
+        - appConfigNamespaceLister
+        - compileFilter
+        - currentVersionLabel
+        - formatDate
+        - historyLimit
+        - namespaceDisplay
+        - namespaceMatches
+        - paramSource
+        - paramVersionSpec
+        - secretSource
+        - secretVersionSpec
+        - shortID
+        - typeLabel
+      mutate:
+        - ErrRestoreUnsupported
+        - Mutator
+        - NewParamMutator
+        - NewSecretMutator
+        - StagingStoreResolver
+        - StrategyBuilder
+        - WriteOutcome
+        - paramMutator
+        - secretMutator
+        - stageAddTag
+        - stageDelete
+        - stageEntry
+        - stageOp
+        - stageOpCreate
+        - stageOpEdit
+        - stageRemoveTag
+        - stagedValueType
+        - stringError
+      staging:
+        - StagedKey
+        - StoreUnavailableError
+      stagingservice:
+        - ApplyEntryResult
+        - ApplyTagResult
+        - StagedDiffAutoUnstaged
+        - StagedDiffCreate
+        - StagedDiffNormal
+        - StagedDiffRow
+        - StagedDiffType
+        - StagedDiffWarning
+        - StagedTagRow
+        - StagingApplyResult
+        - StagingResetNotStaged
+        - StagingResetNothingStaged
+        - StagingResetRestored
+        - StagingResetResult
+        - StagingResetSkipped
+        - StagingResetType
+        - StagingResetUnstaged
+        - StagingResetUnstagedAll
+        - StagingResetUnstagedTag
+        - StagingResolver
+        - StagingResources
+        - StagingReview
+        - TagRemoval
+        - applyStatusLabel
+        - compareKey
+        - mapToTags
+        - sortedRemovals
+        - stagedDiffType
+        - stagingResetType
+  github.com/mpyw/suve/internal/tui/data_test:
+    boundary:
+      mutate:
+        - awsParamCap
+        - azureParamCap
+        - tempStagingStore
+  github.com/mpyw/suve/internal/tui/dialogs:
+    boundary:
+      apply:
+        - clickAt
+        - stubStaging
+        - stubStaging.label
+        - stubStaging.service
+      confirm:
+        - confirmBack
+        - confirmExecute
+        - confirmNone
+        - modeConfirm
+        - modeConfirm.staged
+        - newModeConfirm
+      deleteconfirm:
+        - clampRecovery
+        - ctrlCancel
+        - ctrlDelete
+        - ctrlForce
+        - ctrlRecovery
+        - defaultRecoveryWindow
+        - deleteConfirm
+        - deleteConfirm.activate
+        - deleteConfirm.adjust
+        - deleteConfirm.busy
+        - deleteConfirm.confirming
+        - deleteConfirm.controls
+        - deleteConfirm.effectiveRecoveryWindow
+        - deleteConfirm.err
+        - deleteConfirm.focusControl
+        - deleteConfirm.focused
+        - deleteConfirm.force
+        - deleteConfirm.hits
+        - deleteConfirm.mutator
+        - deleteConfirm.name
+        - deleteConfirm.onResult
+        - deleteConfirm.recoveryWindow
+        - deleteConfirm.staged
+        - deleteConfirm.submit
+        - deleteControlID
+        - deleteStatus
+        - maxRecoveryWindow
+        - minRecoveryWindow
+      dialogs:
+        - awsParamCap
+        - awsSecretCap
+        - canceledCmd
+        - discardNotice
+        - doneCmd
+        - escKey
+        - fakeMutator
+        - fakeMutator.svcCap
+        - keyEnter
+        - keyEsc
+        - keyLeft
+        - keyMsg
+        - keyRight
+        - mutationResultMsg
+        - mutationResultMsg.err
+        - mutationResultMsg.outcome
+        - newDelete
+        - runMutation
+        - serviceParam
+        - serviceSecret
+      entryform:
+        - dialogContentWidth
+        - editorFinishedMsg
+        - editorFinishedMsg.content
+        - entryForm
+        - entryForm.armed
+        - entryForm.beginSubmit
+        - entryForm.busy
+        - entryForm.confirming
+        - entryForm.description
+        - entryForm.err
+        - entryForm.form
+        - entryForm.mutator
+        - entryForm.name
+        - entryForm.nameValidator
+        - entryForm.namespace
+        - entryForm.namespaceField
+        - entryForm.notice
+        - entryForm.onEditorFinished
+        - entryForm.openEditor
+        - entryForm.rebuildForm
+        - entryForm.showType
+        - entryForm.staged
+        - entryForm.submit
+        - entryForm.value
+        - entryForm.valueType
+        - entryFormTheme
+        - entryNoun
+        - entryStatus
+        - formKeyMap
+        - isTTY
+        - minFormBody
+        - namespaceDisplay
+        - requiredField
+        - stringError
+        - titleSpacerRows
+      errordialog:
+        - errorDialog
+        - errorDialog.hits
+        - errorDialog.scrollable
+        - errorDialog.title
+        - errorDialog.vp
+        - regionClose
+      layout:
+        - dialogChrome
+        - dialogFrameHeight
+        - dialogLayout
+        - dialogLayout.availHeight
+        - dialogLayout.contentWidth
+        - dialogLayout.errBudget
+        - dialogLayout.fit
+        - dialogLayout.height
+        - dialogLayout.setSize
+        - dialogLayout.sized
+        - dialogLayout.wrapCapped
+      reset:
+        - buttonGap
+        - resetDialog
+        - resetDialog.hits
+        - resetRegionCancel
+        - resetRegionReset
+        - resetResultsMsg
+        - resetResultsMsg.err
+        - resetResultsMsg.results
+        - resetTypeStatus
+      restore:
+        - restoreForm
+        - restoreForm.busy
+        - restoreForm.err
+        - restoreForm.onResult
+        - restoreForm.submit
+      scrollrepaint:
+        - repaintFormScroll
+        - scrollViewport
+      sizing:
+        - stripANSI
+      tagform:
+        - tagForm
+        - tagForm.armed
+        - tagForm.beginSubmit
+        - tagForm.builtRemove
+        - tagForm.busy
+        - tagForm.confirming
+        - tagForm.notice
+        - tagForm.onResult
+        - tagForm.rebuildForm
+        - tagForm.remove
+        - tagForm.removeField
+        - tagForm.removeKey
+        - tagForm.staged
+        - tagForm.submit
+        - tagForm.tagKey
+        - tagForm.tagValue
+        - tagStatus
+      widgets:
+        - checkbox
+        - clipName
+        - modeLabel
+        - navDec
+        - navDown
+        - navInc
+        - navLeft
+        - navRight
+        - navSelect
+        - navUp
+    qualify:
+      apply:
+        - clickAt
+        - countOutcome
+        - ctrlIgnore
+        - drive
+        - entryLabel
+        - manyEntries
+        - phaseBusy
+        - phaseConfirm
+        - phaseResults
+        - pluralize
+        - pressDown
+        - pressEnter
+        - pressPgDown
+        - resultsChrome
+        - stubStaging
+      deleteconfirm:
+        - DeleteInput
+        - NowFunc
+        - clampRecovery
+        - ctrlCancel
+        - ctrlDelete
+        - ctrlForce
+        - ctrlRecovery
+        - defaultRecoveryWindow
+        - deleteControl
+        - deleteControlFromID
+        - deleteControlID
+        - deleteStatus
+        - maxRecoveryWindow
+        - minRecoveryWindow
+        - nameSpacerRows
+      dialogs:
+        - CanceledMsg
+        - DismissReloader
+        - EscInterceptor
+        - Model
+        - MutationDoneMsg
+        - appConfigCap
+        - awsParamCap
+        - awsSecretCap
+        - canceledCmd
+        - discardNotice
+        - doneCmd
+        - escKey
+        - execCmd
+        - fakeMutator
+        - focusedFieldKey
+        - gcloudSecretCap
+        - isCanceled
+        - keyEnter
+        - keyEsc
+        - keyLeft
+        - keyMsg
+        - keyRight
+        - mutationResultMsg
+        - newAppConfigEntry
+        - newCreateEntry
+        - newDelete
+        - newEntry
+        - newStagedOnlyEntry
+        - noStagingParamCap
+        - runMutation
+        - serviceParam
+        - serviceSecret
+      entryform:
+        - defaultTypeLabel
+        - dialogContentWidth
+        - editorFinishedMsg
+        - editorKey
+        - entryHint
+        - entryNoun
+        - entryStatus
+        - fieldKeyDescription
+        - fieldKeyValue
+        - formKeyMap
+        - isTTY
+        - minFormBody
+        - namespaceDisplay
+        - requiredField
+        - stringError
+        - titleSpacerRows
+      errordialog:
+        - NewError
+        - errorSpacerRows
+        - hintText
+        - regionClose
+      layout:
+        - dialogChrome
+        - dialogFrameHeight
+        - minDialogContent
+      reset:
+        - buttonGap
+        - statusNothingStaged
+      scrollrepaint:
+        - clearScreenType
+        - drain
+        - formFocusKeys
+        - formKeyMayScroll
+        - hasClearScreen
+        - repaintFormScroll
+        - scrollViewport
+      sizing:
+        - ansiSGR
+        - flatten
+        - maxLineWidth
+        - minHeight
+        - minWidth
+        - stripANSI
+      tagform:
+        - TagInput
+        - tagStatus
+      widgets:
+        - checkbox
+        - clipName
+        - modeLabel
+        - navDec
+        - navDown
+        - navInc
+        - navLeft
+        - navRight
+        - navSelect
+        - navUp
+  github.com/mpyw/suve/internal/tui/pages/browser:
+    boundary:
+      browser:
+        - Model.actionStatus
+        - Model.ctx
+        - Model.debounceSeq
+        - Model.deleteStagedKeys
+        - Model.detail
+        - Model.detailErr
+        - Model.detailOK
+        - Model.detailSeq
+        - Model.draggingDivider
+        - Model.entryStagedKeys
+        - Model.filter
+        - Model.focus
+        - Model.height
+        - Model.history
+        - Model.historyErr
+        - Model.historySeq
+        - Model.historyVersions
+        - Model.hits
+        - Model.items
+        - Model.keys
+        - Model.list
+        - Model.listErr
+        - Model.listSeq
+        - Model.listWidth
+        - Model.loading
+        - Model.namespaces
+        - Model.nextToken
+        - Model.nsIndex
+        - Model.nsSeq
+        - Model.prefix
+        - Model.recursive
+        - Model.regions
+        - Model.source
+        - Model.spinner
+        - Model.stagedErr
+        - Model.stagedKeys
+        - Model.stagedSeq
+        - Model.staging
+        - Model.styles
+        - Model.svcCap
+        - Model.tagStagedKeys
+        - Model.token
+        - Model.valuePane
+        - Model.valuesOn
+        - Model.width
+        - appConfigCap
+        - applyInputKey
+        - awsParamCap
+        - awsSecretCap
+        - backListKey
+        - compareKey
+        - debounceDelay
+        - defaultListWidthDen
+        - defaultListWidthNum
+        - deleteKey
+        - diffPickKey
+        - editKey
+        - filterKey
+        - focusFilter
+        - focusHistory
+        - focusList
+        - focusPrefix
+        - historyKey
+        - keyPress
+        - listPreviewIndent
+        - listWidthStep
+        - loadMoreKey
+        - loadedHistoryModel
+        - minDetailWidth
+        - minHistoryHeight
+        - minListWidth
+        - minValueHeight
+        - moveKey
+        - narrowKey
+        - newKey
+        - newModel
+        - paneGutter
+        - prefixKey
+        - recursiveKey
+        - regionDetail
+        - regionDivider
+        - regionFilter
+        - regionHistory
+        - regionList
+        - regionNamespace
+        - regionPrefix
+        - regionRecursive
+        - regionRefresh
+        - regionValueLabel
+        - regionValues
+        - restoreKey
+        - revealKey
+        - spaceKey
+        - stackedMinPaneHeight
+        - stubSource
+        - stubSource.svcCap
+        - tagKey
+        - twoPaneMinWidth
+        - update
+        - valuesKey
+        - widenKey
+      cmds:
+        - Model.loadListCmd
+        - Model.loadNamespacesCmd
+        - Model.loadStagedCmd
+        - Model.reselect
+        - Model.selectedItem
+        - Model.selectedKey
+        - Model.selectionCmd
+        - debounceMsg
+        - debounceMsg.seq
+        - detailLoadedMsg
+        - detailLoadedMsg.d
+        - detailLoadedMsg.err
+        - detailLoadedMsg.seq
+        - detailLoadedMsg.token
+        - historyLoadedMsg
+        - historyLoadedMsg.err
+        - historyLoadedMsg.rows
+        - historyLoadedMsg.seq
+        - historyLoadedMsg.token
+        - listLoadedMsg
+        - listLoadedMsg.append
+        - listLoadedMsg.err
+        - listLoadedMsg.res
+        - listLoadedMsg.seq
+        - listLoadedMsg.token
+        - namespacesLoadedMsg
+        - namespacesLoadedMsg.err
+        - namespacesLoadedMsg.names
+        - namespacesLoadedMsg.seq
+        - namespacesLoadedMsg.token
+        - stagedLoadedMsg
+        - stagedLoadedMsg.err
+        - stagedLoadedMsg.seq
+        - stagedLoadedMsg.snap
+        - stagedLoadedMsg.token
+      mouse:
+        - Model.handleMouseClick
+        - Model.handleMouseMotion
+        - Model.handleMouseWheel
+        - wheelDelta
+      rows:
+        - Model.previewWidth
+        - Model.rebuildRows
+        - historyEntries
+        - namespaceBadge
+        - namespaceOptions
+        - tagsInline
+        - versionIDs
+      update:
+        - Model.currentNamespace
+        - Model.cycleNamespace
+        - Model.errLines
+        - Model.focusFilter
+        - Model.focusPrefix
+        - Model.loadMore
+        - Model.move
+        - Model.openDelete
+        - Model.openDiff
+        - Model.openEdit
+        - Model.openNew
+        - Model.openRestore
+        - Model.openTag
+        - Model.refreshList
+        - Model.selectedIsDeleteStaged
+        - Model.setListWidth
+        - Model.toggleRecursive
+        - Model.toggleValues
+        - dataStagedKey
+      view:
+        - Model.historyHeaderLine
+        - Model.listOuterWidth
+        - Model.renderDetail
+        - Model.valueHeight
+        - clampListWidth
+    qualify:
+      browser:
+        - Model
+        - New
+        - appConfigCap
+        - applyInputKey
+        - awsParamCap
+        - awsSecretCap
+        - backListKey
+        - compareKey
+        - debounceDelay
+        - defaultListWidthDen
+        - defaultListWidthNum
+        - deleteKey
+        - diffPickKey
+        - editKey
+        - filterKey
+        - focus
+        - focusFilter
+        - focusHistory
+        - focusList
+        - focusPrefix
+        - historyKey
+        - historyTopRow
+        - keyForSpace
+        - keyPress
+        - listPreviewIndent
+        - listTopRow
+        - listWidthStep
+        - loadMoreKey
+        - loadedHistoryModel
+        - loadedWheelModel
+        - lookup
+        - minDetailWidth
+        - minHistoryHeight
+        - minListWidth
+        - minValueHeight
+        - moveKey
+        - narrowKey
+        - newKey
+        - newModel
+        - paneGutter
+        - prefixKey
+        - recursiveKey
+        - regionDetail
+        - regionDivider
+        - regionFilter
+        - regionHistory
+        - regionList
+        - regionNamespace
+        - regionOrigin
+        - regionPrefix
+        - regionRecursive
+        - regionRefresh
+        - regionValueLabel
+        - regionValues
+        - restoreKey
+        - revealKey
+        - spaceKey
+        - stackedMinPaneHeight
+        - stubSource
+        - tagKey
+        - tokenModel
+        - twoPaneMinWidth
+        - update
+        - valuesKey
+        - wheel
+        - widenKey
+      cmds:
+        - debounceMsg
+        - detailKey
+        - detailLoadedMsg
+        - historyLoadedMsg
+        - listLoadedMsg
+        - listParams
+        - loadDetailCmd
+        - loadHistoryCmd
+        - loadListCmd
+        - loadNamespacesCmd
+        - loadStagedCmd
+        - namespacesLoadedMsg
+        - reselect
+        - selectedItem
+        - selectedKey
+        - selectionCmd
+        - stagedLoadedMsg
+      help:
+        - compareColumn
+        - mutateColumn
+        - navigateColumn
+        - viewColumn
+      mouse:
+        - clickHistoryRow
+        - wheelDelta
+      rows:
+        - historyBadges
+        - historyEntries
+        - minPreviewWidth
+        - namespaceBadge
+        - namespaceOptions
+        - previewValue
+        - previewWidth
+        - tagsInline
+        - versionIDs
+      update:
+        - CapturesInput
+        - CopyText
+        - blurInputs
+        - currentHistoryVersions
+        - currentNamespace
+        - cycleNamespace
+        - dataStagedKey
+        - debounce
+        - errLines
+        - focusFilter
+        - focusPrefix
+        - handleActionKey
+        - handleInputKey
+        - handleKey
+        - handleNavKey
+        - handleSpace
+        - loadMore
+        - move
+        - onBack
+        - onDetailLoaded
+        - onHistoryLoaded
+        - onListLoaded
+        - onNamespacesLoaded
+        - onSelect
+        - onStagedLoaded
+        - openDelete
+        - openDiff
+        - openEdit
+        - openNew
+        - openRestore
+        - openTag
+        - refreshList
+        - reload
+        - selectedIsDeleteStaged
+        - setListWidth
+        - stepListWidth
+        - toggleCompare
+        - toggleRecursive
+        - toggleValues
+      view:
+        - caretStyle
+        - clampListWidth
+        - clip
+        - fieldLine
+        - fieldValue
+        - fitLines
+        - framePane
+        - gutterColumn
+        - headerSeg
+        - headerSep
+        - historyHeaderLine
+        - listOuterWidth
+        - metaLines
+        - renderBody
+        - renderDetail
+        - renderDetailPane
+        - renderHeader
+        - renderListPane
+        - renderStacked
+        - renderTwoPane
+        - selectedStagedBanner
+        - stateBadgeLine
+        - tagLine
+        - toggle
+        - valueHeight
+        - valueLabelLine
+  github.com/mpyw/suve/internal/tui/pages/diff:
+    boundary:
+      diff:
+        - Model.err
+        - Model.loaded
+        - Model.sideBySide
+        - Model.splitColumnWidth
+        - Model.vp
+        - Model.vpWidth
+        - keyPress
+        - loadedMsg
+        - loadedMsg.content
+        - loadedMsg.err
+        - newDiff
+  github.com/mpyw/suve/internal/tui/pages/staging:
+    boundary:
+      cmds:
+        - Model.cancelAddTagCmd
+        - Model.cancelRemoveTagCmd
+        - Model.unstageCmd
+        - actionDoneMsg
+        - actionDoneMsg.err
+        - actionDoneMsg.section
+        - reviewLoadedMsg
+        - reviewLoadedMsg.err
+        - reviewLoadedMsg.review
+        - reviewLoadedMsg.section
+        - reviewLoadedMsg.seq
+      help:
+        - Model.xKey
+      mouse:
+        - Model.handleMouseClick
+        - Model.handleMouseWheel
+      rows:
+        - Model.autoUnstaged
+        - Model.rebuildRows
+        - Model.selectedRow
+        - Model.selectedSection
+        - Model.totalCounts
+        - rowEntry
+        - rowRef
+        - rowRef.entry
+        - rowRef.key
+        - rowRef.kind
+        - rowRef.section
+        - rowRef.tagKey
+        - rowTagAdd
+        - rowTagRemove
+      staging:
+        - Model.actionBusy
+        - Model.ctx
+        - Model.diffHidden
+        - Model.diffView
+        - Model.height
+        - Model.hits
+        - Model.keys
+        - Model.noticeDismissed
+        - Model.reload
+        - Model.reveal
+        - Model.rows
+        - Model.scroll
+        - Model.scrollToSelection
+        - Model.sections
+        - Model.selected
+        - Model.status
+        - Model.styles
+        - Model.width
+        - applyAllKey
+        - applyKey
+        - detailKey
+        - editKey
+        - hideKey
+        - idIndex
+        - moveKey
+        - prefixRow
+        - prefixSecApply
+        - prefixSecReset
+        - refreshKey
+        - regionApplyAll
+        - regionNotice
+        - regionRefresh
+        - regionResetAll
+        - regionViewToggle
+        - resetAllKey
+        - resetKey
+        - revealKey
+        - rowID
+        - secApplyID
+        - secResetID
+        - section
+        - section.entryRows
+        - section.err
+        - section.label
+        - section.loadSeq
+        - section.loaded
+        - section.review
+        - section.secret
+        - section.service
+        - section.svc
+        - tagKey
+        - unstageKey
+        - viewKey
+      update:
+        - Model.apply
+        - Model.applyServices
+        - Model.maskDiffValue
+        - Model.maskValue
+        - Model.noticeVisible
+        - Model.reset
+        - Model.resetServices
+        - Model.selectedIsCreate
+        - Model.toggleView
+      view:
+        - operationCreate
+        - operationDelete
+    qualify:
+      cmds:
+        - actionDoneMsg
+        - cancelAddTagCmd
+        - cancelRemoveTagCmd
+        - reviewLoadedMsg
+        - unstageCmd
+      help:
+        - canDetailRow
+        - canEditRow
+        - canRevealRow
+        - canTagRow
+        - rowActionsColumn
+        - xKey
+      mouse:
+        - clickSection
+        - selectClickedRow
+        - wheelDelta
+      rows:
+        - autoUnstaged
+        - rowEntry
+        - rowKind
+        - rowRef
+        - rowTagAdd
+        - rowTagRemove
+        - selectedRow
+        - selectedSection
+        - totalCounts
+      staging:
+        - Model
+        - New
+        - applyAllKey
+        - applyKey
+        - canceledTag
+        - capFor
+        - detailKey
+        - editKey
+        - fullHelpDescs
+        - helpDescs
+        - hideKey
+        - idIndex
+        - keyPress
+        - moveKey
+        - newModel
+        - prefixRow
+        - prefixSecApply
+        - prefixSecReset
+        - refreshKey
+        - regionApplyAll
+        - regionNotice
+        - regionOrigin
+        - regionRefresh
+        - regionResetAll
+        - regionViewToggle
+        - resetAllKey
+        - resetKey
+        - revealKey
+        - rowID
+        - rowKindHelpReview
+        - secApplyID
+        - secResetID
+        - section
+        - serviceSecret
+        - stubService
+        - tagKey
+        - tagOpsReview
+        - unstageKey
+        - updateReview
+        - viewKey
+      update:
+        - apply
+        - applyServices
+        - editSelected
+        - handleActionKey
+        - handleKey
+        - maskDiffValue
+        - maskValue
+        - moveSelection
+        - noticeVisible
+        - onActionDone
+        - onEnter
+        - onReveal
+        - onReviewLoaded
+        - openDetail
+        - reset
+        - resetServices
+        - selectedIsCreate
+        - serviceSet
+        - tagSelected
+        - targetServices
+        - toggleView
+        - unstageSelected
+      view:
+        - appendSectionRows
+        - bodyLines
+        - bracket
+        - buildHits
+        - clampScroll
+        - clip
+        - cursor
+        - diffLines
+        - entryLines
+        - firstLine
+        - footerLine
+        - headerLine
+        - headerRanges
+        - indentLines
+        - indexSpan
+        - keyLabel
+        - lineDesc
+        - noticeLine
+        - nsBadge
+        - opMarker
+        - operationCreate
+        - operationDelete
+        - operationUpdate
+        - rangeRegion
+        - sectionHeader
+        - stagingGutter
+        - tagLine
+        - window
+  github.com/mpyw/suve/internal/usecase/azure:
+    qualify:
+      azure:
+        - ErrEntryNotFound
+      delete:
+        - RestoreInput
+        - RestoreOutput
+        - RestoreUseCase
+      listNamespaces:
+        - NamespaceLister
+  github.com/mpyw/suve/internal/usecase/gcloud:
+    boundary:
+      gcloud:
+        - specSuffix
+    qualify:
+      gcloud:
+        - ErrSecretNotFound
+        - specSuffix
+  github.com/mpyw/suve/internal/usecase/param:
+    boundary:
+      version:
+        - parseVersion
+        - specSuffix
+    qualify:
+      errors:
+        - ErrParameterNotFound
+      list:
+        - MatchPrefix
+      version:
+        - specSuffix
+  github.com/mpyw/suve/internal/usecase/param_test:
+    boundary:
+      helper:
+        - errAWS
+        - errAccessDenied
+        - errAddTagsFailed
+        - errDeleteFailed
+        - errGetParameter
+        - errHistoryFailed
+        - errPutFailed
+        - errRemoveTagsFailed
+        - errUnexpectedCall
+  github.com/mpyw/suve/internal/usecase/secret:
+    boundary:
+      version:
+        - extraValue
+        - specSuffix
+        - stages
+    qualify:
+      errors:
+        - ErrSecretNotFound
+      log:
+        - currentVersionID
+      version:
+        - extraValue
+        - specSuffix
+        - stages
+  github.com/mpyw/suve/internal/usecase/secret_test:
+    boundary:
+      show:
+        - mustParseSpec
+  github.com/mpyw/suve/internal/usecase/staging:
+    qualify:
+      add:
+        - DraftInput
+        - DraftOutput
+        - ErrValueNotUTF8
+      edit:
+        - BaselineInput
+        - BaselineOutput
+      export:
+        - EnvelopeWriter
+      import:
+        - EnvelopeReader
+        - ReAnchorResolver
+      tag:
+        - UntagInput
+        - UntagOutput
+  github.com/mpyw/suve/internal/usecase/staging_test:
+    boundary:
+      add:
+        - mockParser
+        - mockParser.parseErr
+        - newMockParser
+      apply:
+        - mockApplyStrategy.fetchModifiedErr
+        - mockApplyStrategy.lastModified
+        - newMockApplyStrategy
+      edit:
+        - mockEditStrategy.fetchErr
+        - newMockEditStrategy
+        - newMockEditStrategyNotFound
+      export:
+        - stageEntry
+      status:
+        - mockServiceStrategy
+        - mockServiceStrategy.hasDeleteOptions
+        - newParamStrategy
+        - newSecretStrategy
+  github.com/mpyw/suve/internal/version:
+    boundary:
+      shift:
+        - isShiftStart
+        - parseShift
+    qualify:
+      parse:
+        - ErrAmbiguousTilde
+        - ErrEmptyName
+        - ErrEmptySpec
+        - ErrMultipleAbsoluteSpec
+        - Spec
+        - findNameEnd
+  github.com/mpyw/suve/internal/version/awssecretversion:
+    qualify:
+      spec:
+        - ErrInvalidID
+        - ErrInvalidLabel
+        - Parse
+        - ParseDiffArgs
+        - isIDChar
+        - isLabelChar
+        - parser
