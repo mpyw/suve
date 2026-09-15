@@ -2,7 +2,6 @@
 package dialogs
 
 import (
-	"reflect"
 	"testing"
 
 	"charm.land/bubbles/v2/viewport"
@@ -10,41 +9,6 @@ import (
 	huh "charm.land/huh/v2"
 	"github.com/stretchr/testify/assert"
 )
-
-//nolint:gochecknoglobals // test-only type sentinel
-var clearScreenType = reflect.TypeOf(tea.ClearScreen())
-
-func drain(cmd tea.Cmd) []tea.Msg {
-	if cmd == nil {
-		return nil
-	}
-
-	msg := cmd()
-	if msg == nil {
-		return nil
-	}
-
-	if batch, ok := msg.(tea.BatchMsg); ok {
-		var out []tea.Msg
-		for _, c := range batch {
-			out = append(out, drain(c)...)
-		}
-
-		return out
-	}
-
-	return []tea.Msg{msg}
-}
-
-func hasClearScreen(cmd tea.Cmd) bool {
-	for _, m := range drain(cmd) {
-		if reflect.TypeOf(m) == clearScreenType {
-			return true
-		}
-	}
-
-	return false
-}
 
 // TestScrollViewportGatesOnOffsetChange pins that a dialog viewport repaint fires
 // only when the offset actually changes on an affected terminal.

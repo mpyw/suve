@@ -16,10 +16,6 @@ import (
 // title, one above the close hint) around the scrollable message body.
 const errorSpacerRows = 2
 
-// regionClose is the close-hint region ID (shared by the error dialog and any
-// confirm dialog whose close hint is clickable).
-const regionClose = "close"
-
 // errorDialog is a plain modal that surfaces a message the app could not handle
 // inline — a blocked operation (e.g. creating while viewing all namespaces) or a
 // staging key-loss hard-fail. It never mutates anything; Enter or Esc dismisses
@@ -94,7 +90,7 @@ func (d *errorDialog) syncViewport() {
 	lines := max(lipgloss.Height(body), 1)
 	// Reserve the taller (scroll) hint variant so the budget is correct regardless
 	// of whether the body ends up scrollable — d.scrollable is only set below.
-	around := lipgloss.Height(d.header()) + lipgloss.Height(hintText(true)) + errorSpacerRows
+	around := lipgloss.Height(d.header()) + lipgloss.Height(errorHintText(true)) + errorSpacerRows
 	avail := max(d.availHeight()-around, 1)
 	height := min(lines, avail)
 
@@ -150,11 +146,11 @@ func (d *errorDialog) body() string {
 // hint pins the close hint, advertising the scroll keys only when the message
 // actually overflows the viewport.
 func (d *errorDialog) hint() string {
-	return d.styles.PageHint.Render(hintText(d.scrollable))
+	return d.styles.PageHint.Render(errorHintText(d.scrollable))
 }
 
-// hintText is the close-hint text, with the scroll keys when the body scrolls.
-func hintText(scrollable bool) string {
+// errorHintText is the close-hint text, with the scroll keys when the body scrolls.
+func errorHintText(scrollable bool) string {
 	if scrollable {
 		return "↑↓/pgup/pgdn: scroll · enter/esc: close"
 	}

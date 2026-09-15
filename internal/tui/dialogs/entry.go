@@ -18,32 +18,17 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// dialogContentWidth is the fixed inner width every dialog's huh form lays out
-// to, so the modal size (and its goldens) stay deterministic regardless of
-// terminal width. It fits the minimum supported 60-column terminal (60 −
-// dialogChrome = 56 ≥ 54).
-const dialogContentWidth = 54
-
-// minFormBody floors the embedded form's scrollable body height so a very short
-// terminal still shows at least a field or two (the rest scrolls into view)
-// rather than collapsing the form to nothing.
-const minFormBody = 3
-
-// titleSpacerRows is the blank line the form dialogs draw between the title and
-// the form body; it is reserved when budgeting the body's scrollable height.
-const titleSpacerRows = 1
-
-// isTTY reports whether the process is attached to a terminal, gating the
+// entryIsTTY reports whether the process is attached to a terminal, gating the
 // $EDITOR handoff (which suspends the program to run an editor). It is a package
 // variable so a test can exercise the no-TTY branch without a real terminal.
 //
 //nolint:gochecknoglobals // swappable TTY-detection seam for the editor handoff
-var isTTY = func() bool {
+var entryIsTTY = func() bool {
 	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 }
 
-// editorFinishedMsg carries the $EDITOR buffer back after the editor exits.
-type editorFinishedMsg struct {
+// entryEditorFinishedMsg carries the $EDITOR buffer back after the editor exits.
+type entryEditorFinishedMsg struct {
 	content string
 	err     error
 }
@@ -51,18 +36,18 @@ type editorFinishedMsg struct {
 // Field keys for the two multi-line fields, shared by rebuildForm and the $EDITOR
 // handoff so it knows which field it is editing.
 const (
-	fieldKeyValue       = "value"
-	fieldKeyDescription = "description"
+	entryFieldKeyValue       = "value"
+	entryFieldKeyDescription = "description"
 )
 
-// editorKey is the value-field $EDITOR handoff binding. It is ctrl+o ("open"), not
+// entryEditorKey is the value-field $EDITOR handoff binding. It is ctrl+o ("open"), not
 // ctrl+e: bubbles text inputs bind ctrl+e to end-of-line (readline), so ctrl+e here
 // would shadow that motion inside the Value textarea; ctrl+o is unbound by the text
 // input and is a portable control character (unlike ctrl+. and friends, which only
 // enhanced-keyboard terminals report).
 //
 //nolint:gochecknoglobals // immutable dialog-local binding
-var editorKey = key.NewBinding(key.WithKeys("ctrl+o"))
+var entryEditorKey = key.NewBinding(key.WithKeys("ctrl+o"))
 
 // entryForm is the create/edit dialog. It embeds a huh form (name, type,
 // namespace, value, description, mode) as a model and adds a $EDITOR handoff on
@@ -169,7 +154,7 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 		edit:             in.Edit,
 		name:             in.Name,
 		namespace:        in.Namespace,
-		valueType:        defaultTypeLabel(svcCap, in.TypeLabel),
+		valueType:        defaultEntryTypeLabel(svcCap, in.TypeLabel),
 		value:            in.Value,
 		description:      in.Description,
 		stagedOnly:       in.StagedOnly,
@@ -205,9 +190,9 @@ func (d *entryForm) showType() bool {
 	return d.svcCap.Service == serviceParam && !d.svcCap.HasNamespaces && !d.stagedOnly
 }
 
-// defaultTypeLabel picks the Type select's initial value: the seeded label when
+// defaultEntryTypeLabel picks the Type select's initial value: the seeded label when
 // valid, else the canonical default ("String").
-func defaultTypeLabel(svcCap capability.ServiceCapability, seed string) string {
+func defaultEntryTypeLabel(svcCap capability.ServiceCapability, seed string) string {
 	if svcCap.Service != serviceParam || svcCap.HasNamespaces {
 		return ""
 	}
@@ -238,7 +223,7 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 			Options(huh.NewOptions(paramtype.Options()...)...).Value(&d.valueType))
 	}
 
-	fields = append(fields, huh.NewText().Key(fieldKeyValue).Title("Value").Lines(4). //nolint:mnd // value textarea height
+	fields = append(fields, huh.NewText().Key(entryFieldKeyValue).Title("Value").Lines(4). //nolint:mnd // value textarea height
 												ExternalEditor(false).Value(&d.value))
 
 	// Description is a free-text field the AWS (Parameter Store + Secrets Manager)
@@ -247,8 +232,8 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 	// It is multi-line like Value (both back onto free-text that accepts newlines),
 	// with the same ctrl+o $EDITOR handoff.
 	if d.svcCap.HasDescription {
-		fields = append(fields, huh.NewText().Key(fieldKeyDescription).Title("Description").Lines(3). //nolint:mnd // description textarea height
-														ExternalEditor(false).Placeholder("(optional)").Value(&d.description))
+		fields = append(fields, huh.NewText().Key(entryFieldKeyDescription).Title("Description").Lines(3). //nolint:mnd // description textarea height
+															ExternalEditor(false).Placeholder("(optional)").Value(&d.description))
 	}
 
 	// The final "[ OK ]" button completes the form. With multi-line Value/Description
@@ -265,7 +250,7 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 		WithWidth(dialogContentWidth).
 		WithShowHelp(false).
 		WithShowErrors(true).
-		WithKeyMap(formKeyMap()).
+		WithKeyMap(entryFormKeyMap()).
 		WithTheme(entryFormTheme())
 
 	// Init the (re)built form, then immediately cap its body to the known
@@ -274,7 +259,7 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 	return tea.Batch(d.form.Init(), d.syncFormSize())
 }
 
-// formKeyMap is the huh keymap the create/edit form uses so the multi-line Value
+// entryFormKeyMap is the huh keymap the create/edit form uses so the multi-line Value
 // and Description fields can hold newlines (#791): in a huh Text field Enter inserts
 // a newline (NewLine), so it cannot double as "next field". Tab advances between
 // fields, and the form is completed from the final "[ OK ]" button (Enter) — never
@@ -282,7 +267,7 @@ func (d *entryForm) rebuildForm() tea.Cmd {
 // ever inserts a newline. Every single-line field keeps huh's defaults, so Enter
 // advances there. (No dialog-level submit key: ctrl+s was terminal XOFF and is gone;
 // the caret motions ctrl+a/ctrl+e now stay with the text input.)
-func formKeyMap() *huh.KeyMap {
+func entryFormKeyMap() *huh.KeyMap {
 	km := huh.NewDefaultKeyMap()
 	km.Text.NewLine = key.NewBinding(key.WithKeys("enter", "ctrl+j"), key.WithHelp("enter", "new line"))
 	km.Text.Next = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next"))
@@ -293,7 +278,7 @@ func formKeyMap() *huh.KeyMap {
 	// Text.KeyBinds() (the help path), which never runs while WithShowHelp(false),
 	// so ExternalEditor(false) alone leaves ctrl+e live — it would launch huh's
 	// default "nano" and shadow the textarea's ctrl+e (readline end-of-line). We own
-	// the $EDITOR handoff on ctrl+o (see editorKey), so ctrl+e is freed to reach the
+	// the $EDITOR handoff on ctrl+o (see entryEditorKey), so ctrl+e is freed to reach the
 	// textarea as end-of-line.
 	km.Text.Editor = key.NewBinding(key.WithDisabled())
 
@@ -356,7 +341,7 @@ func (d *entryForm) formBodyHeight() int {
 // disabled just as the name field is omitted on edit.
 func (d *entryForm) namespaceField() huh.Field {
 	if d.edit {
-		return huh.NewNote().Title("Namespace").Description(namespaceDisplay(d.namespace))
+		return huh.NewNote().Title("Namespace").Description(entryNamespaceDisplay(d.namespace))
 	}
 
 	return huh.NewInput().Key("namespace").Title("Namespace").
@@ -373,7 +358,7 @@ func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return d, d.syncFormSize()
 	case mutationResultMsg:
 		return d.onResult(msg)
-	case editorFinishedMsg:
+	case entryEditorFinishedMsg:
 		return d.onEditorFinished(msg)
 	case tea.KeyPressMsg:
 		if d.busy {
@@ -394,7 +379,7 @@ func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// re-arms (a stray Esc after typing does not silently discard).
 		d.disarm()
 
-		if key.Matches(msg, editorKey) && d.multilineFieldKey() != "" {
+		if key.Matches(msg, entryEditorKey) && d.multilineFieldKey() != "" {
 			return d, d.openEditor()
 		}
 	}
@@ -528,7 +513,7 @@ func (d *entryForm) multilineFieldKey() string {
 	}
 
 	switch f.GetKey() {
-	case fieldKeyValue, fieldKeyDescription:
+	case entryFieldKeyValue, entryFieldKeyDescription:
 		return f.GetKey()
 	default:
 		return ""
@@ -586,7 +571,7 @@ func (d *entryForm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 // honor a flag-bearing or space-containing editor path, and pick the same OS
 // fallback — they cannot diverge.
 func (d *entryForm) openEditor() tea.Cmd {
-	if !isTTY() {
+	if !entryIsTTY() {
 		d.notice = "editor needs a TTY."
 
 		return d.syncFormSize()
@@ -595,7 +580,7 @@ func (d *entryForm) openEditor() tea.Cmd {
 	d.editorField = d.multilineFieldKey()
 
 	buffer := d.value
-	if d.editorField == fieldKeyDescription {
+	if d.editorField == entryFieldKeyDescription {
 		buffer = d.description
 	}
 
@@ -626,10 +611,10 @@ func (d *entryForm) openEditor() tea.Cmd {
 		_ = os.Remove(name)
 
 		if runErr != nil {
-			return editorFinishedMsg{err: runErr}
+			return entryEditorFinishedMsg{err: runErr}
 		}
 
-		return editorFinishedMsg{content: string(content), err: readErr}
+		return entryEditorFinishedMsg{content: string(content), err: readErr}
 	})
 }
 
@@ -637,7 +622,7 @@ func (d *entryForm) openEditor() tea.Cmd {
 // (value/description): an unchanged buffer is a no-op ("No changes made."),
 // otherwise the new content replaces that field and the form is rebuilt so the huh
 // textarea buffer re-syncs (mirroring every other path).
-func (d *entryForm) onEditorFinished(msg editorFinishedMsg) (Model, tea.Cmd) {
+func (d *entryForm) onEditorFinished(msg entryEditorFinishedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		d.notice = "editor error: " + msg.err.Error()
 
@@ -646,7 +631,7 @@ func (d *entryForm) onEditorFinished(msg editorFinishedMsg) (Model, tea.Cmd) {
 
 	// before holds the pre-edit buffer that was written to the tmpfile.
 	before := &d.value
-	if d.editorField == fieldKeyDescription {
+	if d.editorField == entryFieldKeyDescription {
 		before = &d.description
 	}
 
@@ -747,9 +732,9 @@ func entryHint(onMultiline bool) string {
 	return "tab/shift+tab: fields · enter: next · esc: cancel"
 }
 
-// namespaceDisplay renders a namespace for the read-only edit note, showing the
+// entryNamespaceDisplay renders a namespace for the read-only edit note, showing the
 // null (default) namespace as "(default)" so a blank line never hides it.
-func namespaceDisplay(namespace string) string {
+func entryNamespaceDisplay(namespace string) string {
 	if namespace == "" {
 		return "(default)"
 	}
@@ -759,6 +744,9 @@ func namespaceDisplay(namespace string) string {
 
 // entryNoun names the created item per service (App Configuration setting vs SSM
 // parameter vs secret).
+// Shared on purpose: the delete dialog words its prompt with the same noun.
+//
+//declscope:package
 func entryNoun(svcCap capability.ServiceCapability) string {
 	switch {
 	case svcCap.Service == serviceParam && svcCap.HasNamespaces:
@@ -820,19 +808,3 @@ func (d *entryForm) nameValidator() func(string) error {
 		return nil
 	}
 }
-
-// requiredField builds a huh validator that rejects an empty/whitespace value.
-func requiredField(label string) func(string) error {
-	return func(s string) error {
-		if strings.TrimSpace(s) == "" {
-			return stringError(label + " is required")
-		}
-
-		return nil
-	}
-}
-
-// stringError is a small sentinel error type for dialog validation.
-type stringError string
-
-func (e stringError) Error() string { return string(e) }

@@ -16,6 +16,10 @@ import (
 //
 // The viewport scrolls synchronously inside Update, so the offset delta is known
 // immediately and the ClearScreen batch renders the already-scrolled model.
+//
+// Shared with the viewport-scrolling dialogs (apply results, error dialog).
+//
+//declscope:package
 func scrollViewport(vp *viewport.Model, msg tea.Msg) tea.Cmd {
 	before := vp.YOffset()
 
@@ -26,12 +30,12 @@ func scrollViewport(vp *viewport.Model, msg tea.Msg) tea.Cmd {
 	return termquirk.RepaintOnScroll(vp.YOffset() != before, cmd)
 }
 
-// formFocusKeys are the keys that move focus between fields in a huh form (as
+// formScrollKeys are the keys that move focus between fields in a huh form (as
 // opposed to editing text inside a single-line field). Only these can scroll a
 // form whose focused field is a single-line Input.
 //
 //nolint:gochecknoglobals // immutable key set, mirrors the other dialog bindings
-var formFocusKeys = key.NewBinding(key.WithKeys("tab", "shift+tab", "up", "down", "enter"))
+var formScrollKeys = key.NewBinding(key.WithKeys("tab", "shift+tab", "up", "down", "enter"))
 
 // repaintFormScroll forces a full repaint after a key that may scroll a huh
 // form's internal viewport, on a terminal that mishandles the scroll-region
@@ -47,6 +51,10 @@ var formFocusKeys = key.NewBinding(key.WithKeys("tab", "shift+tab", "up", "down"
 // multi-line Text that wraps, or a Select/MultiSelect navigated with j/k/g etc. —
 // repaints on any key, since there the "typing vs. navigation" distinction does
 // not hold.
+//
+// Shared with the huh-form dialogs (entry/tag/restore).
+//
+//declscope:package
 func repaintFormScroll(form *huh.Form, msg tea.Msg, cmd tea.Cmd) tea.Cmd {
 	kp, ok := msg.(tea.KeyPressMsg)
 	if !ok || !termquirk.ScrollNeedsFullRepaint() || !formKeyMayScroll(form, kp) {
@@ -58,10 +66,10 @@ func repaintFormScroll(form *huh.Form, msg tea.Msg, cmd tea.Cmd) tea.Cmd {
 
 // formKeyMayScroll reports whether kp could scroll the form's internal viewport,
 // given the focused field kind. A single-line Input scrolls only when focus
-// moves off-screen (formFocusKeys); any other field may scroll on any key.
+// moves off-screen (formScrollKeys); any other field may scroll on any key.
 func formKeyMayScroll(form *huh.Form, kp tea.KeyPressMsg) bool {
 	if _, isSingleLine := form.GetFocusedField().(*huh.Input); isSingleLine {
-		return key.Matches(kp, formFocusKeys)
+		return key.Matches(kp, formScrollKeys)
 	}
 
 	return true

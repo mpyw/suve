@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 	"strings"
-	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -19,25 +18,19 @@ import (
 
 // Recovery-window bounds (AWS Secrets Manager: 7–30 days), with 30 the default.
 const (
-	minRecoveryWindow     = 7
-	maxRecoveryWindow     = 30
-	defaultRecoveryWindow = 30
+	minDeleteRecoveryWindow     = 7
+	maxDeleteRecoveryWindow     = 30
+	defaultDeleteRecoveryWindow = 30
 )
-
-// NowFunc is the clock the "recoverable until" date is computed from. It is an
-// exported package variable so a golden can pin the date deterministically.
-//
-//nolint:gochecknoglobals // swappable clock seam for the recoverable-until date
-var NowFunc = time.Now
 
 // deleteControl identifies a focusable row in the delete dialog.
 type deleteControl int
 
 const (
-	ctrlForce deleteControl = iota
-	ctrlRecovery
-	ctrlDelete
-	ctrlCancel
+	deleteCtrlForce deleteControl = iota
+	deleteCtrlRecovery
+	deleteCtrlDelete
+	deleteCtrlCancel
 )
 
 // deleteConfirm is the delete dialog. The force row appears per HasForceDelete
@@ -114,7 +107,7 @@ func NewDeleteConfirm(in DeleteInput) Model {
 		styles:         in.Styles,
 		name:           in.Name,
 		namespace:      in.Namespace,
-		recoveryWindow: defaultRecoveryWindow,
+		recoveryWindow: defaultDeleteRecoveryWindow,
 		staged:         svcCap.HasStaging,
 	}
 }
@@ -130,20 +123,20 @@ func (d *deleteConfirm) controls() []deleteControl {
 	var out []deleteControl
 
 	if d.svcCap.HasForceDelete {
-		out = append(out, ctrlForce)
+		out = append(out, deleteCtrlForce)
 	}
 
 	if d.svcCap.HasRecoveryWindow && !d.force {
-		out = append(out, ctrlRecovery)
+		out = append(out, deleteCtrlRecovery)
 	}
 
-	return append(out, ctrlDelete, ctrlCancel)
+	return append(out, deleteCtrlDelete, deleteCtrlCancel)
 }
 
 func (d *deleteConfirm) focused() deleteControl {
 	controls := d.controls()
 	if d.focus < 0 || d.focus >= len(controls) {
-		return ctrlDelete
+		return deleteCtrlDelete
 	}
 
 	return controls[d.focus]
@@ -220,7 +213,7 @@ func (d *deleteConfirm) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 
 	d.focusControl(c)
 
-	if c == ctrlRecovery {
+	if c == deleteCtrlRecovery {
 		return d, nil
 	}
 
@@ -269,11 +262,11 @@ func (d *deleteConfirm) focusControl(c deleteControl) {
 
 // adjust changes the recovery window (when focused) within bounds.
 func (d *deleteConfirm) adjust(delta int) {
-	if d.focused() != ctrlRecovery {
+	if d.focused() != deleteCtrlRecovery {
 		return
 	}
 
-	d.recoveryWindow = clampRecovery(d.recoveryWindow + delta)
+	d.recoveryWindow = clampDeleteRecovery(d.recoveryWindow + delta)
 }
 
 // activate acts on the focused control: toggles force, opens the Stage/Apply popup
@@ -289,13 +282,13 @@ func (d *deleteConfirm) adjust(delta int) {
 // view toggle applies.
 func (d *deleteConfirm) activate() (Model, tea.Cmd) {
 	switch d.focused() {
-	case ctrlForce:
+	case deleteCtrlForce:
 		d.force = !d.force
 		// Toggling force changes the control set (hides/shows recovery); keep focus.
-		d.focusControl(ctrlForce)
+		d.focusControl(deleteCtrlForce)
 
 		return d, tea.ClearScreen
-	case ctrlDelete:
+	case deleteCtrlDelete:
 		// When the service supports staging, the Delete button opens the Stage/Apply
 		// popup; otherwise the delete is always immediate and runs directly.
 		if d.svcCap.HasStaging {
@@ -308,9 +301,9 @@ func (d *deleteConfirm) activate() (Model, tea.Cmd) {
 		d.busy = true
 
 		return d, d.submit()
-	case ctrlCancel:
+	case deleteCtrlCancel:
 		return d, canceledCmd
-	case ctrlRecovery:
+	case deleteCtrlRecovery:
 		// Recovery adjusts with left/right, not enter.
 	}
 
@@ -419,7 +412,7 @@ func (d *deleteConfirm) View() string {
 		// provider error is wrapped and capped to whatever rows remain after the
 		// name, controls, and hint — the controls and close hint always stay
 		// on-screen rather than being pushed off the bottom by a tall error.
-		fixed := lipgloss.Height(header) + nameSpacerRows + lipgloss.Height(name) +
+		fixed := lipgloss.Height(header) + deleteNameSpacerRows + lipgloss.Height(name) +
 			lipgloss.Height(strings.TrimRight(controls.String(), "\n")) + lipgloss.Height(hint)
 		b.WriteString(d.wrapCapped(d.styles.ErrorText.Render(d.err), d.errBudget(fixed)))
 		b.WriteString("\n")
@@ -430,9 +423,9 @@ func (d *deleteConfirm) View() string {
 	return b.String()
 }
 
-// nameSpacerRows is the two blank lines the delete confirm pins around its
+// deleteNameSpacerRows is the two blank lines the delete confirm pins around its
 // header and target name (one after each), reserved when budgeting the error.
-const nameSpacerRows = 2
+const deleteNameSpacerRows = 2
 
 // renderControl draws one focusable row, marking the focused one.
 func (d *deleteConfirm) renderControl(c deleteControl) string {
@@ -442,16 +435,16 @@ func (d *deleteConfirm) renderControl(c deleteControl) string {
 	}
 
 	switch c {
-	case ctrlForce:
+	case deleteCtrlForce:
 		return marker + checkbox(d.force) + " Force delete (immediate, no recovery)"
-	case ctrlRecovery:
+	case deleteCtrlRecovery:
 		line := marker + "Recovery window   " + d.styles.StatusValue.Render(strconv.Itoa(d.recoveryWindow)+" days")
 		hint := "  Recoverable until " + timeutil.FormatDate(NowFunc().AddDate(0, 0, d.recoveryWindow)) + " unless forced."
 
 		return line + "\n" + d.styles.PageHint.Render(hint)
-	case ctrlDelete:
+	case deleteCtrlDelete:
 		return marker + d.styles.ErrorText.Render("[ Delete ]")
-	case ctrlCancel:
+	case deleteCtrlCancel:
 		return marker + "[ Cancel ]"
 	default:
 		return ""
@@ -471,7 +464,7 @@ func deleteStatus(staged bool, o data.WriteOutcome) string {
 	return "Deleted."
 }
 
-// clampRecovery keeps a recovery-window value within the AWS 7–30 bounds.
-func clampRecovery(v int) int {
-	return max(minRecoveryWindow, min(maxRecoveryWindow, v))
+// clampDeleteRecovery keeps a recovery-window value within the AWS 7–30 bounds.
+func clampDeleteRecovery(v int) int {
+	return max(minDeleteRecoveryWindow, min(maxDeleteRecoveryWindow, v))
 }

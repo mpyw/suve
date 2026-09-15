@@ -1,3 +1,9 @@
+//declscope:package
+//
+// Every dialog embeds dialogLayout and draws inside the shell's dialog frame,
+// so the size model and its frame metrics here are shared package-wide on
+// purpose.
+
 package dialogs
 
 import (
@@ -111,3 +117,9 @@ func (l *dialogLayout) errBudget(fixedRows int) int {
 
 	return max(l.availHeight()-fixedRows, 1)
 }
+
+// dialogContentWidth is the fixed inner width every dialog's huh form lays out
+// to, so the modal size (and its goldens) stay deterministic regardless of
+// terminal width. It fits the minimum supported 60-column terminal (60 −
+// dialogChrome = 56 ≥ 54).
+const dialogContentWidth = 54

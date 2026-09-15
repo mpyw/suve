@@ -23,19 +23,19 @@ const (
 	applyRegionCancel = "apply-cancel"
 )
 
-// resultsChrome is the vertical overhead the results view reserves around its
+// applyResultsChrome is the vertical overhead the results view reserves around its
 // scrollable body so the box fits the screen: the shell's dialog border (top +
 // bottom = 2 rows), the pinned "Apply results" title plus its blank spacer
 // (2 rows), and the pinned blank spacer plus close hint (2 rows). The viewport
-// height is capped at screenHeight−resultsChrome so a long fan-out result list
+// height is capped at screenHeight−applyResultsChrome so a long fan-out result list
 // scrolls inside the box while the title and close hint stay visible.
-const resultsChrome = 6
+const applyResultsChrome = 6
 
 // applyControl identifies a focusable row in the apply confirmation.
 type applyControl int
 
 const (
-	ctrlIgnore applyControl = iota
+	applyCtrlIgnore applyControl = iota
 	ctrlApply
 	ctrlApplyCancel
 )
@@ -44,9 +44,9 @@ const (
 type applyPhase int
 
 const (
-	phaseConfirm applyPhase = iota
-	phaseBusy
-	phaseResults
+	applyPhaseConfirm applyPhase = iota
+	applyPhaseBusy
+	applyPhaseResults
 )
 
 // applyResultsMsg carries the aggregated fan-out results back into the dialog.
@@ -63,7 +63,7 @@ type applyResultsMsg struct {
 type applyDialog struct {
 	// dialogLayout carries the terminal size (from the last WindowSizeMsg). The
 	// results view wraps its lines to contentWidth so the box never overflows
-	// horizontally, and caps the scrollable body at height−resultsChrome so a long
+	// horizontally, and caps the scrollable body at height−applyResultsChrome so a long
 	// result list scrolls instead of clipping off-screen.
 	dialogLayout
 
@@ -121,14 +121,14 @@ func NewApply(in ApplyInput) Model {
 	}
 }
 
-func (d *applyDialog) Busy() bool { return d.phase == phaseBusy }
+func (d *applyDialog) Busy() bool { return d.phase == applyPhaseBusy }
 
 // DismissCmd makes Back (Esc) on the results view close with the same
 // reload+voice as enter: the results view has already applied, so a bare pop
 // would leave the staging page and its badge stale. Any other phase returns nil
 // so the shell bare-dismisses (confirm → cancel; busy is already suppressed).
 func (d *applyDialog) DismissCmd() tea.Cmd {
-	if d.phase == phaseResults {
+	if d.phase == applyPhaseResults {
 		return doneCmd("", d.summary(), true)
 	}
 
@@ -143,7 +143,7 @@ func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		return d, nil
 	case applyResultsMsg:
-		d.phase = phaseResults
+		d.phase = applyPhaseResults
 		d.results = msg.results
 
 		if msg.err != nil {
@@ -170,7 +170,7 @@ func (d *applyDialog) Update(msg tea.Msg) (Model, tea.Cmd) {
 // ignore/apply/cancel controls each focus + activate. Busy swallows clicks (the
 // #568 double-fire guard).
 func (d *applyDialog) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
-	if d.phase == phaseBusy {
+	if d.phase == applyPhaseBusy {
 		return d, nil
 	}
 
@@ -179,7 +179,7 @@ func (d *applyDialog) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 		return d, nil
 	}
 
-	if d.phase == phaseResults {
+	if d.phase == applyPhaseResults {
 		if id == regionClose {
 			return d, doneCmd("", d.summary(), true)
 		}
@@ -189,7 +189,7 @@ func (d *applyDialog) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 
 	switch id {
 	case applyRegionIgnore:
-		d.focus = int(ctrlIgnore)
+		d.focus = int(applyCtrlIgnore)
 	case applyRegionApply:
 		d.focus = int(ctrlApply)
 	case applyRegionCancel:
@@ -202,11 +202,11 @@ func (d *applyDialog) handleClick(msg tea.MouseClickMsg) (Model, tea.Cmd) {
 }
 
 func (d *applyDialog) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if d.phase == phaseBusy {
+	if d.phase == applyPhaseBusy {
 		return d, nil // double-submit guard: swallow input while applying
 	}
 
-	if d.phase == phaseResults {
+	if d.phase == applyPhaseResults {
 		if key.Matches(msg, navSelect) {
 			return d, doneCmd("", d.summary(), true)
 		}
@@ -240,10 +240,10 @@ func (d *applyDialog) move(delta int) {
 
 func (d *applyDialog) activate() (Model, tea.Cmd) {
 	switch applyControl(d.focus) {
-	case ctrlIgnore:
+	case applyCtrlIgnore:
 		d.ignoreConflicts = !d.ignoreConflicts
 	case ctrlApply:
-		d.phase = phaseBusy
+		d.phase = applyPhaseBusy
 
 		return d, d.applyCmd()
 	case ctrlApplyCancel:
@@ -277,7 +277,7 @@ func (d *applyDialog) applyCmd() tea.Cmd {
 }
 
 func (d *applyDialog) View() string {
-	if d.phase == phaseResults {
+	if d.phase == applyPhaseResults {
 		return d.resultsView()
 	}
 
@@ -296,14 +296,14 @@ func (d *applyDialog) confirmView() string {
 	b.WriteString(target + "\n")
 	b.WriteString(changes + "\n\n")
 
-	if d.phase == phaseBusy {
+	if d.phase == applyPhaseBusy {
 		d.hits = hit.New() // no controls while applying
 		b.WriteString(d.styles.PageHint.Render("applying…"))
 
 		return b.String()
 	}
 
-	ignoreRow := d.confirmRow(ctrlIgnore, checkbox(d.ignoreConflicts)+" Ignore conflicts")
+	ignoreRow := d.confirmRow(applyCtrlIgnore, checkbox(d.ignoreConflicts)+" Ignore conflicts")
 	applyBtn := d.confirmRow(ctrlApply, "[ Apply ]")
 	cancelBtn := d.confirmRow(ctrlApplyCancel, "[ Cancel ]")
 
@@ -342,7 +342,7 @@ func (d *applyDialog) changesLine() string {
 }
 
 // syncViewport (re)builds the scrollable results body and sizes the viewport to
-// min(needed, screenHeight−resultsChrome), so a long fan-out result list scrolls
+// min(needed, screenHeight−applyResultsChrome), so a long fan-out result list scrolls
 // inside the box while the title and close hint stay pinned. It is a no-op until
 // a WindowSizeMsg arrives (before that the results view renders inline, uncapped).
 func (d *applyDialog) syncViewport() {
@@ -352,7 +352,7 @@ func (d *applyDialog) syncViewport() {
 
 	body := d.resultsBody()
 	lines := max(lipgloss.Height(body), 1)
-	avail := max(d.height-resultsChrome, 1)
+	avail := max(d.height-applyResultsChrome, 1)
 	height := min(lines, avail)
 
 	d.scrollable = lines > height
@@ -439,13 +439,13 @@ func (d *applyDialog) writeServiceResults(b *strings.Builder, res data.StagingAp
 
 	for _, e := range res.Entries {
 		if e.UnstageError != "" {
-			b.WriteString(d.fit(d.unstageWarn(entryLabel(e.Name, e.Namespace), e.UnstageError)) + "\n")
+			b.WriteString(d.fit(d.unstageWarn(applyEntryLabel(e.Name, e.Namespace), e.UnstageError)) + "\n")
 		}
 	}
 
 	for _, t := range res.Tags {
 		if t.UnstageError != "" {
-			b.WriteString(d.fit(d.unstageWarn(entryLabel(t.Name, t.Namespace), t.UnstageError)) + "\n")
+			b.WriteString(d.fit(d.unstageWarn(applyEntryLabel(t.Name, t.Namespace), t.UnstageError)) + "\n")
 		}
 	}
 
@@ -455,21 +455,21 @@ func (d *applyDialog) writeServiceResults(b *strings.Builder, res data.StagingAp
 // entryResultLine renders one entry apply status.
 func (d *applyDialog) entryResultLine(e data.ApplyEntryResult) string {
 	if e.Error != "" {
-		return d.styles.ErrorText.Render("✗ "+e.Status) + "  " + entryLabel(e.Name, e.Namespace) +
+		return d.styles.ErrorText.Render("✗ "+e.Status) + "  " + applyEntryLabel(e.Name, e.Namespace) +
 			"   " + d.styles.ErrorText.Render(e.Error)
 	}
 
-	return d.styles.DiffAdded.Render("✓ "+e.Status) + "  " + entryLabel(e.Name, e.Namespace)
+	return d.styles.DiffAdded.Render("✓ "+e.Status) + "  " + applyEntryLabel(e.Name, e.Namespace)
 }
 
 // tagResultLine renders one tag apply status.
 func (d *applyDialog) tagResultLine(t data.ApplyTagResult) string {
 	if t.Error != "" {
-		return d.styles.ErrorText.Render("✗ tags") + "  " + entryLabel(t.Name, t.Namespace) +
+		return d.styles.ErrorText.Render("✗ tags") + "  " + applyEntryLabel(t.Name, t.Namespace) +
 			"   " + d.styles.ErrorText.Render(t.Error)
 	}
 
-	return d.styles.DiffAdded.Render("✓ tags") + "  " + entryLabel(t.Name, t.Namespace)
+	return d.styles.DiffAdded.Render("✓ tags") + "  " + applyEntryLabel(t.Name, t.Namespace)
 }
 
 // unstageWarn renders the "applied but could not be unstaged" warning.
@@ -485,11 +485,11 @@ func (d *applyDialog) summary() string {
 		conflicts += len(res.Conflicts)
 
 		for _, e := range res.Entries {
-			countOutcome(e.Error, &applied, &failed)
+			countApplyOutcome(e.Error, &applied, &failed)
 		}
 
 		for _, t := range res.Tags {
-			countOutcome(t.Error, &applied, &failed)
+			countApplyOutcome(t.Error, &applied, &failed)
 		}
 	}
 
@@ -503,8 +503,8 @@ func (d *applyDialog) summary() string {
 	}
 }
 
-// countOutcome tallies a result as applied or failed.
-func countOutcome(errMsg string, applied, failed *int) {
+// countApplyOutcome tallies a result as applied or failed.
+func countApplyOutcome(errMsg string, applied, failed *int) {
 	if errMsg != "" {
 		*failed++
 	} else {
@@ -512,20 +512,11 @@ func countOutcome(errMsg string, applied, failed *int) {
 	}
 }
 
-// entryLabel renders a name with its namespace badge (bare name when empty).
-func entryLabel(name, namespace string) string {
+// applyEntryLabel renders a name with its namespace badge (bare name when empty).
+func applyEntryLabel(name, namespace string) string {
 	if namespace == "" {
 		return name
 	}
 
 	return name + " [" + namespace + "]"
-}
-
-// pluralize renders "n singular"/"n plural".
-func pluralize(n int, singular, plural string) string {
-	if n == 1 {
-		return "1 " + singular
-	}
-
-	return strconv.Itoa(n) + " " + plural
 }
