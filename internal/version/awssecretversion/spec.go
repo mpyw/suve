@@ -1,3 +1,8 @@
+// このパッケージの主題は Secrets Manager の version spec そのもので、
+// spec.go がその定義と Parse 系 API を持つ。Parse -> SpecParse のような
+// stutter を避けるため core とする（version.go は表示用の補助にとどまる）。
+//declscope:core
+
 package awssecretversion
 
 import (

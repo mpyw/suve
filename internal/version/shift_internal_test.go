@@ -1,3 +1,6 @@
+// shift.go は parse に合流しているので、その白箱テストも同じ namespace に置く。
+//declscope:namespace parse
+
 package version
 
 import (
