@@ -1,3 +1,6 @@
+// app.go (core) の debug 配線を直接検証する白箱テストなので core に置く。
+//declscope:core
+
 package commands
 
 import (
@@ -16,6 +19,8 @@ import (
 
 // appName is the CLI binary name used to build probe apps in these tests. It is
 // a constant so the literal is not repeated across each Run invocation.
+//
+//declscope:package // completion_test.go も同じ引数列の組み立てに使う
 const appName = "suve"
 
 // runProbe assembles a minimal app wired exactly like the root (debugFlag +

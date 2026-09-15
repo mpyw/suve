@@ -20,7 +20,7 @@ func TestIsShellCompletion(t *testing.T) {
 		want bool
 	}{
 		"present": {
-			args: []string{appName, nounParam, "show", "--generate-shell-completion"},
+			args: []string{appName, "param", "show", "--generate-shell-completion"},
 			want: true,
 		},
 		"present as only arg after program": {
@@ -28,7 +28,7 @@ func TestIsShellCompletion(t *testing.T) {
 			want: true,
 		},
 		"absent": {
-			args: []string{appName, nounParam, "show", "/my/param"},
+			args: []string{appName, "param", "show", "/my/param"},
 			want: false,
 		},
 		"empty": {

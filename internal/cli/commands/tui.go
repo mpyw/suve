@@ -232,9 +232,9 @@ func uniqueTUIProvider(det detect.Result) (provider.Provider, error) {
 	case 1:
 		return active[0], nil
 	case 0:
-		return "", errors.New(noActiveProviderMessage())
+		return "", errors.New(noActiveTUIProviderMessage())
 	default:
-		return "", errors.New(ambiguousProviderMessage(active))
+		return "", errors.New(ambiguousTUIProviderMessage(active))
 	}
 }
 
@@ -260,9 +260,9 @@ func activeTUIProviders(det detect.Result) []provider.Provider {
 	return out
 }
 
-// ambiguousProviderMessage renders the "pick a provider" error for 2+ active
+// ambiguousTUIProviderMessage renders the "pick a provider" error for 2+ active
 // providers, naming the candidates and the explicit `suve <group> --tui` forms.
-func ambiguousProviderMessage(active []provider.Provider) string {
+func ambiguousTUIProviderMessage(active []provider.Provider) string {
 	names := make([]string, len(active))
 	cmds := make([]string, len(active))
 
@@ -276,9 +276,9 @@ func ambiguousProviderMessage(active []provider.Provider) string {
 		strings.Join(cmds, "\n")
 }
 
-// noActiveProviderMessage renders the error for a bare `suve --tui` when no
+// noActiveTUIProviderMessage renders the error for a bare `suve --tui` when no
 // provider is active, listing every explicit form.
-func noActiveProviderMessage() string {
+func noActiveTUIProviderMessage() string {
 	cmds := []string{
 		"  suve aws --tui",
 		"  suve gcloud --tui",
@@ -305,16 +305,11 @@ func tuiGroupProvider(name string) provider.Provider {
 	}
 }
 
-// nounParam is the param service subgroup name. It is a named constant so the
-// literal is not repeated across this package (goconst); tuiService and the
-// completion test both reference it.
-const nounParam = "param"
-
 // tuiService maps a provider subgroup's canonical name to the launch service
 // ("param"/"secret"), or "" when the command is not a service subgroup.
 func tuiService(name string) string {
 	switch name {
-	case nounParam, "secret":
+	case "param", "secret":
 		return name
 	default:
 		return ""

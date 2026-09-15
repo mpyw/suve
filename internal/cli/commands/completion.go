@@ -22,6 +22,8 @@ func IsShellCompletion(args []string) bool {
 // unguarded wrapper would take over the (non-TTY) completion pipe and abort
 // completion (#749). os.Args is the same source urfave/cli reads for the flag,
 // and it mirrors main's IsShellCompletion guard on the update-check notice.
+//
+//declscope:package // tui.go の --tui Before フックが補完実行を見分けるのに使う
 func isShellCompletionInvocation() bool {
 	return IsShellCompletion(os.Args)
 }
