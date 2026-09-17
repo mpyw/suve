@@ -3,14 +3,14 @@ description: Adopt declscope on an existing Go codebase and drive its diagnostic
 license: MIT
 metadata:
     github-path: skills/declscope-adoption
-    github-ref: refs/tags/v0.3.3
+    github-ref: refs/tags/v0.6.0
     github-repo: https://github.com/mpyw/declscope
-    github-tree-sha: c1aa8529449318a16ac89fe45702b4b835e01005
+    github-tree-sha: 44a6bafb66c3ae73dae7abfea78d0804b3f672c6
 name: declscope-adoption
 ---
 # Adopting declscope
 
-Written against **declscope 0.3.3**. Check the version first, since one behaviour described here changed in 0.3.0.
+Written against **declscope 0.6.0**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
@@ -27,7 +27,8 @@ Two of the three rules are off unless the repository asks for them. A count of z
 | `rules.naming.qualify` | `never` | The naming rule is **off** |
 | `rules.naming.exported` | `false` | Even when on, it skips exported declarations |
 | `rules.allowSurplus` | `false` | The surplus rule is **on** |
-| `boundary` | | Always on, with no switch |
+| `rules.allowBoundary` | `false` | The boundary rule is **on**. Set, it leaves only the naming rule |
+| `filter.only` | None | When set anywhere in the chain, files outside it are never read |
 
 The config is looked up from each analyzed package's directory **upwards**, so a subtree can carry its own and a repository can have several. Find them all, and do not read the root alone:
 
@@ -36,7 +37,13 @@ find . -name '.declscope.y*ml' -not -path './.git/*' \
   -exec sh -c 'echo "== $1"; cat "$1"' _ {} \;
 ```
 
-Finding none means the naming rule is off everywhere. Finding one is not the answer on its own, since a config that never sets `qualify` leaves the rule off too.
+Finding none means the naming rule is off everywhere, and the other two are on. Finding one is not the answer on its own. A config that never sets `qualify` leaves that rule off, and one that sets `allowBoundary` leaves off the rule this tool exists for.
+
+**The files compose, so the nearest one does not tell you what applies.** Every file between the package and the module root is read, outermost first. A nearer file owns the keys it states and inherits the rest.
+
+`filter` is the exception to that: `only` intersects down the chain and `omit` unions, so a config file can only ever shrink what is read. A root `omit` holds everywhere below it, and no nested file undoes it.
+
+Each file's patterns are read against **its own** directory, and anchor there when they hold a separator. `gen/**` in the root and the same line in a nested file name different directories. A bare name and a leading `**/` float instead, and a `..` in a pattern is an error.
 
 ### Start at the default, and offer the rest
 
@@ -113,7 +120,7 @@ Boundary violations cluster. Measured across eight repositories, one structural 
 | One helper is used from several files | Shared on purpose | `//declscope:package // why` at the declaration |
 | A name reads badly with its namespace in it | Often the file name, not the declaration | Rename the file |
 
-That last row is worth its own note. In one repository, splitting `statements.go` into `query.go`, `exec.go` and `bind.go` cleared every entry **without renaming a single declaration**. The file name was the thing that was wrong.
+That last row is worth its own note. In one repository a single file held three concerns, and splitting it into three cleared every entry in that cluster **without renaming a single declaration**. The file name was the thing that was wrong.
 
 ## Naming
 
@@ -137,6 +144,8 @@ rules:
 ```
 
 ## Do not turn the check off
+
+**Never set `rules.allowBoundary` to reach zero.** It silences the rule this tool exists for, and every count after it is meaningless. It is the repository owner's choice, for a repository that wants the ownership mark in a name without the scope behind it. It is never a step in an adoption. A baseline is one, because it records what the code already has and still reports what is new. Ask before writing it, the same as any other config change, and never propose it as a way past a diagnostic you could not resolve.
 
 `//declscope:core` exempts a file from the naming rule and merges it into one namespace. Marking every file in a package core means declscope checks nothing there.
 
@@ -168,6 +177,10 @@ These cost real time. Each was measured, not guessed.
 go build ./... && declscope ./...   # never read the count without this
 ```
 
+**A zero may be the filter, not the code.** A `filter.only` anywhere in the chain can leave a package with nothing to read. A package nothing was read from reports nothing. `declscope` says so only when a nested `only` was cancelled by one above it, so the quiet cases stay quiet. Count the files the analysis actually saw before trusting a zero.
+
+**A zero from `boundary` may be the switch, not the code.** `rules.allowBoundary: true` silences the rule entirely, and the run looks like a clean repository. Read every config before reporting a count, the same way you would for `qualify`.
+
 **A dirty working tree poisons a comparison.** Measuring option A, then option B without reverting, measures A and B together. `git stash` leaves untracked files behind, so a new file from the previous attempt stays. Copy the tree instead:
 
 ```bash
@@ -176,15 +189,13 @@ cp -r repo /tmp/try-a   # and measure there
 
 **A bulk rename reaches further than intended.** A `\bname\b` substitution across every `.go` file will hit `keys`, `named` and `check`. Those live in testdata and in unrelated packages too. Limit the paths, then read `git status` to see what actually changed.
 
-**A file created to satisfy a name is often a file too small to exist.** One rename produced a 23-line file holding `Build`. It returned a type declared in the file next to it, and `BuildProgram` in that file was the answer. Before adding a file, ask whether renaming the declaration would do.
+**A file created to satisfy a name is often a file too small to exist.** One rename produced a file of about twenty lines holding one constructor. It returned a type declared in the file beside it, and renaming the constructor where it already was turned out to be the answer. Before adding a file, ask whether renaming the declaration would do.
 
 **`//declscope:namespace` goes before the package clause.** Placed after it, the directive is silently inert and the diagnostics do not move. If a change makes no difference at all, check the placement first.
 
 ## Known gaps
 
 [#64](https://github.com/mpyw/declscope/issues/64) is open. Inflections are generated only in the lengthening direction, so a `storing.go` is never carried by `store*`. The vocabulary entry above covers it in one line.
-
-Fixed in 0.3.0: a `doc.go` holding only a package comment used to count toward the namespace count and turn `ondemand` on. Nine packages in one repository reported for that reason alone. On 0.3.0 those reports are gone, and any `//declscope:core` written to work around it can come out.
 
 ## Order of work
 
