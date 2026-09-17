@@ -3,14 +3,14 @@ description: Adopt declscope on an existing Go codebase and drive its diagnostic
 license: MIT
 metadata:
     github-path: skills/declscope-adoption
-    github-ref: refs/tags/v0.6.0
+    github-ref: refs/tags/v0.6.1
     github-repo: https://github.com/mpyw/declscope
-    github-tree-sha: 44a6bafb66c3ae73dae7abfea78d0804b3f672c6
+    github-tree-sha: bbbc89ab43dce3fb0c0aecaa9ae35d468d30d29c
 name: declscope-adoption
 ---
 # Adopting declscope
 
-Written against **declscope 0.6.0**. Check the version first: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.6.1**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
