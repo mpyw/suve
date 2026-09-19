@@ -1,16 +1,16 @@
 ---
+name: declscope-adoption
 description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when clearing a declscope baseline, or when a declscope diagnostic is hard to act on. Covers reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence.
 license: MIT
-metadata:
-    github-path: skills/declscope-adoption
-    github-ref: refs/tags/v0.6.1
-    github-repo: https://github.com/mpyw/declscope
-    github-tree-sha: bbbc89ab43dce3fb0c0aecaa9ae35d468d30d29c
-name: declscope-adoption
+x-embedded-by: declscope
+x-embedded-version: 0.8.0
+x-embedded-at: "2026-09-19T08:56:35Z"
+x-embedded-digest: "sha256:6175a367d1a77cc04d0291bd6576fc8978848e1a86cb0ce91a5317b9b7556e09"
 ---
+
 # Adopting declscope
 
-Written against **declscope 0.6.1**. Check the version first: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.8.0**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
