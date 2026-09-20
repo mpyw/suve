@@ -3,14 +3,14 @@ name: declscope-adoption
 description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when clearing a declscope baseline, or when a declscope diagnostic is hard to act on. Covers reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence.
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.8.0
-x-embedded-at: "2026-09-19T08:56:35Z"
-x-embedded-digest: "sha256:6175a367d1a77cc04d0291bd6576fc8978848e1a86cb0ce91a5317b9b7556e09"
+x-embedded-version: 0.9.0
+x-embedded-at: "2026-09-20T08:51:23Z"
+x-embedded-digest: "sha256:42253a5ea6f48162339a1b4b76547de9130140a7292f5a8779c565f13e5a14c0"
 ---
 
 # Adopting declscope
 
-Written against **declscope 0.8.0**. Check the version first: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.9.0**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
@@ -33,6 +33,12 @@ Two of the three rules are off unless the repository asks for them. A count of z
 The config is looked up from each analyzed package's directory **upwards**, so a subtree can carry its own and a repository can have several. Find them all, and do not read the root alone:
 
 ```bash
+declscope survey ./...   # Checks in force: one row per config chain, with what it switched on
+```
+
+That answers it directly. To read the files themselves:
+
+```bash
 find . -name '.declscope.y*ml' -not -path './.git/*' \
   -exec sh -c 'echo "== $1"; cat "$1"' _ {} \;
 ```
@@ -51,7 +57,13 @@ Each file's patterns are read against **its own** directory, and anchor there wh
 
 **The minimum is no config file at all.** `boundary` and `surplus` are on. Those two answer a question about the code, where the naming rule answers one about a convention. Most repositories report a handful. Adopting this much is a complete adoption.
 
-**If the goal is a tidier codebase, offer the naming rule on top.** It is a convention. It fires where nothing is wrong, and it costs real work:
+**If the goal is a tidier codebase, offer the naming rule on top.** It is a convention. It fires where nothing is wrong, and it costs real work. Size it before offering, with a throwaway config rather than by counting message fragments:
+
+```bash
+printf 'rules:\n  naming:\n    qualify: ondemand\n    exported: true\n' > /tmp/q.yaml
+declscope survey -config /tmp/q.yaml -format=json ./... | jq .totals.qualify
+```
+
 
 ```yaml
 rules:
@@ -91,22 +103,57 @@ Boundary first. It is the one that points at structure.
 
 ## Measure before deciding
 
-A count is not a work list. Group it first.
-
-A baseline suppresses everything it holds, so move it aside before measuring. Otherwise every command below reports zero and the codebase looks clean.
+A count is not a work list. Group it first — with two commands, not with `grep`.
 
 ```bash
-mv .declscope-baseline.yaml /tmp/bl.bak     # put it back, or delete it, when done
-
-declscope ./... 2>&1 | grep -c "is private to\|is declared private"   # boundary
-declscope ./... 2>&1 | grep -c "does not carry"                       # naming
-declscope ./... 2>&1 | grep "is private" \
-  | sed -E 's/.*namespace "([^"]+)".*/\1/' | sort | uniq -c | sort -rn
+declscope survey -format=json ./...           # which package to open first
+declscope inspect -format=json <that package> # what shape it is in
 ```
+
+`-format` takes `markdown` (the default, readable in a terminal and paste-ready) or `json`. Read the JSON.
+
+Add `-test=false` once the first pass is read. In a large package most of what crosses is scaffolding — `export_test.go` reaching internals is what that file is for — and it outranks the crossings worth acting on.
+
+**`survey` refuses to print a count it cannot stand behind.** It stops on a package that does not type-check, and it reports what was in force before anything else: which config governed which packages, whether each rule was on, and how many entries a baseline holds. A rule that was not asked prints `-`, never `0` — including a rule that stood itself down, as `surplus` does for a package holding assembly, cgo or a build-excluded file.
+
+`-allow-errors` continues past a package that does not compile. It is named under `type check` and given no row, so nothing in the tables reads as a clean result for it.
+
+That removes three steps this skill used to require. Do **not** move the baseline aside to measure: `survey` reports `baselined` as its own column, so what is suppressed and what is left are visible at once. Do not count message fragments either; the wording of a diagnostic is not an interface, and the JSON is.
+
+| What you need | Where it is |
+| --- | --- |
+| Is anything even being checked | `checks.configs[].rules`, `checks.typeCheck` |
+| Which package to open | `packages[]`, already sorted; the first row is the heaviest |
+| Is this deferred or decided | `boundary.baselined` against `boundary.declared` |
+| Which two namespaces to merge | `inspect`'s `crossings[]`, one row per ordered pair, with `clears` |
+| Where the structure is | `inspect`'s `edges[]`, one row per declaration **and reaching namespace** |
+| Where a name is wrong | `inspect`'s `names[]`, with `fixable` saying whether `-fix` would rename it |
+
+**`clears` is the number the decision turns on.** A crossing's `reached` says how much of a namespace it touches; `clears` says how many findings would go away if the two became one namespace, which is less whenever a third namespace reaches the same declaration. Rank the work by `clears`, not by `reached` or `uses`.
+
+**`edges[]` does not count findings.** One declaration reached from three namespaces is three rows and one finding, so the rows always outnumber `findings.boundary.reported`. Count distinct `declaration` values, or read `crossings[]`, or read the tally.
+
+A crossing's `state` is one of six. Three are outcomes of a finding — `reported`, `baselined`, `ignored` — and three say why there was no finding: `declared` (a `//declscope:package` says it is shared), `open` (package-scoped because nothing says otherwise, which is most exported API), and `unchecked` (`rules.allowBoundary` is on).
+
+**A package with nothing reported, much baselined and nothing declared has never been decided about.** It reads as clean under the analyzer alone, which is why `declared` is a column.
 
 Boundary violations cluster. Measured across eight repositories, one structural decision cleared between 10 and 100 entries every time. In one repository 34 of 35 sat in a single namespace.
 
-**Start where the count is concentrated, not where it is large.**
+**Start where the count is concentrated, not where it is large.** The row order does not give you that: rows are sorted by how much is undecided, which is size. Concentration is the `largest crossing` column — a package with 12 findings spread over 6 namespaces sorts above one with 4 in a single crossing, and the second is the one where one decision clears the cluster.
+
+### Reading a saturation
+
+**This needs the naming rule switched on.** At the configuration to start from it is off, so `qualifyTargets` is `0`, `names[]` is empty and every ratio prints `-`. Measure it with the throwaway config above before reading any of what follows.
+
+`inspect` reports, per namespace, how many of the declarations the naming rule examines there fail it. The ratio says which thing is wrong, and the answer is rarely the rename the diagnostic suggests.
+
+| Saturation | What is wrong | The answer |
+| --- | --- | --- |
+| Nearly all of them | The **namespace name** | `//declscope:namespace`, or rename the file |
+| Around half | One file holding several concerns | Split the file |
+| One or two | Those declarations | Rename them |
+
+A baselined finding counts toward it: the baseline defers a decision rather than settling it, so regenerating one moves this number without a line of code changing.
 
 ## What each shape means
 
@@ -119,6 +166,8 @@ Boundary violations cluster. Measured across eight repositories, one structural 
 | `pkg.Foo` is asked to become `pkg.PkgFoo` | The file is the package's API | `//declscope:core` |
 | One helper is used from several files | Shared on purpose | `//declscope:package // why` at the declaration |
 | A name reads badly with its namespace in it | Often the file name, not the declaration | Rename the file |
+
+**Two rows can fire on one cluster.** A mutual pair whose declarations are also read from four other namespaces matches both the second row and the third. Take the one with the larger `clears`: merging two namespaces settles only what no third namespace reaches, so the fan-in case is usually the smaller change and the core case the larger.
 
 That last row is worth its own note. In one repository a single file held three concerns, and splitting it into three cleared every entry in that cluster **without renaming a single declaration**. The file name was the thing that was wrong.
 
@@ -171,15 +220,18 @@ If the goal is zero, delete the file rather than regenerating it. An empty basel
 
 These cost real time. Each was measured, not guessed.
 
-**A failed build reports zero diagnostics.** It looks exactly like success. Check `go build ./...` before reading any count.
+**A failed build reports zero diagnostics.** It looks exactly like success. `declscope survey` refuses instead of printing such a count, naming the packages that did not compile, so measure through it:
 
 ```bash
-go build ./... && declscope ./...   # never read the count without this
+declscope survey ./...              # refuses on a package that does not type-check
+go build ./... && declscope ./...   # never read a bare count without this
 ```
 
-**A zero may be the filter, not the code.** A `filter.only` anywhere in the chain can leave a package with nothing to read. A package nothing was read from reports nothing. `declscope` says so only when a nested `only` was cancelled by one above it, so the quiet cases stay quiet. Count the files the analysis actually saw before trusting a zero.
+**A zero may be the filter, not the code.** A `filter.only` anywhere in the chain can leave a package with nothing to read. A package nothing was read from reports nothing. `declscope` says so only when a nested `only` was cancelled by one above it, so the quiet cases stay quiet. `declscope inspect` lists the files each namespace was built from (`namespaces[].files`); a package whose files are missing from it is one the filter removed.
 
 **A zero from `boundary` may be the switch, not the code.** `rules.allowBoundary: true` silences the rule entirely, and the run looks like a clean repository. Read every config before reporting a count, the same way you would for `qualify`.
+
+**`-fix` widens; it does not draw boundaries.** On a codebase with boundary findings, `declscope -fix ./...` inserts `//declscope:package` above every crossed declaration — the wholesale widening step 2 of the order of work exists to avoid. Run `-fix -diff` first and read it. Its place in an adoption is renaming, after the structure is settled, and only where `names[].fixable` is true.
 
 **A dirty working tree poisons a comparison.** Measuring option A, then option B without reverting, measures A and B together. `git stash` leaves untracked files behind, so a new file from the previous attempt stays. Copy the tree instead:
 
@@ -199,9 +251,9 @@ cp -r repo /tmp/try-a   # and measure there
 
 ## Order of work
 
-1. Group the diagnostics by rule and namespace
+1. `declscope survey ./...`, and read Checks in force before any count
 2. Clear `boundary` by moving the boundary, not by widening everything
-3. Re-measure. Naming often falls with it, since merging two namespaces into one takes `ondemand` out of force
+3. Re-measure with `survey`. Naming often falls with it, since merging two namespaces into one takes `ondemand` out of force
 4. Fix the file names that do not match their contents
 5. Rename what is left, in natural word order
 6. Delete the baseline
