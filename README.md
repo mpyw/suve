@@ -14,9 +14,6 @@
   <!-- /site:skip -->
 </div>
 
-> [!NOTE]
-> This project was written by AI (Claude Code).
-
 A **Git-like CLI/TUI/GUI** for <a href="https://aws.amazon.com/"><img src="https://github.com/user-attachments/assets/03a2fde5-bf10-45f3-8bf0-722b10b6c97f" height="16" alt=""></a> AWS Parameter Store / Secrets Manager, <a href="https://cloud.google.com/"><img src="https://github.com/user-attachments/assets/d6e64422-dd06-482b-90a9-e2eb1e8c3de5" height="16" alt=""></a> Google Cloud Secret Manager, and <a href="https://azure.microsoft.com/"><img src="https://github.com/user-attachments/assets/5095c477-6f77-4cea-84b6-50eff8e61df4" height="16" alt=""></a> Azure Key Vault / App Configuration. Familiar commands like `show`, `log`, `diff`, and a **staging workflow** for safe, reviewable changes.
 
 <p align="center">
