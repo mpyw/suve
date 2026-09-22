@@ -28,7 +28,7 @@ require (
 	github.com/samber/lo v1.53.0
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.11.0
-	github.com/wailsapp/wails/v2 v2.15.0
+	github.com/wailsapp/wails/v2 v2.16.0
 	github.com/walles/moor/v2 v2.19.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.56.0
