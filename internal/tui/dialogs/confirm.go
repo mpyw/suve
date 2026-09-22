@@ -40,8 +40,9 @@ const (
 //
 //declscope:package
 type modeConfirm struct {
-	title  string
 	staged bool
+	//declscope:private
+	title string
 }
 
 // newModeConfirm builds the popup seeded with the dialog's title and current mode

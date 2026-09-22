@@ -39,13 +39,17 @@ type fakeMutator struct {
 	typeLabel      string
 	description    string
 	staged         bool
-	force          bool
 	recoveryWindow int
 	tagKey         string
-	tagValue       string
 
 	outcome data.WriteOutcome
-	err     error
+
+	//declscope:private
+	force bool
+	//declscope:private
+	tagValue string
+	//declscope:private
+	err error
 }
 
 func (m *fakeMutator) Capability() capability.ServiceCapability { return m.svcCap }
