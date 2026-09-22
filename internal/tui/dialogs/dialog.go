@@ -29,6 +29,8 @@ const dialogFrameHeight = 2
 
 // minDialogContent floors the wrap width so a very narrow terminal still wraps
 // to something legible rather than one column.
+//
+//declscope:private
 const minDialogContent = 24
 
 // dialogLayout tracks the terminal size the shell fans to a dialog (via the
