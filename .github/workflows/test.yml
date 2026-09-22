@@ -9,8 +9,12 @@ on:
   pull_request:
     branches: ['**']
 
+# id-token: write is what the coverage uploads authenticate with, in place of
+# a stored token. Ten of the jobs below upload, so the grant is stated once
+# here rather than repeated in each of them.
 permissions:
   contents: read
+  id-token: write
 
 # Deterministic staging data key for the whole test workflow, mirroring what
 # `mise test` sets locally. The staging working store is encrypted with this
@@ -49,8 +53,7 @@ jobs:
           files: ./coverage.txt
           flags: unittests
           name: codecov-suve-unit
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   gui-go-test:
@@ -86,8 +89,7 @@ jobs:
           files: ./coverage-gui.txt
           flags: gui
           name: codecov-suve-gui
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   e2e-aws:
@@ -131,8 +133,7 @@ jobs:
           files: ./coverage-e2e.txt
           flags: e2e
           name: codecov-suve-e2e-aws
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   e2e-aws-tui:
@@ -180,8 +181,7 @@ jobs:
           files: ./coverage-e2e-tui.txt
           flags: e2e
           name: codecov-suve-e2e-aws-tui
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   e2e-gcloud:
@@ -219,8 +219,7 @@ jobs:
           files: ./coverage-e2e-gcloud.txt
           flags: e2e
           name: codecov-suve-e2e-gcloud
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   e2e-gcloud-tui:
@@ -265,8 +264,7 @@ jobs:
           files: ./coverage-e2e-gcloud-tui.txt
           flags: e2e
           name: codecov-suve-e2e-gcloud-tui
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   e2e-azure:
@@ -319,8 +317,7 @@ jobs:
           files: ./coverage-e2e-azure.txt
           flags: e2e
           name: codecov-suve-e2e-azure
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   e2e-azure-tui:
@@ -380,8 +377,7 @@ jobs:
           files: ./coverage-e2e-azure-tui.txt
           flags: e2e
           name: codecov-suve-e2e-azure-tui
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   lint:
@@ -511,8 +507,7 @@ jobs:
           files: ./internal/gui/frontend/coverage/lcov.info
           flags: gui-frontend
           name: codecov-suve-gui-frontend
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
       - name: Upload Playwright report
@@ -770,8 +765,7 @@ jobs:
           files: ./coverage-platform-${{ matrix.os }}.txt
           flags: platform-${{ matrix.os }}
           name: codecov-suve-platform-${{ matrix.os }}
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   platform-lint:
