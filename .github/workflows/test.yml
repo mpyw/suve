@@ -48,7 +48,7 @@ jobs:
           go test -v -race -coverprofile=coverage.txt -covermode=atomic -coverpkg=$COVERPKG $PACKAGES
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage.txt
           flags: unittests
@@ -84,7 +84,7 @@ jobs:
             -coverpkg=./internal/gui/... ./internal/gui/...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage-gui.txt
           flags: gui
@@ -128,7 +128,7 @@ jobs:
           go test -v -race -tags e2e -run '^TestAWS' -coverprofile=coverage-e2e.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage-e2e.txt
           flags: e2e
@@ -176,7 +176,7 @@ jobs:
           go test -v -race -tags e2e -run '^TestTUIAWS' -coverprofile=coverage-e2e-tui.txt -covermode=atomic -coverpkg=$COVERPKG ./e2e/...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage-e2e-tui.txt
           flags: e2e
@@ -214,7 +214,7 @@ jobs:
           SUVE_GCLOUD_SECRETMANAGER_ENDPOINT: localhost:9090
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage-e2e-gcloud.txt
           flags: e2e
@@ -259,7 +259,7 @@ jobs:
           SUVE_GCLOUD_SECRETMANAGER_ENDPOINT: localhost:9090
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage-e2e-gcloud-tui.txt
           flags: e2e
@@ -312,7 +312,7 @@ jobs:
           SUVE_AZURE_KEYVAULT_ENDPOINT: "https://localhost:8443"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage-e2e-azure.txt
           flags: e2e
@@ -372,7 +372,7 @@ jobs:
           SUVE_AZURE_KEYVAULT_ENDPOINT: "https://localhost:8443"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage-e2e-azure-tui.txt
           flags: e2e
@@ -502,7 +502,7 @@ jobs:
 
       - name: Upload frontend coverage to Codecov
         if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./internal/gui/frontend/coverage/lcov.info
           flags: gui-frontend
@@ -760,7 +760,7 @@ jobs:
           go test -v -race -coverprofile=coverage-platform-${{ matrix.os }}.txt -covermode=atomic -coverpkg="$COVERPKG" ${{ steps.packages.outputs.packages }}
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
         with:
           files: ./coverage-platform-${{ matrix.os }}.txt
           flags: platform-${{ matrix.os }}
