@@ -3,14 +3,14 @@ name: declscope-adoption
 description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when clearing a declscope baseline, or when a declscope diagnostic is hard to act on. Covers reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence.
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.10.0
-x-embedded-at: "2026-09-22T23:17:19Z"
-x-embedded-digest: "sha256:00bc4f479891a2dbb6fa20a9ebdc7ef2ba078ded2f48d6a5d0dff885ed5628c4"
+x-embedded-version: 0.10.1
+x-embedded-at: "2026-09-22T23:54:36Z"
+x-embedded-digest: "sha256:302b643ae5d0048495e9c7e437e614ecb640dcb37fe799baeba9c92aa98c35c9"
 ---
 
 # Adopting declscope
 
-Written against **declscope 0.10.0**. Check the version first: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.10.1**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
