@@ -33,8 +33,10 @@ const (
 	flagOverwrite          = "overwrite"
 	flagForce              = "force"
 	flagAllowScopeMismatch = "allow-scope-mismatch"
-	cmdNamePush            = "push"
-	argsUsageName          = "[name]"
+	//declscope:private
+	cmdNamePush = "push"
+	//declscope:private
+	argsUsageName = "[name]"
 )
 
 // CommandConfig holds service-specific configuration for building stage commands.

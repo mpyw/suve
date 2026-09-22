@@ -248,8 +248,10 @@ func pressDown() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyDown} }
 func pressPgDown() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyPgDown} }
 
 //nolint:gochecknoglobals // test-only type sentinel
+//declscope:private
 var clearScreenType = reflect.TypeOf(tea.ClearScreen())
 
+//declscope:private
 func drain(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {
 		return nil
@@ -291,6 +293,8 @@ const (
 
 // ansiSGR matches the SGR color escapes lipgloss emits, so a test can compare
 // the plain text a user reads.
+//
+//declscope:private
 var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 func stripANSI(s string) string { return ansiSGR.ReplaceAllString(s, "") }
