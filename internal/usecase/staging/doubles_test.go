@@ -19,10 +19,13 @@ import (
 )
 
 type mockServiceStrategy struct {
-	service          staging.Service
-	serviceName      string
-	itemName         string
 	hasDeleteOptions bool
+	//declscope:private
+	service staging.Service
+	//declscope:private
+	serviceName string
+	//declscope:private
+	itemName string
 }
 
 func (m *mockServiceStrategy) Service() staging.Service { return m.service }
@@ -51,8 +54,9 @@ func newSecretStrategy() *mockServiceStrategy {
 type mockParser struct {
 	*mockServiceStrategy
 
+	parseErr error
+	//declscope:private
 	parsedName string
-	parseErr   error
 }
 
 func (m *mockParser) ParseName(input string) (string, error) {

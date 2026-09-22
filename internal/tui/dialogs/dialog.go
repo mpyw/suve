@@ -37,10 +37,11 @@ const minDialogContent = 24
 // size-awareness is uniform: long lines wrap to contentWidth, and a body taller
 // than the screen is capped/scrolled rather than clipped off the bottom edge.
 type dialogLayout struct {
-	// width / height are the terminal size (from the last WindowSizeMsg). Zero
+	// height / width are the terminal size (from the last WindowSizeMsg). Zero
 	// until the first size arrives, which every helper treats as "not yet sized".
-	width  int
 	height int
+	//declscope:private
+	width int
 }
 
 // setSize records the terminal size a WindowSizeMsg carries.

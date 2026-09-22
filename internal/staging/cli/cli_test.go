@@ -31,18 +31,28 @@ import (
 //
 //declscope:package // package-wide mock shared with the per-command test files (tag_test.go, ...)
 type fullMockStrategy struct {
-	service              staging.Service
-	hasDeleteOptions     bool
-	parseNameErr         error
-	parseSpecVersion     bool
-	parseSpecErr         error
-	fetchCurrentErr      error
-	fetchCurrentVal      string
-	fetchVersionErr      error
-	fetchVersionVal      string
-	fetchVersionLbl      string
-	applyErr             error
+	service         staging.Service
+	fetchCurrentErr error
+	fetchCurrentVal string
+	//declscope:private
+	hasDeleteOptions bool
+	//declscope:private
+	parseNameErr error
+	//declscope:private
+	parseSpecVersion bool
+	//declscope:private
+	parseSpecErr error
+	//declscope:private
+	fetchVersionErr error
+	//declscope:private
+	fetchVersionVal string
+	//declscope:private
+	fetchVersionLbl string
+	//declscope:private
+	applyErr error
+	//declscope:private
 	fetchLastModifiedVal time.Time
+	//declscope:private
 	fetchLastModifiedErr error
 }
 
