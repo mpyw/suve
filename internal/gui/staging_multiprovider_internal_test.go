@@ -219,3 +219,25 @@ func TestApp_serviceStrategyScoped_UnknownProvider(t *testing.T) {
 	_, err := app.serviceStrategyScoped(provider.GoogleCloudScope("proj"), "param")
 	require.ErrorIs(t, err, errUnsupportedService)
 }
+
+// TestApp_ParamNamespaceHelpers_NoParamService pins the namespace helpers for a
+// provider without a param service (Google Cloud) or an unknown provider: the
+// scope is left alone, it has no namespace axis, and a namespaced param
+// strategy is errUnsupportedService.
+func TestApp_ParamNamespaceHelpers_NoParamService(t *testing.T) {
+	t.Parallel()
+
+	app := &App{ctx: t.Context()}
+
+	for _, sc := range []provider.Scope{provider.GoogleCloudScope("proj"), {Provider: provider.Provider("oracle"), StoreName: "s"}} {
+		assert.Equal(t, sc, app.effectiveParamScopeScoped(sc, "dev"))
+		assert.False(t, hasParamNamespaces(sc))
+
+		_, err := app.paramStrategyForNamespaceScoped(sc, "dev")
+		require.ErrorIs(t, err, errUnsupportedService)
+	}
+
+	// An App Configuration scope with no store name has no namespace axis either.
+	assert.False(t, hasParamNamespaces(provider.AzureKeyVaultScope("vault")))
+	assert.True(t, hasParamNamespaces(provider.AzureAppConfigScope("store")))
+}

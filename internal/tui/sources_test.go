@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -182,4 +183,40 @@ func TestParserFor_PerProvider(t *testing.T) {
 			assert.IsType(t, tt.want, got)
 		})
 	}
+}
+
+// scopeRecordingFactory is a provider.Factory that records the scope it was
+// asked to build a store for.
+type scopeRecordingFactory struct{ got *provider.Scope }
+
+func (f scopeRecordingFactory) Store(_ context.Context, sc provider.Scope, _ provider.Kind) (provider.Store, error) {
+	*f.got = sc
+
+	return &providermock.Store{}, nil
+}
+
+// TestParamResolver_NamespaceOnlyForAppConfig pins that the param store
+// resolver applies the namespace only to a service with a namespace axis (Azure
+// App Configuration) and leaves every other scope alone.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestParamResolver_NamespaceOnlyForAppConfig(t *testing.T) {
+	orig := registry
+	t.Cleanup(func() { registry = orig })
+
+	var got provider.Scope
+
+	registry = provider.NewRegistry()
+	registry.Register(provider.ProviderAzure, scopeRecordingFactory{got: &got})
+	registry.Register(provider.ProviderAWS, scopeRecordingFactory{got: &got})
+
+	azure := provider.Scope{Provider: provider.ProviderAzure, VaultName: "v", StoreName: "s", AppConfigNamespace: "base"}
+	_, err := newSourceFactory(t.Context(), azure).paramResolver()(t.Context(), "dev")
+	require.NoError(t, err)
+	assert.Equal(t, "dev", got.AppConfigNamespace)
+
+	aws := provider.Scope{Provider: provider.ProviderAWS}
+	_, err = newSourceFactory(t.Context(), aws).paramResolver()(t.Context(), "dev")
+	require.NoError(t, err)
+	assert.Equal(t, aws, got)
 }
