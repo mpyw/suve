@@ -183,7 +183,7 @@ func TestAll_ProviderShape(t *testing.T) {
 	want := []shape{
 		{provider: string(provider.ProviderAWS), scopeFields: []string{}, services: []string{"param", "secret"}},
 		{provider: string(provider.ProviderGoogleCloud), scopeFields: []string{"project"}, services: []string{"secret"}},
-		{provider: string(provider.ProviderAzure), scopeFields: []string{}, services: []string{"param", "secret"}},
+		{provider: string(provider.ProviderAzure), scopeFields: []string{"vault", "store", "namespace"}, services: []string{"param", "secret"}},
 	}
 
 	assert.Equal(t, want, got)

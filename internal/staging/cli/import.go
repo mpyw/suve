@@ -422,7 +422,7 @@ func importAction(
 				Stdin:     cmd.Root().Reader,
 				Stdout:    cmd.Root().Writer,
 				Stderr:    cmd.Root().ErrWriter,
-				Target:    resolved.Target,
+				Target:    resolved.Target.String(),
 				BufReader: stdin,
 			},
 			Stderr: cmd.Root().ErrWriter,

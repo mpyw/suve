@@ -24,35 +24,17 @@ type Prompter struct {
 	// read-ahead into the first reader's buffer and hit EOF.
 	BufReader *bufio.Reader
 
-	// Target is a provider-neutral, human-readable description of where the
-	// operation applies (e.g. "my-profile (123456789012 / us-east-1)" for AWS or
-	// "project my-gcloud-project" for Google Cloud). When set, it is shown before
-	// the prompt. It takes precedence over the AWS-specific fields below.
+	// Target is a provider-neutral description of where the operation applies
+	// (provider.Target.String(), e.g. "profile dev · account 123456789012 ·
+	// region us-east-1" for AWS or "project my-project" for Google Cloud). When
+	// set, it is shown before the prompt.
 	Target string
-
-	// AccountID/Region/Profile describe the AWS target. They are used only when
-	// Target is empty, preserving the original AWS confirmation output.
-	AccountID string
-	Region    string
-	Profile   string
 }
 
 // printTargetInfo prints the target information before a prompt, if available.
 func (p *Prompter) printTargetInfo() {
 	if p.Target != "" {
 		output.Printf(p.Stderr, "%s Target: %s\n", colors.For(p.Stderr).Info("i"), p.Target)
-
-		return
-	}
-
-	if p.AccountID == "" || p.Region == "" {
-		return
-	}
-
-	if p.Profile != "" {
-		output.Printf(p.Stderr, "%s Target: %s (%s / %s)\n", colors.For(p.Stderr).Info("i"), p.Profile, p.AccountID, p.Region)
-	} else {
-		output.Printf(p.Stderr, "%s Target: %s / %s\n", colors.For(p.Stderr).Info("i"), p.AccountID, p.Region)
 	}
 }
 

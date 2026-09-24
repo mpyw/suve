@@ -4,14 +4,15 @@
     Capabilities,
     DetectProviders,
     EnvScope,
-    GetAWSIdentity,
     GetCurrentScope,
+    GetScopeTarget,
     InitialProvider,
     InitialService,
+    ResolveScopeTarget,
     SelectScope,
     StagingStatus,
   } from '../wailsjs/go/gui/App';
-  import type { gui } from '../wailsjs/go/models';
+  import type { capability, gui } from '../wailsjs/go/models';
   import ParamView from './lib/ParamView.svelte';
   import { withRetry } from './lib/retry';
   import SecretView from './lib/SecretView.svelte';
@@ -22,7 +23,7 @@
   type ViewKey = 'param' | 'secret' | 'staging';
 
   // ---- Provider / scope: single source of truth for the whole app ----------
-  let capabilities = $state<gui.ProviderCapability[]>([]);
+  let capabilities = $state<capability.ProviderCapability[]>([]);
   let provider = $state(''); // '' until resolved/selected → selector prompt
   let scope = $state<gui.ScopeSelection | null>(null);
   let scopeReady = $state(false); // SelectScope resolved for the current provider
@@ -33,9 +34,11 @@
   // ---- View / sidebar state --------------------------------------------------
   let activeView: ViewKey = $state('param');
   let stagingCount = $state(0);
-  let accountId = $state('');
-  let region = $state('');
-  let profile = $state('');
+  // What the selected scope points at (profile/account/region, project,
+  // vault/store). Pending while ResolveScopeTarget runs (AWS: STS).
+  let target = $state<gui.ScopeTarget | null>(null);
+  // targetSeq drops a target response superseded by a newer scope selection.
+  let targetSeq = 0;
 
   // ---- Azure App Configuration namespace filter -----------------------------
   // App owns the client-side namespace filter so the dropdown can live in the
@@ -103,7 +106,8 @@
   const secretCap = $derived(services.find((s) => s.service === 'secret') ?? null);
 
   // ---- Startup: gate before fetch -------------------------------------------
-  // No GetAWSIdentity / StagingStatus until the provider is known AND is AWS —
+  // No ResolveScopeTarget / StagingStatus until a scope is selected, and the
+  // target is resolved over the network only when it is pending (AWS: STS) —
   // this kills the ~5s STS retry storm in non-AWS environments.
   onMount(async () => {
     try {
@@ -275,11 +279,11 @@
     scopeReady = false;
     pendingProvider = '';
     scopeError = '';
-    resetIdentity();
+    resetTarget();
   }
 
-  // applyScope validates+commits the scope server-side, then (AWS only) loads
-  // identity and the staging badge. On success it switches the active provider
+  // applyScope validates+commits the scope server-side, then loads the scope
+  // target and the staging badge. On success it switches the active provider
   // and clears the pending form; on rejection it leaves the previous provider
   // active (its lists keep working) and surfaces the error in the form.
   async function applyScope(sel: gui.ScopeSelection): Promise<void> {
@@ -292,23 +296,21 @@
       pendingProvider = '';
       scopeReady = true;
       persistScope(sel);
-      resetIdentity();
-      // AWS identity is AWS-only; the staging badge is scope-keyed for every
-      // provider (StagingStatus resolves the scope without STS off-AWS).
-      if (sel.provider === 'aws') {
-        await loadAWSIdentity();
-      }
+      resetTarget();
+      // The target resolves over the network only when pending; the staging
+      // badge is scope-keyed for every provider (StagingStatus resolves the
+      // scope without STS off-AWS).
+      await loadTarget();
       await loadStagingCount();
     } catch (e) {
       scopeError = parseError(e);
     }
   }
 
-  function resetIdentity() {
+  function resetTarget() {
     stagingCount = 0;
-    accountId = '';
-    region = '';
-    profile = '';
+    targetSeq++;
+    target = null;
   }
 
   // Re-seed the namespace filter to the (new) scope's namespace and drop the
@@ -355,17 +357,27 @@
     if (scopeReady) loadStagingCount();
   }
 
-  async function loadAWSIdentity() {
+  // loadTarget shows the scope target at once, then resolves a pending one. A
+  // failed lookup keeps the unresolved segments, which the sidebar shows as "?".
+  async function loadTarget() {
+    const seq = ++targetSeq;
+    let described: gui.ScopeTarget;
     try {
-      const identity = await GetAWSIdentity();
-      accountId = identity?.accountId ?? '';
-      region = identity?.region ?? '';
-      profile = identity?.profile ?? '';
+      described = await GetScopeTarget();
     } catch {
-      accountId = '';
-      region = '';
-      profile = '';
+      if (seq === targetSeq) target = null;
+      return;
     }
+    if (seq !== targetSeq) return;
+    target = described;
+    if (!described.pending) return;
+    let resolved: gui.ScopeTarget;
+    try {
+      resolved = await ResolveScopeTarget();
+    } catch {
+      resolved = { ...described, pending: false } as gui.ScopeTarget;
+    }
+    if (seq === targetSeq) target = resolved;
   }
 </script>
 
@@ -382,9 +394,7 @@
     {scopeError}
     activeView={effectiveView}
     {stagingCount}
-    {accountId}
-    {region}
-    {profile}
+    {target}
     {namespaceOptions}
     {selectedNamespace}
     onnavigate={handleNavigate}

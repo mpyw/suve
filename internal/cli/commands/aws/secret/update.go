@@ -11,7 +11,6 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -118,11 +117,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 			Stdin:  cliinternal.ValueStdin(cmd),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
-		}
-		if identity, _ := aws.LoadIdentity(ctx); identity != nil {
-			prompter.AccountID = identity.AccountID
-			prompter.Region = identity.Region
-			prompter.Profile = identity.Profile
+			Target: awsinternal.ConfirmTarget(ctx),
 		}
 
 		confirmed, err := prompter.ConfirmAction("Update secret", name, false)

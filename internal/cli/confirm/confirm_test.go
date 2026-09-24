@@ -53,17 +53,16 @@ func TestPrompter_Confirm(t *testing.T) {
 		var stderr bytes.Buffer
 
 		p := &confirm.Prompter{
-			Stdin:     strings.NewReader("y\n"),
-			Stdout:    io.Discard,
-			Stderr:    &stderr,
-			AccountID: "123456789012",
-			Region:    "ap-northeast-1",
+			Stdin:  strings.NewReader("y\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+			Target: "account 123456789012 · region ap-northeast-1",
 		}
 
 		result, err := p.Confirm("test message", false)
 		require.NoError(t, err)
 		assert.True(t, result)
-		assert.Contains(t, stderr.String(), "Target: 123456789012 / ap-northeast-1")
+		assert.Contains(t, stderr.String(), "Target: account 123456789012 · region ap-northeast-1")
 	})
 
 	t.Run("confirm with profile displays profile in target info", func(t *testing.T) {
@@ -72,18 +71,16 @@ func TestPrompter_Confirm(t *testing.T) {
 		var stderr bytes.Buffer
 
 		p := &confirm.Prompter{
-			Stdin:     strings.NewReader("y\n"),
-			Stdout:    io.Discard,
-			Stderr:    &stderr,
-			AccountID: "123456789012",
-			Region:    "ap-northeast-1",
-			Profile:   "production",
+			Stdin:  strings.NewReader("y\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+			Target: "profile production · account 123456789012 · region ap-northeast-1",
 		}
 
 		result, err := p.Confirm("test message", false)
 		require.NoError(t, err)
 		assert.True(t, result)
-		assert.Contains(t, stderr.String(), "Target: production (123456789012 / ap-northeast-1)")
+		assert.Contains(t, stderr.String(), "Target: profile production · account 123456789012 · region ap-northeast-1")
 	})
 
 	t.Run("confirm without identity does not display target info", func(t *testing.T) {
@@ -242,56 +239,17 @@ func TestPrompter_ConfirmAction(t *testing.T) {
 		var stderr bytes.Buffer
 
 		p := &confirm.Prompter{
-			Stdin:     strings.NewReader("y\n"),
-			Stdout:    io.Discard,
-			Stderr:    &stderr,
-			AccountID: "123456789012",
-			Region:    "ap-northeast-1",
+			Stdin:  strings.NewReader("y\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+			Target: "account 123456789012 · region ap-northeast-1",
 		}
 
 		result, err := p.ConfirmAction("Update", "/my/param", false)
 		require.NoError(t, err)
 		assert.True(t, result)
-		assert.Contains(t, stderr.String(), "Target: 123456789012 / ap-northeast-1")
+		assert.Contains(t, stderr.String(), "Target: account 123456789012 · region ap-northeast-1")
 		assert.Contains(t, stderr.String(), "Update /my/param?")
-	})
-}
-
-func TestPrompter_PartialIdentity(t *testing.T) {
-	t.Parallel()
-
-	t.Run("account only does not display target info", func(t *testing.T) {
-		t.Parallel()
-
-		var stderr bytes.Buffer
-
-		p := &confirm.Prompter{
-			Stdin:     strings.NewReader("y\n"),
-			Stdout:    io.Discard,
-			Stderr:    &stderr,
-			AccountID: "123456789012",
-		}
-
-		_, err := p.Confirm("test message", false)
-		require.NoError(t, err)
-		assert.NotContains(t, stderr.String(), "Target:")
-	})
-
-	t.Run("region only does not display target info", func(t *testing.T) {
-		t.Parallel()
-
-		var stderr bytes.Buffer
-
-		p := &confirm.Prompter{
-			Stdin:  strings.NewReader("y\n"),
-			Stdout: io.Discard,
-			Stderr: &stderr,
-			Region: "ap-northeast-1",
-		}
-
-		_, err := p.Confirm("test message", false)
-		require.NoError(t, err)
-		assert.NotContains(t, stderr.String(), "Target:")
 	})
 }
 
@@ -337,17 +295,16 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 		var stderr bytes.Buffer
 
 		p := &confirm.Prompter{
-			Stdin:     strings.NewReader("y\n"),
-			Stdout:    io.Discard,
-			Stderr:    &stderr,
-			AccountID: "123456789012",
-			Region:    "ap-northeast-1",
+			Stdin:  strings.NewReader("y\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+			Target: "account 123456789012 · region ap-northeast-1",
 		}
 
 		result, err := p.ConfirmDelete("/my/param", false)
 		require.NoError(t, err)
 		assert.True(t, result)
-		assert.Contains(t, stderr.String(), "Target: 123456789012 / ap-northeast-1")
+		assert.Contains(t, stderr.String(), "Target: account 123456789012 · region ap-northeast-1")
 		assert.Contains(t, stderr.String(), "permanently delete")
 	})
 
@@ -357,18 +314,16 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 		var stderr bytes.Buffer
 
 		p := &confirm.Prompter{
-			Stdin:     strings.NewReader("y\n"),
-			Stdout:    io.Discard,
-			Stderr:    &stderr,
-			AccountID: "123456789012",
-			Region:    "ap-northeast-1",
-			Profile:   "staging",
+			Stdin:  strings.NewReader("y\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+			Target: "profile staging · account 123456789012 · region ap-northeast-1",
 		}
 
 		result, err := p.ConfirmDelete("/my/param", false)
 		require.NoError(t, err)
 		assert.True(t, result)
-		assert.Contains(t, stderr.String(), "Target: staging (123456789012 / ap-northeast-1)")
+		assert.Contains(t, stderr.String(), "Target: profile staging · account 123456789012 · region ap-northeast-1")
 		assert.Contains(t, stderr.String(), "permanently delete")
 	})
 

@@ -36,17 +36,6 @@ func (p *recordingPage) Update(msg tea.Msg) (page, tea.Cmd) {
 func (p *recordingPage) View(int, int) string { return "recording page" }
 func (p *recordingPage) capturesInput() bool  { return false }
 
-// TestAppendKV pins the "key value" segment builder: a non-empty value is
-// appended as "key value", an empty value leaves the slice untouched.
-func TestAppendKV(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, []string{"aws", "account 123"},
-		appendKV([]string{"aws"}, "account", "123"), "a non-empty value is appended as \"key value\"")
-	assert.Equal(t, []string{"aws"},
-		appendKV([]string{"aws"}, "region", ""), "an empty value is skipped")
-}
-
 // TestTargetTitle pins the apply/reset target label: a global fan-out or a
 // multi-target set is "all", while a single target voices its own label.
 func TestTargetTitle(t *testing.T) {
@@ -87,16 +76,16 @@ func TestClipStatus(t *testing.T) {
 	assert.LessOrEqual(t, len([]rune(clipped)), 9, "a wide status is clamped below the terminal width")
 }
 
-// TestApplyTargetLine pins the apply target identity line per provider: AWS shows
-// account/region only when the identity is resolved, Google Cloud shows the
-// project, Azure shows vault/store, and an unknown provider falls back to its bare
-// name.
+// TestApplyTargetLine pins the apply target line per provider: the provider
+// followed by the scope target's set segments. AWS shows profile/account/region
+// only once the target is resolved, and an unknown provider falls back to its
+// bare name.
 func TestApplyTargetLine(t *testing.T) {
 	t.Parallel()
 
-	awsWith := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
-	assert.Equal(t, "aws · account 123456789012 · region ap-northeast-1", awsWith.applyTargetLine(),
-		"AWS voices account and region from the resolved identity")
+	awsWith := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
+	assert.Equal(t, "aws · profile dev · account 123456789012 · region ap-northeast-1", awsWith.applyTargetLine(),
+		"AWS voices profile, account and region from the resolved target")
 
 	awsNo := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}})
 	assert.Equal(t, "aws", awsNo.applyTargetLine(), "AWS with no identity is just the provider name")
@@ -107,6 +96,11 @@ func TestApplyTargetLine(t *testing.T) {
 	azure := newApp(config{scope: provider.Scope{Provider: provider.ProviderAzure, VaultName: "v", StoreName: "s"}})
 	assert.Equal(t, "azure · vault v · store s", azure.applyTargetLine(), "Azure voices the vault and store")
 
+	azureNS := newApp(config{scope: provider.Scope{
+		Provider: provider.ProviderAzure, StoreName: "s", AppConfigNamespace: "dev",
+	}})
+	assert.Equal(t, "azure · store s · namespace dev", azureNS.applyTargetLine(), "Azure voices a selected namespace")
+
 	unknown := newApp(config{scope: provider.Scope{Provider: provider.Provider("mystery")}})
 	assert.Equal(t, "mystery", unknown.applyTargetLine(), "an unknown provider falls back to its bare name")
 }
@@ -116,7 +110,7 @@ func TestApplyTargetLine(t *testing.T) {
 func TestRenderTooSmall(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	m = updateApp(t, m, tea.WindowSizeMsg{Width: minWidth - 20, Height: minHeight - 6})
 
 	// View() takes the too-small branch (it calls renderTooSmall for the content).
@@ -131,7 +125,7 @@ func TestRenderTooSmall(t *testing.T) {
 func TestUpdate_MouseWheelForwardedToPage(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	rp := &recordingPage{}
 	m.pages = []page{rp}
 
@@ -148,7 +142,7 @@ func TestUpdate_MouseWheelForwardedToPage(t *testing.T) {
 func TestUpdate_MouseWheelSwallowedByDialog(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	rp := &recordingPage{}
 	m.pages = []page{rp}
 	fd := &fakeDialog{}
@@ -166,7 +160,7 @@ func TestUpdate_MouseWheelSwallowedByDialog(t *testing.T) {
 func TestUpdate_MouseMotionForwardedToPage(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	rp := &recordingPage{}
 	m.pages = []page{rp}
 
@@ -183,7 +177,7 @@ func TestUpdate_MouseMotionForwardedToPage(t *testing.T) {
 func TestUpdate_MouseMotionSwallowedByDialog(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	rp := &recordingPage{}
 	m.pages = []page{rp}
 	m.dialogs = []dialog{&fakeDialog{}}
@@ -198,7 +192,7 @@ func TestUpdate_MouseMotionSwallowedByDialog(t *testing.T) {
 func TestUpdate_MouseReleaseForwardedToPage(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	rp := &recordingPage{}
 	m.pages = []page{rp}
 
@@ -215,7 +209,7 @@ func TestUpdate_MouseReleaseForwardedToPage(t *testing.T) {
 func TestUpdate_MouseReleaseSwallowedByDialog(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	rp := &recordingPage{}
 	m.pages = []page{rp}
 	m.dialogs = []dialog{&fakeDialog{}}

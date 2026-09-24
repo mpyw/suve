@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingInspectImportFile, StagingPickExportPath, StagingPickImportPath, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
-  import { gui } from '../../wailsjs/go/models';
+  import { capability, gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
   import { withRetry } from './retry';
@@ -10,7 +10,7 @@
   import './common.css';
 
   interface Props {
-    services?: gui.ServiceCapability[];
+    services?: capability.ServiceCapability[];
     oncountchange?: (count: number) => void;
   }
 

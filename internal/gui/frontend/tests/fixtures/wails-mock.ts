@@ -311,7 +311,7 @@ export const defaultCapabilities: ProviderCapability[] = [
   {
     provider: 'azure',
     displayName: 'Azure',
-    scopeFields: [],
+    scopeFields: ['vault', 'store', 'namespace'],
     services: [
       { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true, hasDescription: false },
       { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: false },
@@ -773,7 +773,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
     const state = JSON.parse(JSON.stringify(mockState));
 
     // Records binding invocations so specs can assert e.g. that no
-    // GetAWSIdentity / StagingStatus fires under a non-AWS scope (mount gating).
+    // ResolveScopeTarget network lookup / StagingStatus fires under a non-AWS
+    // scope (mount gating).
     const calls: string[] = [];
     (window as any).__wailsCalls = calls;
 
@@ -817,6 +818,35 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
             : `azure/keyvault/${s.vaultName}`;
         default:
           return `aws/${state.awsIdentity.accountId}/${state.awsIdentity.region}`;
+      }
+    }
+
+    // describeScopeTarget mirrors provider.Scope.Target for the current scope
+    // (without the App Configuration namespace, as GetScopeTarget drops it).
+    function describeScopeTarget() {
+      const s = state.currentScope || {};
+      switch (s.provider) {
+        case 'aws':
+          return {
+            segments: [
+              { label: 'profile', value: '' },
+              { label: 'account', value: '' },
+              { label: 'region', value: '' },
+            ],
+            pending: true,
+          };
+        case 'googlecloud':
+          return { segments: [{ label: 'project', value: s.projectId || '' }], pending: false };
+        case 'azure':
+          return {
+            segments: [
+              { label: 'vault', value: s.vaultName || '' },
+              { label: 'store', value: s.storeName || '' },
+            ],
+            pending: false,
+          };
+        default:
+          return { segments: [], pending: false };
       }
     }
 
@@ -879,13 +909,30 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
 
-      // AWS Identity
-      GetAWSIdentity: async () => {
-        calls.push('GetAWSIdentity');
-        if (state.simulateError?.operation === 'GetAWSIdentity') {
+      // Scope target (the sidebar's "who am I connected to"), mirroring
+      // provider.Scope.Target / binding.ResolveTarget: AWS is pending until
+      // ResolveScopeTarget answers from the (mock) STS identity; the App
+      // Configuration namespace is left to the sidebar's filter dropdown.
+      GetScopeTarget: async () => {
+        calls.push('GetScopeTarget');
+        return describeScopeTarget();
+      },
+      ResolveScopeTarget: async () => {
+        calls.push('ResolveScopeTarget');
+        const described = describeScopeTarget();
+        if (!described.pending) return described;
+        if (state.simulateError?.operation === 'ResolveScopeTarget') {
           throw new Error(state.simulateError.message);
         }
-        return state.awsIdentity;
+        const id = state.awsIdentity;
+        return {
+          segments: [
+            { label: 'profile', value: id.profile },
+            { label: 'account', value: id.accountId },
+            { label: 'region', value: id.region },
+          ],
+          pending: false,
+        };
       },
 
       // Parameter operations

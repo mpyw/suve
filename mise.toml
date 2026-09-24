@@ -20,7 +20,7 @@ golangci-lint = "2.13.1"
 # with GORELEASER_VERSION there.
 goreleaser = "2.17.1"
 nfpm = "2.41.1"
-"go:github.com/wailsapp/wails/v2/cmd/wails" = "2.13.0"
+"go:github.com/wailsapp/wails/v2/cmd/wails" = "2.16.0"
 # Reports production dead code; run via the `deadcode` task (deadcode lint gate).
 "go:golang.org/x/tools/cmd/deadcode" = "0.49.0"
 

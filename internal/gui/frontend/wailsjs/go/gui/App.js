@@ -14,12 +14,12 @@ export function EnvScope(arg1) {
   return window['go']['gui']['App']['EnvScope'](arg1);
 }
 
-export function GetAWSIdentity() {
-  return window['go']['gui']['App']['GetAWSIdentity']();
-}
-
 export function GetCurrentScope() {
   return window['go']['gui']['App']['GetCurrentScope']();
+}
+
+export function GetScopeTarget() {
+  return window['go']['gui']['App']['GetScopeTarget']();
 }
 
 export function InitialProvider() {
@@ -64,6 +64,10 @@ export function ParamShow(arg1, arg2) {
 
 export function ParamTypeOptions() {
   return window['go']['gui']['App']['ParamTypeOptions']();
+}
+
+export function ResolveScopeTarget() {
+  return window['go']['gui']['App']['ResolveScopeTarget']();
 }
 
 export function SecretAddTag(arg1, arg2, arg3) {

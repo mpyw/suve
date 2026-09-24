@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { gui } from '../../wailsjs/go/models';
+  import type { capability, gui } from '../../wailsjs/go/models';
 
   type ViewKey = 'param' | 'secret' | 'staging';
 
   interface Props {
-    capabilities?: gui.ProviderCapability[];
+    capabilities?: capability.ProviderCapability[];
     provider?: string;
     pendingProvider?: string;
-    services?: gui.ServiceCapability[];
+    services?: capability.ServiceCapability[];
     hasAnyStaging?: boolean;
     scope?: gui.ScopeSelection | null;
     scopeReady?: boolean;
@@ -15,9 +15,8 @@
     scopeError?: string;
     activeView?: ViewKey;
     stagingCount?: number;
-    accountId?: string;
-    region?: string;
-    profile?: string;
+    // What the active scope points at, in display order (see GetScopeTarget).
+    target?: gui.ScopeTarget | null;
     // Azure App Configuration namespace filter (footer dropdown). namespaceOptions
     // are the choices ((NULL), discovered, *); selectedNamespace is the current
     // value; onchangenamespace reports a new selection. Client-side only — this
@@ -44,9 +43,7 @@
     scopeError = '',
     activeView = 'param',
     stagingCount = 0,
-    accountId = '',
-    region = '',
-    profile = '',
+    target = null,
     namespaceOptions = [],
     selectedNamespace = '',
     onnavigate,
@@ -56,6 +53,13 @@
     onchangescope,
     onchangenamespace,
   }: Props = $props();
+
+  // A provider with scope inputs (a scope form) offers "Change scope"; one that
+  // reads its scope from the ambient config (AWS) has nothing to change.
+  const activeCap = $derived(capabilities.find((c) => c.provider === provider) ?? null);
+  const hasScopeForm = $derived((activeCap?.scopeFields?.length ?? 0) > 0);
+  // The namespace filter row shows for a service with a namespace axis.
+  const hasNamespaces = $derived(services.some((s) => s.hasNamespaces));
 
   // Service key → stable nav icon/letter (labels come from capability names).
   const NAV_ICON: Record<string, string> = { param: 'P', secret: 'S' };
@@ -241,58 +245,32 @@
     </nav>
   {/if}
 
-  <!-- Identity / scope info (hidden while a scope form is pending) -->
-  {#if provider === 'aws'}
-    <!-- Gated by provider only, symmetric with Google Cloud / Azure: every row
-         is always rendered, showing "?" when unset (e.g. identity unavailable).
-         AWS has no editable scope form (region/creds come from the ambient AWS
-         config), so there is no Change scope button. -->
-    <div class="aws-info">
-      <div class="aws-info-row">
-        <span class="aws-info-label">Profile</span>
-        <span class="aws-info-value aws-info-profile" title={profile || '?'}>{profile || '?'}</span>
-      </div>
-      <div class="aws-info-row">
-        <span class="aws-info-label">Account</span>
-        <span class="aws-info-value" title={accountId || '?'}>{accountId || '?'}</span>
-      </div>
-      <div class="aws-info-row">
-        <span class="aws-info-label">Region</span>
-        <span class="aws-info-value" title={region || '?'}>{region || '?'}</span>
-      </div>
-    </div>
-  {:else if provider === 'googlecloud'}
-    <!-- Gated by provider only: every row is always rendered ("?" when unset).
-         Change scope is always present and only disabled while a form is pending
-         (so it stays reachable in an errored/partial state). -->
-    <div class="aws-info scope-info">
-      <div class="aws-info-row">
-        <span class="aws-info-label">Project</span>
-        <span class="aws-info-value" title={scope?.projectId || '?'}>{scope?.projectId || '?'}</span>
-      </div>
-      <button type="button" class="scope-change" disabled={!!pendingProvider} onclick={() => onchangescope?.()}>Change scope</button>
-    </div>
-  {:else if provider === 'azure'}
-    <div class="aws-info scope-info">
-      <div class="aws-info-row">
-        <span class="aws-info-label">Key Vault</span>
-        <span class="aws-info-value" title={scope?.vaultName || '?'}>{scope?.vaultName || '?'}</span>
-      </div>
-      <div class="aws-info-row">
-        <span class="aws-info-label">App Config</span>
-        <span class="aws-info-value" title={scope?.storeName || '?'}>{scope?.storeName || '?'}</span>
-      </div>
-      {#if scope?.storeName}
-        <!-- The scope's Namespace row is a client-side filter dropdown (App
-             Configuration only). Changing it filters ParamView's rows without
-             re-scoping; the "Change scope" button below re-points the scope. -->
-        <div class="aws-info-row">
-          <span class="aws-info-label">App Config NS</span>
+  <!-- Scope target: the same segments the TUI status bar and the CLI prompts
+       show. Every segment is always rendered, showing "…" while a lookup is
+       pending and "?" when unset (e.g. identity unavailable). -->
+  {#if provider}
+    <div class="scope-info">
+      {#each target?.segments ?? [] as seg, i}
+        <div class="scope-info-row">
+          <span class="scope-info-label">{seg.label}</span>
+          <span
+            class="scope-info-value"
+            class:scope-info-primary={i === 0}
+            title={seg.value || '?'}>{seg.value || (target?.pending ? '…' : '?')}</span
+          >
+        </div>
+      {/each}
+      {#if hasNamespaces}
+        <!-- The Namespace row is a client-side filter dropdown. Changing it
+             filters ParamView's rows without re-scoping; the "Change scope"
+             button below re-points the scope. -->
+        <div class="scope-info-row">
+          <span class="scope-info-label">namespace</span>
           <select
-            class="aws-info-value namespace-select"
+            class="scope-info-value namespace-select"
             value={selectedNamespace}
             onchange={handleNamespaceChange}
-            aria-label="App Config NS"
+            aria-label="Namespace"
           >
             {#each namespaceOptions as ns}
               <option value={ns}>{ns}</option>
@@ -300,7 +278,11 @@
           </select>
         </div>
       {/if}
-      <button type="button" class="scope-change" disabled={!!pendingProvider} onclick={() => onchangescope?.()}>Change scope</button>
+      {#if hasScopeForm}
+        <!-- Always present and only disabled while a form is pending (so it
+             stays reachable in an errored/partial state). -->
+        <button type="button" class="scope-change" disabled={!!pendingProvider} onclick={() => onchangescope?.()}>Change scope</button>
+      {/if}
     </div>
   {/if}
 </aside>
@@ -507,14 +489,14 @@
     color: #e94560;
   }
 
-  .aws-info {
+  .scope-info {
     margin-top: auto;
     padding: 12px 16px;
     border-top: 1px solid #2d2d44;
     font-size: 11px;
   }
 
-  .aws-info-row {
+  .scope-info-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -522,12 +504,13 @@
     padding: 4px 0;
   }
 
-  .aws-info-label {
+  .scope-info-label {
     color: #666;
     flex-shrink: 0;
+    text-transform: capitalize;
   }
 
-  .aws-info-value {
+  .scope-info-value {
     color: #a0a0a0;
     font-family: monospace;
     font-size: 10px;
@@ -537,7 +520,7 @@
     white-space: nowrap;
   }
 
-  .aws-info-profile {
+  .scope-info-primary {
     color: #e94560;
     font-weight: bold;
   }

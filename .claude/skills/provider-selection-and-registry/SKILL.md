@@ -88,10 +88,10 @@ root group, service packages and stage commands.
   Only the provider field is needed because the AWS factory builds its client
   from the ambient AWS config (region from env/profile), so no STS
   `GetCallerIdentity` call is made on the read/write path. The full
-  account/region identity (`infra.GetAWSIdentity` → `provider.AWSScope(accountID, region)`)
+  account/region identity (`aws.LoadIdentity` → `provider.AWSScope(accountID, region)`)
   is resolved separately by `binding.StagingScope` (the CLI's
   `awsinternal.StagingScopeResolver`, the GUI and the TUI all go through it), only where
-  staging state must be keyed.
+  staging state must be keyed, and by `binding.ResolveTarget` for display.
 - **Google Cloud** — the project id from `--project` or `GOOGLE_CLOUD_PROJECT`
   (`provider.GoogleCloudScope(project)`). The `gcloud` root package owns the
   flag and the Before hook, which stores the id with `gcloudinternal.WithProject`
@@ -110,6 +110,28 @@ and TUI all use:
 |---------------|------|
 | `Lookup(p, kind)` → `Binding` | `Parser()` / `ParserFactory()` (store-less parser), `Strategy(store)`, `Namespaced(sc)` / `NamespaceScope(sc, ns)` (App Configuration namespace override) |
 | `StagingScope(ctx, sc, kind, lookup)` | the scope that keys staging state plus the confirmation target. Azure keys param by store and secret by vault; AWS resolves the STS identity (pass `lookup` to memoize or stub it; nil uses `DefaultIdentity`) |
+| `ResolveTarget(ctx, sc, lookup)` | the display target (see below) with any pending part filled in by the same identity lookup |
+
+## Scope target ("who am I connected to")
+
+`provider.Target` is the one neutral descriptor every UI renders for the
+selected scope: ordered `{Label, Value}` segments plus a `Pending` flag.
+`Scope.Target()` (`internal/provider/target.go`) describes a scope without any
+network call. Each provider always lists the same labels: AWS
+profile/account/region, Google Cloud project, Azure vault/store (plus the
+namespace when one is selected). An AWS scope without account and region is
+`Pending`, and `binding.ResolveTarget` fills it from the STS caller identity
+(`provider.AWSTarget`).
+
+| Consumer | Renders |
+|----------|---------|
+| TUI status bar (`components/statusbar.go`) | `label:value` for each set segment, then `loading…` while pending |
+| TUI apply confirmation (`applyTargetLine`) | the provider, then `Target.String()` |
+| CLI confirmation prompts (`confirm.Prompter.Target`) | `Target.String()` (`label value · label value`) |
+| GUI sidebar (`GetScopeTarget`, then `ResolveScopeTarget` when pending) | one row per segment, `…` while pending, `?` when unset |
+
+Do not add a provider switch to a UI to show the target; change
+`Scope.Target()` or the provider's identity lookup instead.
 
 An unknown provider is `binding.ErrUnknownProvider`; a known provider without
 the kind is `provider.ErrUnsupportedKind`.

@@ -2,6 +2,7 @@
 package tui
 
 import (
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -20,14 +21,10 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// awsIdentityFixture is the deterministic identity used in AWS goldens so the
-// status bar renders without an async STS call.
-func awsIdentityFixture() *components.AWSIdentity {
-	return &components.AWSIdentity{
-		Account: "123456789012",
-		Region:  "ap-northeast-1",
-		Profile: "dev",
-	}
+// awsTargetFixture is the deterministic resolved target used in AWS goldens so
+// the status bar renders without an async STS call.
+func awsTargetFixture() *provider.Target {
+	return new(provider.AWSTarget("dev", "123456789012", "ap-northeast-1"))
 }
 
 // keyPress builds a printable-character key press.
@@ -75,7 +72,7 @@ func updateApp(t *testing.T, m *App, msg tea.Msg) *App {
 func TestUpdate_TabSwitching(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	require.Len(t, m.tabs, 3, "AWS offers Param, Secret, Staging")
 	assert.Equal(t, 0, m.activeTab)
 
@@ -113,7 +110,7 @@ func TestUpdate_JumpBeyondTabsIsNoop(t *testing.T) {
 func TestUpdate_DialogModality(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	fd := &fakeDialog{}
 	m.dialogs = []dialog{fd}
 
@@ -135,7 +132,7 @@ func TestUpdate_DialogModality(t *testing.T) {
 func TestUpdate_DialogCapturesGlobalKeys(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	fd := &fakeDialog{}
 	m.dialogs = []dialog{fd}
 
@@ -159,7 +156,7 @@ func TestUpdate_DialogCapturesGlobalKeys(t *testing.T) {
 func TestUpdate_BusyDialogSuppressesDismiss(t *testing.T) {
 	t.Parallel()
 
-	busy := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	busy := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	fdBusy := &fakeDialog{busyFlag: true}
 	busy.dialogs = []dialog{fdBusy}
 
@@ -167,7 +164,7 @@ func TestUpdate_BusyDialogSuppressesDismiss(t *testing.T) {
 	require.Len(t, busy.dialogs, 1, "a busy dialog is not dismissed by esc")
 	assert.Len(t, fdBusy.got, 1, "esc is forwarded to the busy dialog instead of closing it")
 
-	idle := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	idle := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	idle.dialogs = []dialog{&fakeDialog{}}
 	idle = updateApp(t, idle, specialKey(tea.KeyEscape))
 	assert.Empty(t, idle.dialogs, "an idle dialog is dismissed by esc")
@@ -182,7 +179,7 @@ func TestUpdate_DirtyFormEscGuard(t *testing.T) {
 	t.Parallel()
 
 	newModel := func() *App {
-		m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+		m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 		ef, _ := dialogs.NewEntryForm(dialogs.EntryFormInput{
 			Ctx: t.Context(), Mutator: capMutator{cap: goldenCap("aws", "secret")},
 			Service: "secret", Styles: styles.New(),
@@ -224,7 +221,7 @@ func TestUpdate_DirtyFormEscGuard(t *testing.T) {
 func TestUpdate_StagedCountBadge(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 
 	m = updateApp(t, m, nav.StagedCount{Service: "param", Count: 2})
 	m = updateApp(t, m, nav.StagedCount{Service: "secret", Count: 1})
@@ -240,7 +237,7 @@ func TestUpdate_StagedCountBadge(t *testing.T) {
 func TestUpdate_MutationDoneClosesDialog(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	m.dialogs = []dialog{&fakeDialog{}}
 
 	m = updateApp(t, m, dialogs.MutationDoneMsg{Service: "param", Status: "Staged create."})
@@ -259,7 +256,7 @@ func TestUpdate_DialogOpenGuardPreventsStacking(t *testing.T) {
 	mut := capMutator{cap: goldenCap("aws", "param")}
 	m := newApp(config{
 		scope:      provider.Scope{Provider: provider.ProviderAWS},
-		identity:   awsIdentityFixture(),
+		target:     awsTargetFixture(),
 		mutatorFor: func(string) data.Mutator { return mut },
 	})
 
@@ -289,7 +286,7 @@ func stagingTabTitle(m *App) string {
 func TestUpdate_MouseClickReducesToTabSelect(t *testing.T) {
 	t.Parallel()
 
-	base := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	base := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 
 	// Size the shell above the minimum so the tab bar is actually rendered and
 	// mouse tab selection is live (below the minimum a click is inert).
@@ -301,7 +298,7 @@ func TestUpdate_MouseClickReducesToTabSelect(t *testing.T) {
 
 	clicked := updateApp(t, base, tea.MouseClickMsg{X: x, Y: base.tabBarRow(), Button: tea.MouseLeft})
 
-	keyed := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	keyed := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	keyed = updateApp(t, keyed, keyPress('2'))
 
 	assert.Equal(t, keyed.activeTab, clicked.activeTab, "click and key select the same tab")
@@ -314,7 +311,7 @@ func TestUpdate_MouseClickReducesToTabSelect(t *testing.T) {
 func TestUpdate_MouseClickInertBelowMinSize(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 
 	// A column that WOULD map to tab 1 at full size, then shrink below the minimum.
 	x, ok := columnForTab(m.tabBar(), 1)
@@ -347,7 +344,7 @@ func columnForTab(tb components.TabBar, target int) (int, bool) {
 func TestUpdate_DialogClickTranslatedToContentLocal(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	m = updateApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
 
 	fd := &fakeDialog{}
@@ -384,7 +381,7 @@ func TestUpdate_DialogClickTranslatedToContentLocal(t *testing.T) {
 func TestUpdate_DialogClickOutsideBoxSwallowed(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	m = updateApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
 
 	fd := &fakeDialog{}
@@ -405,7 +402,7 @@ func TestUpdate_DialogClickOutsideBoxSwallowed(t *testing.T) {
 func TestUpdate_HelpBarClickTogglesHelp(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	m = updateApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
 	require.False(t, m.help.ShowAll, "help starts collapsed")
 
@@ -436,7 +433,7 @@ func TestUpdate_CopyToClipboard(t *testing.T) {
 	t.Cleanup(func() { setClipboard = orig })
 
 	// A focused value is present: y copies it through the seam.
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	m.copyValue = "s3cr3t"
 	_ = updateApp(t, m, keyPress('y'))
 
@@ -445,7 +442,7 @@ func TestUpdate_CopyToClipboard(t *testing.T) {
 
 	// No focused value: y must be a no-op so it never clears the clipboard.
 	called = false
-	empty := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	empty := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	_ = updateApp(t, empty, keyPress('y'))
 
 	assert.False(t, called, "y with no value does not clear the clipboard")
@@ -461,7 +458,7 @@ func TestUpdate_FocusedFilterCapturesGlobalKeys(t *testing.T) {
 	// Control: with nothing focused, `q` quits (proves q IS normally a global key).
 	control := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 	control = updateApp(t, control, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
@@ -474,7 +471,7 @@ func TestUpdate_FocusedFilterCapturesGlobalKeys(t *testing.T) {
 	// Now focus the filter and type q then 1.
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
@@ -527,7 +524,7 @@ func (m *App) keyForBinding(t *testing.T, keystroke string) tea.KeyPressMsg {
 func TestShell_AWSGolden(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 
 	requireShellGolden(t, m)
 }
@@ -575,4 +572,42 @@ func requireShellGolden(t *testing.T, m *App) {
 	out, err := io.ReadAll(tm.FinalOutput(t))
 	require.NoError(t, err)
 	golden.RequireEqual(t, renderVisibleScreen(t, out))
+}
+
+// TestUpdate_PendingTargetResolves pins the async target flow: a pending AWS
+// target starts a fetch on Init, the resolved target replaces it, and a failed
+// fetch only clears the pending flag. A target that describes itself (Google
+// Cloud) never fetches.
+func TestUpdate_PendingTargetResolves(t *testing.T) {
+	t.Parallel()
+
+	resolved := provider.AWSTarget("dev", "123456789012", "ap-northeast-1")
+	m := newApp(config{
+		scope:       provider.Scope{Provider: provider.ProviderAWS},
+		fetchTarget: func() (provider.Target, error) { return resolved, nil },
+	})
+	require.True(t, m.statusBar().Target.Pending, "the AWS target is pending until STS answers")
+	assert.Equal(t, "aws", m.applyTargetLine())
+
+	m.Update(targetMsg{target: resolved})
+	assert.False(t, m.statusBar().Target.Pending)
+	assert.Equal(t, "aws · profile dev · account 123456789012 · region ap-northeast-1", m.applyTargetLine())
+
+	failed := newApp(config{
+		scope:       provider.Scope{Provider: provider.ProviderAWS},
+		fetchTarget: func() (provider.Target, error) { return provider.Target{}, errors.New("no credentials") },
+	})
+	failed.Update(targetErrMsg{err: errors.New("no credentials")})
+	assert.False(t, failed.statusBar().Target.Pending, "a failed lookup stops the loading placeholder")
+
+	gcloud := newApp(config{
+		scope: provider.GoogleCloudScope("proj"),
+		fetchTarget: func() (provider.Target, error) {
+			t.Error("a self-describing target must not fetch")
+
+			return provider.Target{}, nil
+		},
+	})
+	assert.False(t, gcloud.statusBar().Target.Pending)
+	assert.Equal(t, "googlecloud · project proj", gcloud.applyTargetLine())
 }

@@ -74,7 +74,7 @@ func resultsPhaseApply(t *testing.T) dialogs.Model {
 func TestUpdate_EscOnApplyResultsReloadsThroughAdapter(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 
 	// pushDialog wraps the dialog in dialogAdapter — the exact production wiring.
 	m.pushDialog(resultsPhaseApply(t), nil)
@@ -103,7 +103,7 @@ func TestUpdate_EscOnApplyResultsReloadsThroughAdapter(t *testing.T) {
 func TestUpdate_EscOnNonReloaderBarePops(t *testing.T) {
 	t.Parallel()
 
-	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	m.pushDialog(reloadlessDialog{}, nil)
 	require.Len(t, m.dialogs, 1, "the reloadless dialog is on the stack")
 

@@ -12,15 +12,24 @@ landed across #273–#282.
 ## Bindings: regenerate, then rebuild immediately
 
 - Any backend binding change requires `mise generate-gui-bindings`, then an
-  immediate `mise build-gui`. Stale bindings make every API arity mismatch, so
+  immediate `mise build-gui`. The task runs the wails CLI pinned in `mise.toml`,
+  which must match the `wailsapp/wails/v2` version in `go.mod`/`gui/go.mod`;
+  bump both together. It needs `internal/gui/frontend/dist/index.html` to
+  exist (a placeholder is enough) and deletes it when it exits. Stale bindings make every API arity mismatch, so
   **verification is always `mise build-gui`, never the CLI build**.
 
 ## Capability-driven UI
 
 - Drive control visibility from the per-provider capability descriptor
-  (`ProviderCapability` / `ServiceCapability` in `internal/gui/capability.go`,
-  #264/#274). Hide unsupported controls via the descriptor; never hardcode
+  (`capability.ProviderCapability` / `capability.ServiceCapability` from
+  `internal/capability`, bound by `Capabilities` in `internal/gui/capability.go`;
+  the generated TypeScript types live in the `capability` namespace of
+  `wailsjs/go/models.ts`). Hide unsupported controls via the descriptor; never hardcode
   provider conditionals in Svelte.
+- The sidebar's scope target comes from `GetScopeTarget` (no network) and,
+  while it is pending, `ResolveScopeTarget` (AWS: STS). Both wrap
+  `provider.Target` (`internal/gui/target.go`); render its segments, never a
+  per-provider block. "Change scope" shows when the provider has `scopeFields`.
 - Security-relevant guards live **server-side in the Go bindings**, not only in
   frontend hiding (#276) — e.g. staging guards and scope validation/readback.
 

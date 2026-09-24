@@ -214,7 +214,7 @@ func TestAppCursor_BrowserFilter(t *testing.T) {
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
@@ -232,7 +232,7 @@ func TestAppCursor_BrowserPrefix(t *testing.T) {
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})
@@ -252,7 +252,7 @@ func TestAppCursor_BrowserFilterTracksArrows(t *testing.T) {
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 	m = updateApp(t, m, tea.WindowSizeMsg{Width: browserTermWidth, Height: browserTermHeight})

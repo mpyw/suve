@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte';
   import { ParamAddTag, ParamDelete, ParamDiff, ParamList, ParamLog, ParamRemoveTag, ParamSet, ParamShow, ParamTypeOptions, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
-  import type { gui } from '../../wailsjs/go/models';
+  import type { capability as capabilityModel, gui } from '../../wailsjs/go/models';
   import DiffDisplay from './DiffDisplay.svelte';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';
@@ -14,7 +14,7 @@
   import './common.css';
 
   interface Props {
-    capability?: gui.ServiceCapability;
+    capability?: capabilityModel.ServiceCapability;
     provider?: string;
     // selectedNamespace is the App Configuration namespace filter, owned by App
     // (the dropdown lives in the sidebar footer). (NULL) → null/default rows, a

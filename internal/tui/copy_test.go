@@ -58,7 +58,7 @@ func TestApp_CopyWritesActivePageValue(t *testing.T) {
 
 	t.Cleanup(func() { setClipboard = orig })
 
-	app := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, identity: awsIdentityFixture()})
+	app := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
 	fp := &fakeCopyPage{text: "s3cr3t"}
 	app.pages = []page{fp}
 

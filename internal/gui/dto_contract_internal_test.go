@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/mpyw/suve/internal/capability"
 )
 
 // modelsPath is the Wails-generated (hand-maintained) TypeScript mirror of the
@@ -27,9 +29,11 @@ const modelsPath = "frontend/wailsjs/go/models.ts"
 func dtoContract() []any {
 	return []any{
 		// app.go
-		AWSIdentityResult{}, ScopeSelection{},
+		ScopeSelection{},
+		// target.go
+		ScopeTarget{}, ScopeTargetSegment{},
 		// detect.go, capability.go
-		DetectResult{}, ServiceCapability{}, ProviderCapability{},
+		DetectResult{}, capability.ServiceCapability{}, capability.ProviderCapability{},
 		// param.go
 		ParamListResult{}, ParamListEntry{}, ParamShowTag{}, ParamShowResult{},
 		ParamLogResult{}, ParamLogEntry{}, ParamDiffResult{}, ParamSetResult{},

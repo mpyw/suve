@@ -19,10 +19,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/staging/store/file"
-	"github.com/mpyw/suve/internal/tui/components"
 )
 
 // registry is the provider registry backing the TUI's read/write operations. It
@@ -110,13 +108,13 @@ func newModel(ctx context.Context, scope provider.Scope, service string) (*App, 
 	// see the field-threaded context, so it is silenced here.
 	//nolint:contextcheck // Run context is threaded via config.runCtx into every page fetch command
 	model := newApp(config{
-		scope:         scope,
-		service:       service,
-		fetchIdentity: awsIdentityFetcher(ctx),
-		sourceFor:     factory.sourceFor,
-		mutatorFor:    factory.mutatorFor,
-		stagingFor:    factory.stagingService,
-		runCtx:        ctx,
+		scope:       scope,
+		service:     service,
+		fetchTarget: factory.resolveTarget,
+		sourceFor:   factory.sourceFor,
+		mutatorFor:  factory.mutatorFor,
+		stagingFor:  factory.stagingService,
+		runCtx:      ctx,
 	})
 
 	return model, nil
@@ -145,22 +143,4 @@ func ensureResolvable(ctx context.Context, scope provider.Scope) error {
 	}
 
 	return lastErr
-}
-
-// awsIdentityFetcher builds the status bar's AWS identity fetcher as a closure
-// over the Run context, so the model never stores a context nor imports the AWS
-// provider package.
-func awsIdentityFetcher(ctx context.Context) identityFetcher {
-	return func() (components.AWSIdentity, error) {
-		id, err := aws.LoadIdentity(ctx)
-		if err != nil {
-			return components.AWSIdentity{}, err
-		}
-
-		return components.AWSIdentity{
-			Account: id.AccountID,
-			Region:  id.Region,
-			Profile: id.Profile,
-		}, nil
-	}
 }

@@ -11,7 +11,6 @@ import (
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -65,10 +64,10 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	// Get AWS identity for confirmation display
-	var identity *aws.Identity
+	// Resolve the AWS target for the confirmation display
+	var target string
 	if !skipConfirm {
-		identity, _ = aws.LoadIdentity(ctx)
+		target = awsinternal.ConfirmTarget(ctx)
 	}
 
 	useCase := &param.DeleteUseCase{Store: store}
@@ -89,11 +88,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		Stdin:  os.Stdin,
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
-	}
-	if identity != nil {
-		prompter.AccountID = identity.AccountID
-		prompter.Region = identity.Region
-		prompter.Profile = identity.Profile
+		Target: target,
 	}
 
 	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)

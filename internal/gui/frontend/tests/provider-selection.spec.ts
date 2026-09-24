@@ -86,10 +86,10 @@ test.describe('Provider selection', () => {
       await waitForItemList(page);
 
       await expect(page.getByText('my-project')).toBeVisible();
-      await expect(page.locator('.aws-info-profile')).toHaveCount(0);
+      await expect(page.locator('.scope-info-label')).toHaveText(['project']);
     });
 
-    test('no GetAWSIdentity (STS) call under a Google Cloud scope', async ({ page }) => {
+    test('no ResolveScopeTarget (STS) call under a Google Cloud scope', async ({ page }) => {
       await setupWailsMocks(page, createGoogleCloudState());
       await page.goto('/');
       await waitForItemList(page);
@@ -97,7 +97,8 @@ test.describe('Provider selection', () => {
       // Staging is now multi-provider, so StagingStatus may run under Google
       // Cloud — but it must resolve the scope without any AWS STS round-trip.
       const calls = await getRecordedCalls(page);
-      expect(calls).not.toContain('GetAWSIdentity');
+      expect(calls).toContain('GetScopeTarget');
+      expect(calls).not.toContain('ResolveScopeTarget');
     });
 
     test('secret detail: no Restore, no ARN (capability/presence-gated)', async ({ page }) => {

@@ -299,6 +299,13 @@ func (f *sourceFactory) stagingScope(kind provider.Kind) (provider.Scope, error)
 	return resolved.Scope, nil
 }
 
+// resolveTarget resolves the launched scope's target for the status bar and the
+// apply confirmation. It shares memoizedIdentity with staging, so an AWS launch
+// makes one STS call for both.
+func (f *sourceFactory) resolveTarget() (provider.Target, error) {
+	return binding.ResolveTarget(f.ctx, f.scope, f.memoizedIdentity)
+}
+
 // memoizedIdentity resolves (and memoizes) the identity-keyed staging scope.
 // Because the launched provider/scope are fixed for the process lifetime, the
 // identity is resolved once and reused across every staging-store access rather
