@@ -1,4 +1,4 @@
-package awsparamversion_test
+package version_test
 
 import (
 	"testing"
@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/version/awsparamversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 //nolint:funlen // Table-driven test with many cases
-func TestParse(t *testing.T) {
+func TestParameterStoreParse(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -272,7 +272,7 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := awsparamversion.Parse(tt.input)
+			spec, err := version.ParameterStore.Parse(tt.input)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -288,27 +288,27 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestSpec_HasShift(t *testing.T) {
+func TestParameterStoreSpec_HasShift(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
-		spec *awsparamversion.Spec
+		spec *version.NumericSpec
 		want bool
 	}{
 		{
 			name: "no shift",
-			spec: &awsparamversion.Spec{Name: "/my/param", Shift: 0},
+			spec: &version.NumericSpec{Name: "/my/param", Shift: 0},
 			want: false,
 		},
 		{
 			name: "with shift 1",
-			spec: &awsparamversion.Spec{Name: "/my/param", Shift: 1},
+			spec: &version.NumericSpec{Name: "/my/param", Shift: 1},
 			want: true,
 		},
 		{
 			name: "with shift 5",
-			spec: &awsparamversion.Spec{Name: "/my/param", Shift: 5},
+			spec: &version.NumericSpec{Name: "/my/param", Shift: 5},
 			want: true,
 		},
 	}
@@ -321,86 +321,9 @@ func TestSpec_HasShift(t *testing.T) {
 	}
 }
 
-func TestParseDiffArgs(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		args       []string
-		wantSpec1  *awsparamversion.Spec
-		wantSpec2  *awsparamversion.Spec
-		wantErrMsg string
-	}{
-		{
-			name: "one arg with version",
-			args: []string{"/app/param#3"},
-			wantSpec1: &awsparamversion.Spec{
-				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
-			},
-			wantSpec2: &awsparamversion.Spec{
-				Name: "/app/param",
-			},
-		},
-		{
-			name: "two args",
-			args: []string{"/app/param#1", "#2"},
-			wantSpec1: &awsparamversion.Spec{
-				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
-			},
-			wantSpec2: &awsparamversion.Spec{
-				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
-			},
-		},
-		{
-			name: "three args",
-			args: []string{"/app/param", "#1", "#2"},
-			wantSpec1: &awsparamversion.Spec{
-				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
-			},
-			wantSpec2: &awsparamversion.Spec{
-				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
-			},
-		},
-		{
-			name:       "no arguments",
-			args:       []string{},
-			wantErrMsg: "usage:",
-		},
-		{
-			name:       "invalid spec",
-			args:       []string{"/app/param#"},
-			wantErrMsg: "invalid",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			spec1, spec2, err := awsparamversion.ParseDiffArgs(tt.args)
-
-			if tt.wantErrMsg != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErrMsg)
-
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantSpec1, spec1)
-			assert.Equal(t, tt.wantSpec2, spec2)
-		})
-	}
-}
-
 // TestSuffix pins that Suffix rebuilds the part after the name, normalized, and
 // that name+suffix re-parses to an equivalent spec.
-func TestSuffix(t *testing.T) {
+func TestParameterStoreSuffix(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -418,11 +341,11 @@ func TestSuffix(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := awsparamversion.Parse(tt.input)
+			spec, err := version.ParameterStore.Parse(tt.input)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, awsparamversion.Suffix(spec))
+			assert.Equal(t, tt.want, version.ParameterStore.Suffix(spec))
 
-			reparsed, err := awsparamversion.Parse(spec.Name + awsparamversion.Suffix(spec))
+			reparsed, err := version.ParameterStore.Parse(spec.Name + version.ParameterStore.Suffix(spec))
 			require.NoError(t, err)
 			assert.Equal(t, spec, reparsed)
 		})

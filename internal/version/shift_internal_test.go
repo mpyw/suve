@@ -1,5 +1,5 @@
-// shift.go joins parse's namespace, so its white-box tests go there too.
-//declscope:namespace parse
+// White-box tests of shift.go, which is core, so they are core too.
+//declscope:core
 
 package version
 

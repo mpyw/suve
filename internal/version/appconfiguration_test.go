@@ -1,4 +1,4 @@
-package azureappconfigversion_test
+package version_test
 
 import (
 	"testing"
@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/version/azureappconfigversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
-func TestParse(t *testing.T) {
+func TestAppConfigurationParse(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -129,7 +129,7 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := azureappconfigversion.Parse(tt.input)
+			spec, err := version.AppConfiguration.Parse(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 
@@ -144,73 +144,12 @@ func TestParse(t *testing.T) {
 
 // TestParse_SpecifierLikeKeysAccepted verifies that keys containing what would
 // be version specifiers in versioned stores are accepted verbatim (#353).
-func TestParse_SpecifierLikeKeysAccepted(t *testing.T) {
+func TestAppConfigurationParse_SpecifierLikeKeysAccepted(t *testing.T) {
 	t.Parallel()
 
 	for _, input := range []string{"my-key#3", "my-key~1", "my-key:prod", "Logging:LogLevel:Default"} {
-		spec, err := azureappconfigversion.Parse(input)
+		spec, err := version.AppConfiguration.Parse(input)
 		require.NoError(t, err, "input=%q", input)
 		assert.Equal(t, input, spec.Name)
 	}
-}
-
-func TestParseDiffArgs(t *testing.T) {
-	t.Parallel()
-
-	t.Run("single bare key compares against itself", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azureappconfigversion.ParseDiffArgs([]string{"key-a"})
-		require.NoError(t, err)
-		assert.Equal(t, "key-a", spec1.Name)
-		assert.Equal(t, "key-a", spec2.Name)
-	})
-
-	t.Run("two bare keys compared", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azureappconfigversion.ParseDiffArgs([]string{"key-a", "key-b"})
-		require.NoError(t, err)
-		assert.Equal(t, "key-a", spec1.Name)
-		assert.Equal(t, "key-b", spec2.Name)
-	})
-
-	t.Run("single key containing hash compares against itself", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azureappconfigversion.ParseDiffArgs([]string{"my-key#1"})
-		require.NoError(t, err)
-		assert.Equal(t, "my-key#1", spec1.Name)
-		assert.Equal(t, "my-key#1", spec2.Name)
-	})
-
-	t.Run("two keys where the second contains a hash", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azureappconfigversion.ParseDiffArgs([]string{"my-key", "#1"})
-		require.NoError(t, err)
-		assert.Equal(t, "my-key", spec1.Name)
-		assert.Equal(t, "#1", spec2.Name)
-	})
-
-	t.Run("three args rejected", func(t *testing.T) {
-		t.Parallel()
-
-		_, _, err := azureappconfigversion.ParseDiffArgs([]string{"my-key", "#1", "#2"})
-		require.Error(t, err)
-	})
-
-	t.Run("no args rejected", func(t *testing.T) {
-		t.Parallel()
-
-		_, _, err := azureappconfigversion.ParseDiffArgs([]string{})
-		require.Error(t, err)
-	})
-
-	t.Run("too many args rejected", func(t *testing.T) {
-		t.Parallel()
-
-		_, _, err := azureappconfigversion.ParseDiffArgs([]string{"a", "b", "c", "d"})
-		require.Error(t, err)
-	})
 }

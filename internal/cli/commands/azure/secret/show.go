@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/azurekvversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // showJSONOutput represents the JSON output structure for the show command.
@@ -30,17 +30,17 @@ type showJSONOutput struct {
 // showPresenter renders Azure Key Vault show output.
 type showPresenter struct {
 	uc     *secret.ShowUseCase
-	spec   *azurekvversion.Spec
+	spec   *version.OpaqueSpec
 	result *secret.ShowOutput
 }
 
 // NewShowPresenter builds an Azure Key Vault show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *azurekvversion.Spec) generic.ShowPresenter {
+func NewShowPresenter(reader provider.Reader, spec *version.OpaqueSpec) generic.ShowPresenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: azurekvversion.Suffix(p.spec)})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.KeyVault.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Azure Key Vault show command.
 func ShowCommand() *cli.Command {
-	return generic.ShowCommand(generic.ShowConfig[*azurekvversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*version.OpaqueSpec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
@@ -132,8 +132,8 @@ EXAMPLES:
   suve azure secret show --raw my-secret                  Output raw value (for piping)
   suve azure secret show --output=json my-secret          Output as JSON`,
 		UsageError: "usage: suve azure secret show <name>",
-		ParseSpec:  azurekvversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *azurekvversion.Spec) (generic.ShowPresenter, error) {
+		ParseSpec:  version.KeyVault.Parse,
+		NewPresenter: func(ctx context.Context, spec *version.OpaqueSpec) (generic.ShowPresenter, error) {
 			store, err := azureinternal.KeyVaultStore(ctx)
 			if err != nil {
 				return nil, err

@@ -2,13 +2,13 @@ package staging
 
 import (
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/azurekvversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // AzureKeyVaultSecretStrategy implements the staging strategies for Azure Key
 // Vault secrets over a provider.Store. Key Vault specifics:
 //
-//   - Versions are opaque ids, parsed with azurekvversion (#ID, ~SHIFT); a
+//   - Versions are opaque ids, parsed with version.KeyVault (#ID, ~SHIFT); a
 //     staged "edit" applies as a new version via Put.
 //   - There are no force / recovery-window delete options (delete is a soft
 //     delete), so HasDeleteOptions reports false.
@@ -46,10 +46,10 @@ func (azureKeyVaultSecretHooks) traits() versionedTraits {
 }
 
 func (azureKeyVaultSecretHooks) parse(input string) (name, suffix string, err error) {
-	spec, err := azurekvversion.Parse(input)
+	spec, err := version.KeyVault.Parse(input)
 	if err != nil {
 		return "", "", err
 	}
 
-	return spec.Name, azurekvversion.Suffix(spec), nil
+	return spec.Name, version.KeyVault.Suffix(spec), nil
 }

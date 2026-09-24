@@ -13,7 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // TestShowPresenter_RendersDescription guards #753: a secret carrying a
@@ -36,7 +36,7 @@ func TestShowPresenter_RendersDescription(t *testing.T) {
 		},
 	}
 
-	spec, err := awssecretversion.Parse("my-secret")
+	spec, err := version.SecretsManager.Parse("my-secret")
 	require.NoError(t, err)
 
 	presenter := awssecret.NewShowPresenter(store, spec)
@@ -73,7 +73,7 @@ func TestShowPresenter_OmitsEmptyDescription(t *testing.T) {
 		},
 	}
 
-	spec, err := awssecretversion.Parse("my-secret")
+	spec, err := version.SecretsManager.Parse("my-secret")
 	require.NoError(t, err)
 
 	presenter := awssecret.NewShowPresenter(store, spec)

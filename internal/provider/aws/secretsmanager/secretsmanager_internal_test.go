@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // baseIndex and sortNewestFirst are pure package-private helpers over the raw
@@ -38,33 +38,33 @@ func TestBaseIndex(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		abs     awssecretversion.AbsoluteSpec
+		abs     version.OpaqueAbsolute
 		wantIdx int
 		wantErr string
 	}{
 		{
 			name:    "id found",
-			abs:     awssecretversion.AbsoluteSpec{ID: aws.String("id-2")},
+			abs:     version.OpaqueAbsolute{ID: aws.String("id-2")},
 			wantIdx: 1,
 		},
 		{
 			name:    "id not found",
-			abs:     awssecretversion.AbsoluteSpec{ID: aws.String("nope")},
+			abs:     version.OpaqueAbsolute{ID: aws.String("nope")},
 			wantErr: "version ID not found: nope",
 		},
 		{
 			name:    "label found",
-			abs:     awssecretversion.AbsoluteSpec{Label: aws.String("AWSPREVIOUS")},
+			abs:     version.OpaqueAbsolute{Label: aws.String("AWSPREVIOUS")},
 			wantIdx: 1,
 		},
 		{
 			name:    "label not found",
-			abs:     awssecretversion.AbsoluteSpec{Label: aws.String("NOSUCHLABEL")},
+			abs:     version.OpaqueAbsolute{Label: aws.String("NOSUCHLABEL")},
 			wantErr: "version label not found: NOSUCHLABEL",
 		},
 		{
 			name:    "no spec anchors at AWSCURRENT",
-			abs:     awssecretversion.AbsoluteSpec{},
+			abs:     version.OpaqueAbsolute{},
 			wantIdx: 0,
 		},
 	}
@@ -97,7 +97,7 @@ func TestBaseIndex_NoSpecFallsBackToZero(t *testing.T) {
 		{VersionId: aws.String("id-1"), VersionStages: []string{}},
 	}
 
-	idx, err := baseIndex(list, awssecretversion.AbsoluteSpec{})
+	idx, err := baseIndex(list, version.OpaqueAbsolute{})
 	require.NoError(t, err)
 	assert.Equal(t, 0, idx)
 }

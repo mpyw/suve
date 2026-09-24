@@ -16,7 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // showJSONOutput represents the JSON output structure for the show command.
@@ -34,7 +34,7 @@ type showJSONOutput struct {
 // showPresenter renders Secrets Manager show output byte-for-byte as before.
 type showPresenter struct {
 	uc     *secret.ShowUseCase
-	spec   *awssecretversion.Spec
+	spec   *version.OpaqueSpec
 	result *secret.ShowOutput
 	// arn is the Secrets Manager ARN the adapter surfaces in the entry's Extra
 	// metadata ("" when absent).
@@ -43,12 +43,12 @@ type showPresenter struct {
 
 // NewShowPresenter builds a secret show presenter over the given reader and spec.
 // It is exported for the shared golden-output test harness.
-func NewShowPresenter(reader provider.Reader, spec *awssecretversion.Spec) generic.ShowPresenter {
+func NewShowPresenter(reader provider.Reader, spec *version.OpaqueSpec) generic.ShowPresenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: awssecretversion.Suffix(p.spec)})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.SecretsManager.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Secrets Manager show command.
 func ShowCommand() *cli.Command {
-	return generic.ShowCommand(generic.ShowConfig[*awssecretversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*version.OpaqueSpec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION | :LABEL][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
@@ -161,8 +161,8 @@ EXAMPLES:
   suve aws secret show --output=json my-secret                Output as JSON
   API_KEY=$(suve aws secret show --raw my-secret)             Use in shell variable`,
 		UsageError: "usage: suve aws secret show <name>",
-		ParseSpec:  awssecretversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *awssecretversion.Spec) (generic.ShowPresenter, error) {
+		ParseSpec:  version.SecretsManager.Parse,
+		NewPresenter: func(ctx context.Context, spec *version.OpaqueSpec) (generic.ShowPresenter, error) {
 			store, err := awsinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err

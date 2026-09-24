@@ -9,10 +9,11 @@ import (
 
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
+	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // diffJSONOutput represents the JSON output structure for the diff command.
@@ -30,21 +31,21 @@ type diffJSONOutput struct {
 // diffPresenter renders SSM Parameter Store diff output byte-for-byte as before.
 type diffPresenter struct {
 	uc     *param.DiffUseCase
-	spec1  *awsparamversion.Spec
-	spec2  *awsparamversion.Spec
+	spec1  *version.NumericSpec
+	spec2  *version.NumericSpec
 	result *param.DiffOutput
 }
 
 // NewDiffPresenter builds a param diff presenter over the given reader and specs.
 // It is exported for the shared golden-output test harness.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *awsparamversion.Spec) generic.DiffPresenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.NumericSpec) generic.DiffPresenter {
 	return &diffPresenter{uc: &param.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
 	result, err := p.uc.Execute(ctx, param.DiffInput{
-		Name1: p.spec1.Name, Suffix1: awsparamversion.Suffix(p.spec1),
-		Name2: p.spec2.Name, Suffix2: awsparamversion.Suffix(p.spec2),
+		Name1: p.spec1.Name, Suffix1: version.ParameterStore.Suffix(p.spec1),
+		Name2: p.spec2.Name, Suffix2: version.ParameterStore.Suffix(p.spec2),
 	})
 	if err != nil {
 		return err
@@ -84,7 +85,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the SSM Parameter Store diff command.
 func DiffCommand() *cli.Command {
-	return generic.DiffCommand(generic.DiffConfig[*awsparamversion.Spec]{
+	return generic.DiffCommand(generic.DiffConfig[*version.NumericSpec]{
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
 		Description: `Compare two versions of a parameter in unified diff format.
@@ -105,8 +106,8 @@ EXAMPLES:
   suve aws param diff --output=json /app/config~      Output comparison as JSON
 
 For comparing staged values, use: suve aws stage param diff`,
-		ParseDiffArgs: awsparamversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *awsparamversion.Spec) (generic.DiffPresenter, error) {
+		ParseDiffArgs: parseDiffArgs,
+		NewPresenter: func(ctx context.Context, spec1, spec2 *version.NumericSpec) (generic.DiffPresenter, error) {
 			store, err := awsinternal.ParamStore(ctx)
 			if err != nil {
 				return nil, err
@@ -115,4 +116,15 @@ For comparing staged values, use: suve aws stage param diff`,
 			return NewDiffPresenter(store, spec1, spec2), nil
 		},
 	})
+}
+
+// parseDiffArgs parses the diff arguments with the SSM Parameter Store grammar.
+func parseDiffArgs(args []string) (*version.NumericSpec, *version.NumericSpec, error) {
+	return diffargs.ParseArgs(
+		args,
+		version.ParameterStore.Parse,
+		version.NumericAbsolute.IsSet,
+		"#~",
+		"usage: suve aws param diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
+	)
 }

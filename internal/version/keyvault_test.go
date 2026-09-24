@@ -1,4 +1,4 @@
-package azurekvversion_test
+package version_test
 
 import (
 	"testing"
@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/version/azurekvversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
-func TestParse(t *testing.T) {
+func TestKeyVaultParse(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -182,7 +182,7 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := azurekvversion.Parse(tt.input)
+			spec, err := version.KeyVault.Parse(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 
@@ -197,98 +197,28 @@ func TestParse(t *testing.T) {
 	}
 }
 
-func TestParse_LabelErrorMessage(t *testing.T) {
+func TestKeyVaultParse_LabelErrorMessage(t *testing.T) {
 	t.Parallel()
 
-	_, err := azurekvversion.Parse("my-secret:latest")
+	_, err := version.KeyVault.Parse("my-secret:latest")
 	require.Error(t, err)
-	require.ErrorIs(t, err, azurekvversion.ErrLabelUnsupported)
+	require.ErrorIs(t, err, version.ErrKeyVaultLabelUnsupported)
 }
 
 // TestParse_LabelAfterVersionRejected exercises the ':' reject path reached
 // AFTER a valid '#' specifier: parseAbsolute advances past "#abc" and then hits
 // ':', invoking the label parser's Apply (which returns ErrLabelUnsupported).
-func TestParse_LabelAfterVersionRejected(t *testing.T) {
+func TestKeyVaultParse_LabelAfterVersionRejected(t *testing.T) {
 	t.Parallel()
 
-	_, err := azurekvversion.Parse("my-secret#abc:latest")
+	_, err := version.KeyVault.Parse("my-secret#abc:latest")
 	require.Error(t, err)
-	require.ErrorIs(t, err, azurekvversion.ErrLabelUnsupported)
-}
-
-func TestParseDiffArgs(t *testing.T) {
-	t.Parallel()
-
-	t.Run("single spec compares against current", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azurekvversion.ParseDiffArgs([]string{"my-secret#abc"})
-		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
-		assert.Nil(t, spec2.Absolute.ID)
-	})
-
-	t.Run("two specs", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azurekvversion.ParseDiffArgs([]string{"my-secret#abc", "my-secret#def"})
-		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
-		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
-	})
-
-	t.Run("mixed format: full spec plus specifier-only", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azurekvversion.ParseDiffArgs([]string{"my-secret#abc", "#def"})
-		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
-		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
-	})
-
-	t.Run("partial spec: name plus specifier-only is swapped", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azurekvversion.ParseDiffArgs([]string{"my-secret", "#abc"})
-		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
-		assert.Nil(t, spec2.Absolute.ID)
-	})
-
-	t.Run("three args: name plus two specifiers", func(t *testing.T) {
-		t.Parallel()
-
-		spec1, spec2, err := azurekvversion.ParseDiffArgs([]string{"my-secret", "#abc", "#def"})
-		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
-		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
-	})
-
-	t.Run("no args rejected", func(t *testing.T) {
-		t.Parallel()
-
-		_, _, err := azurekvversion.ParseDiffArgs([]string{})
-		require.Error(t, err)
-	})
-
-	t.Run("too many args rejected", func(t *testing.T) {
-		t.Parallel()
-
-		_, _, err := azurekvversion.ParseDiffArgs([]string{"a", "b", "c", "d"})
-		require.Error(t, err)
-	})
-
-	t.Run("label rejected", func(t *testing.T) {
-		t.Parallel()
-
-		_, _, err := azurekvversion.ParseDiffArgs([]string{"my-secret:latest"})
-		require.Error(t, err)
-	})
+	require.ErrorIs(t, err, version.ErrKeyVaultLabelUnsupported)
 }
 
 // TestSuffix pins that Suffix rebuilds the part after the name, normalized, and
 // that name+suffix re-parses to an equivalent spec.
-func TestSuffix(t *testing.T) {
+func TestKeyVaultSuffix(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -305,11 +235,11 @@ func TestSuffix(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := azurekvversion.Parse(tt.input)
+			spec, err := version.KeyVault.Parse(tt.input)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, azurekvversion.Suffix(spec))
+			assert.Equal(t, tt.want, version.KeyVault.Suffix(spec))
 
-			reparsed, err := azurekvversion.Parse(spec.Name + azurekvversion.Suffix(spec))
+			reparsed, err := version.KeyVault.Parse(spec.Name + version.KeyVault.Suffix(spec))
 			require.NoError(t, err)
 			assert.Equal(t, spec, reparsed)
 		})

@@ -27,8 +27,7 @@ param:
           - "internal/provider/aws/paramtype/**"
           - "internal/provider/azure/appconfig/**"
           - "internal/usecase/param/**"
-          - "internal/version/awsparamversion/**"
-          - "internal/version/azureappconfigversion/**"
+          - "internal/version/**"
 
 secret:
   - changed-files:
@@ -40,9 +39,7 @@ secret:
           - "internal/provider/azure/keyvault/**"
           - "internal/provider/gcloud/**"
           - "internal/usecase/secret/**"
-          - "internal/version/awssecretversion/**"
-          - "internal/version/azurekvversion/**"
-          - "internal/version/gcloudversion/**"
+          - "internal/version/**"
 
 documentation:
   - changed-files:

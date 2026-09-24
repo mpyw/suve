@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/gcloudversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // showJSONOutput represents the JSON output structure for the show command.
@@ -31,17 +31,17 @@ type showJSONOutput struct {
 // showPresenter renders Google Cloud Secret Manager show output.
 type showPresenter struct {
 	uc     *secret.ShowUseCase
-	spec   *gcloudversion.Spec
+	spec   *version.NumericSpec
 	result *secret.ShowOutput
 }
 
 // NewShowPresenter builds a Google Cloud show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *gcloudversion.Spec) generic.ShowPresenter {
+func NewShowPresenter(reader provider.Reader, spec *version.NumericSpec) generic.ShowPresenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: gcloudversion.Suffix(p.spec)})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.SecretManager.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Google Cloud Secret Manager show command.
 func ShowCommand() *cli.Command {
-	return generic.ShowCommand(generic.ShowConfig[*gcloudversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*version.NumericSpec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
@@ -138,8 +138,8 @@ EXAMPLES:
   suve gcloud secret show --raw my-secret                  Output raw value (for piping)
   suve gcloud secret show --output=json my-secret          Output as JSON`,
 		UsageError: "usage: suve gcloud secret show <name>",
-		ParseSpec:  gcloudversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *gcloudversion.Spec) (generic.ShowPresenter, error) {
+		ParseSpec:  version.SecretManager.Parse,
+		NewPresenter: func(ctx context.Context, spec *version.NumericSpec) (generic.ShowPresenter, error) {
 			store, err := gcloudinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err

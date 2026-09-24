@@ -8,23 +8,22 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/cli/diffargs"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 func TestParseArgs_Param(t *testing.T) {
 	t.Parallel()
 
-	parse := awsparamversion.Parse
-	hasAbsolute := func(abs awsparamversion.AbsoluteSpec) bool { return abs.Version != nil }
+	parse := version.ParameterStore.Parse
+	hasAbsolute := func(abs version.NumericAbsolute) bool { return abs.Version != nil }
 	prefixes := "#~"
 	usage := "usage: suve param diff"
 
 	tests := []struct {
 		name       string
 		args       []string
-		wantSpec1  *awsparamversion.Spec
-		wantSpec2  *awsparamversion.Spec
+		wantSpec1  *version.NumericSpec
+		wantSpec2  *version.NumericSpec
 		wantErrMsg string
 	}{
 		// Error cases
@@ -43,22 +42,22 @@ func TestParseArgs_Param(t *testing.T) {
 		{
 			name: "one arg with version",
 			args: []string{"/app/param#3"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name: "/app/param",
 			},
 		},
 		{
 			name: "one arg with shift",
 			args: []string{"/app/param~1"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:  "/app/param",
 				Shift: 1,
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name: "/app/param",
 			},
 		},
@@ -72,25 +71,25 @@ func TestParseArgs_Param(t *testing.T) {
 		{
 			name: "two args both full spec",
 			args: []string{"/app/param#1", "/app/param#2"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
 			},
 		},
 		{
 			name: "two args different names",
 			args: []string{"/app/config#1", "/app/secrets#2"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:     "/app/config",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name:     "/app/secrets",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
 			},
 		},
 
@@ -98,23 +97,23 @@ func TestParseArgs_Param(t *testing.T) {
 		{
 			name: "two args mixed format",
 			args: []string{"/app/param#1", "#2"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
 			},
 		},
 		{
 			name: "two args mixed format with shift",
 			args: []string{"/app/param~1", "~2"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:  "/app/param",
 				Shift: 1,
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name:  "/app/param",
 				Shift: 2,
 			},
@@ -124,22 +123,22 @@ func TestParseArgs_Param(t *testing.T) {
 		{
 			name: "two args partial spec format",
 			args: []string{"/app/param", "#3"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name: "/app/param",
 			},
 		},
 		{
 			name: "two args partial spec with shift",
 			args: []string{"/app/param", "~2"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:  "/app/param",
 				Shift: 2,
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name: "/app/param",
 			},
 		},
@@ -163,23 +162,23 @@ func TestParseArgs_Param(t *testing.T) {
 		{
 			name: "three args",
 			args: []string{"/app/param", "#1", "#2"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
 			},
 		},
 		{
 			name: "three args with shifts",
 			args: []string{"/app/param", "~2", "~1"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:  "/app/param",
 				Shift: 2,
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name:  "/app/param",
 				Shift: 1,
 			},
@@ -222,16 +221,16 @@ func TestParseArgs_Param(t *testing.T) {
 func TestParseArgs_ThreeArgRequiresSpecifier(t *testing.T) {
 	t.Parallel()
 
-	parse := awsparamversion.Parse
-	hasAbsolute := func(abs awsparamversion.AbsoluteSpec) bool { return abs.Version != nil }
+	parse := version.ParameterStore.Parse
+	hasAbsolute := func(abs version.NumericAbsolute) bool { return abs.Version != nil }
 	prefixes := "#~"
 	usage := "usage: suve param diff"
 
 	tests := []struct {
 		name       string
 		args       []string
-		wantSpec1  *awsparamversion.Spec
-		wantSpec2  *awsparamversion.Spec
+		wantSpec1  *version.NumericSpec
+		wantSpec2  *version.NumericSpec
 		wantErrMsg string
 	}{
 		{
@@ -247,13 +246,13 @@ func TestParseArgs_ThreeArgRequiresSpecifier(t *testing.T) {
 		{
 			name: "hash specifiers keep name",
 			args: []string{"/p", "#3", "#1"},
-			wantSpec1: &awsparamversion.Spec{
+			wantSpec1: &version.NumericSpec{
 				Name:     "/p",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
 			},
-			wantSpec2: &awsparamversion.Spec{
+			wantSpec2: &version.NumericSpec{
 				Name:     "/p",
-				Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
 			},
 		},
 	}
@@ -281,27 +280,27 @@ func TestParseArgs_ThreeArgRequiresSpecifier(t *testing.T) {
 func TestParseArgs_Secret(t *testing.T) {
 	t.Parallel()
 
-	parse := awssecretversion.Parse
-	hasAbsolute := func(abs awssecretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil }
+	parse := version.SecretsManager.Parse
+	hasAbsolute := func(abs version.OpaqueAbsolute) bool { return abs.ID != nil || abs.Label != nil }
 	prefixes := "#:~"
 	usage := "usage: suve secret diff"
 
 	tests := []struct {
 		name       string
 		args       []string
-		wantSpec1  *awssecretversion.Spec
-		wantSpec2  *awssecretversion.Spec
+		wantSpec1  *version.OpaqueSpec
+		wantSpec2  *version.OpaqueSpec
 		wantErrMsg string
 	}{
 		// 1 arg with label
 		{
 			name: "one arg with label",
 			args: []string{"my-secret:AWSPREVIOUS"},
-			wantSpec1: &awssecretversion.Spec{
+			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: awssecretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
 			},
-			wantSpec2: &awssecretversion.Spec{
+			wantSpec2: &version.OpaqueSpec{
 				Name: "my-secret",
 			},
 		},
@@ -310,13 +309,13 @@ func TestParseArgs_Secret(t *testing.T) {
 		{
 			name: "two args mixed with labels",
 			args: []string{"my-secret:AWSPREVIOUS", ":AWSCURRENT"},
-			wantSpec1: &awssecretversion.Spec{
+			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: awssecretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
 			},
-			wantSpec2: &awssecretversion.Spec{
+			wantSpec2: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: awssecretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")},
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")},
 			},
 		},
 
@@ -324,13 +323,13 @@ func TestParseArgs_Secret(t *testing.T) {
 		{
 			name: "two args with version ID",
 			args: []string{"my-secret#abc123", "#def456"},
-			wantSpec1: &awssecretversion.Spec{
+			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: awssecretversion.AbsoluteSpec{ID: lo.ToPtr("abc123")},
+				Absolute: version.OpaqueAbsolute{ID: lo.ToPtr("abc123")},
 			},
-			wantSpec2: &awssecretversion.Spec{
+			wantSpec2: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: awssecretversion.AbsoluteSpec{ID: lo.ToPtr("def456")},
+				Absolute: version.OpaqueAbsolute{ID: lo.ToPtr("def456")},
 			},
 		},
 
@@ -338,13 +337,13 @@ func TestParseArgs_Secret(t *testing.T) {
 		{
 			name: "three args with labels",
 			args: []string{"my-secret", ":AWSPREVIOUS", ":AWSCURRENT"},
-			wantSpec1: &awssecretversion.Spec{
+			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: awssecretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
 			},
-			wantSpec2: &awssecretversion.Spec{
+			wantSpec2: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: awssecretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")},
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")},
 			},
 		},
 	}

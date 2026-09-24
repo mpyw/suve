@@ -14,7 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/azureappconfigversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // showJSONOutput represents the JSON output structure for the show command.
@@ -29,12 +29,12 @@ type showJSONOutput struct {
 // is unversioned, so no version/state metadata is rendered.
 type showPresenter struct {
 	uc     *param.ShowUseCase
-	spec   *azureappconfigversion.Spec
+	spec   *version.BareSpec
 	result *param.ShowOutput
 }
 
 // NewShowPresenter builds an Azure App Configuration show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *azureappconfigversion.Spec) generic.ShowPresenter {
+func NewShowPresenter(reader provider.Reader, spec *version.BareSpec) generic.ShowPresenter {
 	return &showPresenter{uc: &param.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -103,7 +103,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Azure App Configuration show command.
 func ShowCommand() *cli.Command {
-	return generic.ShowCommand(generic.ShowConfig[*azureappconfigversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*version.BareSpec]{
 		Usage:     "Show setting value with metadata",
 		ArgsUsage: argsUsageKey,
 		Description: `Display an App Configuration setting's value along with its metadata.
@@ -119,8 +119,8 @@ EXAMPLES:
   suve azure param show --raw my-key                  Output raw value (for piping)
   suve azure param show --output=json my-key          Output as JSON`,
 		UsageError: "usage: suve azure param show <key>",
-		ParseSpec:  azureappconfigversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *azureappconfigversion.Spec) (generic.ShowPresenter, error) {
+		ParseSpec:  version.AppConfiguration.Parse,
+		NewPresenter: func(ctx context.Context, spec *version.BareSpec) (generic.ShowPresenter, error) {
 			store, err := azureinternal.AppConfigStore(ctx)
 			if err != nil {
 				return nil, err

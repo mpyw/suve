@@ -13,7 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // TestShowPresenter_RendersDescription guards #753: a parameter carrying a
@@ -36,7 +36,7 @@ func TestShowPresenter_RendersDescription(t *testing.T) {
 		},
 	}
 
-	spec, err := awsparamversion.Parse("/my/param")
+	spec, err := version.ParameterStore.Parse("/my/param")
 	require.NoError(t, err)
 
 	presenter := awsparam.NewShowPresenter(store, spec)
@@ -78,7 +78,7 @@ func TestShowPresenter_OmitsEmptyDescription(t *testing.T) {
 		},
 	}
 
-	spec, err := awsparamversion.Parse("/my/param")
+	spec, err := version.ParameterStore.Parse("/my/param")
 	require.NoError(t, err)
 
 	presenter := awsparam.NewShowPresenter(store, spec)
