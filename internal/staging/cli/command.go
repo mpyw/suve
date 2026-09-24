@@ -47,6 +47,15 @@ type CommandConfig struct {
 	// ItemName is the item name for messages (e.g., "parameter", "secret").
 	ItemName string
 
+	// ProviderLabel is the human-readable provider name used in help text,
+	// prompts, and messages (e.g., "AWS", "Google Cloud", "Azure").
+	ProviderLabel string
+
+	// CommandPath is the explicit command path of this service's stage group,
+	// used in help examples and usage errors (e.g., "suve aws stage param",
+	// "suve gcloud stage", "suve azure stage secret").
+	CommandPath string
+
 	// Factory creates a FullStrategy backed by a provider.Store.
 	Factory staging.StrategyFactory
 
@@ -88,6 +97,17 @@ type CommandConfig struct {
 	// empty return means "not specified": create applies plaintext and update
 	// preserves the existing type.
 	ValueTypeFromCmd func(cmd *cli.Command) (domain.ValueType, error)
+}
+
+// remoteName is the provider label used in messages, or "remote" when unset.
+//
+//declscope:package // shared by design with the apply/edit runners
+func remoteName(providerLabel string) string {
+	if providerLabel == "" {
+		return "remote"
+	}
+
+	return providerLabel
 }
 
 // valueTypeFor resolves the staged value type from the command flags, or ""
@@ -205,7 +225,7 @@ func NewStatusCommand(cfg CommandConfig) *cli.Command {
 func NewDiffCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:        "diff",
-		Usage:       "Show diff between staged and AWS values",
+		Usage:       fmt.Sprintf("Show diff between staged and %s values", remoteName(cfg.ProviderLabel)),
 		ArgsUsage:   argsUsageName,
 		Description: diffDescription(cfg),
 		Flags: []cli.Flag{
@@ -223,7 +243,7 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 			var name string
 
 			if cmd.Args().Len() > 1 {
-				return fmt.Errorf("usage: suve stage %s diff [name]", cfg.CommandName)
+				return fmt.Errorf("usage: %s diff [name]", cfg.CommandPath)
 			}
 
 			if cmd.Args().Len() == 1 {
@@ -283,7 +303,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 		Flags: append(cfg.descriptionFlags(), cfg.ValueTypeFlags...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve stage %s add <name> [value]", cfg.CommandName)
+				return fmt.Errorf("usage: %s add <name> [value]", cfg.CommandPath)
 			}
 
 			name := cmd.Args().First()
@@ -341,7 +361,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 		Flags: append(cfg.descriptionFlags(), cfg.ValueTypeFlags...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve stage %s edit <name> [value]", cfg.CommandName)
+				return fmt.Errorf("usage: %s edit <name> [value]", cfg.CommandPath)
 			}
 
 			name := cmd.Args().First()
@@ -371,8 +391,9 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 					Strategy: strategy,
 					Store:    store,
 				},
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
+				ProviderLabel: cfg.ProviderLabel,
+				Stdout:        cmd.Root().Writer,
+				Stderr:        cmd.Root().ErrWriter,
 			}
 
 			return r.Run(ctx, EditOptions{
@@ -391,7 +412,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:        "apply",
 		Aliases:     []string{cmdNamePush},
-		Usage:       fmt.Sprintf("Apply staged %s changes to AWS", cfg.ItemName),
+		Usage:       fmt.Sprintf("Apply staged %s changes to %s", cfg.ItemName, remoteName(cfg.ProviderLabel)),
 		ArgsUsage:   argsUsageName,
 		Description: applyDescription(cfg),
 		Flags: []cli.Flag{
@@ -401,7 +422,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:  "ignore-conflicts",
-				Usage: "Apply even if AWS was modified after staging",
+				Usage: fmt.Sprintf("Apply even if %s was modified after staging", remoteName(cfg.ProviderLabel)),
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -435,12 +456,13 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 					Store:       store,
 					StrategyFor: cfg.applyStrategyFor(ctx),
 				},
-				Store:       store,
-				Parser:      cfg.ParserFactory(),
-				Confirmer:   prompter,
-				SkipConfirm: cmd.Bool(flagYes),
-				Stdout:      cmd.Root().Writer,
-				Stderr:      cmd.Root().ErrWriter,
+				Store:         store,
+				Parser:        cfg.ParserFactory(),
+				ProviderLabel: cfg.ProviderLabel,
+				Confirmer:     prompter,
+				SkipConfirm:   cmd.Bool(flagYes),
+				Stdout:        cmd.Root().Writer,
+				Stderr:        cmd.Root().ErrWriter,
 			}
 
 			return r.RunInteractive(ctx, opts)
@@ -465,7 +487,7 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 			resetAll := cmd.Bool("all")
 
 			if !resetAll && cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve stage %s reset <spec> or suve stage %s reset --all", cfg.CommandName, cfg.CommandName)
+				return fmt.Errorf("usage: %s reset <spec> or %s reset --all", cfg.CommandPath, cfg.CommandPath)
 			}
 
 			opts := ResetOptions{
@@ -480,7 +502,7 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 			parser := cfg.ParserFactory()
 
 			// Check if a version spec is provided. If so, we need a fetcher strategy
-			// to restore the value from AWS.
+			// to restore the value from the remote store.
 			var hasVersion bool
 
 			if !resetAll && opts.Spec != "" {
@@ -553,7 +575,7 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 		Flags:       flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
-				return fmt.Errorf("usage: suve stage %s delete <name>", cfg.CommandName)
+				return fmt.Errorf("usage: %s delete <name>", cfg.CommandPath)
 			}
 
 			store, _, err := workingStore(ctx, cfg.ScopeResolver)
@@ -602,7 +624,7 @@ type tagCommandRunner func(
 func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func(context.Context, *cli.Command) error {
 	return func(ctx context.Context, cmd *cli.Command) error {
 		if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and key/value
-			return fmt.Errorf("usage: suve stage %s %s", cfg.CommandName, usageMsg)
+			return fmt.Errorf("usage: %s %s", cfg.CommandPath, usageMsg)
 		}
 
 		name := cmd.Args().First()

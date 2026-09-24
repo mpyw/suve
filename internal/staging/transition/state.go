@@ -13,7 +13,7 @@ import (
 
 // EntryState represents the current state of a staged entry.
 type EntryState struct {
-	CurrentValue *string          // nil means non-existing on AWS
+	CurrentValue *string          // nil means non-existing remotely
 	StagedState  EntryStagedState // Current staging state
 }
 
@@ -49,7 +49,7 @@ func (EntryStagedStateDelete) isEntryStagedState() {}
 
 // StagedTags represents the staged tag changes.
 // Tags are stored as diff operations rather than final state.
-// AWS current values are checked at staging time for auto-skip.
+// Current remote values are checked at staging time for auto-skip.
 type StagedTags struct {
 	ToSet   map[string]string   // Tags to add or update
 	ToUnset maputil.Set[string] // Tag keys to remove

@@ -28,7 +28,7 @@ type DiffRunner struct {
 
 // remoteLabel names the backing store in diff labels (e.g. "App Configuration",
 // "Key Vault", "Secret Manager") via the strategy's ServiceName. This runner
-// serves every non-AWS provider, so the label must not be hard-coded to "AWS".
+// serves every provider, so the label comes from the strategy.
 func (r *DiffRunner) remoteLabel() string {
 	if r.UseCase == nil || r.UseCase.Strategy == nil {
 		return "remote"
@@ -122,23 +122,23 @@ func (r *DiffRunner) Run(ctx context.Context, opts DiffOptions) error {
 
 // OutputDiff outputs a diff entry for an existing resource.
 func (r *DiffRunner) OutputDiff(opts DiffOptions, entry stagingusecase.DiffEntry) {
-	awsValue := entry.AWSValue
+	remoteValue := entry.RemoteValue
 	stagedValue := entry.StagedValue
 
 	// Format as JSON if enabled
 	if opts.ParseJSON {
-		awsValue, stagedValue = jsonutil.TryFormatOrWarn2(awsValue, stagedValue, r.Stderr, entry.Name)
+		remoteValue, stagedValue = jsonutil.TryFormatOrWarn2(remoteValue, stagedValue, r.Stderr, entry.Name)
 	}
 
 	name := diffEntryDisplayName(entry)
-	label1 := fmt.Sprintf("%s%s (%s)", name, entry.AWSIdentifier, r.remoteLabel())
+	label1 := fmt.Sprintf("%s%s (%s)", name, entry.RemoteIdentifier, r.remoteLabel())
 	label2 := fmt.Sprintf(lo.Ternary(
 		entry.Operation == staging.OperationDelete,
 		"%s (staged for deletion)",
 		"%s (staged)",
 	), name)
 
-	diff := output.Diff(r.Stdout, label1, label2, awsValue, stagedValue)
+	diff := output.Diff(r.Stdout, label1, label2, remoteValue, stagedValue)
 	output.Print(r.Stdout, diff)
 
 	// Show staged metadata

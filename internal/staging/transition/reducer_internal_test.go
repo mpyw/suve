@@ -320,8 +320,8 @@ func TestReduceTag_Tag(t *testing.T) {
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{},
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{},
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{"env": "prod"},
@@ -333,8 +333,8 @@ func TestReduceTag_Tag(t *testing.T) {
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{"env": "prod"},
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{"env": "prod"},
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{},
@@ -346,8 +346,8 @@ func TestReduceTag_Tag(t *testing.T) {
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{"env": "dev"},
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{"env": "dev"},
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{"env": "prod"},
@@ -362,8 +362,8 @@ func TestReduceTag_Tag(t *testing.T) {
 				ToUnset: maputil.NewSet("env"),
 			},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{},
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{},
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{"env": "prod"},
@@ -375,8 +375,8 @@ func TestReduceTag_Tag(t *testing.T) {
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{},
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{},
 			},
 			wantStagedTag: StagedTags{},
 			wantError:     ErrCannotTagDelete,
@@ -386,8 +386,8 @@ func TestReduceTag_Tag(t *testing.T) {
 			entryState: EntryState{CurrentValue: nil, StagedState: EntryStagedStateCreate{DraftValue: "new"}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{},
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{},
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{"env": "prod"},
@@ -399,8 +399,8 @@ func TestReduceTag_Tag(t *testing.T) {
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateUpdate{DraftValue: "updated"}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{},
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{},
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{"env": "prod"},
@@ -415,8 +415,8 @@ func TestReduceTag_Tag(t *testing.T) {
 				ToUnset: maputil.NewSet("env"), // Previously staged untag
 			},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{"env": "prod"}, // Same as AWS
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{"env": "prod"}, // Same as AWS
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{},
@@ -424,12 +424,12 @@ func TestReduceTag_Tag(t *testing.T) {
 			},
 		},
 		{
-			name:       "Nil CurrentAWSTags disables auto-skip",
+			name:       "Nil CurrentRemoteTags disables auto-skip",
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: nil, // nil disables auto-skip
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: nil, // nil disables auto-skip
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{"env": "prod"}, // Should be staged since we don't know AWS state
@@ -441,8 +441,8 @@ func TestReduceTag_Tag(t *testing.T) {
 			entryState: EntryState{CurrentValue: nil, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionTag{
-				Tags:           map[string]string{"env": "prod"},
-				CurrentAWSTags: map[string]string{},
+				Tags:              map[string]string{"env": "prod"},
+				CurrentRemoteTags: map[string]string{},
 			},
 			wantStagedTag: StagedTags{},
 			wantError:     ErrCannotTagNotFound,
@@ -478,8 +478,8 @@ func TestReduceTag_Untag(t *testing.T) {
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
-				Keys:              maputil.NewSet("env"),
-				CurrentAWSTagKeys: maputil.NewSet("env"),
+				Keys:                 maputil.NewSet("env"),
+				CurrentRemoteTagKeys: maputil.NewSet("env"),
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{},
@@ -491,8 +491,8 @@ func TestReduceTag_Untag(t *testing.T) {
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
-				Keys:              maputil.NewSet("env"),
-				CurrentAWSTagKeys: maputil.NewSet[string](),
+				Keys:                 maputil.NewSet("env"),
+				CurrentRemoteTagKeys: maputil.NewSet[string](),
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{},
@@ -507,8 +507,8 @@ func TestReduceTag_Untag(t *testing.T) {
 				ToUnset: maputil.NewSet[string](),
 			},
 			action: TagActionUntag{
-				Keys:              maputil.NewSet("env"),
-				CurrentAWSTagKeys: maputil.NewSet("env"),
+				Keys:                 maputil.NewSet("env"),
+				CurrentRemoteTagKeys: maputil.NewSet("env"),
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{},
@@ -523,8 +523,8 @@ func TestReduceTag_Untag(t *testing.T) {
 				ToUnset: maputil.NewSet[string](),
 			},
 			action: TagActionUntag{
-				Keys:              maputil.NewSet("env"),
-				CurrentAWSTagKeys: maputil.NewSet[string](), // AWS has no tags (resource doesn't exist)
+				Keys:                 maputil.NewSet("env"),
+				CurrentRemoteTagKeys: maputil.NewSet[string](), // AWS has no tags (resource doesn't exist)
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{},      // ToSet cleared (tag cancelled)
@@ -536,8 +536,8 @@ func TestReduceTag_Untag(t *testing.T) {
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
-				Keys:              maputil.NewSet("env"),
-				CurrentAWSTagKeys: maputil.NewSet("env"),
+				Keys:                 maputil.NewSet("env"),
+				CurrentRemoteTagKeys: maputil.NewSet("env"),
 			},
 			wantStagedTag: StagedTags{},
 			wantError:     ErrCannotUntagDelete,
@@ -550,8 +550,8 @@ func TestReduceTag_Untag(t *testing.T) {
 				ToUnset: maputil.NewSet[string](),
 			},
 			action: TagActionUntag{
-				Keys:              maputil.NewSet("env"),
-				CurrentAWSTagKeys: maputil.NewSet[string](), // Not on AWS
+				Keys:                 maputil.NewSet("env"),
+				CurrentRemoteTagKeys: maputil.NewSet[string](), // Not on AWS
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{}, // ToSet should be cleared
@@ -559,12 +559,12 @@ func TestReduceTag_Untag(t *testing.T) {
 			},
 		},
 		{
-			name:       "Nil CurrentAWSTagKeys disables auto-skip",
+			name:       "Nil CurrentRemoteTagKeys disables auto-skip",
 			entryState: EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
-				Keys:              maputil.NewSet("env"),
-				CurrentAWSTagKeys: nil, // nil disables auto-skip
+				Keys:                 maputil.NewSet("env"),
+				CurrentRemoteTagKeys: nil, // nil disables auto-skip
 			},
 			wantStagedTag: StagedTags{
 				ToSet:   map[string]string{},
@@ -576,8 +576,8 @@ func TestReduceTag_Untag(t *testing.T) {
 			entryState: EntryState{CurrentValue: nil, StagedState: EntryStagedStateNotStaged{}},
 			stagedTags: StagedTags{},
 			action: TagActionUntag{
-				Keys:              maputil.NewSet("env"),
-				CurrentAWSTagKeys: maputil.NewSet("env"),
+				Keys:                 maputil.NewSet("env"),
+				CurrentRemoteTagKeys: maputil.NewSet("env"),
 			},
 			wantStagedTag: StagedTags{},
 			wantError:     ErrCannotUntagNotFound,

@@ -42,7 +42,7 @@ func Command() *cli.Command {
 		Description: `Create a new parameter in AWS Systems Manager Parameter Store.
 
 Use this command for new parameters only. To update an existing parameter,
-use 'suve param update' instead.
+use 'suve aws param update' instead.
 
 PARAMETER TYPES:
    String        Plain text value (default)
@@ -56,15 +56,15 @@ The value may be given as a positional argument, read from stdin with
 --value-stdin (so it never appears in argv/ps or shell history), or, when
 omitted, typed into $EDITOR.
 
-To add tags after creation, use 'suve param tag' command.
+To add tags after creation, use 'suve aws param tag' command.
 
 EXAMPLES:
-   suve param create /app/config/db-url "postgres://..."       Create String parameter
-   suve param create --secure /app/config/api-key "secret123"  Create SecureString
-   suve param create --type StringList /app/hosts "a.com,b.com" Create StringList
-   suve param create --description "DB URL" /app/db-url "..."  With description
-   printf '%s' "$V" | suve param create --secure /app/key --value-stdin  Read value from stdin
-   suve param create --secure /app/key                         Type value into $EDITOR`,
+   suve aws param create /app/config/db-url "postgres://..."       Create String parameter
+   suve aws param create --secure /app/config/api-key "secret123"  Create SecureString
+   suve aws param create --type StringList /app/hosts "a.com,b.com" Create StringList
+   suve aws param create --description "DB URL" /app/db-url "..."  With description
+   printf '%s' "$V" | suve aws param create --secure /app/key --value-stdin  Read value from stdin
+   suve aws param create --secure /app/key                         Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -104,7 +104,7 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args()
 	if args.Len() < 1 {
-		return errors.New("usage: suve param create <name> [<value>]")
+		return errors.New("usage: suve aws param create <name> [<value>]")
 	}
 
 	secure := cmd.Bool("secure")

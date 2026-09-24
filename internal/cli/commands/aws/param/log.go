@@ -267,15 +267,15 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-   suve param log /app/config                             Show last 10 versions
-   suve param log --patch /app/config                     Show versions with diffs
-   suve param log --patch --parse-json /app/config        Show diffs with JSON formatting
-   suve param log --oneline /app/config                   Compact one-line format
-   suve param log --oneline --max-value-length 80 /app/config  Custom truncation length
-   suve param log --number 5 /app/config                  Show last 5 versions
-   suve param log --since 2024-01-01T00:00:00Z /app/config  Show versions since date
-   suve param log --output=json /app/config               Output as JSON`,
-		UsageError: "usage: suve param log <name>",
+   suve aws param log /app/config                             Show last 10 versions
+   suve aws param log --patch /app/config                     Show versions with diffs
+   suve aws param log --patch --parse-json /app/config        Show diffs with JSON formatting
+   suve aws param log --oneline /app/config                   Compact one-line format
+   suve aws param log --oneline --max-value-length 80 /app/config  Custom truncation length
+   suve aws param log --number 5 /app/config                  Show last 5 versions
+   suve aws param log --since 2024-01-01T00:00:00Z /app/config  Show versions since date
+   suve aws param log --output=json /app/config               Output as JSON`,
+		UsageError: "usage: suve aws param log <name>",
 		Flags: []cli.Flag{
 			&cli.Int32Flag{
 				Name:    "number",

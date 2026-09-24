@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -299,17 +300,17 @@ func exportAction(service staging.Service, resolver staging.ScopeResolver) func(
 // NewGlobalExportCommand creates the global `stage export <dir>` command. It
 // writes <dir>/param.json and <dir>/secret.json, one file per service that has
 // staged changes (empty services are skipped). The resolver determines the
-// provider staging scope.
-func NewGlobalExportCommand(resolver staging.ScopeResolver) *cli.Command {
+// provider staging scope; its CommandPath renders the help examples.
+func NewGlobalExportCommand(gcfg GlobalConfig) *cli.Command {
 	return &cli.Command{
 		Name:      "export",
 		Usage:     "Export staged changes to a directory (one file per service)",
 		ArgsUsage: "<dir>",
-		Description: `Export staged changes from the working staging area to a directory.
+		Description: strings.ReplaceAll(`Export staged changes from the working staging area to a directory.
 
 Writes one file per service that has staged changes:
-   <dir>/param.json    SSM Parameter Store staged changes
-   <dir>/secret.json   Secrets Manager staged changes
+   <dir>/param.json    staged parameter changes
+   <dir>/secret.json   staged secret changes
 
 Only services with staged changes are written. The directory is created if
 needed. Each file is a plaintext JSON envelope whose payload is encrypted when
@@ -319,11 +320,11 @@ By default the working staging area is cleared after exporting; use --keep to
 retain it.
 
 EXAMPLES:
-   suve stage export ./backup                       Export all staged changes to ./backup
-   suve stage export ./backup --keep                Export but keep the working staging area
-   echo "secret" | suve stage export ./backup --passphrase-stdin   Encrypt with passphrase from stdin`,
+   {path} export ./backup                       Export all staged changes to ./backup
+   {path} export ./backup --keep                Export but keep the working staging area
+   echo "secret" | {path} export ./backup --passphrase-stdin   Encrypt with passphrase from stdin`, "{path}", gcfg.CommandPath),
 		Flags:  exportFlags(),
-		Action: exportAction("", resolver),
+		Action: exportAction("", gcfg.ScopeResolver),
 	}
 }
 
@@ -337,28 +338,19 @@ func NewExportCommand(cfg CommandConfig) *cli.Command {
 		Name:      "export",
 		Usage:     fmt.Sprintf("Export staged %s changes to a file", cfg.ItemName),
 		ArgsUsage: "<file>",
-		Description: fmt.Sprintf(`Export staged %s changes from the working staging area to a file.
+		Description: renderHelp(cfg, `Export staged {item} changes from the working staging area to a file.
 
 The file is a plaintext JSON envelope whose payload is encrypted when a
 passphrase is supplied (empty passphrase = plaintext). The parent directory is
 created if needed.
 
-By default the %s entries are cleared from the working staging area after
+By default the {item} entries are cleared from the working staging area after
 exporting; use --keep to retain them.
 
 EXAMPLES:
-   suve stage %s export ./%s.json                     Export staged %s changes
-   suve stage %s export ./%s.json --keep              Export but keep the working staging area
-   echo "secret" | suve stage %s export ./%s.json --passphrase-stdin   Encrypt with passphrase from stdin`,
-			cfg.ItemName,
-			cfg.ItemName,
-			cfg.CommandName,
-			cfg.CommandName,
-			cfg.ItemName,
-			cfg.CommandName,
-			cfg.CommandName,
-			cfg.CommandName,
-			cfg.CommandName),
+   {path} export ./{name}.json                     Export staged {item} changes
+   {path} export ./{name}.json --keep              Export but keep the working staging area
+   echo "secret" | {path} export ./{name}.json --passphrase-stdin   Encrypt with passphrase from stdin`),
 		Flags:  exportFlags(),
 		Action: exportAction(service, cfg.ScopeResolver),
 	}

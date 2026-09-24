@@ -16,6 +16,8 @@ const nounSecret = "secret"
 var config = stgcli.CommandConfig{
 	CommandName:    nounSecret,
 	ItemName:       nounSecret,
+	ProviderLabel:  "AWS",
+	CommandPath:    "suve aws stage secret",
 	Factory:        cliinternal.AWSSecretStrategyFactory,
 	ParserFactory:  staging.AWSSecretParserFactory,
 	ScopeResolver:  cliinternal.AWSStagingScopeResolver,
@@ -36,13 +38,13 @@ func Command() *cli.Command {
 		Usage:   "Staging operations for Secrets Manager",
 		Description: `Stage changes locally before applying to AWS.
 
-Use 'suve stage secret add' to create and stage a new secret.
-Use 'suve stage secret edit' to edit and stage an existing secret.
-Use 'suve stage secret delete' to stage a secret for deletion.
-Use 'suve stage secret status' to view staged secret changes.
-Use 'suve stage secret diff' to see differences between staged and AWS values.
-Use 'suve stage secret apply' to apply staged secret changes to AWS.
-Use 'suve stage secret reset' to unstage or restore from a version.`,
+Use 'suve aws stage secret add' to create and stage a new secret.
+Use 'suve aws stage secret edit' to edit and stage an existing secret.
+Use 'suve aws stage secret delete' to stage a secret for deletion.
+Use 'suve aws stage secret status' to view staged secret changes.
+Use 'suve aws stage secret diff' to see differences between staged and AWS values.
+Use 'suve aws stage secret apply' to apply staged secret changes to AWS.
+Use 'suve aws stage secret reset' to unstage or restore from a version.`,
 		Commands: []*cli.Command{
 			stgcli.NewAddCommand(config),
 			stgcli.NewEditCommand(config),

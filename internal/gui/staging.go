@@ -152,9 +152,8 @@ type StagingDiffResult struct {
 }
 
 // StagingDiffEntry represents a single diff entry. RemoteValue/RemoteIdentifier
-// are the current value and version identifier on the provider being compared
-// against (AWS today; the field names are provider-neutral so Google Cloud and
-// Azure fit without another rename).
+// are the current value and version identifier in the remote store the staged
+// value is compared against.
 type StagingDiffEntry struct {
 	Name string `json:"name"`
 	// Namespace is the App Configuration namespace of the entry (empty for the
@@ -181,7 +180,7 @@ type StagingDiffTagEntry struct {
 	// the null/default namespace and every other provider).
 	Namespace  string            `json:"namespace"`
 	AddTags    map[string]string `json:"addTags,omitempty"`
-	RemoveTags map[string]string `json:"removeTags,omitempty"` // key=current value from AWS
+	RemoveTags map[string]string `json:"removeTags,omitempty"` // key=current remote value
 }
 
 // Enum → frontend-string lookup tables. Kept as immutable package-level maps so
@@ -829,8 +828,8 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 			Namespace:        e.Namespace,
 			Type:             diffEntryTypeNames[e.Type],
 			Operation:        string(e.Operation),
-			RemoteValue:      e.AWSValue,
-			RemoteIdentifier: e.AWSIdentifier,
+			RemoteValue:      e.RemoteValue,
+			RemoteIdentifier: e.RemoteIdentifier,
 			StagedValue:      e.StagedValue,
 			Description:      e.Description,
 			Warning:          e.Warning,

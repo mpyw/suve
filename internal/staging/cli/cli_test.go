@@ -2052,6 +2052,47 @@ func TestApplyRunner_RunInteractive_TagOnly(t *testing.T) {
 	})
 }
 
+// TestApplyRunner_RunInteractive_ProviderLabel verifies the confirmation prompt
+// names the provider the runner is configured for, and falls back to "remote"
+// when no label is set (the shared runner serves every provider).
+func TestApplyRunner_RunInteractive_ProviderLabel(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		label, want string
+	}{
+		{label: "Google Cloud", want: "to Google Cloud?"},
+		{label: "", want: "to remote?"},
+	} {
+		t.Run(tt.want, func(t *testing.T) {
+			t.Parallel()
+
+			store := testutil.NewMockStore()
+			_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
+				Operation: staging.OperationUpdate,
+				Value:     lo.ToPtr("v"),
+				StagedAt:  time.Now(),
+			})
+
+			var stdout, stderr bytes.Buffer
+
+			conf := &stubConfirmer{reply: false}
+			r := &cli.ApplyRunner{
+				UseCase:       &stagingusecase.ApplyUseCase{Strategy: &fullMockStrategy{service: staging.ServiceParam}, Store: store},
+				Store:         store,
+				Parser:        &fullMockStrategy{service: staging.ServiceParam},
+				ProviderLabel: tt.label,
+				Confirmer:     conf,
+				Stdout:        &stdout,
+				Stderr:        &stderr,
+			}
+			require.NoError(t, r.RunInteractive(t.Context(), cli.ApplyOptions{}))
+			assert.Contains(t, conf.message, tt.want)
+			assert.NotContains(t, conf.message, "AWS")
+		})
+	}
+}
+
 // TestApplyRunner_RunInteractive_ReadsPrompterStdin verifies that the
 // interactive apply flow reads its yes/no confirmation from the Prompter's
 // Stdin reader (which the command wires to cmd.Root().Reader, #332) rather than
@@ -2508,8 +2549,9 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
 				Store:    store,
 			},
-			Stdout: &stdout,
-			Stderr: &stderr,
+			ProviderLabel: "AWS",
+			Stdout:        &stdout,
+			Stderr:        &stderr,
 		}
 
 		// Edit with value that matches AWS - should be skipped
@@ -2544,8 +2586,9 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "aws-value"},
 				Store:    store,
 			},
-			Stdout: &stdout,
-			Stderr: &stderr,
+			ProviderLabel: "AWS",
+			Stdout:        &stdout,
+			Stderr:        &stderr,
 		}
 
 		// Edit back to AWS value - should auto-unstage

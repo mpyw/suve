@@ -226,7 +226,7 @@ func (s *stagingService) Review(ctx context.Context) (StagingReview, error) {
 				Namespace:   e.Namespace,
 				Type:        stagedDiffType(e.Type),
 				Operation:   string(e.Operation),
-				RemoteValue: e.AWSValue,
+				RemoteValue: e.RemoteValue,
 				StagedValue: e.StagedValue,
 				Warning:     e.Warning,
 				Secret:      e.Secret,

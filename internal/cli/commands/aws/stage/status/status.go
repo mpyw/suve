@@ -1,4 +1,5 @@
-// Package status provides the global status command for viewing all staged changes.
+// Package status provides the provider-wide status command that shows staged
+// changes for every service of one provider (used by AWS and Azure).
 package status
 
 import (
@@ -51,13 +52,14 @@ func Command(cfg stgcli.GlobalConfig) *cli.Command {
 	return &cli.Command{
 		Name:  "status",
 		Usage: "Show all staged changes",
-		Description: `Display all staged changes for the active provider's services.
+		Description: fmt.Sprintf(`Display all staged changes for the %s services.
 
 Use -v/--verbose to show detailed information including the staged values.
 
 EXAMPLES:
-   suve stage status     Show all staged changes
-   suve stage status -v  Show detailed information`,
+   %s status     Show all staged changes
+   %s status -v  Show detailed information`,
+			cfg.ProviderLabel, cfg.CommandPath, cfg.CommandPath),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "verbose",

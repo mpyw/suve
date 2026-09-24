@@ -1,4 +1,5 @@
-// Package apply provides the global apply command for applying all staged changes.
+// Package apply provides the provider-wide apply command that applies staged
+// changes for every service of one provider (used by AWS and Azure).
 package apply
 
 import (
@@ -79,17 +80,17 @@ type Runner struct {
 	IgnoreConflicts bool
 }
 
-// Command returns the global apply command for the given provider config.
+// Command returns the provider-wide apply command for the given provider config.
 func Command(cfg stgcli.GlobalConfig) *cli.Command {
 	return &cli.Command{
 		Name:    "apply",
 		Aliases: []string{"push"},
 		Usage:   "Apply all staged changes",
-		Description: `Apply all staged changes for the active provider's services.
+		Description: fmt.Sprintf(`Apply all staged changes to the %s services.
 
 After successful apply, the staged changes are cleared.
 
-Use 'suve stage status' to view all staged changes before applying.
+Use '%s status' to view all staged changes before applying.
 
 CONFLICT DETECTION:
    Before applying, suve checks for conflicts to prevent lost updates:
@@ -98,9 +99,10 @@ CONFLICT DETECTION:
    Use --ignore-conflicts to force apply despite conflicts.
 
 EXAMPLES:
-   suve stage apply                      Apply all staged changes (with confirmation)
-   suve stage apply --yes                Apply without confirmation
-   suve stage apply --ignore-conflicts   Apply even if conflicts detected`,
+   %s apply                      Apply all staged changes (with confirmation)
+   %s apply --yes                Apply without confirmation
+   %s apply --ignore-conflicts   Apply even if conflicts detected`,
+			cfg.ProviderLabel, cfg.CommandPath, cfg.CommandPath, cfg.CommandPath, cfg.CommandPath),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "yes",
@@ -108,7 +110,7 @@ EXAMPLES:
 			},
 			&cli.BoolFlag{
 				Name:  "ignore-conflicts",
-				Usage: "Apply even if the remote store was modified after staging",
+				Usage: fmt.Sprintf("Apply even if %s was modified after staging", cfg.ProviderLabel),
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {

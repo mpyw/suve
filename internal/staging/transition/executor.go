@@ -31,7 +31,7 @@ func NewExecutor(store store.ReadWriteOperator) *Executor {
 type EntryExecuteOptions struct {
 	BaseModifiedAt *time.Time       // Base modification time for conflict detection
 	Description    *string          // Optional description for the staged entry
-	ValueType      domain.ValueType // Provider-neutral value type (AWS param axis); empty means unset
+	ValueType      domain.ValueType // Provider-neutral value type (e.g. an SSM Parameter Store type); empty means unset
 }
 
 // ExecuteEntry executes an entry action and persists the result.
@@ -181,15 +181,15 @@ func (e *Executor) persistTagState(
 	})
 }
 
-// LoadEntryState loads the current entry state from the store and AWS info.
+// LoadEntryState loads the current entry state from the store and the remote value.
 func LoadEntryState(
 	ctx context.Context,
 	store store.ReadOperator,
 	service staging.Service,
 	key staging.EntryKey,
-	currentAWSValue *string,
+	currentRemoteValue *string,
 ) (EntryState, error) {
-	state, _, err := LoadEntryStateWithMetadata(ctx, store, service, key, currentAWSValue)
+	state, _, err := LoadEntryStateWithMetadata(ctx, store, service, key, currentRemoteValue)
 
 	return state, err
 }
@@ -201,7 +201,7 @@ func LoadEntryStateWithMetadata(
 	store store.ReadOperator,
 	service staging.Service,
 	key staging.EntryKey,
-	currentAWSValue *string,
+	currentRemoteValue *string,
 ) (EntryState, *time.Time, error) {
 	stagedEntry, err := store.GetEntry(ctx, service, key)
 	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
@@ -209,7 +209,7 @@ func LoadEntryStateWithMetadata(
 	}
 
 	state := EntryState{
-		CurrentValue: currentAWSValue,
+		CurrentValue: currentRemoteValue,
 		StagedState:  EntryStagedStateNotStaged{},
 	}
 

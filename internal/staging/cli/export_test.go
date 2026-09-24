@@ -48,6 +48,11 @@ func fixedResolver(scope provider.Scope) staging.ScopeResolver {
 	}
 }
 
+// globalExportCmd builds the global export command for a fixed scope.
+func globalExportCmd(scope provider.Scope) *cli.Command {
+	return stgcli.NewGlobalExportCommand(stgcli.GlobalConfig{ScopeResolver: fixedResolver(scope)})
+}
+
 // paramExportImportConfig builds a service-specific param CommandConfig bound to
 // the given resolver.
 func paramExportImportConfig(resolver staging.ScopeResolver) stgcli.CommandConfig {
@@ -129,7 +134,7 @@ func TestGlobalExport(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
-		stdout, stderr, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), nil, dir)
+		stdout, stderr, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "exported")
 		// Plaintext (non-TTY, no passphrase) → warning.
@@ -152,7 +157,7 @@ func TestGlobalExport(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), nil, dir)
+		_, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
 		require.NoError(t, err)
 
 		_, err = os.Stat(filepath.Join(dir, "param.json"))
@@ -167,7 +172,7 @@ func TestGlobalExport(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), nil, dir, "--keep")
+		stdout, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir, "--keep")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "kept in the working staging area")
 
@@ -181,7 +186,7 @@ func TestGlobalExport(t *testing.T) {
 		dir := filepath.Join(t.TempDir(), "backup")
 
 		stdin := bytes.NewBufferString("pw123\n")
-		stdout, stderr, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), stdin, dir, "--passphrase-stdin")
+		stdout, stderr, err := runLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "encrypted")
 		assert.NotContains(t, stderr, "plain text")
@@ -198,7 +203,7 @@ func TestGlobalExport(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), nil, dir)
+		stdout, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No staged changes to export.")
 
@@ -209,7 +214,7 @@ func TestGlobalExport(t *testing.T) {
 	t.Run("missing dir argument", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
 
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), nil)
+		_, _, err := runLeafCmd(t, globalExportCmd(scope), nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage")
 	})
@@ -221,7 +226,7 @@ func TestGlobalExport(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
 
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), nil, dir)
+		_, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exist")
 	})
@@ -233,7 +238,7 @@ func TestGlobalExport(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
 
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), nil, dir, "--yes")
+		_, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir, "--yes")
 		require.NoError(t, err)
 
 		env, err := file.ReadEnvelopeFile(filepath.Join(dir, "param.json"))
@@ -253,7 +258,7 @@ func TestGlobalExport(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
 
 		stdin := bytes.NewBufferString("pw123\n")
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), stdin, dir, "--passphrase-stdin")
+		stdout, _, err := runLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exist")
 		assert.Contains(t, err.Error(), "--yes")
@@ -272,7 +277,7 @@ func TestGlobalExport(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
 
 		stdin := bytes.NewBufferString("pw123\n")
-		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), stdin, dir, "--passphrase-stdin", "--yes")
+		stdout, _, err := runLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin", "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "encrypted")
 

@@ -23,7 +23,7 @@ essentials (Name, Value, Type, Version, Description, Tags, Modified). It has no
 ARN, no KMS key, no metadata `any` bag, and no `[M]` generic.
 
 Provider-specific, display-only metadata is surfaced through `Entry.Extra`
-(`domain.go:107`), a `[]Field` where `Field` (`domain.go:71`) holds a
+(`domain.go:108`), a `[]Field` where `Field` (`domain.go:72`) holds a
 human-facing `Label` and a pre-formatted string `Value`. It is neutral in shape
 (no cloud types, no `any`): adapters populate it, consumers render it verbatim
 and never interpret it. Add new provider metadata by appending an `Extra` field

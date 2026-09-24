@@ -17,6 +17,8 @@ import (
 var config = stgcli.CommandConfig{
 	CommandName:      "param",
 	ItemName:         "parameter",
+	ProviderLabel:    "AWS",
+	CommandPath:      "suve aws stage param",
 	Factory:          cliinternal.AWSParamStrategyFactory,
 	ParserFactory:    staging.AWSParamParserFactory,
 	ScopeResolver:    cliinternal.AWSStagingScopeResolver,
@@ -82,13 +84,13 @@ func Command() *cli.Command {
 		Usage:   "Staging operations for SSM Parameter Store parameters",
 		Description: `Stage changes locally before applying to AWS.
 
-Use 'suve stage param add' to create and stage a new parameter.
-Use 'suve stage param edit' to edit and stage an existing parameter.
-Use 'suve stage param delete' to stage a parameter for deletion.
-Use 'suve stage param status' to view staged parameter changes.
-Use 'suve stage param diff' to see differences between staged and AWS values.
-Use 'suve stage param apply' to apply staged parameter changes to AWS.
-Use 'suve stage param reset' to unstage or restore from a version.`,
+Use 'suve aws stage param add' to create and stage a new parameter.
+Use 'suve aws stage param edit' to edit and stage an existing parameter.
+Use 'suve aws stage param delete' to stage a parameter for deletion.
+Use 'suve aws stage param status' to view staged parameter changes.
+Use 'suve aws stage param diff' to see differences between staged and AWS values.
+Use 'suve aws stage param apply' to apply staged parameter changes to AWS.
+Use 'suve aws stage param reset' to unstage or restore from a version.`,
 		Commands: []*cli.Command{
 			stgcli.NewAddCommand(config),
 			stgcli.NewEditCommand(config),

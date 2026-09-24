@@ -24,7 +24,7 @@ func TestCommand_Validation(t *testing.T) {
 		app := apptest.AWSApp()
 		err := app.Run(t.Context(), []string{"suve", "param", "delete"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "usage: suve param delete")
+		assert.Contains(t, err.Error(), "usage: suve aws param delete")
 	})
 }
 

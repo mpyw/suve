@@ -59,6 +59,10 @@ Staging is a distinct increment on top of read/write (#247 → #261, #262):
   `internal/cli/commands/internal/client.go`) and set it on every staging
   config; there is no default resolver.
 - Add the provider's staging strategy.
+- Set `ProviderLabel` (e.g. `"Google Cloud"`) and `CommandPath` (the explicit
+  stage path, e.g. `"suve gcloud stage"`) on every `stgcli.CommandConfig` and
+  `stgcli.GlobalConfig`. The shared staging help, usage errors, and prompts
+  render from them, so a missing value shows up as a blank path or "remote".
 - Register the service spec in `GlobalConfig` (#261).
 
 ## PR conventions

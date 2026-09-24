@@ -1,6 +1,8 @@
 package stage_test
 
 import (
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/samber/lo"
@@ -107,4 +109,42 @@ func TestGlobalConfig(t *testing.T) {
 	// Parser factories are carried through and are network-free.
 	assert.Equal(t, "SSM Parameter Store", cfg.Services[0].ParserFactory().ServiceName())
 	assert.Equal(t, "Secrets Manager", cfg.Services[1].ParserFactory().ServiceName())
+}
+
+// TestStageHelpWording verifies the stage help text names AWS and uses the explicit
+// "suve aws stage" command paths, never another provider's wording or the flat
+// alias paths.
+func TestStageHelpWording(t *testing.T) {
+	t.Parallel()
+
+	for path, text := range stageHelpTexts(stage.Command(), "suve aws stage") {
+		for _, m := range regexp.MustCompile(`suve (?:aws|gcloud|azure|param|secret|stage|stg)\b`).FindAllString(text, -1) {
+			assert.Equal(t, "suve aws", m, "%s: %q", path, text)
+		}
+	}
+}
+
+// stageHelpTexts returns every help string (usage, description, flag usages) in the
+// command tree, keyed by the command path.
+func stageHelpTexts(cmd *cli.Command, path string) map[string]string {
+	texts := map[string]string{}
+
+	var walk func(c *cli.Command, p string)
+	walk = func(c *cli.Command, p string) {
+		parts := []string{c.Usage, c.Description}
+		for _, f := range c.Flags {
+			if u, ok := f.(interface{ GetUsage() string }); ok {
+				parts = append(parts, u.GetUsage())
+			}
+		}
+
+		texts[p] = strings.Join(parts, "\n")
+
+		for _, sub := range c.Commands {
+			walk(sub, p+" "+sub.Name)
+		}
+	}
+	walk(cmd, path)
+
+	return texts
 }

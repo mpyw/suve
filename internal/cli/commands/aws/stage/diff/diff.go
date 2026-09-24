@@ -1,4 +1,5 @@
-// Package diff provides the global diff command for viewing staged changes.
+// Package diff provides the provider-wide diff command that shows staged changes
+// for every service of one provider (used by AWS and Azure).
 package diff
 
 import (
@@ -76,13 +77,14 @@ func Command(cfg stgcli.GlobalConfig) *cli.Command {
 	return &cli.Command{
 		Name:  "diff",
 		Usage: "Show diff of all staged changes",
-		Description: `Compare all staged changes against the provider's current values.
+		Description: fmt.Sprintf(`Compare all staged changes against the current %s values.
 
 For comparing specific versions, use the per-service diff commands.
 
 EXAMPLES:
-   suve stage diff     Show diff of all staged changes
-   suve stage diff -j  Show diff with JSON formatting`,
+   %s diff     Show diff of all staged changes
+   %s diff -j  Show diff with JSON formatting`,
+			cfg.ProviderLabel, cfg.CommandPath, cfg.CommandPath),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "parse-json",
@@ -96,7 +98,7 @@ EXAMPLES:
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() > 0 {
-				return fmt.Errorf("usage: suve stage diff (no arguments)")
+				return fmt.Errorf("usage: %s diff (no arguments)", cfg.CommandPath)
 			}
 
 			return runAction(ctx, cmd, cfg)

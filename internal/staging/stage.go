@@ -3,7 +3,8 @@
 // staging.X call sites.
 //declscope:core
 
-// Package staging provides staging functionality for AWS parameter and secret changes.
+// Package staging provides provider-neutral staging of parameter and secret
+// changes for every supported provider (AWS, Google Cloud, Azure).
 package staging
 
 import (
@@ -101,8 +102,8 @@ type Entry struct {
 	ValueType domain.ValueType `json:"value_type,omitempty"`
 	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	StagedAt time.Time `json:"staged_at"`
-	// BaseModifiedAt records the AWS LastModified time when the value was fetched.
-	// Used for conflict detection: if AWS was modified after this time, it's a conflict.
+	// BaseModifiedAt records the remote last-modified time when the value was fetched.
+	// Used for conflict detection: if the remote store was modified after this time, it's a conflict.
 	// Only set for update/delete operations (nil for create since there's no base).
 	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	BaseModifiedAt *time.Time `json:"base_modified_at,omitempty"`
@@ -120,7 +121,7 @@ type TagEntry struct {
 	// StagedAt records when the tag change was staged.
 	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	StagedAt time.Time `json:"staged_at"`
-	// BaseModifiedAt records the AWS LastModified time when tags were fetched.
+	// BaseModifiedAt records the remote last-modified time when tags were fetched.
 	// Used for conflict detection.
 	//nolint:tagliatelle // JSON uses snake_case for consistency with file storage format
 	BaseModifiedAt *time.Time `json:"base_modified_at,omitempty"`
@@ -526,13 +527,15 @@ func (s *State) RemoveService(service Service) {
 	s.Tags[service] = make(map[EntryKey]TagEntry)
 }
 
-// Service represents which AWS service the staged change belongs to.
+// Service is the provider-neutral service axis a staged change belongs to.
 type Service string
 
 const (
-	// ServiceParam represents AWS Systems Manager Parameter Store.
+	// ServiceParam is the parameter service (e.g. AWS SSM Parameter Store,
+	// Azure App Configuration).
 	ServiceParam Service = "param"
-	// ServiceSecret represents AWS Secrets Manager.
+	// ServiceSecret is the secret service (e.g. AWS Secrets Manager, Google
+	// Cloud Secret Manager, Azure Key Vault).
 	ServiceSecret Service = "secret"
 )
 

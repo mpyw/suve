@@ -1,6 +1,6 @@
 // Package aws provides the "suve aws" command group: the explicit,
 // always-present home for the AWS backends (Parameter Store, Secrets Manager,
-// and the AWS-only staging workflow). It mirrors the gcloud/azure groups so
+// and staging for both). It mirrors the gcloud/azure groups so
 // that AWS is a peer provider rather than a special top-level default. The
 // top-level `param` / `secret` aliases are added separately (and only when AWS
 // is the uniquely active provider); this group is what you always get with an

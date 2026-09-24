@@ -16,10 +16,10 @@ func UntagCommand() *cli.Command {
 Specify the tag keys to remove. Non-existent keys are silently ignored.
 
 EXAMPLES:
-   suve param untag /app/config deprecated              Remove single tag
-   suve param untag /app/config env team                Remove multiple tags`,
+   suve aws param untag /app/config deprecated              Remove single tag
+   suve aws param untag /app/config env team                Remove multiple tags`,
 		Noun:       "parameter",
-		UsageError: "usage: suve param untag <name> <key> [key]",
+		UsageError: "usage: suve aws param untag <name> <key> [key]",
 		NewTagger:  newTagger,
 	})
 }

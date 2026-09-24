@@ -1,9 +1,11 @@
-// Package reset provides the global reset command for unstaging all changes.
+// Package reset provides the provider-wide reset command that unstages every
+// service of one provider (used by AWS and Azure).
 package reset
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -39,19 +41,20 @@ func (r *Runner) storeForService(ctx context.Context, spec stgcli.GlobalServiceS
 	return st, err
 }
 
-// Command returns the global reset command for the given provider config.
+// Command returns the provider-wide reset command for the given provider config.
 func Command(cfg stgcli.GlobalConfig) *cli.Command {
 	return &cli.Command{
 		Name:  "reset",
 		Usage: "Unstage all changes",
-		Description: `Remove all staged changes from the staging area.
+		Description: fmt.Sprintf(`Remove all staged changes from the staging area.
 
-This does not affect the remote store - it only clears the local staging area.
+This does not affect %s - it only clears the local staging area.
 
-Use 'suve stage <service> reset' for service-specific operations.
+Use '%s <service> reset' for service-specific operations.
 
 EXAMPLES:
-   suve stage reset --all    Unstage all changes`,
+   %s reset --all    Unstage all changes`,
+			cfg.ProviderLabel, cfg.CommandPath, cfg.CommandPath),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",
@@ -62,7 +65,7 @@ EXAMPLES:
 			// Require --all flag for safety
 			if !cmd.Bool("all") {
 				output.Warning(cmd.Root().ErrWriter, "no effect without --all flag")
-				output.Hint(cmd.Root().ErrWriter, "Use 'suve stage reset --all' to unstage all changes")
+				output.Hint(cmd.Root().ErrWriter, "Use '%s reset --all' to unstage all changes", cfg.CommandPath)
 
 				return nil
 			}

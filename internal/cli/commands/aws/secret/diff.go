@@ -76,8 +76,8 @@ func (p *diffPresenter) RenderJSON(stdout io.Writer, oldValue, newValue string, 
 }
 
 func (p *diffPresenter) Hints(stderr io.Writer) {
-	output.Hint(stderr, "To compare with previous version, use: suve secret diff %s~1", p.result.OldName)
-	output.Hint(stderr, "or: suve secret diff %s:AWSPREVIOUS", p.result.OldName)
+	output.Hint(stderr, "To compare with previous version, use: suve aws secret diff %s~1", p.result.OldName)
+	output.Hint(stderr, "or: suve aws secret diff %s:AWSPREVIOUS", p.result.OldName)
 }
 
 // DiffCommand returns the Secrets Manager diff command.
@@ -97,13 +97,13 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-  suve secret diff my-secret~                        Compare previous with current
-  suve secret diff my-secret:AWSPREVIOUS             Compare AWSPREVIOUS with AWSCURRENT
-  suve secret diff my-secret#abc my-secret#def       Compare specific version IDs
-  suve secret diff --parse-json my-secret~           Format JSON values before diffing
-  suve secret diff --output=json my-secret~          Output comparison as JSON
+  suve aws secret diff my-secret~                        Compare previous with current
+  suve aws secret diff my-secret:AWSPREVIOUS             Compare AWSPREVIOUS with AWSCURRENT
+  suve aws secret diff my-secret#abc my-secret#def       Compare specific version IDs
+  suve aws secret diff --parse-json my-secret~           Format JSON values before diffing
+  suve aws secret diff --output=json my-secret~          Output comparison as JSON
 
-For comparing staged values, use: suve stage secret diff`,
+For comparing staged values, use: suve aws stage secret diff`,
 		ParseDiffArgs: awssecretversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *awssecretversion.Spec) (genericdiff.Presenter, error) {
 			store, err := cliinternal.AWSSecretStore(ctx)

@@ -49,8 +49,8 @@ func Command() *cli.Command {
 
 This creates a new version of the parameter in AWS Systems Manager Parameter Store.
 
-Use 'suve param create' to create a new parameter.
-To manage tags, use 'suve param tag' and 'suve param untag' commands.
+Use 'suve aws param create' to create a new parameter.
+To manage tags, use 'suve aws param tag' and 'suve aws param untag' commands.
 
 PARAMETER TYPES:
    String        Plain text value
@@ -69,11 +69,11 @@ The value may be given as a positional argument, read from stdin with
 omitted, typed into $EDITOR.
 
 EXAMPLES:
-   suve param update /app/config/db-url "postgres://..."       Update parameter
-   suve param update --secure /app/config/api-key "secret123"  Update as SecureString
-   suve param update --yes /app/config/db-url "postgres://..." Update without confirmation
-   printf '%s' "$V" | suve param update --yes --secure /app/key --value-stdin  Read value from stdin
-   suve param update --secure /app/key                         Type value into $EDITOR`,
+   suve aws param update /app/config/db-url "postgres://..."       Update parameter
+   suve aws param update --secure /app/config/api-key "secret123"  Update as SecureString
+   suve aws param update --yes /app/config/db-url "postgres://..." Update without confirmation
+   printf '%s' "$V" | suve aws param update --yes --secure /app/key --value-stdin  Read value from stdin
+   suve aws param update --secure /app/key                         Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "type",
@@ -116,7 +116,7 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args()
 	if args.Len() < 1 {
-		return errors.New("usage: suve param update <name> [<value>]")
+		return errors.New("usage: suve aws param update <name> [<value>]")
 	}
 
 	secure := cmd.Bool("secure")

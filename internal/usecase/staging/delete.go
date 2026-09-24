@@ -67,7 +67,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 			return nil, fmt.Errorf("failed to fetch %s: %w", itemName, err)
 		}
 	} else {
-		// Resource exists on AWS - a non-nil currentValue signals existence to
+		// Resource exists remotely - a non-nil currentValue signals existence to
 		// the reducer. A zero fetched time here means "exists, modification time
 		// unknown" and is preserved as-is.
 		lastModified = fetched
@@ -88,7 +88,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 		return nil, result.Error
 	}
 
-	// A CREATE reduces to NotStaged (nothing to delete on AWS); anything else
+	// A CREATE reduces to NotStaged (nothing to delete remotely); anything else
 	// stages a DELETE. In both cases DiscardTags may be set, and the resource
 	// ends up gone, so orphan staged tags must be unstaged too.
 	_, unstaged := result.NewState.StagedState.(transition.EntryStagedStateNotStaged)

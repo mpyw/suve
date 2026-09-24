@@ -1,8 +1,10 @@
-// Package diffargs provides shared diff command argument parsing logic for SSM Parameter Store and Secrets Manager.
+// Package diffargs provides the diff command argument parsing shared by every
+// provider version parser (AWS, Google Cloud, Azure).
 //
-// The diff command compares two versions of a parameter (SSM Parameter Store) or secret (Secrets Manager).
+// The diff command compares two versions of one parameter or secret. The
+// examples below use AWS specs (Parameter Store "#N", Secrets Manager labels).
 // This package provides a generic ParseArgs function that handles the various
-// argument patterns supported by both services.
+// argument patterns every provider supports.
 //
 // # Argument Patterns
 //
@@ -13,32 +15,32 @@
 // Each argument is a complete specification including name and version.
 //
 //   - 1 arg: Compare specified version against default (latest/AWSCURRENT)
-//     suve param diff /app/config#3
-//     suve secret diff my-secret:AWSPREVIOUS
+//     suve aws param diff /app/config#3
+//     suve aws secret diff my-secret:AWSPREVIOUS
 //
 //   - 2 args: Compare two fully-specified versions
-//     suve param diff /app/config#1 /app/config#2
-//     suve secret diff my-secret:AWSPREVIOUS my-secret:AWSCURRENT
+//     suve aws param diff /app/config#1 /app/config#2
+//     suve aws secret diff my-secret:AWSPREVIOUS my-secret:AWSCURRENT
 //
 // ## Partial Spec Format
 //
 // Name is specified separately from version specifiers.
 //
 //   - 2 args: Name + specifier → compare with default
-//     suve param diff /app/config '#3'
-//     suve secret diff my-secret ':AWSPREVIOUS'
+//     suve aws param diff /app/config '#3'
+//     suve aws secret diff my-secret ':AWSPREVIOUS'
 //
 //   - 3 args: Name + two specifiers
-//     suve param diff /app/config '#1' '#2'
-//     suve secret diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'
+//     suve aws param diff /app/config '#1' '#2'
+//     suve aws secret diff my-secret ':AWSPREVIOUS' ':AWSCURRENT'
 //
 // ## Mixed Format
 //
 // First argument is full spec, second is specifier-only (inherits name from first).
 //
 //   - 2 args: Full spec + specifier
-//     suve param diff /app/config#1 '#2'
-//     suve secret diff my-secret:AWSPREVIOUS ':AWSCURRENT'
+//     suve aws param diff /app/config#1 '#2'
+//     suve aws secret diff my-secret:AWSPREVIOUS ':AWSCURRENT'
 //
 // # Return Value Semantics
 //
@@ -97,7 +99,7 @@ import (
 //	    awsparamversion.Parse,
 //	    func(abs awsparamversion.AbsoluteSpec) bool { return abs.Version != nil },
 //	    "#~",
-//	    "usage: suve param diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
+//	    "usage: suve aws param diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 //	)
 //
 // Secrets Manager usage:
@@ -107,7 +109,7 @@ import (
 //	    awssecretversion.Parse,
 //	    func(abs awssecretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
 //	    "#:~",
-//	    "usage: suve secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
+//	    "usage: suve aws secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 //	)
 func ParseArgs[A any](
 	args []string,

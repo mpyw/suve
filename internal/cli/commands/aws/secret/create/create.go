@@ -36,7 +36,7 @@ func Command() *cli.Command {
 		Description: `Create a new secret in AWS Secrets Manager.
 
 Use this command for new secrets only. To update an existing secret,
-use 'suve secret update' instead.
+use 'suve aws secret update' instead.
 
 Secret values are automatically encrypted by Secrets Manager using
 the default KMS key or a custom KMS key configured in the account.
@@ -45,14 +45,14 @@ The value may be given as a positional argument, read from stdin with
 --value-stdin (so it never appears in argv/ps or shell history), or, when
 omitted, typed into $EDITOR.
 
-To add tags after creation, use 'suve secret tag' command.
+To add tags after creation, use 'suve aws secret tag' command.
 
 EXAMPLES:
-   suve secret create my-api-key "sk-12345"                    Create simple secret
-   suve secret create --description "API Key for X" my-key "..." With description
-   suve secret create my-config '{"host":"db.example.com"}'    Create JSON secret
-   printf '%s' "$VALUE" | suve secret create my-key --value-stdin  Read value from stdin
-   suve secret create my-key                                   Type value into $EDITOR`,
+   suve aws secret create my-api-key "sk-12345"                    Create simple secret
+   suve aws secret create --description "API Key for X" my-key "..." With description
+   suve aws secret create my-config '{"host":"db.example.com"}'    Create JSON secret
+   printf '%s' "$VALUE" | suve aws secret create my-key --value-stdin  Read value from stdin
+   suve aws secret create my-key                                   Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
@@ -67,7 +67,7 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args()
 	if args.Len() < 1 {
-		return errors.New("usage: suve secret create <name> [<value>]")
+		return errors.New("usage: suve aws secret create <name> [<value>]")
 	}
 
 	value, proceed, err := internal.ResolveValue(ctx, internal.ValueSource{

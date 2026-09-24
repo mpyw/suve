@@ -24,13 +24,16 @@ type applyConfirmer interface {
 // (empty-check, name validation, and interactive confirmation) that the
 // `stage <service> apply` command performs before applying.
 type ApplyRunner struct {
-	UseCase     *stagingusecase.ApplyUseCase
-	Store       store.ReadWriteOperator
-	Parser      staging.Parser
-	Confirmer   applyConfirmer
-	SkipConfirm bool
-	Stdout      io.Writer
-	Stderr      io.Writer
+	UseCase *stagingusecase.ApplyUseCase
+	Store   store.ReadWriteOperator
+	Parser  staging.Parser
+	// ProviderLabel names the remote store in prompts and conflict warnings
+	// (e.g. "AWS"); empty renders as "remote".
+	ProviderLabel string
+	Confirmer     applyConfirmer
+	SkipConfirm   bool
+	Stdout        io.Writer
+	Stderr        io.Writer
 }
 
 // ApplyOptions holds options for the apply command.
@@ -98,10 +101,10 @@ func (r *ApplyRunner) RunInteractive(ctx context.Context, opts ApplyOptions) err
 	// Confirm apply
 	var message string
 	if opts.Name != "" {
-		message = fmt.Sprintf("Apply staged changes for %s to AWS?", opts.Name)
+		message = fmt.Sprintf("Apply staged changes for %s to %s?", opts.Name, remoteName(r.ProviderLabel))
 	} else {
 		total := len(serviceEntries) + len(serviceTags)
-		message = fmt.Sprintf("Apply %d staged %s change(s) to AWS?", total, r.Parser.ServiceName())
+		message = fmt.Sprintf("Apply %d staged %s change(s) to %s?", total, r.Parser.ServiceName(), remoteName(r.ProviderLabel))
 	}
 
 	confirmed, err := r.Confirmer.Confirm(message, r.SkipConfirm)
@@ -131,7 +134,7 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 	// Output conflicts if any. result.Conflicts is already sorted by (name,
 	// namespace); render each with the namespace badge (bare name when empty).
 	for _, key := range result.Conflicts {
-		output.Warning(r.Stderr, "conflict detected for %s: AWS was modified after staging", key.Label())
+		output.Warning(r.Stderr, "conflict detected for %s: %s was modified after staging", key.Label(), remoteName(r.ProviderLabel))
 	}
 
 	// Handle "nothing staged" case

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 
@@ -521,11 +522,11 @@ func NewGlobalImportCommand(gcfg GlobalConfig) *cli.Command {
 		Name:      "import",
 		Usage:     "Import staged changes from a directory (one file per service)",
 		ArgsUsage: "<dir>",
-		Description: `Import staged changes from a directory into the working staging area.
+		Description: strings.ReplaceAll(`Import staged changes from a directory into the working staging area.
 
 Reads one file per service:
-   <dir>/param.json    SSM Parameter Store staged changes
-   <dir>/secret.json   Secrets Manager staged changes
+   <dir>/param.json    staged parameter changes
+   <dir>/secret.json   staged secret changes
 
 Missing files are skipped; it is an error only when neither exists. Each file's
 scope is validated against the current scope (override with
@@ -534,9 +535,9 @@ working staging area already
 holds changes; use --merge / --overwrite to choose non-interactively.
 
 EXAMPLES:
-   suve stage import ./backup                       Import staged changes from ./backup
-   suve stage import ./backup --overwrite           Replace the working staging area
-   echo "secret" | suve stage import ./backup --passphrase-stdin   Decrypt with passphrase from stdin`,
+   {path} import ./backup                       Import staged changes from ./backup
+   {path} import ./backup --overwrite           Replace the working staging area
+   echo "secret" | {path} import ./backup --passphrase-stdin   Decrypt with passphrase from stdin`, "{path}", gcfg.CommandPath),
 		Flags:                  importFlags(),
 		MutuallyExclusiveFlags: importMutuallyExclusiveFlags(),
 		Action:                 importAction("", resolver, globalImportReAnchorSpecs(gcfg)),
@@ -554,27 +555,18 @@ func NewImportCommand(cfg CommandConfig) *cli.Command {
 		Name:      "import",
 		Usage:     fmt.Sprintf("Import staged %s changes from a file", cfg.ItemName),
 		ArgsUsage: "<file>",
-		Description: fmt.Sprintf(`Import staged %s changes from a file into the working staging area.
+		Description: renderHelp(cfg, `Import staged {item} changes from a file into the working staging area.
 
-The file's service must match (%s); importing another service's file is a hard
+The file's service must match ({name}); importing another service's file is a hard
 error. The file's scope is validated against the current scope (override with
 --allow-scope-mismatch). A Merge / Overwrite prompt appears only when the working
 staging area already holds changes; use --merge / --overwrite to choose
 non-interactively.
 
 EXAMPLES:
-   suve stage %s import ./%s.json                     Import staged %s changes
-   suve stage %s import ./%s.json --overwrite         Replace the working staging area
-   echo "secret" | suve stage %s import ./%s.json --passphrase-stdin   Decrypt with passphrase from stdin`,
-			cfg.ItemName,
-			cfg.CommandName,
-			cfg.CommandName,
-			cfg.CommandName,
-			cfg.ItemName,
-			cfg.CommandName,
-			cfg.CommandName,
-			cfg.CommandName,
-			cfg.CommandName),
+   {path} import ./{name}.json                     Import staged {item} changes
+   {path} import ./{name}.json --overwrite         Replace the working staging area
+   echo "secret" | {path} import ./{name}.json --passphrase-stdin   Decrypt with passphrase from stdin`),
 		Flags:                  importFlags(),
 		MutuallyExclusiveFlags: importMutuallyExclusiveFlags(),
 		Action: importAction(service, cfg.ScopeResolver, map[staging.Service]importReAnchorSpec{

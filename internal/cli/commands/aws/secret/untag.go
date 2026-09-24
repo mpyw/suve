@@ -16,10 +16,10 @@ func UntagCommand() *cli.Command {
 Specify the tag keys to remove. Non-existent keys are silently ignored.
 
 EXAMPLES:
-   suve secret untag my-api-key deprecated               Remove single tag
-   suve secret untag my-api-key env team                 Remove multiple tags`,
+   suve aws secret untag my-api-key deprecated               Remove single tag
+   suve aws secret untag my-api-key env team                 Remove multiple tags`,
 		Noun:       nounSecret,
-		UsageError: "usage: suve secret untag <name> <key> [key]",
+		UsageError: "usage: suve aws secret untag <name> <key> [key]",
 		NewTagger:  newTagger,
 	})
 }

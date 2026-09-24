@@ -155,14 +155,14 @@ VERSION SPECIFIERS:
   ~SHIFT    N versions ago (e.g., ~1, ~2); ~ alone means ~1
 
 EXAMPLES:
-  suve param show /app/config                               Show latest version
-  suve param show /app/config~                              Show previous version
-  suve param show /app/config#3                             Show version 3
-  suve param show --raw /app/config                         Output raw value (for piping)
-  suve param show --parse-json /app/config                  Pretty print JSON value
-  suve param show --output=json /app/config                 Output as JSON
-  DB_URL=$(suve param show --raw /app/config)               Use in shell variable`,
-		UsageError: "usage: suve param show <name>",
+  suve aws param show /app/config                               Show latest version
+  suve aws param show /app/config~                              Show previous version
+  suve aws param show /app/config#3                             Show version 3
+  suve aws param show --raw /app/config                         Output raw value (for piping)
+  suve aws param show --parse-json /app/config                  Pretty print JSON value
+  suve aws param show --output=json /app/config                 Output as JSON
+  DB_URL=$(suve aws param show --raw /app/config)               Use in shell variable`,
+		UsageError: "usage: suve aws param show <name>",
 		ParseSpec:  awsparamversion.Parse,
 		NewPresenter: func(ctx context.Context, spec *awsparamversion.Spec) (genericshow.Presenter, error) {
 			store, err := cliinternal.AWSParamStore(ctx)

@@ -36,12 +36,12 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-   suve secret list                       List all secrets
-   suve secret list prod                  List secrets containing "prod"
-   suve secret list my-app/               List secrets starting with "my-app/"
-   suve secret list --filter '\.prod$'    List secrets matching regex
-   suve secret list --show prod           List with values
-   suve secret list --output=json prod    List as JSON`,
+   suve aws secret list                       List all secrets
+   suve aws secret list prod                  List secrets containing "prod"
+   suve aws secret list my-app/               List secrets starting with "my-app/"
+   suve aws secret list --filter '\.prod$'    List secrets matching regex
+   suve aws secret list --show prod           List with values
+   suve aws secret list --output=json prod    List as JSON`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "filter",
