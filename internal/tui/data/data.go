@@ -668,8 +668,9 @@ func (e stringError) Error() string { return string(e) }
 // StrategyBuilder builds the provider-specific staging strategy over a resolved
 // provider.Store. The returned FullStrategy satisfies staging.EditStrategy and
 // (via the concrete type) staging.DeleteStrategy, matching the GUI's
-// serviceStrategyScoped narrowing.
-type StrategyBuilder func(store provider.Store) staging.FullStrategy
+// serviceStrategyScoped narrowing. It fails for a provider that has no strategy
+// for the service.
+type StrategyBuilder func(store provider.Store) (staging.FullStrategy, error)
 
 // StoreUnavailableError marks a StagingProbe failure that comes from CONSTRUCTING
 // the on-disk staging store (a keychain hard-fail / key-loss while encrypted state

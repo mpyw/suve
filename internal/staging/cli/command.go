@@ -54,7 +54,7 @@ type CommandConfig struct {
 	ParserFactory staging.ParserFactory
 
 	// ScopeResolver resolves the provider staging scope used to key on-disk
-	// state. When nil, it defaults to AWSScopeResolver, preserving AWS behavior.
+	// state. Required: a nil resolver makes every staging command fail.
 	ScopeResolver staging.ScopeResolver
 
 	// HasDescription reports whether this service's writer honors a free-text

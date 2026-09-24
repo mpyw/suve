@@ -38,7 +38,10 @@ same shape.
 
 - Wire a `Factory` (`internal/provider/registry.go`) that returns
   `provider.ErrUnsupportedKind` for services the provider does not offer.
-- Register the factory in the CLI registry and in `internal/cli/commands/app.go`.
+- Expose `Register(reg)` from the adapter package and call it from
+  `builtin.NewRegistry()` (`internal/provider/builtin/builtin.go`), which the
+  CLI, GUI and TUI all build from; wire the command group in
+  `internal/cli/commands/app.go`.
 - Add the provider's scope flag plus its environment-variable fallback.
 
 ## SDK confinement guards
@@ -52,7 +55,9 @@ same shape.
 
 Staging is a distinct increment on top of read/write (#247 → #261, #262):
 
-- Implement the provider `ScopeResolver`.
+- Implement the provider `ScopeResolver` (next to the others in
+  `internal/cli/commands/internal/client.go`) and set it on every staging
+  config; there is no default resolver.
 - Add the provider's staging strategy.
 - Register the service spec in `GlobalConfig` (#261).
 

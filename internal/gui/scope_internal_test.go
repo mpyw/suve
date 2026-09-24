@@ -79,7 +79,7 @@ func TestApp_SelectScope(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			app := NewApp(provider.Scope{Provider: provider.ProviderAWS}, "")
+			app := newTestApp(t, provider.Scope{Provider: provider.ProviderAWS}, "")
 
 			err := app.SelectScope(tt.sel)
 			if tt.wantErr != nil {
@@ -132,7 +132,7 @@ func TestApp_GetCurrentScope_RoundTrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			app := NewApp(provider.Scope{Provider: provider.ProviderAWS}, "")
+			app := newTestApp(t, provider.Scope{Provider: provider.ProviderAWS}, "")
 			require.NoError(t, app.SelectScope(tt.sel))
 
 			got := app.GetCurrentScope()
@@ -150,7 +150,7 @@ func TestApp_GetCurrentScope_RoundTrip(t *testing.T) {
 func TestApp_GetCurrentScope_EnvDerivedInitialScope(t *testing.T) {
 	t.Setenv("GOOGLE_CLOUD_PROJECT", "env-project")
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderGoogleCloud}, "")
+	app := newTestApp(t, provider.Scope{Provider: provider.ProviderGoogleCloud}, "")
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -163,7 +163,7 @@ func TestApp_GetCurrentScope_EnvDerivedAzure(t *testing.T) {
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
 	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "env-ns")
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderAzure}, "")
+	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAzure}, "")
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -181,7 +181,7 @@ func TestApp_GetCurrentScope_EnvDerivedAzure_Namespace(t *testing.T) {
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
 	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "dev")
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderAzure}, "")
+	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAzure}, "")
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -195,7 +195,7 @@ func TestApp_GetCurrentScope_ExplicitNamespaceWinsOverEnv(t *testing.T) {
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
 	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "env-ns")
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderAzure, AppConfigNamespace: "flag-ns"}, "")
+	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAzure, AppConfigNamespace: "flag-ns"}, "")
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -210,7 +210,7 @@ func TestApp_GetCurrentScope_EnvDerivedAzure_VaultOnly(t *testing.T) {
 	t.Setenv("AZURE_KEYVAULT_NAME", "env-vault")
 	t.Setenv("AZURE_APPCONFIG_NAME", "")
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderAzure}, "")
+	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAzure}, "")
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -225,7 +225,7 @@ func TestApp_GetCurrentScope_EnvDerivedAzure_StoreOnly(t *testing.T) {
 	t.Setenv("AZURE_KEYVAULT_NAME", "")
 	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderAzure}, "")
+	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAzure}, "")
 
 	got := app.GetCurrentScope()
 	require.NotNil(t, got)
@@ -246,7 +246,7 @@ func TestApp_EnvScope(t *testing.T) {
 	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "env-ns")
 
 	// Launched as AWS — EnvScope must not be gated on the launch provider.
-	app := NewApp(provider.Scope{Provider: provider.ProviderAWS}, "")
+	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAWS}, "")
 
 	tests := []struct {
 		name     string
@@ -273,21 +273,21 @@ func TestApp_EnvScope(t *testing.T) {
 			provider: "aws",
 			want:     ScopeSelection{Provider: "aws"},
 		},
-		{
-			// An unknown provider falls back to the AWS default (hydrateScope's
-			// default branch), so the form never prefills bogus fields.
-			name:     "unknown provider falls back to aws default",
-			provider: "oracle",
-			want:     ScopeSelection{Provider: "aws"},
-		},
 	}
 
 	//nolint:paralleltest // parent uses t.Setenv, so subtests cannot run in parallel
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := app.EnvScope(tt.provider)
+			got, err := app.EnvScope(tt.provider)
+			require.NoError(t, err)
 			require.NotNil(t, got)
 			assert.Equal(t, &tt.want, got)
 		})
 	}
+
+	// An unknown provider is an error, so the form never prefills a scope for a
+	// provider nobody asked for.
+	got, err := app.EnvScope("oracle")
+	require.ErrorIs(t, err, errInvalidProvider)
+	assert.Nil(t, got)
 }

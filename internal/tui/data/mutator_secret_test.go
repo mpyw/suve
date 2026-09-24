@@ -78,7 +78,7 @@ func newSecretMutator(t *testing.T, provStore provider.Store) (data.Mutator, sto
 	mut := data.NewSecretMutator(
 		awsSecretCap(t),
 		provStore,
-		func(s provider.Store) staging.FullStrategy { return staging.NewAWSSecretStrategy(s) },
+		func(s provider.Store) (staging.FullStrategy, error) { return staging.NewAWSSecretStrategy(s), nil },
 		resolve,
 	)
 

@@ -59,7 +59,7 @@ EXAMPLES:
 		NewList: func(
 			ctx context.Context, cmd *cli.Command, withValue bool,
 		) (func(context.Context) ([]genericlist.Entry, error), error) {
-			store, err := cliinternal.SecretStore(ctx)
+			store, err := cliinternal.AWSSecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

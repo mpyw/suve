@@ -157,7 +157,7 @@ EXAMPLES:
 		UsageError: "usage: suve secret show <name>",
 		ParseSpec:  awssecretversion.Parse,
 		NewPresenter: func(ctx context.Context, spec *awssecretversion.Spec) (genericshow.Presenter, error) {
-			store, err := cliinternal.SecretStore(ctx)
+			store, err := cliinternal.AWSSecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

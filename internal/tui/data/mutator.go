@@ -255,7 +255,12 @@ func (m *paramMutator) stageStrategy(
 		return nil, nil, err
 	}
 
-	return m.newStrategy(provStore), st, nil
+	strategy, err := m.newStrategy(provStore)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return strategy, st, nil
 }
 
 func (m *paramMutator) stageEntry(
@@ -426,7 +431,12 @@ func (m *secretMutator) stage(
 		return WriteOutcome{}, err
 	}
 
-	return fn(m.newStrategy(m.store), st)
+	strategy, err := m.newStrategy(m.store)
+	if err != nil {
+		return WriteOutcome{}, err
+	}
+
+	return fn(strategy, st)
 }
 
 // =============================================================================

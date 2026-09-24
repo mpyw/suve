@@ -49,7 +49,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("usage: suve secret restore <name>")
 	}
 
-	store, err := internal.SecretStore(ctx)
+	store, err := internal.AWSSecretStore(ctx)
 	if err != nil {
 		return err
 	}

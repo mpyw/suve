@@ -104,7 +104,7 @@ EXAMPLES:
 For comparing staged values, use: suve stage param diff`,
 		ParseDiffArgs: awsparamversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *awsparamversion.Spec) (genericdiff.Presenter, error) {
-			store, err := cliinternal.ParamStore(ctx)
+			store, err := cliinternal.AWSParamStore(ctx)
 			if err != nil {
 				return nil, err
 			}

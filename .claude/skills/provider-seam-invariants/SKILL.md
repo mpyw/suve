@@ -64,18 +64,17 @@ The contract is split so a provider or command implements only what it needs
 
 | Interface | Methods | Lines |
 |-----------|---------|-------|
-| `Reader` | `Resolve` + `Get` + `History` + `List` | 74-85 |
-| `Writer` | `Create` + `Put` + `Delete` | 88-105 |
-| `Tagger` | `Tag` + `Untag` | 107-113 |
-| `Store` | `Reader` + `Writer` + `Tagger` | 118-122 |
-| `Restorer` (optional) | `Restore` | 125-128 |
-| `Describer` (optional) | `Describe` | 130-134 |
+| `Reader` | `Resolve` + `Get` + `History` + `List` | 102-113 |
+| `Writer` | `Create` + `Put` + `Delete` | 116-133 |
+| `Tagger` | `Tag` + `Untag` | 136-141 |
+| `Store` | `Reader` + `Writer` + `Tagger` | 146-150 |
+| `Restorer` (optional) | `Restore` | 153-156 |
 
 `Writer` carries both `Create` and `Put`: `Create` returns a wrapped
 `provider.ErrAlreadyExists` and never overwrites, while `Put` is the upsert.
 Choose `Create` when a caller must not clobber an existing entry, `Put` when it
-should. `Restorer` (soft-delete restore, e.g. Secrets Manager) and `Describer`
-(metadata without value) are optional capabilities a provider may add.
+should. `Restorer` (soft-delete restore: AWS Secrets Manager, Azure Key Vault)
+is an optional capability a provider may add.
 
 ## 5. SDK confinement
 

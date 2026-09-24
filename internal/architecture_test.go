@@ -15,18 +15,17 @@ import (
 	"testing"
 )
 
-// TestNoAWSSDKOutsideProviderAWS enforces that only internal/provider (which
+// TestNoCloudSDKOutsideProvider enforces that only internal/provider (which
 // includes internal/provider/aws, .../gcloud, .../azure) may import a cloud
 // SDK. It walks the entire internal/ tree plus cmd/ and fails loudly if any
 // other non-test package reintroduces a direct cloud-SDK dependency, which
 // would break provider pluggability.
-func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
+func TestNoCloudSDKOutsideProvider(t *testing.T) {
 	t.Parallel()
 
 	// guardedRoots are the trees (relative to this package dir) that are walked
-	// in full. Everything under them must not import a cloud SDK, or the
-	// (now-removed) paramapi/secretapi aliases, directly, except for the
-	// allowedRoots subtrees which are pruned from the walk.
+	// in full. Everything under them must not import a cloud SDK directly,
+	// except for the allowedRoots subtrees which are pruned from the walk.
 	guardedRoots := []string{".", "../cmd"}
 
 	// allowedRoots are the subtrees (relative to this package dir) that are
@@ -44,8 +43,6 @@ func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 		"github.com/aws/aws-sdk-go-v2/service/secretsmanager",
 		"cloud.google.com/go/secretmanager",
 		"github.com/Azure/azure-sdk-for-go",
-		"github.com/mpyw/suve/internal/api/paramapi",
-		"github.com/mpyw/suve/internal/api/secretapi",
 	}
 
 	isForbidden := func(importPath string) bool {
@@ -91,8 +88,8 @@ func TestNoAWSSDKOutsideProviderAWS(t *testing.T) {
 
 				if isForbidden(importPath) {
 					t.Errorf(
-						"%s imports %q: the AWS SDK must stay behind the provider seam "+
-							"(only internal/provider/aws may import it)",
+						"%s imports %q: cloud SDKs must stay behind the provider seam "+
+							"(only internal/provider/<cloud> may import its own SDK)",
 						path, importPath,
 					)
 				}

@@ -76,8 +76,8 @@ type Client interface {
 	ListSettings(ctx context.Context, filter string) ([]azappconfig.Setting, error)
 }
 
-// Store is the App Configuration implementation of provider.Store. It implements
-// neither Restorer nor Describer.
+// Store is the App Configuration implementation of provider.Store. It does not
+// implement Restorer.
 type Store struct {
 	client Client
 	// namespace is the raw --namespace value selected for this store (the axis

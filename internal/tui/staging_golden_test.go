@@ -533,7 +533,7 @@ func TestStaging_RoundTrip(t *testing.T) {
 		},
 	}
 
-	newStrategy := func(s provider.Store) staging.FullStrategy { return staging.NewAWSSecretStrategy(s) }
+	newStrategy := func(s provider.Store) (staging.FullStrategy, error) { return staging.NewAWSSecretStrategy(s), nil }
 
 	ctx := context.Background()
 

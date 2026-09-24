@@ -84,7 +84,9 @@ func TestParamMutator_RejectsFilterNamespace(t *testing.T) {
 
 			return nil, errors.New("store must not be resolved for an invalid namespace")
 		},
-		func(provider.Store) staging.FullStrategy { return nil },
+		func(provider.Store) (staging.FullStrategy, error) {
+			return nil, errors.New("strategy must not be built for an invalid namespace")
+		},
 		func() (store.ReadWriteOperator, error) {
 			return nil, errors.New("staging store must not be resolved for an invalid namespace")
 		},
@@ -158,7 +160,7 @@ func newParamMutator(t *testing.T, provStore provider.Store) (data.Mutator, stor
 	mut := data.NewParamMutator(
 		awsParamCap(t),
 		func(context.Context, string) (provider.Store, error) { return provStore, nil },
-		func(s provider.Store) staging.FullStrategy { return staging.NewAWSParamStrategy(s) },
+		func(s provider.Store) (staging.FullStrategy, error) { return staging.NewAWSParamStrategy(s), nil },
 		resolve,
 	)
 

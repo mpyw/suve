@@ -165,7 +165,7 @@ EXAMPLES:
 		UsageError: "usage: suve param show <name>",
 		ParseSpec:  awsparamversion.Parse,
 		NewPresenter: func(ctx context.Context, spec *awsparamversion.Spec) (genericshow.Presenter, error) {
-			store, err := cliinternal.ParamStore(ctx)
+			store, err := cliinternal.AWSParamStore(ctx)
 			if err != nil {
 				return nil, err
 			}

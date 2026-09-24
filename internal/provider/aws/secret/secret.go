@@ -1,5 +1,5 @@
-// Package secret implements the provider.Store, provider.Restorer and
-// provider.Describer contracts for AWS Secrets Manager. It confines all
+// Package secret implements the provider.Store and provider.Restorer
+// contracts for AWS Secrets Manager. It confines all
 // Secrets Manager SDK types to this package: version/label/shift resolution
 // lives here, so AWS staging labels (AWSCURRENT etc.) never leak past this
 // boundary. Spec PARSING stays generic via awssecretversion.Parse.
@@ -63,16 +63,15 @@ type Client interface {
 	) (*secretsmanager.ListSecretsOutput, error)
 }
 
-// Store is the Secrets Manager implementation of provider.Store (+ Restorer, Describer).
+// Store is the Secrets Manager implementation of provider.Store (+ Restorer).
 type Store struct {
 	client Client
 }
 
 // Compile-time assertions that Store implements the provider contracts.
 var (
-	_ provider.Store     = (*Store)(nil)
-	_ provider.Restorer  = (*Store)(nil)
-	_ provider.Describer = (*Store)(nil)
+	_ provider.Store    = (*Store)(nil)
+	_ provider.Restorer = (*Store)(nil)
 )
 
 // New builds a Store backed by the given Secrets Manager client.
@@ -476,50 +475,6 @@ func (s *Store) Restore(ctx context.Context, name string) error {
 	}
 
 	return nil
-}
-
-// Describe returns the secret's metadata (description, tags, current version)
-// without fetching its value. Type is always secret.
-func (s *Store) Describe(ctx context.Context, name string) (*domain.Entry, error) {
-	desc, err := s.client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
-		SecretId: aws.String(name),
-	})
-	if err != nil {
-		if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
-			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
-		}
-
-		return nil, fmt.Errorf("failed to describe secret: %w", err)
-	}
-
-	entry := &domain.Entry{
-		Name:        aws.ToString(desc.Name),
-		Type:        domain.ValueTypeSecret,
-		Description: aws.ToString(desc.Description),
-		Tags:        mapTags(desc.Tags),
-		Modified:    desc.LastChangedDate,
-		Extra:       []domain.Field{{Label: "ARN", Value: aws.ToString(desc.ARN)}},
-	}
-
-	// Best-effort: surface the current (AWSCURRENT) version with its OWN
-	// creation time. DescribeSecret's CreatedDate is when the SECRET was
-	// created, not when the AWSCURRENT version was, so an updated secret would
-	// otherwise report a stale version timestamp; ListSecretVersionIds carries
-	// the per-version CreatedDate (#317). A listing failure is tolerated: the
-	// metadata entry is still returned without version details.
-	if versions, listErr := s.listAllVersions(ctx, name); listErr == nil {
-		if cur, found := lo.Find(versions, func(v types.SecretVersionsListEntry) bool {
-			return slices.Contains(v.VersionStages, "AWSCURRENT")
-		}); found {
-			entry.Version = domain.Version{
-				ID:            aws.ToString(cur.VersionId),
-				StagingLabels: cur.VersionStages,
-				Created:       cur.CreatedDate,
-			}
-		}
-	}
-
-	return entry, nil
 }
 
 // Tag adds or updates tags on a secret.

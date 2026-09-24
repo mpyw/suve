@@ -2,9 +2,6 @@
 // provider.Factory / provider.Registry. It builds SSM and Secrets Manager
 // clients from the AWS config (honoring the scope's region) and hands them to
 // the per-service adapters in the param and secret subpackages.
-//
-// This package is additive: it makes the AWS provider available behind the
-// #199 interfaces without rewiring existing commands (that migration is #204).
 package aws
 
 import (
@@ -51,12 +48,4 @@ func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Ki
 // Register associates the AWS Factory with provider.ProviderAWS in reg.
 func Register(reg *provider.Registry) {
 	reg.Register(provider.ProviderAWS, Factory{})
-}
-
-// NewRegistry returns a provider.Registry with the AWS provider registered.
-func NewRegistry() *provider.Registry {
-	reg := provider.NewRegistry()
-	Register(reg)
-
-	return reg
 }

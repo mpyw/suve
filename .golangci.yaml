@@ -128,17 +128,16 @@ linters:
       rules:
         aws-sdk:
           files:
-            - "!**/internal/api/**"
             - "!**/internal/provider/aws/**"
           deny:
             - pkg: "github.com/aws/aws-sdk-go-v2/service/ssm"
-              desc: "Use github.com/mpyw/suve/internal/api/paramapi instead"
+              desc: "The AWS SSM SDK must stay behind the provider seam (internal/provider/aws only)"
             - pkg: "github.com/aws/aws-sdk-go-v2/service/ssm/types"
-              desc: "Use github.com/mpyw/suve/internal/api/paramapi instead"
+              desc: "The AWS SSM SDK must stay behind the provider seam (internal/provider/aws only)"
             - pkg: "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-              desc: "Use github.com/mpyw/suve/internal/api/secretapi instead"
+              desc: "The AWS Secrets Manager SDK must stay behind the provider seam (internal/provider/aws only)"
             - pkg: "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
-              desc: "Use github.com/mpyw/suve/internal/api/secretapi instead"
+              desc: "The AWS Secrets Manager SDK must stay behind the provider seam (internal/provider/aws only)"
         gcloud-sdk:
           files:
             - "!**/internal/provider/gcloud/**"
