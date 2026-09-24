@@ -264,3 +264,14 @@ func TestStagingProbe_CapabilityGated(t *testing.T) {
 	assert.NotNil(t, f.stagingProbe(provider.KindSecret, "secret"), "Secret Manager stages")
 	assert.Nil(t, f.stagingProbe(provider.KindParam, "param"), "Google Cloud offers no param service")
 }
+
+// TestSourceFor_UnofferedService pins that a service the provider does not
+// offer has no source and no probe.
+func TestSourceFor_UnofferedService(t *testing.T) {
+	t.Parallel()
+
+	f := newSourceFactory(t.Context(), provider.GoogleCloudScope("proj"))
+	src, probe := f.sourceFor("param")
+	assert.Nil(t, src)
+	assert.Nil(t, probe)
+}
