@@ -211,19 +211,24 @@ func TestTUIAzureKeyVault_VersionHistoryPerVersionTags(t *testing.T) {
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 
 	// Gate on the list, isolate this test's secret so it is selected (soft-deleted
-	// leftovers otherwise share the list), then gate on the per-version tag line
-	// rendering — a target-specific, unmasked marker proving THIS secret's history
-	// (its tagged current version) has loaded.
+	// leftovers otherwise share the list), and let the filter's reselection
+	// detail/history reload settle before revealing.
 	waitForScreen(t, tm, name)
 	filterBrowser(t, tm, "kv-history")
 	settleReload()
 
 	// Reveal so the per-version value lines show (the shared `x` toggle drives both
-	// the detail value pane and the history value lines), then gate on the DETAIL
-	// content: the per-version tag line and the older version's revealed value both
-	// prove THIS secret's two-version history has loaded and rendered.
+	// the detail value pane and the history value lines), then gate on the older
+	// version's revealed value: it lives only in the history and is masked until
+	// this reveal, so it proves THIS secret's two-version history has loaded.
+	//
+	// Do NOT gate on "tags: env=prod" here. The tag line is unmasked, so it renders
+	// as soon as the history loads, which can happen before or during the first
+	// waitForScreen above. waitForScreen consumes the output stream, and later
+	// frames only emit changed cells, so an already-consumed, unchanged tag line
+	// never shows up again and the wait times out. The tag line is asserted on the
+	// settled final screen below instead.
 	tm.Send(keyRune('x'))
-	waitForScreen(t, tm, "tags: env=prod")
 	waitForScreen(t, tm, v1Value)
 
 	screen := finalScreen(t, tm)
