@@ -17,7 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 // logJSONItem represents a single version entry in JSON output.
@@ -32,19 +32,19 @@ type logJSONItem struct {
 
 // logPresenter renders Azure Key Vault log output.
 type logPresenter struct {
-	uc     *azure.LogUseCase
+	uc     *secret.LogUseCase
 	req    genericlog.Request
-	result *azure.LogOutput
+	result *secret.LogOutput
 	values map[string]string
 }
 
 // NewLogPresenter builds an Azure Key Vault log presenter over the given reader and request.
 func NewLogPresenter(reader provider.Reader, req genericlog.Request) genericlog.Presenter {
-	return &logPresenter{uc: &azure.LogUseCase{Reader: reader}, req: req}
+	return &logPresenter{uc: &secret.LogUseCase{Reader: reader}, req: req}
 }
 
 func (p *logPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, azure.LogInput{
+	result, err := p.uc.Execute(ctx, secret.LogInput{
 		Name:       p.req.Name,
 		MaxResults: p.req.MaxResults,
 		Since:      p.req.Since,
@@ -70,7 +70,7 @@ func (p *logPresenter) Fetch(ctx context.Context) error {
 func (p *logPresenter) Len() int { return len(p.result.Entries) }
 
 func (p *logPresenter) RenderJSON(stdout io.Writer) error {
-	items := lo.Map(p.result.Entries, func(entry azure.LogEntry, _ int) logJSONItem {
+	items := lo.Map(p.result.Entries, func(entry secret.LogEntry, _ int) logJSONItem {
 		item := logJSONItem{Version: entry.Version, State: entry.State}
 
 		if entry.CreatedDate != nil {

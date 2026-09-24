@@ -22,7 +22,7 @@ type CreateInput struct {
 // CreateOutput holds the result of the create use case.
 type CreateOutput struct {
 	Name    string
-	Version int64
+	Version string // opaque version id; "" for an unversioned store
 }
 
 // CreateUseCase executes create operations.
@@ -41,6 +41,6 @@ func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*Create
 
 	return &CreateOutput{
 		Name:    input.Name,
-		Version: parseVersion(version.ID),
+		Version: version.ID,
 	}, nil
 }

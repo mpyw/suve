@@ -181,7 +181,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	output.Success(r.Stdout, "Created parameter %s (version: %d)", result.Name, result.Version)
+	output.Success(r.Stdout, "Created parameter %s (version: %s)", result.Name, result.Version)
 
 	return nil
 }

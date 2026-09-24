@@ -16,7 +16,7 @@ import (
 
 // ListInput holds input for the list use case.
 type ListInput struct {
-	Prefix    string // Name prefix filter (case-sensitive), replicating the AWS name filter
+	Prefix    string // Name prefix filter (case-sensitive)
 	Filter    string // Regex filter pattern (client-side)
 	WithValue bool   // Include secret values
 }
@@ -41,9 +41,8 @@ type ListUseCase struct {
 
 // Execute runs the list use case.
 //
-// The provider returns every secret name; the AWS-style name prefix filter and
-// the client-side regex filter are applied here, matching the pre-migration
-// behavior (the old AWS name filter is a case-sensitive prefix match).
+// The provider returns every secret name; the case-sensitive name prefix filter
+// and the client-side regex filter are applied here.
 func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput, error) {
 	// Compile regex filter if specified.
 	var filterRegex *regexp.Regexp
@@ -76,7 +75,7 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 
 	// Distinguishes "the API returned nothing" from "the client-side filters
 	// dropped everything" — the two look identical in the final output.
-	debug.From(ctx).Logf("aws secretsmanager list: provider returned %d names, %d after filters (prefix=%q, filter=%q)\n",
+	debug.From(ctx).Logf("secret list: provider returned %d names, %d after filters (prefix=%q, filter=%q)\n",
 		len(names), len(filtered), input.Prefix, input.Filter)
 
 	// Sort names alphabetically so the listing has a stable, deterministic order

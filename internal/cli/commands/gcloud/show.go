@@ -13,7 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/usecase/gcloud"
+	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
@@ -30,18 +30,18 @@ type showJSONOutput struct {
 
 // showPresenter renders Google Cloud Secret Manager show output.
 type showPresenter struct {
-	uc     *gcloud.ShowUseCase
+	uc     *secret.ShowUseCase
 	spec   *gcloudversion.Spec
-	result *gcloud.ShowOutput
+	result *secret.ShowOutput
 }
 
 // NewShowPresenter builds a Google Cloud show presenter over the given reader and spec.
 func NewShowPresenter(reader provider.Reader, spec *gcloudversion.Spec) genericshow.Presenter {
-	return &showPresenter{uc: &gcloud.ShowUseCase{Reader: reader}, spec: spec}
+	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, gcloud.ShowInput{Spec: p.spec})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: gcloudversion.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}

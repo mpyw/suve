@@ -10,7 +10,7 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
 
@@ -29,19 +29,19 @@ type diffJSONOutput struct {
 // Configuration is unversioned, diff compares two settings (by key) rather than
 // two versions of one key.
 type diffPresenter struct {
-	uc     *azure.DiffUseCase
+	uc     *param.DiffUseCase
 	spec1  *azureappconfigversion.Spec
 	spec2  *azureappconfigversion.Spec
-	result *azure.DiffOutput
+	result *param.DiffOutput
 }
 
 // NewDiffPresenter builds an Azure App Configuration diff presenter over the given reader and specs.
 func NewDiffPresenter(reader provider.Reader, spec1, spec2 *azureappconfigversion.Spec) genericdiff.Presenter {
-	return &diffPresenter{uc: &azure.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
+	return &diffPresenter{uc: &param.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, azure.DiffInput{
+	result, err := p.uc.Execute(ctx, param.DiffInput{
 		Name1:   p.spec1.Name,
 		Suffix1: "",
 		Name2:   p.spec2.Name,

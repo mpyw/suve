@@ -11,12 +11,12 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 // UpdateRunner executes the update command.
 type UpdateRunner struct {
-	UseCase *azure.UpdateUseCase
+	UseCase *param.UpdateUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -91,7 +91,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	uc := &azure.UpdateUseCase{Store: store}
+	uc := &param.UpdateUseCase{Store: store}
 
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
@@ -129,10 +129,10 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the update command.
 func (r *UpdateRunner) Run(ctx context.Context, opts UpdateOptions) error {
-	result, err := r.UseCase.Execute(ctx, azure.UpdateInput{
-		Name:      opts.Name,
-		Value:     opts.Value,
-		ValueType: domain.ValueTypePlaintext,
+	result, err := r.UseCase.Execute(ctx, param.UpdateInput{
+		Name:  opts.Name,
+		Value: opts.Value,
+		Type:  domain.ValueTypePlaintext,
 	})
 	if err != nil {
 		return err

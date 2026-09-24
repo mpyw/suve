@@ -89,7 +89,7 @@ func TestUpdateUseCase_Execute(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.Name)
-	assert.Equal(t, int64(5), output.Version)
+	assert.Equal(t, "5", output.Version)
 }
 
 // TestUpdateUseCase_Execute_PreserveType verifies that a value-only update

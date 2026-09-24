@@ -1,4 +1,12 @@
-// Package param provides use cases for SSM Parameter Store operations.
+// Package param provides the provider-neutral use cases of the param service
+// axis (AWS Systems Manager Parameter Store, Azure App Configuration).
+//
+// The use cases speak only the neutral provider seam: an entry is addressed by
+// its name plus an opaque version suffix (e.g. "#3", "~2", or "" for the latest
+// version) that the caller rebuilt with its provider's grammar and that the
+// adapter re-parses in Reader.Resolve. Versions come back as opaque ids;
+// provider-specific rendering (e.g. AWS integer versions) belongs to the
+// presenters.
 package param
 
 import (
@@ -9,12 +17,14 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 // ShowInput holds input for the show use case.
 type ShowInput struct {
-	Spec *awsparamversion.Spec
+	Name string
+	// Suffix is the version-spec suffix after the name ("#3", "~2", or "" for
+	// the latest version), re-parsed by the adapter.
+	Suffix string
 }
 
 // ShowTag represents a tag key-value pair.
@@ -27,7 +37,7 @@ type ShowTag struct {
 type ShowOutput struct {
 	Name         string
 	Value        string
-	Version      int64
+	Version      string // opaque version id
 	Type         domain.ValueType
 	Description  string
 	LastModified *time.Time
@@ -41,12 +51,12 @@ type ShowUseCase struct {
 
 // Execute runs the show use case.
 func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput, error) {
-	ref, err := u.Reader.Resolve(ctx, input.Spec.Name, versionSpecSuffix(input.Spec))
+	ref, err := u.Reader.Resolve(ctx, input.Name, input.Suffix)
 	if err != nil {
 		return nil, err
 	}
 
-	entry, err := u.Reader.Get(ctx, input.Spec.Name, ref)
+	entry, err := u.Reader.Get(ctx, input.Name, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +64,7 @@ func (u *ShowUseCase) Execute(ctx context.Context, input ShowInput) (*ShowOutput
 	output := &ShowOutput{
 		Name:         entry.Name,
 		Value:        entry.Value,
-		Version:      parseVersion(entry.Version.ID),
+		Version:      entry.Version.ID,
 		Type:         entry.Type,
 		Description:  entry.Description,
 		LastModified: entry.Modified,

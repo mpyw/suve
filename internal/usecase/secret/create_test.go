@@ -38,7 +38,7 @@ func TestCreateUseCase_Execute(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", output.Name)
-	assert.Equal(t, "abc123", output.VersionID)
+	assert.Equal(t, "abc123", output.Version)
 }
 
 func TestCreateUseCase_Execute_WithDescription(t *testing.T) {

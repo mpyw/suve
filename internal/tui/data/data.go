@@ -19,7 +19,6 @@ package data
 import (
 	"context"
 	"regexp"
-	"strconv"
 	"time"
 
 	"github.com/samber/lo"
@@ -34,8 +33,6 @@ import (
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // historyLimit caps how many version-history rows the browser fetches per
@@ -104,12 +101,13 @@ type Detail struct {
 	// State is the per-version lifecycle state (Google Cloud / Azure Key Vault),
 	// empty when the version carries staging labels instead.
 	State string
-	// StagingLabels are the AWS staging labels of the current version, empty when
-	// the version carries a State instead. Never infer one from the other (#419).
-	StagingLabels []string
-	Description   string
-	Tags          []Tag
-	Namespace     string
+	// Labels are the current version's movable labels (AWS staging labels),
+	// empty when the version carries a State instead. Never infer one from the
+	// other (#419).
+	Labels      []string
+	Description string
+	Tags        []Tag
+	Namespace   string
 	// TypeLabel is the entry's display value type (e.g. "SecureString"), so the
 	// edit dialog can preserve the type on an update. Empty for services with no
 	// value type (secret, App Configuration).
@@ -127,10 +125,10 @@ type HistoryRow struct {
 	// Label is the display form ("#14" for param, a shortened id for secret).
 	Label string
 	// Date is the pre-formatted creation/modification date, empty when unknown.
-	Date          string
-	IsCurrent     bool
-	State         string
-	StagingLabels []string
+	Date      string
+	IsCurrent bool
+	State     string
+	Labels    []string
 	// Value is this version's raw value, fetched alongside the metadata so the
 	// history can show what the value was at each revision (GUI parity). Empty when
 	// the value could not be fetched. It is masked in the UI when Secret is set.
@@ -292,7 +290,7 @@ func (s *paramSource) Show(ctx context.Context, name, namespace string) (Detail,
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	out, err := uc.Execute(ctx, param.ShowInput{Spec: &awsparamversion.Spec{Name: name}})
+	out, err := uc.Execute(ctx, param.ShowInput{Name: name})
 	if err != nil {
 		return Detail{}, err
 	}
@@ -310,7 +308,7 @@ func (s *paramSource) Show(ctx context.Context, name, namespace string) (Detail,
 	}
 
 	if s.svcCap.HasVersionHistory {
-		d.Meta = append(d.Meta, MetaRow{Label: "Version", Value: currentVersionLabel(strconv.FormatInt(out.Version, 10))})
+		d.Meta = append(d.Meta, MetaRow{Label: "Version", Value: currentVersionLabel(out.Version)})
 	}
 
 	// App Configuration values are untyped, so only a typed param service (AWS
@@ -348,11 +346,9 @@ func (s *paramSource) History(ctx context.Context, name, namespace string) ([]Hi
 	}
 
 	return lo.Map(out.Entries, func(e param.LogEntry, _ int) HistoryRow {
-		v := strconv.FormatInt(e.Version, 10)
-
 		return HistoryRow{
-			Version:   v,
-			Label:     "#" + v,
+			Version:   e.Version,
+			Label:     "#" + e.Version,
 			Date:      formatDate(e.LastModified),
 			IsCurrent: e.IsCurrent,
 			Value:     e.Value,
@@ -374,16 +370,16 @@ func (s *paramSource) VersionContents(
 	uc := &param.DiffUseCase{Reader: store}
 
 	out, err := uc.Execute(ctx, param.DiffInput{
-		Spec1: paramVersionSpec(name, oldVersion),
-		Spec2: paramVersionSpec(name, newVersion),
+		Name1: name, Suffix1: versionSuffix(oldVersion),
+		Name2: name, Suffix2: versionSuffix(newVersion),
 	})
 	if err != nil {
 		return DiffContent{}, err
 	}
 
 	return DiffContent{
-		OldLabel: out.OldName + "#" + strconv.FormatInt(out.OldVersion, 10),
-		NewLabel: out.NewName + "#" + strconv.FormatInt(out.NewVersion, 10),
+		OldLabel: out.OldName + "#" + out.OldVersion,
+		NewLabel: out.NewName + "#" + out.NewVersion,
 		OldValue: out.OldValue,
 		NewValue: out.NewValue,
 		// A SecureString param is a secret on the value-type axis, so the diff page
@@ -415,18 +411,6 @@ func (s *paramSource) Namespaces(ctx context.Context) ([]string, error) {
 	return lo.Uniq(lo.Map(rows, func(row appconfig.KeyNamespace, _ int) string {
 		return row.Namespace
 	})), nil
-}
-
-// paramVersionSpec builds a param version spec for a numeric version string; an
-// empty/non-numeric version yields the latest (no absolute specifier).
-func paramVersionSpec(name, version string) *awsparamversion.Spec {
-	spec := &awsparamversion.Spec{Name: name}
-
-	if v, err := strconv.ParseInt(version, 10, 64); err == nil {
-		spec.Absolute.Version = lo.ToPtr(v)
-	}
-
-	return spec
 }
 
 // =============================================================================
@@ -468,32 +452,32 @@ func (s *secretSource) List(ctx context.Context, params ListParams) (ListResult,
 func (s *secretSource) Show(ctx context.Context, name, _ string) (Detail, error) {
 	uc := &secret.ShowUseCase{Reader: s.store}
 
-	out, err := uc.Execute(ctx, secret.ShowInput{Spec: &awssecretversion.Spec{Name: name}})
+	out, err := uc.Execute(ctx, secret.ShowInput{Name: name})
 	if err != nil {
 		return Detail{}, err
 	}
 
 	d := Detail{
-		Name:          out.Name,
-		Value:         out.Value,
-		Secret:        true,
-		State:         out.State,
-		StagingLabels: out.VersionStage,
-		Description:   out.Description,
-		ARN:           out.ARN,
+		Name:        out.Name,
+		Value:       out.Value,
+		Secret:      true,
+		State:       out.State,
+		Labels:      out.Labels,
+		Description: out.Description,
+		ARN:         lo.FindOrElse(out.Extra, domain.Field{}, func(f domain.Field) bool { return f.Label == "ARN" }).Value,
 		Tags: lo.Map(out.Tags, func(t secret.ShowTag, _ int) Tag {
 			return Tag{Key: t.Key, Value: t.Value}
 		}),
 	}
 
-	d.Meta = append(d.Meta, MetaRow{Label: "Version ID", Value: out.VersionID})
+	d.Meta = append(d.Meta, MetaRow{Label: "Version ID", Value: out.Version})
 
 	if out.CreatedDate != nil {
 		d.Meta = append(d.Meta, MetaRow{Label: "Created", Value: timeutil.FormatDateTime(*out.CreatedDate)})
 	}
 
-	if out.ARN != "" {
-		d.Meta = append(d.Meta, MetaRow{Label: "ARN", Value: out.ARN})
+	if d.ARN != "" {
+		d.Meta = append(d.Meta, MetaRow{Label: "ARN", Value: d.ARN})
 	}
 
 	return d, nil
@@ -513,13 +497,13 @@ func (s *secretSource) History(ctx context.Context, name, _ string) ([]HistoryRo
 
 	return lo.Map(out.Entries, func(e secret.LogEntry, _ int) HistoryRow {
 		return HistoryRow{
-			Version:       e.VersionID,
-			Label:         shortID(e.VersionID),
-			Date:          formatDate(e.CreatedDate),
-			IsCurrent:     e.IsCurrent,
-			State:         e.State,
-			StagingLabels: e.VersionStage,
-			Value:         e.Value,
+			Version:   e.Version,
+			Label:     shortID(e.Version),
+			Date:      formatDate(e.CreatedDate),
+			IsCurrent: e.IsCurrent,
+			State:     e.State,
+			Labels:    e.Labels,
+			Value:     e.Value,
 			// Every secret-service value is secret material and masked by default.
 			Secret: true,
 			Tags: lo.Map(e.Tags, func(t domain.Tag, _ int) Tag {
@@ -535,16 +519,16 @@ func (s *secretSource) VersionContents(
 	uc := &secret.DiffUseCase{Reader: s.store}
 
 	out, err := uc.Execute(ctx, secret.DiffInput{
-		Spec1: secretVersionSpec(name, oldVersion),
-		Spec2: secretVersionSpec(name, newVersion),
+		Name1: name, Suffix1: versionSuffix(oldVersion),
+		Name2: name, Suffix2: versionSuffix(newVersion),
 	})
 	if err != nil {
 		return DiffContent{}, err
 	}
 
 	return DiffContent{
-		OldLabel: out.OldName + "#" + shortID(out.OldVersionID),
-		NewLabel: out.NewName + "#" + shortID(out.NewVersionID),
+		OldLabel: out.OldName + "#" + shortID(out.OldVersion),
+		NewLabel: out.NewName + "#" + shortID(out.NewVersion),
 		OldValue: out.OldValue,
 		NewValue: out.NewValue,
 		Secret:   true,
@@ -552,18 +536,6 @@ func (s *secretSource) VersionContents(
 }
 
 func (s *secretSource) Namespaces(context.Context) ([]string, error) { return nil, nil }
-
-// secretVersionSpec builds a secret version spec for a version id; an empty id
-// yields the current version (no absolute specifier).
-func secretVersionSpec(name, version string) *awssecretversion.Spec {
-	spec := &awssecretversion.Spec{Name: name}
-
-	if version != "" {
-		spec.Absolute.ID = lo.ToPtr(version)
-	}
-
-	return spec
-}
 
 // =============================================================================
 // Shared helpers
@@ -613,6 +585,16 @@ func typeLabel(t domain.ValueType, known bool) string {
 // currentVersionLabel annotates a param version number as the current one.
 func currentVersionLabel(version string) string {
 	return version + " (current)"
+}
+
+// versionSuffix addresses a history row's raw version id for Resolve; an empty
+// id is the current version (no suffix).
+func versionSuffix(version string) string {
+	if version == "" {
+		return ""
+	}
+
+	return "#" + version
 }
 
 // shortID shortens a long opaque version id for compact history/diff labels,

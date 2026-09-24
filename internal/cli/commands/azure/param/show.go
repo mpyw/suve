@@ -13,7 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
 
@@ -28,19 +28,19 @@ type showJSONOutput struct {
 // showPresenter renders Azure App Configuration show output. App Configuration
 // is unversioned, so no version/state metadata is rendered.
 type showPresenter struct {
-	uc     *azure.ShowUseCase
+	uc     *param.ShowUseCase
 	spec   *azureappconfigversion.Spec
-	result *azure.ShowOutput
+	result *param.ShowOutput
 }
 
 // NewShowPresenter builds an Azure App Configuration show presenter over the given reader and spec.
 func NewShowPresenter(reader provider.Reader, spec *azureappconfigversion.Spec) genericshow.Presenter {
-	return &showPresenter{uc: &azure.ShowUseCase{Reader: reader}, spec: spec}
+	return &showPresenter{uc: &param.ShowUseCase{Reader: reader}, spec: spec}
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
 	// App Configuration has no version specifier, so the suffix is always empty.
-	result, err := p.uc.Execute(ctx, azure.ShowInput{Name: p.spec.Name, Suffix: ""})
+	result, err := p.uc.Execute(ctx, param.ShowInput{Name: p.spec.Name, Suffix: ""})
 	if err != nil {
 		return err
 	}
@@ -65,8 +65,8 @@ func (p *showPresenter) RenderText(stdout io.Writer, value string) {
 	out := output.New(stdout)
 	out.Field("Name", result.Name)
 
-	if result.CreatedDate != nil {
-		out.Field("Modified", timeutil.FormatRFC3339(*result.CreatedDate))
+	if result.LastModified != nil {
+		out.Field("Modified", timeutil.FormatRFC3339(*result.LastModified))
 	}
 
 	if len(result.Tags) > 0 {
@@ -89,8 +89,8 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 		Value: value,
 	}
 
-	if result.CreatedDate != nil {
-		jsonOut.Modified = timeutil.FormatRFC3339(*result.CreatedDate)
+	if result.LastModified != nil {
+		jsonOut.Modified = timeutil.FormatRFC3339(*result.LastModified)
 	}
 
 	jsonOut.Tags = make(map[string]string)

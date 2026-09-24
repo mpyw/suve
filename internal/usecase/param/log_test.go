@@ -28,17 +28,20 @@ type logVer struct {
 }
 
 // newLogStore builds a provider mock whose History returns the given versions
-// newest-first (input is oldest-first) and whose Resolve/Get fetch a version's
-// value/type by id, mirroring the AWS param adapter.
+// newest-first (input is oldest-first), marking the highest version current,
+// and whose Resolve/Get fetch a version's value/type by id, mirroring the AWS
+// param adapter.
 func newLogStore(oldestFirst []logVer) *providermock.Store {
 	byID := make(map[string]logVer, len(oldestFirst))
 
 	versionsNewestFirst := make([]domain.Version, 0, len(oldestFirst))
 
+	current := lo.MaxBy(oldestFirst, func(a, b logVer) bool { return a.ver > b.ver }).ver
+
 	for _, v := range slices.Backward(oldestFirst) {
 		id := strconv.FormatInt(v.ver, 10)
 		byID[id] = v
-		versionsNewestFirst = append(versionsNewestFirst, domain.Version{ID: id, Created: v.modified})
+		versionsNewestFirst = append(versionsNewestFirst, domain.Version{ID: id, Current: v.ver == current, Created: v.modified})
 	}
 
 	return &providermock.Store{
@@ -84,9 +87,9 @@ func TestLogUseCase_Execute(t *testing.T) {
 	assert.Len(t, output.Entries, 3)
 
 	// Newest first (default order)
-	assert.Equal(t, int64(3), output.Entries[0].Version)
-	assert.Equal(t, int64(2), output.Entries[1].Version)
-	assert.Equal(t, int64(1), output.Entries[2].Version)
+	assert.Equal(t, "3", output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[1].Version)
+	assert.Equal(t, "1", output.Entries[2].Version)
 
 	// IsCurrent flag
 	assert.True(t, output.Entries[0].IsCurrent)
@@ -144,7 +147,7 @@ func TestLogUseCase_Execute_PartialFetchError(t *testing.T) {
 	assert.Equal(t, "v2", output.Entries[0].Value)
 	require.Error(t, output.Entries[1].Error)
 	assert.Empty(t, output.Entries[1].Value)
-	// IsCurrent stays correct even for a failed entry (derived from version number).
+	// IsCurrent stays correct even for a failed entry (set by the adapter).
 	assert.True(t, output.Entries[0].IsCurrent)
 	assert.False(t, output.Entries[1].IsCurrent)
 }
@@ -165,9 +168,9 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 	require.NoError(t, err)
 
 	// Oldest first when Reverse is true
-	assert.Equal(t, int64(1), output.Entries[0].Version)
-	assert.Equal(t, int64(2), output.Entries[1].Version)
-	assert.Equal(t, int64(3), output.Entries[2].Version)
+	assert.Equal(t, "1", output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[1].Version)
+	assert.Equal(t, "3", output.Entries[2].Version)
 }
 
 func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
@@ -187,8 +190,8 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, output.Entries, 2)
-	assert.Equal(t, int64(3), output.Entries[0].Version)
-	assert.Equal(t, int64(2), output.Entries[1].Version)
+	assert.Equal(t, "3", output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[1].Version)
 }
 
 func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
@@ -208,8 +211,8 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, output.Entries, 2)
-	assert.Equal(t, int64(2), output.Entries[0].Version)
-	assert.Equal(t, int64(1), output.Entries[1].Version)
+	assert.Equal(t, "2", output.Entries[0].Version)
+	assert.Equal(t, "1", output.Entries[1].Version)
 }
 
 func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
@@ -230,7 +233,7 @@ func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, output.Entries, 1)
-	assert.Equal(t, int64(2), output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[0].Version)
 }
 
 // TestLogUseCase_Execute_FilterBeforeCount asserts date filters run BEFORE the
@@ -256,7 +259,7 @@ func TestLogUseCase_Execute_FilterBeforeCount(t *testing.T) {
 	// Only v1 and v2 predate --until; capping to 1 yields the newest of those (v2),
 	// not an empty result from truncating to v3 first.
 	require.Len(t, output.Entries, 1)
-	assert.Equal(t, int64(2), output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[0].Version)
 }
 
 func TestLogUseCase_Execute_NoLastModifiedDate(t *testing.T) {
@@ -291,5 +294,5 @@ func TestLogUseCase_Execute_FilterWithNilLastModifiedDate(t *testing.T) {
 
 	// v1 has nil timestamp, so it is skipped when a date filter is applied; only v2 remains.
 	assert.Len(t, output.Entries, 1)
-	assert.Equal(t, int64(2), output.Entries[0].Version)
+	assert.Equal(t, "2", output.Entries[0].Version)
 }

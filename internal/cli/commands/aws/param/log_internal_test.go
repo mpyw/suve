@@ -61,7 +61,7 @@ func TestRenderOnelineDateHonorsTZ(t *testing.T) {
 	p := &logPresenter{
 		result: &param.LogOutput{
 			Entries: []param.LogEntry{
-				{Version: 1, Value: "v", LastModified: &modified},
+				{Version: "1", Value: "v", LastModified: &modified},
 			},
 		},
 	}

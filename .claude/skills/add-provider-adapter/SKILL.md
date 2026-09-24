@@ -24,6 +24,9 @@ same shape.
 - Do **pagination and deterministic ordering from day one**. List and history
   operations must page through all results and break timestamp ties with a
   stable secondary key. Skipping this produced #311, #312, and #314.
+- In `History`, mark the version the provider serves as current with
+  `domain.Version.Current`. The shared use cases read it for `IsCurrent`. They
+  do not guess it from labels or from position.
 
 ## Version-spec parser
 
@@ -33,6 +36,9 @@ same shape.
   rejects unsupported specifiers before any API call**. Google Cloud rejects
   labels with a dedicated error at parse time (`ErrLabelUnsupported`, #231);
   App Configuration is unversioned and rejects all specifiers.
+- For a versioned grammar, add `Suffix(spec)` next to `Parse`. The CLI and GUI
+  call the neutral `usecase/{param,secret}` with `spec.Name` plus
+  `Suffix(spec)`. There is no per-provider use case package.
 
 ## Wiring
 

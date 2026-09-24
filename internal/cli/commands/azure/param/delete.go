@@ -11,12 +11,12 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 // DeleteRunner executes the delete command.
 type DeleteRunner struct {
-	UseCase *azure.DeleteUseCase
+	UseCase *param.DeleteUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -64,7 +64,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	uc := &azure.DeleteUseCase{Store: store}
+	uc := &param.DeleteUseCase{Store: store}
 
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
@@ -102,7 +102,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the delete command.
 func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
-	result, err := r.UseCase.Execute(ctx, azure.DeleteInput{Name: opts.Name})
+	result, err := r.UseCase.Execute(ctx, param.DeleteInput{Name: opts.Name})
 	if err != nil {
 		return err
 	}

@@ -409,7 +409,7 @@ func TestParamShow_MapsEntry(t *testing.T) {
 func TestParamLog_MapsVersions(t *testing.T) {
 	store := &providermock.Store{
 		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
-			return []domain.Version{{ID: "2"}, {ID: "1"}}, nil
+			return []domain.Version{{ID: "2", Current: true}, {ID: "1"}}, nil
 		},
 		ResolveFunc: func(context.Context, string, string) (provider.VersionRef, error) {
 			return provider.VersionRef{}, nil

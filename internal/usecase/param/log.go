@@ -22,12 +22,14 @@ type LogInput struct {
 
 // LogEntry represents a single version entry.
 type LogEntry struct {
-	Version      int64
+	Version      string // opaque version id
 	Type         domain.ValueType
 	Value        string
 	LastModified *time.Time
-	IsCurrent    bool
-	Error        error // Error from fetching value, if any
+	// IsCurrent reports whether the adapter marked this version as the current
+	// one (domain.Version.Current).
+	IsCurrent bool
+	Error     error // Error from fetching value, if any
 }
 
 // LogOutput holds the result of the log use case.
@@ -65,13 +67,7 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 	// The complete history is newest first, so its last element is the very
 	// first version that ever existed. Remember it before truncation so we can
 	// tell whether the oldest shown version is genuinely the initial one.
-	initialVersion := parseVersion(versions[len(versions)-1].ID)
-
-	// The current version is the highest version number over the full history.
-	maxVersion := lo.MaxBy(versions, func(a, b domain.Version) bool {
-		return parseVersion(a.ID) > parseVersion(b.ID)
-	})
-	maxVersionNum := parseVersion(maxVersion.ID)
+	initialVersion := versions[len(versions)-1].ID
 
 	// Apply date filters BEFORE the count limit: -n must return up to N versions
 	// that match --since/--until, not N newest-then-filtered to fewer (#351).
@@ -105,9 +101,9 @@ func (u *LogUseCase) Execute(ctx context.Context, input LogInput) (*LogOutput, e
 		entry, fetchErr := u.getVersion(ctx, input.Name, v)
 
 		logEntry := LogEntry{
-			Version:      parseVersion(v.ID),
+			Version:      v.ID,
 			LastModified: v.Created,
-			IsCurrent:    parseVersion(v.ID) == maxVersionNum,
+			IsCurrent:    v.Current,
 			Error:        fetchErr,
 		}
 		// Record a per-version fetch failure on the entry rather than aborting

@@ -42,7 +42,10 @@ func NewDiffPresenter(reader provider.Reader, spec1, spec2 *awsparamversion.Spec
 }
 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, param.DiffInput{Spec1: p.spec1, Spec2: p.spec2})
+	result, err := p.uc.Execute(ctx, param.DiffInput{
+		Name1: p.spec1.Name, Suffix1: awsparamversion.Suffix(p.spec1),
+		Name2: p.spec2.Name, Suffix2: awsparamversion.Suffix(p.spec2),
+	})
 	if err != nil {
 		return err
 	}
@@ -56,17 +59,17 @@ func (p *diffPresenter) OldValue() string { return p.result.OldValue }
 func (p *diffPresenter) NewValue() string { return p.result.NewValue }
 
 func (p *diffPresenter) Labels() (string, string) {
-	return fmt.Sprintf("%s#%d", p.result.OldName, p.result.OldVersion),
-		fmt.Sprintf("%s#%d", p.result.NewName, p.result.NewVersion)
+	return fmt.Sprintf("%s#%s", p.result.OldName, p.result.OldVersion),
+		fmt.Sprintf("%s#%s", p.result.NewName, p.result.NewVersion)
 }
 
 func (p *diffPresenter) RenderJSON(stdout io.Writer, oldValue, newValue string, identical bool, diff string) error {
 	jsonOut := diffJSONOutput{
 		OldName:    p.result.OldName,
-		OldVersion: p.result.OldVersion,
+		OldVersion: versionNumber(p.result.OldVersion),
 		OldValue:   oldValue,
 		NewName:    p.result.NewName,
-		NewVersion: p.result.NewVersion,
+		NewVersion: versionNumber(p.result.NewVersion),
 		NewValue:   newValue,
 		Identical:  identical,
 		Diff:       diff,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -48,7 +47,7 @@ func NewShowPresenter(reader provider.Reader, spec *awsparamversion.Spec) generi
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, param.ShowInput{Spec: p.spec})
+	result, err := p.uc.Execute(ctx, param.ShowInput{Name: p.spec.Name, Suffix: awsparamversion.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -83,7 +82,7 @@ func (p *showPresenter) RenderText(stdout io.Writer, value string) {
 
 	out := output.New(stdout)
 	out.Field("Name", result.Name)
-	out.Field("Version", strconv.FormatInt(result.Version, 10))
+	out.Field("Version", result.Version)
 	out.Field("Type", paramtype.Display(result.Type))
 	// Show json_parsed only when --parse-json was used and succeeded
 	if p.jsonParsed {
@@ -115,7 +114,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 	jsonOut := showJSONOutput{
 		Name:    result.Name,
-		Version: result.Version,
+		Version: versionNumber(result.Version),
 		Type:    paramtype.Display(result.Type),
 		Value:   value,
 	}

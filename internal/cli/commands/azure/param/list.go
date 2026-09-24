@@ -13,7 +13,7 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 // namespaceListJSONItem is one row of `--output=json` for the namespace-aware
@@ -45,10 +45,10 @@ type ListOptions struct {
 type ListRunner struct {
 	// Namespace produces per-(key, namespace) rows for the NAMESPACE column. Nil
 	// when the resolved store is not Azure App Configuration.
-	Namespace *azure.ListNamespacesUseCase
+	Namespace *param.ListNamespacesUseCase
 	// KeyOnly produces the neutral, deduped key-only listing (the --hide-namespace
 	// fallback), honoring the store's namespace filter via Reader.List.
-	KeyOnly *azure.ListUseCase
+	KeyOnly *param.ListUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -95,14 +95,14 @@ func (r *ListRunner) keyOnlyEntries(opts ListOptions) func(context.Context) ([]g
 // come from the provider-neutral use case, byte-for-byte the shared listing.
 func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Context) ([]genericlist.Entry, error) {
 	return func(ctx context.Context) ([]genericlist.Entry, error) {
-		result, err := r.KeyOnly.Execute(ctx, azure.ListInput{
-			Prefix: opts.Prefix, Filter: opts.Filter, WithValue: opts.Show,
+		result, err := r.KeyOnly.Execute(ctx, param.ListInput{
+			Prefix: opts.Prefix, PlainPrefix: true, Filter: opts.Filter, WithValue: opts.Show,
 		})
 		if err != nil {
 			return nil, err
 		}
 
-		entries := lo.Map(result.Entries, func(e azure.ListEntry, _ int) genericlist.Entry {
+		entries := lo.Map(result.Entries, func(e param.ListEntry, _ int) genericlist.Entry {
 			return genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
 		})
 
@@ -115,7 +115,7 @@ func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Con
 // deduped key-only rows the --hide-namespace listing shows.
 func (r *ListRunner) keyOnlyEntriesFromNamespaced(opts ListOptions) func(context.Context) ([]genericlist.Entry, error) {
 	return func(ctx context.Context) ([]genericlist.Entry, error) {
-		result, err := r.Namespace.Execute(ctx, azure.ListNamespacesInput{
+		result, err := r.Namespace.Execute(ctx, param.ListNamespacesInput{
 			Prefix: opts.Prefix, Filter: opts.Filter, WithValue: true,
 		})
 		if err != nil {
@@ -130,7 +130,7 @@ func (r *ListRunner) keyOnlyEntriesFromNamespaced(opts ListOptions) func(context
 // key-only rows the --hide-namespace listing shows, carrying each key's value.
 // A key that resolves to different values across namespaces cannot be shown as
 // one value, so it becomes an error row rather than an arbitrary pick.
-func collapseToKeyOnlyList(rows []azure.ListNamespacesEntry) []genericlist.Entry {
+func collapseToKeyOnlyList(rows []param.ListNamespacesEntry) []genericlist.Entry {
 	type collapsed struct {
 		value     string
 		ambiguous bool
@@ -175,7 +175,7 @@ var errAmbiguousListValue = errors.New("value differs across namespaces; drop --
 // json: {namespace, name, value?}). The null namespace shows as "(NULL)" in text
 // but stays "" in JSON so machine consumers see the raw label.
 func (r *ListRunner) runNamespaced(ctx context.Context, opts ListOptions) error {
-	result, err := r.Namespace.Execute(ctx, azure.ListNamespacesInput{
+	result, err := r.Namespace.Execute(ctx, param.ListNamespacesInput{
 		Prefix: opts.Prefix, Filter: opts.Filter, WithValue: opts.Show,
 	})
 	if err != nil {
@@ -183,7 +183,7 @@ func (r *ListRunner) runNamespaced(ctx context.Context, opts ListOptions) error 
 	}
 
 	if opts.Output == output.FormatJSON {
-		items := lo.Map(result.Entries, func(e azure.ListNamespacesEntry, _ int) namespaceListJSONItem {
+		items := lo.Map(result.Entries, func(e param.ListNamespacesEntry, _ int) namespaceListJSONItem {
 			return namespaceListJSONItem{Namespace: e.Namespace, Name: e.Name, Value: e.Value}
 		})
 
@@ -278,14 +278,14 @@ EXAMPLES:
 			}
 
 			runner := &ListRunner{
-				KeyOnly: &azure.ListUseCase{Reader: store},
+				KeyOnly: &param.ListUseCase{Reader: store},
 				Stdout:  cmd.Root().Writer,
 				Stderr:  cmd.Root().ErrWriter,
 			}
 			// Only the App Configuration store implements the namespace extension;
 			// a store that does not keep the NAMESPACE column off entirely.
-			if lister, ok := store.(azure.NamespacesLister); ok {
-				runner.Namespace = &azure.ListNamespacesUseCase{Lister: lister}
+			if lister, ok := store.(param.NamespacesLister); ok {
+				runner.Namespace = &param.ListNamespacesUseCase{Lister: lister}
 			}
 
 			return runner.Run(ctx, ListOptions{

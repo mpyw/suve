@@ -2,8 +2,8 @@ package param
 
 import "strings"
 
-// MatchPrefix reports whether name is in scope for the given prefix, using AWS
-// Parameter Store PATH-HIERARCHY semantics (the old server-side Path filter):
+// MatchPrefix reports whether name is in scope for the given prefix, using
+// path-hierarchy semantics (AWS Parameter Store's server-side Path filter):
 //
 //   - An empty prefix matches everything (the old code applied no Path filter,
 //     returning all parameters at any depth).

@@ -1,4 +1,4 @@
-package azure
+package param
 
 import (
 	"context"
@@ -88,7 +88,7 @@ func (u *ListNamespacesUseCase) Execute(ctx context.Context, input ListNamespace
 		return entry, true
 	})
 
-	debug.From(ctx).Logf("azure list (namespaces): provider returned %d rows, %d after filters (prefix=%q, filter=%q)\n",
+	debug.From(ctx).Logf("param list (namespaces): provider returned %d rows, %d after filters (prefix=%q, filter=%q)\n",
 		len(rows), len(out.Entries), input.Prefix, input.Filter)
 
 	return out, nil

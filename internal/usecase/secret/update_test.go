@@ -68,7 +68,7 @@ func TestUpdateUseCase_Execute_UpdateValue(t *testing.T) {
 	output, err := uc.Execute(t.Context(), secret.UpdateInput{Name: "my-secret", Value: "new-value"})
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", output.Name)
-	assert.Equal(t, "new-version-id", output.VersionID)
+	assert.Equal(t, "new-version-id", output.Version)
 }
 
 // TestUpdateUseCase_Execute_UpdateValueAndDescription is a genuine
@@ -99,7 +99,7 @@ func TestUpdateUseCase_Execute_UpdateValueAndDescription(t *testing.T) {
 		Description: "new description",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "new-version-id", output.VersionID)
+	assert.Equal(t, "new-version-id", output.Version)
 }
 
 func TestUpdateUseCase_Execute_NotFound(t *testing.T) {

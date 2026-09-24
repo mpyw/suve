@@ -61,7 +61,7 @@ func (p *logPresenter) Fetch(ctx context.Context) error {
 
 	for _, entry := range result.Entries {
 		if entry.Error == nil {
-			p.secretValues[entry.VersionID] = entry.Value
+			p.secretValues[entry.Version] = entry.Value
 		}
 	}
 
@@ -73,10 +73,10 @@ func (p *logPresenter) Len() int { return len(p.result.Entries) }
 func (p *logPresenter) RenderJSON(stdout io.Writer) error {
 	items := lo.Map(p.result.Entries, func(entry secret.LogEntry, _ int) logJSONItem {
 		item := logJSONItem{
-			VersionID: entry.VersionID,
+			VersionID: entry.Version,
 		}
-		if len(entry.VersionStage) > 0 {
-			item.Stages = entry.VersionStage
+		if len(entry.Labels) > 0 {
+			item.Stages = entry.Labels
 		}
 
 		if entry.CreatedDate != nil {
@@ -105,12 +105,12 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, _ int) {
 	}
 
 	labelsStr := ""
-	if len(entry.VersionStage) > 0 {
-		labelsStr = colors.For(stdout).Current(fmt.Sprintf(" %v", entry.VersionStage))
+	if len(entry.Labels) > 0 {
+		labelsStr = colors.For(stdout).Current(fmt.Sprintf(" %v", entry.Labels))
 	}
 
 	output.Printf(stdout, "%s%s  %s%s\n",
-		colors.For(stdout).Version(awssecretversion.TruncateVersionID(entry.VersionID)),
+		colors.For(stdout).Version(awssecretversion.TruncateVersionID(entry.Version)),
 		labelsStr,
 		colors.For(stdout).FieldLabel(dateStr),
 		"",
@@ -120,9 +120,9 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, _ int) {
 func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 	entry := p.result.Entries[i]
 
-	versionLabel := fmt.Sprintf("Version %s", awssecretversion.TruncateVersionID(entry.VersionID))
-	if len(entry.VersionStage) > 0 {
-		versionLabel += " " + colors.For(stdout).Current(fmt.Sprintf("%v", entry.VersionStage))
+	versionLabel := fmt.Sprintf("Version %s", awssecretversion.TruncateVersionID(entry.Version))
+	if len(entry.Labels) > 0 {
+		versionLabel += " " + colors.For(stdout).Current(fmt.Sprintf("%v", entry.Labels))
 	}
 
 	output.Println(stdout, colors.For(stdout).Version(versionLabel))
@@ -142,7 +142,7 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 
 	newEntry := entries[i]
 
-	newValue, newOk := p.secretValues[newEntry.VersionID]
+	newValue, newOk := p.secretValues[newEntry.Version]
 	if !newOk {
 		return
 	}
@@ -168,19 +168,19 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 
 		var oldOk bool
 
-		oldValue, oldOk = p.secretValues[oldEntry.VersionID]
+		oldValue, oldOk = p.secretValues[oldEntry.Version]
 		if !oldOk {
 			return
 		}
 
-		oldName = fmt.Sprintf("%s#%s", p.result.Name, awssecretversion.TruncateVersionID(oldEntry.VersionID))
+		oldName = fmt.Sprintf("%s#%s", p.result.Name, awssecretversion.TruncateVersionID(oldEntry.Version))
 
 		if parseJSON {
 			oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, stderr, "")
 		}
 	}
 
-	newName := fmt.Sprintf("%s#%s", p.result.Name, awssecretversion.TruncateVersionID(newEntry.VersionID))
+	newName := fmt.Sprintf("%s#%s", p.result.Name, awssecretversion.TruncateVersionID(newEntry.Version))
 
 	diff := output.Diff(stdout, oldName, newName, oldValue, newValue)
 	if diff != "" {

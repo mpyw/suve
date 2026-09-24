@@ -7,7 +7,7 @@
 // that version history is unsupported instead of crashing. The group otherwise
 // reuses the generic command scaffolding (show,
 // list, diff, create, update, delete, tag, untag) via App Configuration
-// presenters and the shared internal/usecase/azure use cases.
+// presenters and the provider-neutral internal/usecase/param use cases.
 // command.go is this package's subject: the azure param command group it
 // assembles, together with the vocabulary its sibling files share. Hence core.
 //

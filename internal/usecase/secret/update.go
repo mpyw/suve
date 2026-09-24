@@ -21,8 +21,8 @@ type UpdateInput struct {
 
 // UpdateOutput holds the result of the update use case.
 type UpdateOutput struct {
-	Name      string
-	VersionID string
+	Name    string
+	Version string // opaque version id
 }
 
 // UpdateUseCase executes update operations.
@@ -66,7 +66,7 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 	}
 
 	return &UpdateOutput{
-		Name:      input.Name,
-		VersionID: version.ID,
+		Name:    input.Name,
+		Version: version.ID,
 	}, nil
 }

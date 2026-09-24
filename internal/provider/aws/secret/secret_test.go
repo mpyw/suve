@@ -204,8 +204,8 @@ func TestGet_MapsEntryWithDescriptionAndTags(t *testing.T) {
 	assert.Equal(t, "s3cr3t", entry.Value)
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "id-3", entry.Version.ID)
-	// StagingLabels carries the full stage set; State is empty (no such concept).
-	assert.Equal(t, []string{"AWSCURRENT"}, entry.Version.StagingLabels)
+	// Labels carries the full stage set; State is empty (no such concept).
+	assert.Equal(t, []string{"AWSCURRENT"}, entry.Version.Labels)
 	assert.Empty(t, entry.Version.State)
 	assert.Equal(t, "my desc", entry.Description)
 	require.Len(t, entry.Tags, 1)
@@ -255,8 +255,8 @@ func TestGet_LabelPrefersAWSCURRENTRegardlessOfOrder(t *testing.T) {
 
 	entry, err := store.Get(t.Context(), "my-secret", provider.NewVersionRef("id-3"))
 	require.NoError(t, err)
-	// StagingLabels keeps every staging label AWS returned, in order.
-	assert.Equal(t, []string{"my-custom-label", "AWSPREVIOUS", "AWSCURRENT"}, entry.Version.StagingLabels)
+	// Labels keeps every staging label AWS returned, in order.
+	assert.Equal(t, []string{"my-custom-label", "AWSPREVIOUS", "AWSCURRENT"}, entry.Version.Labels)
 }
 
 // History preserves every staging label AWS returns for a version, in the
@@ -289,9 +289,47 @@ func TestHistory_StagingLabels(t *testing.T) {
 	require.Len(t, versions, 2)
 	// Newest first: id-2.
 	assert.Equal(t, "id-2", versions[0].ID)
-	assert.Equal(t, []string{"AWSPREVIOUS", "AWSPENDING"}, versions[0].StagingLabels)
+	assert.Equal(t, []string{"AWSPREVIOUS", "AWSPENDING"}, versions[0].Labels)
 	assert.Equal(t, "id-1", versions[1].ID)
-	assert.Equal(t, []string{"zeta", "alpha"}, versions[1].StagingLabels)
+	assert.Equal(t, []string{"zeta", "alpha"}, versions[1].Labels)
+	// No version carries AWSCURRENT, so the newest one is current.
+	assert.True(t, versions[0].Current)
+	assert.False(t, versions[1].Current)
+}
+
+// TestHistory_CurrentIsAWSCURRENT pins that the current version is the one
+// carrying the AWSCURRENT staging label (membership, even alongside a custom
+// label, #317), not the newest one.
+func TestHistory_CurrentIsAWSCURRENT(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	store := secret.New(&mockClient{
+		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+			return &secretsmanager.ListSecretVersionIdsOutput{
+				Versions: []types.SecretVersionsListEntry{
+					{
+						VersionId:     aws.String("pending"),
+						CreatedDate:   aws.Time(base.Add(time.Hour)),
+						VersionStages: []string{"AWSPENDING"},
+					},
+					{
+						VersionId:     aws.String("current"),
+						CreatedDate:   aws.Time(base),
+						VersionStages: []string{"custom", "AWSCURRENT"},
+					},
+				},
+			}, nil
+		},
+	})
+
+	versions, err := store.History(t.Context(), "my-secret")
+	require.NoError(t, err)
+	require.Len(t, versions, 2)
+	assert.Equal(t, "pending", versions[0].ID)
+	assert.False(t, versions[0].Current)
+	assert.Equal(t, "current", versions[1].ID)
+	assert.True(t, versions[1].Current)
 }
 
 func TestHistory_NewestFirst(t *testing.T) {
@@ -307,7 +345,7 @@ func TestHistory_NewestFirst(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, versions, 3)
 	assert.Equal(t, "id-3", versions[0].ID)
-	assert.Equal(t, []string{"AWSCURRENT"}, versions[0].StagingLabels)
+	assert.Equal(t, []string{"AWSCURRENT"}, versions[0].Labels)
 	assert.Equal(t, "id-1", versions[2].ID)
 }
 

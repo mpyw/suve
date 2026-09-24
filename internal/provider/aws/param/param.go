@@ -179,16 +179,20 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 	return entry, nil
 }
 
-// History returns the parameter's version history, newest first.
+// History returns the parameter's version history, newest first. The current
+// version is the one with the highest version number.
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
 	params, err := s.getFullHistory(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parameter history: %w", err)
 	}
 
+	current := lo.MaxBy(params, func(a, b types.ParameterHistory) bool { return a.Version > b.Version }).Version
+
 	versions := lo.Map(params, func(p types.ParameterHistory, _ int) domain.Version {
 		return domain.Version{
 			ID:      strconv.FormatInt(p.Version, 10),
+			Current: p.Version == current,
 			Created: p.LastModifiedDate,
 		}
 	})

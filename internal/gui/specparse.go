@@ -3,10 +3,6 @@
 package gui
 
 import (
-	"strconv"
-
-	"github.com/samber/lo"
-
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/awsparamversion"
 	"github.com/mpyw/suve/internal/version/awssecretversion"
@@ -17,76 +13,67 @@ import (
 
 // Per-provider version-spec parsing.
 //
-// The param/secret usecases the GUI drives are typed to *awsparamversion.Spec /
-// *awssecretversion.Spec, but the grammar that is legal depends on the active
-// provider. Parsing every input with the AWS grammar mis-handles other
-// providers — most visibly it splits an Azure App Configuration key that
-// legally contains '#' or '~' into a bogus name+version. These helpers select
-// the correct grammar (mirroring the CLI's per-provider parsers) and then adapt
-// the result back into the usecase's spec type.
-//
-// The adaptation round-trips through the neutral name+suffix contract: the
-// usecase reconstructs a suffix string from the returned spec and hands
-// name+suffix to provider.Reader.Resolve, which re-parses it with the
-// provider's OWN grammar (see each adapter's Resolve). So carrying the parsed
-// name and an equivalent absolute/shift in a awsparamversion/awssecretversion spec is
-// sufficient — the suffix bytes are grammar-agnostic (#id / :label / ~N).
+// The grammar that is legal depends on the active provider: parsing every input
+// with the AWS grammar would, for example, split an Azure App Configuration key
+// that legally contains '#' or '~' into a bogus name+version. These helpers pick
+// the provider's grammar (mirroring the CLI's per-provider parsers) and return
+// the name plus the rebuilt version suffix the neutral usecases hand to
+// provider.Reader.Resolve, which re-parses it with the same grammar.
 
-// parseParamSpec parses a parameter version spec with the grammar of the active
-// provider and adapts it to the *awsparamversion.Spec the param usecase expects.
+// parseParamSpec splits a parameter version spec into its name and version
+// suffix with the grammar of the active provider.
 //
 //   - AWS   -> awsparamversion (name#N~shift).
 //   - Azure -> App Configuration is unversioned; azureappconfigversion accepts a
 //     bare name only and rejects any specifier, so a key containing '#'/'~' gets
 //     a clean error instead of a mis-split.
-func (a *App) parseParamSpec(specStr string) (*awsparamversion.Spec, error) {
+func (a *App) parseParamSpec(specStr string) (name, suffix string, err error) {
 	switch a.currentScope().Provider {
 	case provider.ProviderAzure:
 		spec, err := azureappconfigversion.Parse(specStr)
 		if err != nil {
-			return nil, err
+			return "", "", err
 		}
 
-		// App Configuration has no absolute/shift specifier, so the equivalent
-		// awsparamversion spec is a bare name (empty suffix).
-		return &awsparamversion.Spec{Name: spec.Name}, nil
+		return spec.Name, "", nil
 	default:
-		return awsparamversion.Parse(specStr)
+		spec, err := awsparamversion.Parse(specStr)
+		if err != nil {
+			return "", "", err
+		}
+
+		return spec.Name, awsparamversion.Suffix(spec), nil
 	}
 }
 
-// parseSecretSpec parses a secret version spec with the grammar of the active
-// provider and adapts it to the *awssecretversion.Spec the secret usecase expects.
+// parseSecretSpec splits a secret version spec into its name and version suffix
+// with the grammar of the active provider.
 //
 //   - AWS          -> awssecretversion (name#id | :label, plus ~shift).
 //   - Google Cloud -> gcloudversion (integer #N, ~shift; ':' labels rejected).
 //   - Azure        -> azurekvversion (opaque #id, ~shift; ':' labels rejected).
-func (a *App) parseSecretSpec(specStr string) (*awssecretversion.Spec, error) {
+func (a *App) parseSecretSpec(specStr string) (name, suffix string, err error) {
 	switch a.currentScope().Provider {
 	case provider.ProviderGoogleCloud:
 		spec, err := gcloudversion.Parse(specStr)
 		if err != nil {
-			return nil, err
+			return "", "", err
 		}
 
-		out := &awssecretversion.Spec{Name: spec.Name, Shift: spec.Shift}
-		if spec.Absolute.Version != nil {
-			out.Absolute.ID = lo.ToPtr(strconv.FormatInt(*spec.Absolute.Version, 10))
-		}
-
-		return out, nil
+		return spec.Name, gcloudversion.Suffix(spec), nil
 	case provider.ProviderAzure:
 		spec, err := azurekvversion.Parse(specStr)
 		if err != nil {
-			return nil, err
+			return "", "", err
 		}
 
-		return &awssecretversion.Spec{
-			Name:     spec.Name,
-			Absolute: awssecretversion.AbsoluteSpec{ID: spec.Absolute.ID},
-			Shift:    spec.Shift,
-		}, nil
+		return spec.Name, azurekvversion.Suffix(spec), nil
 	default:
-		return awssecretversion.Parse(specStr)
+		spec, err := awssecretversion.Parse(specStr)
+		if err != nil {
+			return "", "", err
+		}
+
+		return spec.Name, awssecretversion.Suffix(spec), nil
 	}
 }

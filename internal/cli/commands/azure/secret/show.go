@@ -13,7 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/azurekvversion"
 )
 
@@ -29,18 +29,18 @@ type showJSONOutput struct {
 
 // showPresenter renders Azure Key Vault show output.
 type showPresenter struct {
-	uc     *azure.ShowUseCase
+	uc     *secret.ShowUseCase
 	spec   *azurekvversion.Spec
-	result *azure.ShowOutput
+	result *secret.ShowOutput
 }
 
 // NewShowPresenter builds an Azure Key Vault show presenter over the given reader and spec.
 func NewShowPresenter(reader provider.Reader, spec *azurekvversion.Spec) genericshow.Presenter {
-	return &showPresenter{uc: &azure.ShowUseCase{Reader: reader}, spec: spec}
+	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, azure.ShowInput{Name: p.spec.Name, Suffix: specSuffix(p.spec)})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: azurekvversion.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}

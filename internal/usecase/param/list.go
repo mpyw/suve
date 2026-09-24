@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/samber/lo"
 
@@ -16,10 +17,16 @@ import (
 
 // ListInput holds input for the list use case.
 type ListInput struct {
-	Prefix    string
+	Prefix string
+	// Recursive matches any depth under Prefix instead of immediate children
+	// only (see MatchPrefix). Ignored with PlainPrefix.
 	Recursive bool
-	Filter    string // Regex filter pattern
-	WithValue bool   // Include parameter values
+	// PlainPrefix matches Prefix as a plain, case-sensitive string prefix, for
+	// stores whose keys have no path hierarchy. Without it Prefix uses the
+	// path-hierarchy semantics of MatchPrefix.
+	PlainPrefix bool
+	Filter      string // Regex filter pattern
+	WithValue   bool   // Include parameter values
 }
 
 // ListEntry represents a single parameter in list output.
@@ -63,7 +70,7 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 
 	// Apply prefix/recursive and regex filtering client-side.
 	filtered := lo.Filter(names, func(name string, _ int) bool {
-		if !MatchPrefix(name, input.Prefix, input.Recursive) {
+		if !listMatchesPrefix(name, input) {
 			return false
 		}
 
@@ -76,14 +83,23 @@ func (u *ListUseCase) Execute(ctx context.Context, input ListInput) (*ListOutput
 
 	// Distinguishes "the API returned nothing" from "the client-side filters
 	// dropped everything" — the two look identical in the final output.
-	debug.From(ctx).Logf("aws ssm list: provider returned %d names, %d after filters (prefix=%q, recursive=%v, filter=%q)\n",
-		len(names), len(filtered), input.Prefix, input.Recursive, input.Filter)
+	debug.From(ctx).Logf("param list: provider returned %d names, %d after filters (prefix=%q, plain=%v, recursive=%v, filter=%q)\n",
+		len(names), len(filtered), input.Prefix, input.PlainPrefix, input.Recursive, input.Filter)
 
 	// Sort names alphabetically so the listing has a stable, deterministic order
 	// regardless of the provider API's native ordering (#480).
 	slices.Sort(filtered)
 
 	return u.buildOutput(ctx, input.WithValue, filtered), nil
+}
+
+// listMatchesPrefix applies the input's prefix filter to name.
+func listMatchesPrefix(name string, input ListInput) bool {
+	if input.PlainPrefix {
+		return strings.HasPrefix(name, input.Prefix)
+	}
+
+	return MatchPrefix(name, input.Prefix, input.Recursive)
 }
 
 // buildOutput creates the output, fetching values in parallel when requested.

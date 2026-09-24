@@ -283,6 +283,10 @@ func TestHistory_NewestFirst(t *testing.T) {
 	require.Len(t, versions, 3)
 	assert.Equal(t, "3", versions[0].ID)
 	assert.Equal(t, "1", versions[2].ID)
+	// The highest version number is the current one.
+	assert.True(t, versions[0].Current)
+	assert.False(t, versions[1].Current)
+	assert.False(t, versions[2].Current)
 }
 
 func TestList_Paginated(t *testing.T) {

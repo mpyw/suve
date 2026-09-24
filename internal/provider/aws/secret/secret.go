@@ -264,9 +264,9 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 		Value: aws.ToString(out.SecretString),
 		Type:  domain.ValueTypeSecret,
 		Version: domain.Version{
-			ID:            aws.ToString(out.VersionId),
-			StagingLabels: out.VersionStages,
-			Created:       out.CreatedDate,
+			ID:      aws.ToString(out.VersionId),
+			Labels:  out.VersionStages,
+			Created: out.CreatedDate,
 		},
 		Modified: out.CreatedDate,
 		Extra:    []domain.Field{{Label: "ARN", Value: aws.ToString(out.ARN)}},
@@ -285,7 +285,10 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 }
 
 // History returns the secret's version history, newest first, including
-// deprecated (unlabeled) versions.
+// deprecated (unlabeled) versions. The current version is the one carrying the
+// AWSCURRENT staging label (membership, not position, so it stays correct even
+// when the version carries extra custom labels, #317); a history without it
+// falls back to the newest version.
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
 	list, err := s.listAllVersions(ctx, name)
 	if err != nil {
@@ -294,13 +297,20 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 
 	sortNewestFirst(list)
 
-	return lo.Map(list, func(v types.SecretVersionsListEntry, _ int) domain.Version {
+	versions := lo.Map(list, func(v types.SecretVersionsListEntry, _ int) domain.Version {
 		return domain.Version{
-			ID:            aws.ToString(v.VersionId),
-			StagingLabels: v.VersionStages,
-			Created:       v.CreatedDate,
+			ID:      aws.ToString(v.VersionId),
+			Labels:  v.VersionStages,
+			Current: slices.Contains(v.VersionStages, "AWSCURRENT"),
+			Created: v.CreatedDate,
 		}
-	}), nil
+	})
+
+	if len(versions) > 0 && !slices.ContainsFunc(versions, func(v domain.Version) bool { return v.Current }) {
+		versions[0].Current = true
+	}
+
+	return versions, nil
 }
 
 // List returns the names of all secrets, paging through ListSecrets.

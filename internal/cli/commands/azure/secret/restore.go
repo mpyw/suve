@@ -10,12 +10,12 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 // RestoreRunner executes the restore command.
 type RestoreRunner struct {
-	UseCase *azure.RestoreUseCase
+	UseCase *secret.RestoreUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -58,7 +58,7 @@ func restoreAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &RestoreRunner{
-		UseCase: &azure.RestoreUseCase{Restorer: restorer},
+		UseCase: &secret.RestoreUseCase{Restorer: restorer},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}
@@ -68,7 +68,7 @@ func restoreAction(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the restore command.
 func (r *RestoreRunner) Run(ctx context.Context, opts RestoreOptions) error {
-	result, err := r.UseCase.Execute(ctx, azure.RestoreInput{Name: opts.Name})
+	result, err := r.UseCase.Execute(ctx, secret.RestoreInput{Name: opts.Name})
 	if err != nil {
 		return err
 	}

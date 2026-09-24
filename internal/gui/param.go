@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strconv"
 
 	"github.com/samber/lo"
 
@@ -213,7 +214,7 @@ func (a *App) paramListWithNamespaces(
 // entry's own namespace so a namespaced setting is read under its own label
 // rather than the shared read scope's (which the footer filter never changes).
 func (a *App) ParamShow(specStr, namespace string) (*ParamShowResult, error) {
-	spec, err := a.parseParamSpec(specStr)
+	name, suffix, err := a.parseParamSpec(specStr)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +226,7 @@ func (a *App) ParamShow(specStr, namespace string) (*ParamShowResult, error) {
 
 	uc := &param.ShowUseCase{Reader: store}
 
-	result, err := uc.Execute(a.ctx, param.ShowInput{Spec: spec})
+	result, err := uc.Execute(a.ctx, param.ShowInput{Name: name, Suffix: suffix})
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +234,7 @@ func (a *App) ParamShow(specStr, namespace string) (*ParamShowResult, error) {
 	r := &ParamShowResult{
 		Name:        result.Name,
 		Value:       result.Value,
-		Version:     result.Version,
+		Version:     paramVersionNumber(result.Version),
 		Type:        paramtype.Display(result.Type),
 		Secret:      result.Type == domain.ValueTypeSecret,
 		Description: result.Description,
@@ -269,7 +270,7 @@ func (a *App) ParamLog(name string, maxResults int32, namespace string) (*ParamL
 
 	entries := lo.Map(result.Entries, func(e param.LogEntry, _ int) ParamLogEntry {
 		entry := ParamLogEntry{
-			Version:   e.Version,
+			Version:   paramVersionNumber(e.Version),
 			Value:     e.Value,
 			Type:      paramtype.Display(e.Type),
 			Secret:    e.Type == domain.ValueTypeSecret,
@@ -289,12 +290,12 @@ func (a *App) ParamLog(name string, maxResults int32, namespace string) (*ParamL
 // App Configuration namespace (empty for the null/default namespace and every
 // other provider).
 func (a *App) ParamDiff(spec1Str, spec2Str, namespace string) (*ParamDiffResult, error) {
-	spec1, err := a.parseParamSpec(spec1Str)
+	name1, suffix1, err := a.parseParamSpec(spec1Str)
 	if err != nil {
 		return nil, err
 	}
 
-	spec2, err := a.parseParamSpec(spec2Str)
+	name2, suffix2, err := a.parseParamSpec(spec2Str)
 	if err != nil {
 		return nil, err
 	}
@@ -307,8 +308,8 @@ func (a *App) ParamDiff(spec1Str, spec2Str, namespace string) (*ParamDiffResult,
 	uc := &param.DiffUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, param.DiffInput{
-		Spec1: spec1,
-		Spec2: spec2,
+		Name1: name1, Suffix1: suffix1,
+		Name2: name2, Suffix2: suffix2,
 	})
 	if err != nil {
 		return nil, err
@@ -368,7 +369,7 @@ func (a *App) ParamSet(name, value, paramType, namespace, description string) (*
 	if err == nil {
 		return &ParamSetResult{
 			Name:      createResult.Name,
-			Version:   createResult.Version,
+			Version:   paramVersionNumber(createResult.Version),
 			IsCreated: true,
 		}, nil
 	}
@@ -391,7 +392,7 @@ func (a *App) ParamSet(name, value, paramType, namespace, description string) (*
 
 	return &ParamSetResult{
 		Name:      updateResult.Name,
-		Version:   updateResult.Version,
+		Version:   paramVersionNumber(updateResult.Version),
 		IsCreated: false,
 	}, nil
 }
@@ -461,4 +462,16 @@ func (a *App) ParamTypeOptions() []string {
 	}
 
 	return paramtype.Options()
+}
+
+// paramVersionNumber converts a param version id to the integer the bindings
+// carry (AWS SSM versions are integers). A non-numeric or empty id — e.g. an
+// unversioned Azure App Configuration setting — yields 0.
+func paramVersionNumber(id string) int64 {
+	n, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	return n
 }

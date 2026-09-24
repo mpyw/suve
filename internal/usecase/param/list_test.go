@@ -96,6 +96,29 @@ func TestListUseCase_Execute_PrefixHierarchy(t *testing.T) {
 	assert.NotContains(t, names, "/application/other")
 }
 
+// TestListUseCase_Execute_PlainPrefix verifies that PlainPrefix matches the
+// prefix as a plain string (keys without a path hierarchy, such as Azure App
+// Configuration): the sibling "/application" and nested keys are included and
+// Recursive is irrelevant.
+func TestListUseCase_Execute_PlainPrefix(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		ListFunc: listNames("/app/config", "/application/other", "/app/sub/nested", "other"),
+	}
+
+	uc := &param.ListUseCase{Reader: store}
+
+	output, err := uc.Execute(t.Context(), param.ListInput{Prefix: "/app", PlainPrefix: true})
+	require.NoError(t, err)
+
+	assert.Equal(t, []param.ListEntry{
+		{Name: "/app/config"},
+		{Name: "/app/sub/nested"},
+		{Name: "/application/other"},
+	}, output.Entries)
+}
+
 func TestListUseCase_Execute_WithFilter(t *testing.T) {
 	t.Parallel()
 

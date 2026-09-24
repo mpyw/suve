@@ -263,12 +263,15 @@ func TestHistory(t *testing.T) {
 	require.Len(t, versions, 2)
 	// Newest first: version 2 (enabled) then 1 (destroyed).
 	assert.Equal(t, "2", versions[0].ID)
-	// State carries the per-version lifecycle; StagingLabels is not a GCloud concept.
+	// State carries the per-version lifecycle; Labels is not a GCloud concept.
 	assert.Equal(t, "enabled", versions[0].State)
-	assert.Empty(t, versions[0].StagingLabels)
+	assert.Empty(t, versions[0].Labels)
 	assert.Equal(t, "1", versions[1].ID)
 	assert.Equal(t, "destroyed", versions[1].State)
-	assert.Empty(t, versions[1].StagingLabels)
+	assert.Empty(t, versions[1].Labels)
+	// The newest version is current (what "latest" serves).
+	assert.True(t, versions[0].Current)
+	assert.False(t, versions[1].Current)
 }
 
 func TestList(t *testing.T) {

@@ -525,3 +525,34 @@ func TestParseDiffArgs(t *testing.T) {
 		})
 	}
 }
+
+// TestSuffix pins that Suffix rebuilds the part after the name, normalized, and
+// that name+suffix re-parses to an equivalent spec.
+func TestSuffix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "my-secret", want: ""},
+		{input: "my-secret#abc-123", want: "#abc-123"},
+		{input: "my-secret:AWSPREVIOUS", want: ":AWSPREVIOUS"},
+		{input: "my-secret:AWSCURRENT~1", want: ":AWSCURRENT~1"},
+		{input: "my-secret~~", want: "~2"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
+			spec, err := awssecretversion.Parse(tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, awssecretversion.Suffix(spec))
+
+			reparsed, err := awssecretversion.Parse(spec.Name + awssecretversion.Suffix(spec))
+			require.NoError(t, err)
+			assert.Equal(t, spec, reparsed)
+		})
+	}
+}

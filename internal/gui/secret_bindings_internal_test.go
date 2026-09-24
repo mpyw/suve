@@ -93,7 +93,7 @@ func TestSecretShow_StateVsStagingLabels(t *testing.T) {
 	}{
 		{
 			name:        "aws staging labels populate StagingLabels not State",
-			version:     domain.Version{ID: "v1", StagingLabels: []string{"AWSPREVIOUS", "AWSCURRENT"}},
+			version:     domain.Version{ID: "v1", Labels: []string{"AWSPREVIOUS", "AWSCURRENT"}},
 			wantStaging: []string{"AWSCURRENT", "AWSPREVIOUS"}, // stages() sorts.
 			wantState:   "",
 		},
@@ -167,8 +167,8 @@ func TestSecretLog_StateVsStagingLabels(t *testing.T) {
 		{
 			name: "aws staging labels populate StagingLabels not State",
 			versions: []domain.Version{
-				{ID: "v2", StagingLabels: []string{"AWSCURRENT"}},
-				{ID: "v1", StagingLabels: []string{"AWSPREVIOUS"}},
+				{ID: "v2", Labels: []string{"AWSCURRENT"}, Current: true},
+				{ID: "v1", Labels: []string{"AWSPREVIOUS"}},
 			},
 			wantStaging: []string{"AWSCURRENT"},
 			wantState:   "",
@@ -176,7 +176,7 @@ func TestSecretLog_StateVsStagingLabels(t *testing.T) {
 		{
 			name: "lifecycle state populates State not StagingLabels",
 			versions: []domain.Version{
-				{ID: "v2", State: "enabled"},
+				{ID: "v2", State: "enabled", Current: true},
 				{ID: "v1", State: "disabled"},
 			},
 			wantStaging: nil,

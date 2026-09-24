@@ -4,10 +4,11 @@
 // Key Vault secrets are versioned by opaque ids (there are no staging labels),
 // so this group exposes the read/write/tag commands (show, log, list, diff,
 // create, update, delete, tag, untag) reusing the generic command scaffolding
-// via Azure-specific presenters and the shared internal/usecase/azure use cases.
+// via Azure-specific presenters and the provider-neutral internal/usecase/secret
+// use cases.
 //
 // command.go is this package's subject: the azure secret command group it
-// assembles, together with the vocabulary and helpers its sibling files share.
+// assembles, together with the vocabulary its sibling files share.
 // Hence core.
 //
 //declscope:core
@@ -15,13 +16,10 @@ package secret
 
 import (
 	"context"
-	"strconv"
-	"strings"
 
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
-	"github.com/mpyw/suve/internal/version/azurekvversion"
 )
 
 // nounSecret is the command name / noun used across the Key Vault secret commands.
@@ -72,27 +70,4 @@ AZURE_KEYVAULT_NAME environment variable.`,
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
-}
-
-// specSuffix reconstructs the version-spec suffix (the part after the name) from
-// a parsed Key Vault spec, so that name+suffix re-parses to an equivalent spec.
-// It is handed to provider.Reader.Resolve via the use cases.
-//
-// Examples: {ID:"abc"} -> "#abc"; {Shift:2} -> "~2"; {} -> "" (current).
-//
-//declscope:package // diff and show rebuild the suffix they pass to Resolve
-func specSuffix(spec *azurekvversion.Spec) string {
-	var b strings.Builder
-
-	if spec.Absolute.ID != nil {
-		b.WriteString("#")
-		b.WriteString(*spec.Absolute.ID)
-	}
-
-	if spec.Shift > 0 {
-		b.WriteString("~")
-		b.WriteString(strconv.Itoa(spec.Shift))
-	}
-
-	return b.String()
 }

@@ -16,10 +16,10 @@ type UpdateInput struct {
 	Type        domain.ValueType
 	Description string
 	// PreserveType, when true, keeps the existing parameter's type instead of
-	// applying Type. `aws param update` sets it when neither --type nor --secure
-	// is given, so a value-only update never downgrades an existing SecureString
-	// (dropping KMS encryption) or StringList to String. Callers that pass an
-	// explicit type (GUI, TUI) leave it false and Type is applied as-is.
+	// applying Type, so a value-only update never downgrades an existing secret
+	// or list value (e.g. an AWS SecureString losing its KMS encryption) to
+	// plaintext. The AWS CLI sets it when no type flag is given; callers that
+	// pass an explicit type (GUI, TUI) leave it false and Type is applied as-is.
 	PreserveType bool
 	// Options carries provider-specific write options (e.g. AWS param Tier,
 	// DataType). They are passed through to the provider unchanged.
@@ -29,7 +29,7 @@ type UpdateInput struct {
 // UpdateOutput holds the result of the update use case.
 type UpdateOutput struct {
 	Name    string
-	Version int64
+	Version string // opaque version id; "" for an unversioned store
 }
 
 // UpdateUseCase executes update operations.
@@ -68,7 +68,7 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 
 	// A value-only update must not change the type. When the caller did not
 	// specify one, reuse the existing entry's type (already fetched above) so a
-	// SecureString/StringList is never silently rewritten as String.
+	// secret/list value is never silently rewritten as plaintext.
 	valueType := input.Type
 	if input.PreserveType {
 		valueType = entry.Type
@@ -81,6 +81,6 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 
 	return &UpdateOutput{
 		Name:    input.Name,
-		Version: parseVersion(version.ID),
+		Version: version.ID,
 	}, nil
 }

@@ -27,19 +27,21 @@ const (
 // It carries two independent, provider-specific axes that must NOT be
 // conflated (#419):
 //
-//   - StagingLabels are movable pointers naming "which version is current"
-//     (AWS Secrets Manager: AWSCURRENT / AWSPENDING / AWSPREVIOUS). Rotation
-//     moves a label from one version to another; a version may carry several
-//     labels or none (unlabeled versions are passively retained history, still
-//     readable by ID). Multi-valued.
+//   - Labels are movable pointers naming "which version is current"
+//     (AWS Secrets Manager staging labels: AWSCURRENT / AWSPENDING /
+//     AWSPREVIOUS). Rotation moves a label from one version to another; a
+//     version may carry several labels or none (unlabeled versions are passively
+//     retained history, still readable by ID). Multi-valued.
 //   - State is a per-version enable/disable switch for reading that specific
 //     version's value (Google Cloud + Azure Key Vault). It is single-valued and
 //     orthogonal to "which version is latest".
 //
 // Providers that have neither concept (AWS SSM, Azure App Configuration) leave
-// both empty.
+// both empty. Which version is current is decided by the adapter and reported
+// through Current, so callers never infer it from Labels or position.
 type Version struct {
-	// ID is the provider-internal version identifier.
+	// ID is the provider-internal version identifier. It is opaque to callers:
+	// they display it and hand it back to the same provider, never parse it.
 	ID string
 	// State is the per-version lifecycle state: "enabled" / "disabled" /
 	// "destroyed", or "" when the provider has no such concept. It is a
@@ -47,11 +49,15 @@ type Version struct {
 	// (Google Cloud + Azure Key Vault); it is orthogonal to which version is
 	// latest. Empty for AWS Secrets Manager, AWS SSM and Azure App Config.
 	State string
-	// StagingLabels are the AWS Secrets Manager staging labels for this version
-	// (all of them, e.g. AWSCURRENT / AWSPREVIOUS). A staging label is a movable
-	// pointer naming "which version is current", not a per-version state.
-	// nil/empty for every other provider.
-	StagingLabels []string
+	// Labels are the movable version labels attached to this version (all of
+	// them, e.g. the AWS Secrets Manager staging labels AWSCURRENT /
+	// AWSPREVIOUS). A label is a pointer naming a version, not a per-version
+	// state. nil/empty for providers without version labels.
+	Labels []string
+	// Current reports whether this is the version the provider serves as the
+	// current value. Adapters set it on History results (exactly one version of
+	// a non-empty history); it is not populated on Get.
+	Current bool
 	// Created is the version creation time, if known.
 	Created *time.Time
 	// Tags are the labels attached to THIS version. Only Azure Key Vault scopes

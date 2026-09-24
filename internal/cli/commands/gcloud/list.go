@@ -8,7 +8,7 @@ import (
 
 	genericlist "github.com/mpyw/suve/internal/cli/commands/generic/list"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
-	"github.com/mpyw/suve/internal/usecase/gcloud"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 // ListCommand returns the Google Cloud Secret Manager list command.
@@ -55,8 +55,8 @@ EXAMPLES:
 				return nil, err
 			}
 
-			uc := &gcloud.ListUseCase{Reader: store}
-			input := gcloud.ListInput{
+			uc := &secret.ListUseCase{Reader: store}
+			input := secret.ListInput{
 				Prefix:    cmd.Args().First(),
 				Filter:    cmd.String("filter"),
 				WithValue: withValue,
@@ -68,7 +68,7 @@ EXAMPLES:
 					return nil, err
 				}
 
-				entries := lo.Map(result.Entries, func(e gcloud.ListEntry, _ int) genericlist.Entry {
+				entries := lo.Map(result.Entries, func(e secret.ListEntry, _ int) genericlist.Entry {
 					return genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
 				})
 
