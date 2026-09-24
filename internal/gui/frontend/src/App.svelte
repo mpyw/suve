@@ -318,7 +318,7 @@
   }
 
   async function loadStagingCount() {
-    // Steady-state, AWS-only: no retry wrapping (a real failure must not hammer).
+    // Steady-state: no retry wrapping (a real failure must not hammer).
     try {
       const staged = await StagingStatus();
       // Include tag-only staged changes (paramTags/secretTags) so the badge

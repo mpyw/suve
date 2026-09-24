@@ -118,7 +118,7 @@ func TestStrategyBuilders_PerProvider(t *testing.T) {
 	}{
 		{"aws", provider.ProviderAWS, &staging.AWSParamStrategy{}, &staging.AWSSecretStrategy{}},
 		{"google cloud", provider.ProviderGoogleCloud, nil, &staging.GoogleCloudSecretStrategy{}},
-		{"azure", provider.ProviderAzure, &staging.AzureAppConfigParamStrategy{}, &staging.AzureKeyVaultSecretStrategy{}},
+		{"azure", provider.ProviderAzure, &staging.AzureParamStrategy{}, &staging.AzureSecretStrategy{}},
 		{"unknown", provider.Provider("oracle"), nil, nil},
 	}
 
@@ -162,8 +162,8 @@ func TestParserFor_PerProvider(t *testing.T) {
 		{"aws param", provider.ProviderAWS, "param", &staging.AWSParamStrategy{}},
 		{"aws secret", provider.ProviderAWS, "secret", &staging.AWSSecretStrategy{}},
 		{"google cloud secret", provider.ProviderGoogleCloud, "secret", &staging.GoogleCloudSecretStrategy{}},
-		{"azure param", provider.ProviderAzure, "param", &staging.AzureAppConfigParamStrategy{}},
-		{"azure secret", provider.ProviderAzure, "secret", &staging.AzureKeyVaultSecretStrategy{}},
+		{"azure param", provider.ProviderAzure, "param", &staging.AzureParamStrategy{}},
+		{"azure secret", provider.ProviderAzure, "secret", &staging.AzureSecretStrategy{}},
 		{"google cloud param", provider.ProviderGoogleCloud, "param", nil},
 		{"unknown secret", provider.Provider("oracle"), "secret", nil},
 	}

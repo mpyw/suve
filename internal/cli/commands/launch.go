@@ -124,7 +124,7 @@ func launchScope(cmd *cli.Command, p provider.Provider) provider.Scope {
 // inverse of groupName.
 func launchGroupProvider(name string) provider.Provider {
 	p, _ := lo.Find(
-		[]provider.Provider{provider.ProviderAWS, provider.ProviderGoogleCloud, provider.ProviderAzure},
+		provider.Providers(),
 		func(p provider.Provider) bool { return groupName(p) == name },
 	)
 

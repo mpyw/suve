@@ -123,7 +123,7 @@ type SecretRestoreResult struct {
 // Secret Methods
 // =============================================================================
 
-// SecretList lists Secrets Manager secrets.
+// SecretList lists the secrets of the current provider's secret service.
 func (a *App) SecretList(prefix string, withValue bool, filter string) (*SecretListResult, error) {
 	store, err := a.secretStore()
 	if err != nil {

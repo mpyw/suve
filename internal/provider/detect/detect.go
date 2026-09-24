@@ -170,10 +170,10 @@ func Resolve(env Environment) Result {
 }
 
 // ActiveProviders lists every provider active on any service axis (param,
-// secret, or stage), deduplicated, in stable order (AWS, GoogleCloud, Azure).
+// secret, or stage), deduplicated, in provider.Providers order.
 func (r Result) ActiveProviders() []provider.Provider {
 	return lo.Filter(
-		[]provider.Provider{provider.ProviderAWS, provider.ProviderGoogleCloud, provider.ProviderAzure},
+		provider.Providers(),
 		func(p provider.Provider, _ int) bool {
 			return slices.Contains(r.ParamActive, p) ||
 				slices.Contains(r.SecretActive, p) ||

@@ -27,8 +27,8 @@ func TestLookup_PerProvider(t *testing.T) {
 		{"aws param", provider.ProviderAWS, provider.KindParam, &staging.AWSParamStrategy{}},
 		{"aws secret", provider.ProviderAWS, provider.KindSecret, &staging.AWSSecretStrategy{}},
 		{"google cloud secret", provider.ProviderGoogleCloud, provider.KindSecret, &staging.GoogleCloudSecretStrategy{}},
-		{"azure param", provider.ProviderAzure, provider.KindParam, &staging.AzureAppConfigParamStrategy{}},
-		{"azure secret", provider.ProviderAzure, provider.KindSecret, &staging.AzureKeyVaultSecretStrategy{}},
+		{"azure param", provider.ProviderAzure, provider.KindParam, &staging.AzureParamStrategy{}},
+		{"azure secret", provider.ProviderAzure, provider.KindSecret, &staging.AzureSecretStrategy{}},
 	}
 
 	for _, tt := range tests {

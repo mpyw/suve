@@ -244,9 +244,9 @@ func DiffCommand[S any](cfg DiffConfig[S]) *cli.Command {
 //   - Lines removed from spec1 as "-" (red)
 //   - Lines added in spec2 as "+" (green)
 //
-// This function is generic over the absolute specifier type A, which differs
-// between SSM Parameter Store (AbsoluteSpec with Version *int64) and Secrets Manager (AbsoluteSpec with
-// ID *string and Label *string).
+// This function is generic over the absolute specifier type A, which each
+// grammar in internal/version defines (version.NumericAbsolute,
+// version.OpaqueAbsolute).
 //
 // # Parameters
 //
@@ -254,9 +254,9 @@ func DiffCommand[S any](cfg DiffConfig[S]) *cli.Command {
 //   - parse: Service-specific parser function (e.g., version.AWSParameterStore.Parse, version.AWSSecretsManager.Parse)
 //   - hasAbsolute: Returns true if the absolute specifier is set (non-zero).
 //     Used to distinguish "mixed" pattern from "partial spec" pattern in 2-arg case.
-//     For SSM Parameter Store: func(abs) bool { return abs.Version != nil }
-//     For Secrets Manager: func(abs) bool { return abs.ID != nil || abs.Label != nil }
-//   - prefixes: Characters that start a specifier (e.g., "#~" for SSM Parameter Store, "#:~" for Secrets Manager).
+//     Pass the grammar's IsSet (version.NumericAbsolute.IsSet, version.OpaqueAbsolute.IsSet).
+//   - prefixes: Characters that start a specifier ("#~" for a numeric grammar, "#:~" for an
+//     opaque grammar with labels).
 //     Used to detect if second argument is specifier-only.
 //   - usage: Error message to show when argument count is invalid.
 //
@@ -315,7 +315,8 @@ func ParseDiffArgs[A any](
 // Pattern: "name#v" or "name~N" or "name:LABEL"
 //
 // The single argument specifies the "from" version, and it will be compared
-// against the default version (latest for SSM Parameter Store, AWSCURRENT for Secrets Manager).
+// against the default version (the zero spec, which each provider resolves to
+// its current version).
 //
 // Examples:
 //
@@ -334,9 +335,8 @@ func parseDiffOneArg[A any](
 		return nil, nil, fmt.Errorf("invalid version specification: %w", err)
 	}
 
-	// spec2 is the default version (zero absolute specifier, no shift).
-	// For SSM Parameter Store: latest version
-	// For Secrets Manager: AWSCURRENT label
+	// spec2 is the default version (zero absolute specifier, no shift), which
+	// the provider resolves to its current version.
 	var zero A
 
 	spec2 := &version.Spec[A]{Name: spec.Name, Absolute: zero, Shift: 0}

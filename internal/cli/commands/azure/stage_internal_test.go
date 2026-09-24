@@ -36,12 +36,12 @@ func TestStageGlobalConfig(t *testing.T) {
 	}
 
 	param := stgcli.CommandConfig{
-		ParserFactory:        staging.AzureAppConfigParamParserFactory,
+		ParserFactory:        staging.AzureParamParserFactory,
 		ScopeResolver:        paramResolver,
 		StrategyForNamespace: strategyForNamespace,
 	}
 	secret := stgcli.CommandConfig{
-		ParserFactory: staging.AzureKeyVaultSecretParserFactory,
+		ParserFactory: staging.AzureSecretParserFactory,
 		ScopeResolver: secretResolver,
 	}
 

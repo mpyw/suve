@@ -110,7 +110,7 @@ Staging is a distinct increment on top of read/write (#247 → #261, #262):
   secret service embeds `versionedSecretHooks` for the defaults). The strategy
   built over a nil store must work as a store-less parser, because that is the
   parser every surface uses. An unversioned service writes its own strategy, as
-  `azure_appconfig_param.go` does.
+  `azure_param.go` does.
 - Register it in the descriptor table in `internal/staging/binding/binding.go`:
   parser, strategy constructor, staging-scope derivation (and an identity lookup
   if the scope needs a network call), and the namespace flag if the service has

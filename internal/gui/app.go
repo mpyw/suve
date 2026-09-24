@@ -380,8 +380,8 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 }
 
 // strategyAsScoped resolves the service strategy for an already-snapshotted
-// scope (#560) and narrows it to the requested staging strategy interface T. The
-// concrete *AWSParamStrategy / *AWSSecretStrategy satisfy every staging strategy
+// scope (#560) and narrows it to the requested staging strategy interface T.
+// Every provider's concrete strategy satisfies every staging strategy
 // interface, so this succeeds for the Edit, Apply and Diff interfaces (which
 // FullStrategy embeds) as well as for DeleteStrategy (which it does not embed
 // but the concrete types implement).

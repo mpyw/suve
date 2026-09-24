@@ -27,7 +27,7 @@ func TestVersionedStrategy_ZeroValueParser(t *testing.T) {
 		{"aws param", &staging.AWSParamStrategy{}, staging.ServiceParam, "SSM Parameter Store", "parameter", false, "/app/key#3"},
 		{"aws secret", &staging.AWSSecretStrategy{}, staging.ServiceSecret, "Secrets Manager", "secret", true, "app-key:AWSPREVIOUS"},
 		{"google cloud secret", &staging.GoogleCloudSecretStrategy{}, staging.ServiceSecret, "Secret Manager", "secret", false, "app-key#3"},
-		{"azure key vault secret", &staging.AzureKeyVaultSecretStrategy{}, staging.ServiceSecret, "Key Vault", "secret", false, "app-key~1"},
+		{"azure key vault secret", &staging.AzureSecretStrategy{}, staging.ServiceSecret, "Key Vault", "secret", false, "app-key~1"},
 	}
 
 	for _, tt := range tests {

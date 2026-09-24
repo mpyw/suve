@@ -90,7 +90,7 @@ type ShowConfig[S any] struct {
 	// ParseSpec parses the raw name argument into the provider's version spec.
 	ParseSpec func(arg string) (S, error)
 	// NewPresenter builds the provider ShowPresenter bound to the parsed spec (this
-	// is where the provider constructs its AWS client and usecase).
+	// is where the provider constructs its client and use case).
 	NewPresenter func(ctx context.Context, spec S) (ShowPresenter, error)
 }
 
