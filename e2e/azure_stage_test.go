@@ -237,11 +237,15 @@ func TestAzureAppConfigStage_Namespaces(t *testing.T) {
 	})
 
 	t.Run("apply-writes-each-namespace", func(t *testing.T) {
-		_, err := runAzureStage(t, "param", "apply", "--yes")
+		stdout, err := runAzureStage(t, "param", "apply", "--yes")
 		require.NoError(t, err)
 
+		// Each namespace's create is reported on its own line.
+		assert.Contains(t, stdout, "Created "+key+"\n")
+		assert.Contains(t, stdout, "Created "+key+" [dev]\n")
+
 		// The null-namespace value and the dev value are independent.
-		stdout, err := runAzureParam(t, "show", "--raw", key)
+		stdout, err = runAzureParam(t, "show", "--raw", key)
 		require.NoError(t, err)
 		assert.Equal(t, "null-value", stdout)
 
@@ -457,8 +461,12 @@ func TestAzureAppConfigStage_NamespacedTags(t *testing.T) {
 	// apply writes each tag onto its own namespaced setting; neither overwrites
 	// the other.
 	t.Run("apply-writes-each-namespaced-tag", func(t *testing.T) {
-		_, err := runAzureStage(t, "param", "apply", "--yes")
+		stdout, err := runAzureStage(t, "param", "apply", "--yes")
 		require.NoError(t, err)
+
+		// Each namespace's tag change is reported on its own line.
+		assert.Contains(t, stdout, "Tagged "+key+" [+1]\n")
+		assert.Contains(t, stdout, "Tagged "+key+" [dev] [+1]\n")
 
 		nullShow, err := runAzureParam(t, "show", key)
 		require.NoError(t, err)

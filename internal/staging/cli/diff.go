@@ -100,12 +100,12 @@ func (r *DiffRunner) outputEntries(opts DiffOptions, entries []stagingusecase.Di
 		switch entry.Type {
 		case stagingusecase.DiffEntryWarning:
 			if r.keptStagedWarnings {
-				output.Warning(r.Stderr, "could not diff %s (kept staged): %s", entry.Name, entry.Warning)
+				output.Warning(r.Stderr, "could not diff %s (kept staged): %s", diffEntryDisplayName(entry), entry.Warning)
 			} else {
-				output.Warning(r.Stderr, "%s is %s", entry.Name, entry.Warning)
+				output.Warning(r.Stderr, "%s is %s", diffEntryDisplayName(entry), entry.Warning)
 			}
 		case stagingusecase.DiffEntryAutoUnstaged:
-			output.Warning(r.Stderr, "unstaged %s: %s", entry.Name, entry.Warning)
+			output.Warning(r.Stderr, "unstaged %s: %s", diffEntryDisplayName(entry), entry.Warning)
 		case stagingusecase.DiffEntryCreate:
 			r.separate(first)
 			r.OutputDiffCreate(opts, entry)

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -144,57 +143,52 @@ func (r *ApplyRunner) Run(ctx context.Context, opts ApplyOptions) error {
 		return nil
 	}
 
-	// Output entry results in sorted order
-	for name := range maputil.SortedNames(result.EntryResults, func(e stagingusecase.ApplyEntryResult) string { return e.Name }) {
-		for _, entry := range result.EntryResults {
-			if entry.Name != name {
-				continue
-			}
+	// Output entry results in the usecase's (name, namespace) order. The same
+	// name may be applied under several App Configuration namespaces; each is
+	// its own line, labeled with its namespace badge (bare name for the empty
+	// namespace).
+	for _, entry := range result.EntryResults {
+		label := staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}.Label()
 
-			if entry.Error != nil {
-				output.Failed(r.Stderr, name, entry.Error)
-			} else {
-				switch entry.Status {
-				case stagingusecase.ApplyResultCreated:
-					output.Success(r.Stdout, "Created %s", name)
-				case stagingusecase.ApplyResultUpdated:
-					output.Success(r.Stdout, "Updated %s", name)
-				case stagingusecase.ApplyResultDeleted:
-					output.Success(r.Stdout, "Deleted %s", name)
-				case stagingusecase.ApplyResultFailed:
-					// Unreachable: when Status is Failed, entry.Error is always non-nil,
-					// so the outer if-branch handles this case.
-				}
+		if entry.Error != nil {
+			output.Failed(r.Stderr, label, entry.Error)
 
-				// The cloud apply succeeded but clearing the staged entry failed:
-				// warn so the leftover (which a later apply would re-run) is visible.
-				if entry.UnstageError != nil {
-					output.Warning(r.Stderr, "failed to clear staging for %s: %v", name, entry.UnstageError)
-				}
-			}
+			continue
+		}
 
-			break
+		switch entry.Status {
+		case stagingusecase.ApplyResultCreated:
+			output.Success(r.Stdout, "Created %s", label)
+		case stagingusecase.ApplyResultUpdated:
+			output.Success(r.Stdout, "Updated %s", label)
+		case stagingusecase.ApplyResultDeleted:
+			output.Success(r.Stdout, "Deleted %s", label)
+		case stagingusecase.ApplyResultFailed:
+			// Unreachable: when Status is Failed, entry.Error is always non-nil,
+			// so the branch above handles this case.
+		}
+
+		// The cloud apply succeeded but clearing the staged entry failed:
+		// warn so the leftover (which a later apply would re-run) is visible.
+		if entry.UnstageError != nil {
+			output.Warning(r.Stderr, "failed to clear staging for %s: %v", label, entry.UnstageError)
 		}
 	}
 
-	// Output tag results in sorted order
-	for name := range maputil.SortedNames(result.TagResults, func(e stagingusecase.ApplyTagResult) string { return e.Name }) {
-		for _, tag := range result.TagResults {
-			if tag.Name != name {
-				continue
-			}
+	// Output tag results in the same order, one line per namespace.
+	for _, tag := range result.TagResults {
+		label := staging.EntryKey{Name: tag.Name, Namespace: tag.Namespace}.Label()
 
-			if tag.Error != nil {
-				output.Failed(r.Stderr, name+" (tags)", tag.Error)
-			} else {
-				output.Success(r.Stdout, "Tagged %s%s", name, FormatTagApplySummary(tag))
+		if tag.Error != nil {
+			output.Failed(r.Stderr, label+" (tags)", tag.Error)
 
-				if tag.UnstageError != nil {
-					output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", name, tag.UnstageError)
-				}
-			}
+			continue
+		}
 
-			break
+		output.Success(r.Stdout, "Tagged %s%s", label, FormatTagApplySummary(tag))
+
+		if tag.UnstageError != nil {
+			output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", label, tag.UnstageError)
 		}
 	}
 

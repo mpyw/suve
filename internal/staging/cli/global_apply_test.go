@@ -1154,10 +1154,12 @@ func TestGlobalApply_AppliesEntriesUnderTheirNamespace(t *testing.T) {
 		StrategyFor: strategyFor,
 	}
 
+	var stdout bytes.Buffer
+
 	r := &stgcli.GlobalApplyRunner{
 		UseCase:         globalApplyServices(svc),
 		ProviderLabel:   "Azure",
-		Stdout:          &bytes.Buffer{},
+		Stdout:          &stdout,
 		Stderr:          &bytes.Buffer{},
 		IgnoreConflicts: true, // this test is about namespace routing, not conflicts
 	}
@@ -1166,6 +1168,10 @@ func TestGlobalApply_AppliesEntriesUnderTheirNamespace(t *testing.T) {
 
 	// Each entry reached the strategy scoped to ITS namespace.
 	assert.Equal(t, map[string]string{"": "va", "dev": "vb"}, appliedByNS)
+
+	// Each entry is reported on its own line, labeled with its namespace badge.
+	assert.Contains(t, stdout.String(), "SSM Parameter Store: Created k\n")
+	assert.Contains(t, stdout.String(), "SSM Parameter Store: Created k [dev]\n")
 
 	// Both entries were unstaged under their own (name, namespace) key.
 	remaining, _ := st.ListEntries(ctx, staging.ServiceParam)
