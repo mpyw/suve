@@ -9,13 +9,13 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // AWSParamStrategy implements ServiceStrategy for SSM Parameter Store over a
 // provider.Store. Parameter Store specifics:
 //
-//   - Versions are integers, parsed with awsparamversion (#N, ~SHIFT).
+//   - Versions are integers, parsed with version.ParameterStore (#N, ~SHIFT).
 //   - Values carry a type (String / SecureString / StringList); a SecureString
 //     is masked in diffs, and an edit keeps the existing type unless it staged
 //     one.
@@ -51,12 +51,12 @@ func (awsParamHooks) traits() versionedTraits {
 }
 
 func (awsParamHooks) parse(input string) (name, suffix string, err error) {
-	spec, err := awsparamversion.Parse(input)
+	spec, err := version.ParameterStore.Parse(input)
 	if err != nil {
 		return "", "", err
 	}
 
-	return spec.Name, awsparamversion.Suffix(spec), nil
+	return spec.Name, version.ParameterStore.Suffix(spec), nil
 }
 
 func (awsParamHooks) versionLabel(id string) string { return "#" + id }

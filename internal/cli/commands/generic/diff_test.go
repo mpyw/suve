@@ -21,8 +21,7 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 func TestDiffCommand_Validation(t *testing.T) {
@@ -66,7 +65,7 @@ type paramWantSpec struct {
 	shift   int
 }
 
-func assertParamSpec(t *testing.T, label string, got *awsparamversion.Spec, want *paramWantSpec) {
+func assertParamSpec(t *testing.T, label string, got *version.NumericSpec, want *paramWantSpec) {
 	t.Helper()
 	assert.Equal(t, want.name, got.Name, "%s.Name", label)
 	assert.Equal(t, want.version, got.Absolute.Version, "%s.Absolute.Version", label)
@@ -199,8 +198,8 @@ func TestParseArgsParam(t *testing.T) {
 
 			spec1, spec2, err := diffargs.ParseArgs(
 				tt.args,
-				awsparamversion.Parse,
-				func(abs awsparamversion.AbsoluteSpec) bool { return abs.Version != nil },
+				version.ParameterStore.Parse,
+				func(abs version.NumericAbsolute) bool { return abs.Version != nil },
 				"#~",
 				"usage: suve param diff <spec1> [spec2] | <name> <version1> [version2]",
 			)
@@ -228,7 +227,7 @@ type secretWantSpec struct {
 	shift      int
 }
 
-func assertSecretSpec(t *testing.T, label string, got *awssecretversion.Spec, want *secretWantSpec) {
+func assertSecretSpec(t *testing.T, label string, got *version.OpaqueSpec, want *secretWantSpec) {
 	t.Helper()
 	assert.Equal(t, want.secretName, got.Name, "%s.Name", label)
 	assert.Equal(t, want.id, got.Absolute.ID, "%s.Absolute.ID", label)
@@ -358,8 +357,8 @@ func TestParseArgsSecret(t *testing.T) {
 
 			spec1, spec2, err := diffargs.ParseArgs(
 				tt.args,
-				awssecretversion.Parse,
-				func(abs awssecretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
+				version.SecretsManager.Parse,
+				func(abs version.OpaqueAbsolute) bool { return abs.ID != nil || abs.Label != nil },
 				"#:~",
 				"usage: suve secret diff <spec1> [spec2] | <name> <version1> [version2]",
 			)
@@ -411,8 +410,8 @@ func paramDiffStore(byRef map[string]*domain.Entry) *providermock.Store {
 	}
 }
 
-func paramVersionSpec(v int64) *awsparamversion.Spec {
-	return &awsparamversion.Spec{Name: "/app/param", Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(v)}}
+func paramVersionSpec(v int64) *version.NumericSpec {
+	return &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(v)}}
 }
 
 func TestDiffRunParam(t *testing.T) {
@@ -420,8 +419,8 @@ func TestDiffRunParam(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		spec1   *awsparamversion.Spec
-		spec2   *awsparamversion.Spec
+		spec1   *version.NumericSpec
+		spec2   *version.NumericSpec
 		opts    generic.DiffOptions
 		store   *providermock.Store
 		wantErr bool
@@ -527,7 +526,7 @@ func TestParamIdenticalWarning(t *testing.T) {
 		"": {Name: "/app/param", Value: "same-value", Version: domain.Version{ID: "1"}},
 	})
 
-	spec := &awsparamversion.Spec{Name: "/app/param", Absolute: awsparamversion.AbsoluteSpec{}}
+	spec := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{}}
 	presenter := cmdparam.NewDiffPresenter(store, spec, spec)
 	stdout, stderr, err := runDiff(t, presenter, generic.DiffOptions{})
 	require.NoError(t, err)
@@ -553,8 +552,8 @@ func TestDiff_DistinctVersionsSameContent(t *testing.T) {
 		"3": {Name: "/app/param", Value: "same-value", Version: domain.Version{ID: "3"}},
 	})
 
-	spec1 := &awsparamversion.Spec{Name: "/app/param", Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}}
-	spec3 := &awsparamversion.Spec{Name: "/app/param", Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))}}
+	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))}}
+	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))}}
 
 	stdout, stderr, err := runDiff(t, cmdparam.NewDiffPresenter(store, spec1, spec3), generic.DiffOptions{})
 	require.NoError(t, err)
@@ -577,8 +576,8 @@ func TestDiff_FormattingOnlyDifference(t *testing.T) {
 		"3": {Name: "/app/param", Value: `{"b":2,"a":1}`, Version: domain.Version{ID: "3"}},
 	})
 
-	spec1 := &awsparamversion.Spec{Name: "/app/param", Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}}
-	spec3 := &awsparamversion.Spec{Name: "/app/param", Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))}}
+	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))}}
+	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))}}
 
 	stdout, stderr, err := runDiff(t, cmdparam.NewDiffPresenter(store, spec1, spec3), generic.DiffOptions{ParseJSON: true})
 	require.NoError(t, err)
@@ -599,8 +598,8 @@ func TestDiff_JSONOutputIdenticalOnRawValues(t *testing.T) {
 		"3": {Name: "/app/param", Value: `{"b":2,"a":1}`, Version: domain.Version{ID: "3"}},
 	})
 
-	spec1 := &awsparamversion.Spec{Name: "/app/param", Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(1))}}
-	spec3 := &awsparamversion.Spec{Name: "/app/param", Absolute: awsparamversion.AbsoluteSpec{Version: lo.ToPtr(int64(3))}}
+	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))}}
+	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))}}
 
 	stdout, _, err := runDiff(t, cmdparam.NewDiffPresenter(store, spec1, spec3),
 		generic.DiffOptions{ParseJSON: true, Output: output.FormatJSON})
@@ -629,9 +628,9 @@ func secretDiffStore(entries map[string]*domain.Entry, errs map[string]error) *p
 	}
 }
 
-func prevCurrSpecs() (*awssecretversion.Spec, *awssecretversion.Spec) {
-	return &awssecretversion.Spec{Name: "my-secret", Absolute: awssecretversion.AbsoluteSpec{Label: lo.ToPtr("AWSPREVIOUS")}},
-		&awssecretversion.Spec{Name: "my-secret", Absolute: awssecretversion.AbsoluteSpec{Label: lo.ToPtr("AWSCURRENT")}}
+func prevCurrSpecs() (*version.OpaqueSpec, *version.OpaqueSpec) {
+	return &version.OpaqueSpec{Name: "my-secret", Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")}},
+		&version.OpaqueSpec{Name: "my-secret", Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")}}
 }
 
 func TestDiffRunSecret(t *testing.T) {
@@ -789,7 +788,7 @@ func TestSecretIdenticalWarning(t *testing.T) {
 		"": {Name: "my-secret", Value: "same-content", Version: domain.Version{ID: "version-id"}},
 	}, nil)
 
-	spec := &awssecretversion.Spec{Name: "my-secret", Absolute: awssecretversion.AbsoluteSpec{}}
+	spec := &version.OpaqueSpec{Name: "my-secret", Absolute: version.OpaqueAbsolute{}}
 	presenter := cmdsecret.NewDiffPresenter(store, spec, spec)
 	stdout, stderr, err := runDiff(t, presenter, generic.DiffOptions{})
 	require.NoError(t, err)

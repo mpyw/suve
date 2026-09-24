@@ -10,14 +10,14 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/azureappconfigversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // AzureAppConfigParamStrategy implements the staging strategies for Azure App
 // Configuration. App Configuration is UNVERSIONED, so:
 //
-//   - Version specifiers (#VERSION, ~SHIFT, :LABEL) are rejected at parse time
-//     via azureappconfigversion.
+//   - There are no version specifiers: version.AppConfiguration takes the whole
+//     argument as the key, since '#', ':' and '~' are legal key characters.
 //   - Conflict detection is disabled (last-write-wins): FetchLastModified and
 //     the edit base time return zero, so apply never reports a modified-after
 //     conflict. Apply overwrites unconditionally.
@@ -162,7 +162,7 @@ func (s *AzureAppConfigParamStrategy) FetchCurrentTags(ctx context.Context, name
 // ParseName parses and validates a name. App Configuration is unversioned, so
 // the entire argument is the key (':' / '#' / '~' are legal key characters).
 func (s *AzureAppConfigParamStrategy) ParseName(input string) (string, error) {
-	spec, err := azureappconfigversion.Parse(input)
+	spec, err := version.AppConfiguration.Parse(input)
 	if err != nil {
 		return "", err
 	}
@@ -188,7 +188,7 @@ func (s *AzureAppConfigParamStrategy) FetchCurrentValue(ctx context.Context, nam
 // ParseSpec parses a name for reset. App Configuration is unversioned, so a
 // version is never present; the entire argument is the key.
 func (s *AzureAppConfigParamStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
-	spec, err := azureappconfigversion.Parse(input)
+	spec, err := version.AppConfiguration.Parse(input)
 	if err != nil {
 		return "", false, err
 	}
@@ -199,7 +199,7 @@ func (s *AzureAppConfigParamStrategy) ParseSpec(input string) (name string, hasV
 // FetchVersion fetches the current value. App Configuration is unversioned and
 // the entire argument is the key, so this only ever resolves the current value.
 func (s *AzureAppConfigParamStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
-	spec, err := azureappconfigversion.Parse(input)
+	spec, err := version.AppConfiguration.Parse(input)
 	if err != nil {
 		return "", "", err
 	}

@@ -1,7 +1,7 @@
 // shift.go is a part of parse.go: it reads the <shift> clause (~ and ~N) and
-// nothing else, and parse.go is its only caller. It is one piece of the version
-// spec parser, so it joins parse's namespace.
-//declscope:namespace parse
+// nothing else, and parse.go is its only caller. It is one piece of the core
+// version spec parser, so it is core too.
+//declscope:core
 
 package version
 

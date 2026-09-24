@@ -35,17 +35,19 @@ inside the adapter, never by widening `Entry`.
 reference produced and consumed by the same provider. Its zero value means
 latest/current; it exposes no id or staging-label semantics to generic callers.
 
-- Syntactic parsing of `#VERSION` / `~SHIFT` / `:LABEL` lives in
-  `internal/version/*` (`awsparamversion`, `awssecretversion`, `gcloudversion`,
-  `azurekvversion`, `azureappconfigversion`).
+- Syntactic parsing of `#VERSION` / `~SHIFT` / `:LABEL` lives in the flat
+  `internal/version` package: a product grammar value (`version.ParameterStore`,
+  `version.SecretsManager`, `version.SecretManager`, `version.KeyVault`,
+  `version.AppConfiguration`) built from one of three grammars (numeric,
+  opaque, bare). It imports nothing from the CLI.
 - Version *resolution* (mapping a parsed spec plus history onto a concrete
   version) lives behind `Reader.Resolve` (`provider.go:77`), inside the adapter.
   Generic code calls `Resolve` and passes the returned `VersionRef` to
   `Reader.Get`; it never interprets version ids or labels.
 - The `internal/usecase/{param,secret}` use cases take a name plus the version
   suffix string (`#3`, `:LABEL`, `~2`, or `""`). The caller parses with its
-  provider's grammar and rebuilds the suffix with that package's `Suffix`. The
-  use cases never import a provider's version package.
+  provider's grammar and rebuilds the suffix with that grammar's `Suffix`. The
+  use cases never import `internal/version`.
 - Which version is current is the adapter's call: `History` sets
   `domain.Version.Current` on exactly one version (AWS SSM: highest number; AWS
   Secrets Manager: the `AWSCURRENT` label; Google Cloud and Key Vault: newest).

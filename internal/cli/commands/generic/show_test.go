@@ -18,8 +18,7 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 func TestShowCommand_Validation(t *testing.T) {
@@ -73,10 +72,10 @@ func runShow(
 	return buf.String(), err
 }
 
-func mustParseParam(t *testing.T, s string) *awsparamversion.Spec {
+func mustParseParam(t *testing.T, s string) *version.NumericSpec {
 	t.Helper()
 
-	spec, err := awsparamversion.Parse(s)
+	spec, err := version.ParameterStore.Parse(s)
 	require.NoError(t, err)
 
 	return spec
@@ -373,7 +372,7 @@ func TestShowRunSecret(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		spec    *awssecretversion.Spec
+		spec    *version.OpaqueSpec
 		opts    generic.ShowOptions
 		store   *providermock.Store
 		wantErr bool
@@ -381,7 +380,7 @@ func TestShowRunSecret(t *testing.T) {
 	}{
 		{
 			name: "show latest version",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
 				Value:   "secret-value",
@@ -396,7 +395,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "show with shift",
-			spec: &awssecretversion.Spec{Name: "my-secret", Shift: 1},
+			spec: &version.OpaqueSpec{Name: "my-secret", Shift: 1},
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
 				Value:   "previous-value",
@@ -409,7 +408,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "show JSON formatted with sorted keys",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			opts: generic.ShowOptions{ParseJSON: true},
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
@@ -430,7 +429,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "error from AWS",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			store: &providermock.Store{
 				ResolveFunc: func(_ context.Context, _, _ string) (provider.VersionRef, error) {
 					return provider.VersionRef{}, nil
@@ -443,7 +442,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "show without optional fields",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			store: showStore(&domain.Entry{
 				Name:  "my-secret",
 				Value: "secret-value",
@@ -459,7 +458,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "json flag with non-JSON value warns",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			opts: generic.ShowOptions{ParseJSON: true},
 			store: showStore(&domain.Entry{
 				Name:  "my-secret",
@@ -473,7 +472,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "raw mode outputs only value",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			opts: generic.ShowOptions{Raw: true},
 			store: showStore(&domain.Entry{
 				Name:  "my-secret",
@@ -486,7 +485,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "raw mode with shift",
-			spec: &awssecretversion.Spec{Name: "my-secret", Shift: 1},
+			spec: &version.OpaqueSpec{Name: "my-secret", Shift: 1},
 			opts: generic.ShowOptions{Raw: true},
 			store: showStore(&domain.Entry{
 				Name:  "my-secret",
@@ -499,7 +498,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "raw mode with JSON formatting",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			opts: generic.ShowOptions{ParseJSON: true, Raw: true},
 			store: showStore(&domain.Entry{
 				Name:  "my-secret",
@@ -518,7 +517,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "show with tags",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
 				Value:   "secret-value",
@@ -541,7 +540,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "show with tags in JSON output",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			opts: generic.ShowOptions{Output: output.FormatJSON},
 			store: showStore(&domain.Entry{
 				Name:    "my-secret",
@@ -564,7 +563,7 @@ func TestShowRunSecret(t *testing.T) {
 		},
 		{
 			name: "JSON output with empty tags shows empty object",
-			spec: &awssecretversion.Spec{Name: "my-secret"},
+			spec: &version.OpaqueSpec{Name: "my-secret"},
 			opts: generic.ShowOptions{Output: output.FormatJSON},
 			store: showStore(&domain.Entry{
 				Name:  "my-secret",

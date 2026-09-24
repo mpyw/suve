@@ -2,7 +2,7 @@
 // contracts for AWS Secrets Manager. It confines all
 // Secrets Manager SDK types to this package: version/label/shift resolution
 // lives here, so AWS staging labels (AWSCURRENT etc.) never leak past this
-// boundary. Spec PARSING stays generic via awssecretversion.Parse.
+// boundary. Spec PARSING stays generic via version.SecretsManager.Parse.
 package secretsmanager
 
 import (
@@ -20,7 +20,7 @@ import (
 	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // Client is the narrow Secrets Manager surface this adapter needs. The concrete
@@ -85,7 +85,7 @@ func New(client Client) *Store {
 // so no AWS label escapes this package. An empty/latest spec resolves to the
 // latest ref (empty id).
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
-	parsed, err := awssecretversion.Parse(name + spec)
+	parsed, err := version.SecretsManager.Parse(name + spec)
 	if err != nil {
 		return provider.VersionRef{}, err
 	}
@@ -175,7 +175,7 @@ func (s *Store) listAllVersions(ctx context.Context, name string) ([]types.Secre
 // the newest-created version, so anchoring at index 0 would make `~1` skip past
 // AWSCURRENT (and leave AWSPREVIOUS unreachable). Anchor at AWSCURRENT instead,
 // falling back to index 0 only if no version carries that label.
-func baseIndex(list []types.SecretVersionsListEntry, abs awssecretversion.AbsoluteSpec) (int, error) {
+func baseIndex(list []types.SecretVersionsListEntry, abs version.OpaqueAbsolute) (int, error) {
 	switch {
 	case abs.ID != nil:
 		_, idx, found := lo.FindIndexOf(list, func(v types.SecretVersionsListEntry) bool {
@@ -534,4 +534,18 @@ func mapTags(tags []types.Tag) []domain.Tag {
 	return lo.Map(tags, func(t types.Tag, _ int) domain.Tag {
 		return domain.Tag{Key: aws.ToString(t.Key), Value: aws.ToString(t.Value)}
 	})
+}
+
+// versionIDDisplayLength is the number of characters to display for version IDs.
+const versionIDDisplayLength = 8
+
+// TruncateVersionID truncates a version ID to a readable short form for
+// display. Secrets Manager version IDs are UUIDs, which are long; this gives a
+// short form similar to a git commit hash.
+func TruncateVersionID(id string) string {
+	if len(id) > versionIDDisplayLength {
+		return id[:versionIDDisplayLength]
+	}
+
+	return id
 }

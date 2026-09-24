@@ -1,13 +1,13 @@
 // Package appconfig implements the provider.Store contract (Reader/Writer/Tagger)
 // for Azure App Configuration, confining all App Configuration SDK types to this
-// package. Spec PARSING stays generic via azureappconfigversion.Parse.
+// package. Spec PARSING stays generic via version.AppConfiguration.Parse.
 //
 // Azure App Configuration is the abstraction's acid test: it has NO versioning.
 // A key/label pair holds a single current value with no history. Every
 // version-dependent operation therefore degrades cleanly rather than crashing:
 //
 //   - Resolve accepts a bare name only (any #/~/: specifier is rejected by
-//     azureappconfigversion.Parse before any API call) and always returns the
+//     version.AppConfiguration.Parse before any API call) and always returns the
 //     latest ref.
 //   - History returns ErrVersioningUnsupported so the generic log command
 //     surfaces a clear error instead of iterating a non-existent history.
@@ -49,8 +49,11 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
-	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
+
+// ErrVersioningUnsupported is returned by Resolve for a version specifier and
+// by History: App Configuration keeps no version history.
+var ErrVersioningUnsupported = errors.New("the Azure App Configuration store does not support versions")
 
 // tagWriteMaxAttempts bounds the GET-merge-PUT retry loop used by Tag/Untag when
 // a concurrent writer changes the setting between the GET and the conditional
@@ -104,7 +107,7 @@ func (s *Store) Resolve(_ context.Context, _, spec string) (provider.VersionRef,
 	// the caller passes no version specifier. A non-empty spec means something
 	// tried to version an unversioned store, which is unsupported.
 	if spec != "" {
-		return provider.VersionRef{}, fmt.Errorf("%w", azureappconfigversion.ErrVersioningUnsupported)
+		return provider.VersionRef{}, fmt.Errorf("%w", ErrVersioningUnsupported)
 	}
 
 	// Resolve precedes every single-item read; reject a namespace value that
@@ -143,7 +146,7 @@ func (s *Store) Get(ctx context.Context, name string, _ provider.VersionRef) (*d
 // History returns ErrVersioningUnsupported: App Configuration keeps no version
 // history. The generic log command surfaces this error without crashing.
 func (s *Store) History(_ context.Context, _ string) ([]domain.Version, error) {
-	return nil, fmt.Errorf("%w (no version history)", azureappconfigversion.ErrVersioningUnsupported)
+	return nil, fmt.Errorf("%w (no version history)", ErrVersioningUnsupported)
 }
 
 // List returns the distinct key names visible under the selected namespace

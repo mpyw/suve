@@ -17,7 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/provider/aws/paramtype"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // showJSONOutput represents the JSON output structure for the show command.
@@ -35,19 +35,19 @@ type showJSONOutput struct {
 // showPresenter renders SSM Parameter Store show output byte-for-byte as before.
 type showPresenter struct {
 	uc         *param.ShowUseCase
-	spec       *awsparamversion.Spec
+	spec       *version.NumericSpec
 	result     *param.ShowOutput
 	jsonParsed bool
 }
 
 // NewShowPresenter builds a param show presenter over the given reader and spec.
 // It is exported for the shared golden-output test harness.
-func NewShowPresenter(reader provider.Reader, spec *awsparamversion.Spec) generic.ShowPresenter {
+func NewShowPresenter(reader provider.Reader, spec *version.NumericSpec) generic.ShowPresenter {
 	return &showPresenter{uc: &param.ShowUseCase{Reader: reader}, spec: spec}
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, param.ShowInput{Name: p.spec.Name, Suffix: awsparamversion.Suffix(p.spec)})
+	result, err := p.uc.Execute(ctx, param.ShowInput{Name: p.spec.Name, Suffix: version.ParameterStore.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the SSM Parameter Store show command.
 func ShowCommand() *cli.Command {
-	return generic.ShowCommand(generic.ShowConfig[*awsparamversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*version.NumericSpec]{
 		Usage:     "Show parameter value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Display a parameter's value along with its metadata (name, version, type, modification date).
@@ -162,8 +162,8 @@ EXAMPLES:
   suve aws param show --output=json /app/config                 Output as JSON
   DB_URL=$(suve aws param show --raw /app/config)               Use in shell variable`,
 		UsageError: "usage: suve aws param show <name>",
-		ParseSpec:  awsparamversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *awsparamversion.Spec) (generic.ShowPresenter, error) {
+		ParseSpec:  version.ParameterStore.Parse,
+		NewPresenter: func(ctx context.Context, spec *version.NumericSpec) (generic.ShowPresenter, error) {
 			store, err := awsinternal.ParamStore(ctx)
 			if err != nil {
 				return nil, err

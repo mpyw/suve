@@ -35,15 +35,22 @@ same shape.
 
 ## Version-spec parser
 
-- Add a parser package `internal/version/<name>version` (see the existing
-  `gcloudversion`, `azurekvversion`, `azureappconfigversion`). It resolves
-  `#VERSION` / `~SHIFT` / `:LABEL` per the provider's capabilities and **cleanly
-  rejects unsupported specifiers before any API call**. Google Cloud rejects
-  labels with a dedicated error at parse time (`ErrLabelUnsupported`, #231);
-  App Configuration is unversioned and rejects all specifiers.
-- For a versioned grammar, add `Suffix(spec)` next to `Parse`. The CLI and GUI
-  call the neutral `usecase/{param,secret}` with `spec.Name` plus
-  `Suffix(spec)`. There is no per-provider use case package.
+- Add the product's grammar value to `internal/version/products.go`, built from
+  one of the three grammars: `NumericGrammar` (integer versions),
+  `OpaqueGrammar` (opaque ids, `Labels` for staging labels) or `BareGrammar`
+  (unversioned). It parses `#VERSION` / `~SHIFT` / `:LABEL` per the product's
+  capabilities and **cleanly rejects unsupported specifiers before any API
+  call**: Google Cloud and Key Vault set `LabelError` so a `:LABEL` fails at
+  parse time (#231). App Configuration is unversioned, and its keys may contain
+  `#`, `:` and `~`, so the whole argument is the key. Add a new grammar only
+  when none of the three fits.
+- A versioned grammar has `Suffix(spec)` next to `Parse`. The CLI and GUI call
+  the neutral `usecase/{param,secret}` with `spec.Name` plus
+  `version.<Product>.Suffix(spec)`. There is no per-provider use case package.
+- The diff command's argument parsing lives in the CLI, not in
+  `internal/version`: `diff.go` in each service package defines
+  `parseDiffArgs`, which wraps `internal/cli/diffargs.ParseArgs` with the
+  grammar and the usage string.
 
 ## Wiring
 

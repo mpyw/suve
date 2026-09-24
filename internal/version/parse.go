@@ -1,5 +1,17 @@
-// Package version provides shared version specification parsing logic
-// for SSM Parameter Store and Secrets Manager version specifiers.
+// parse.go holds the Spec type and the grammar-neutral Parse engine that every
+// grammar file builds on. It is the package's core: Spec does not have to
+// become ParseSpec.
+//declscope:core
+
+// Package version parses the version specifiers that follow a name
+// (#VERSION, :LABEL, ~SHIFT) for every cloud product.
+//
+// Three grammars cover the products: NumericGrammar (integer versions),
+// OpaqueGrammar (opaque version ids, optionally with staging labels), and
+// BareGrammar (unversioned; the whole argument is the name). products.go binds
+// each product to one of them (ParameterStore, SecretsManager, SecretManager,
+// KeyVault, AppConfiguration). Each versioned grammar's Suffix rebuilds the
+// suffix that callers hand to the use cases.
 //
 // Version specification grammar:
 //
@@ -11,8 +23,8 @@
 //   - <shift>    is ~ or ~N for relative version shift (optional, repeatable)
 //
 // Examples:
-//   - SSM Parameter Store: /my/param, /my/param#3, /my/param~1, /my/param#5~2
-//   - Secrets Manager: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
+//   - Numeric: /my/param, /my/param#3, /my/param~1, /my/param#5~2
+//   - Opaque: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
 package version
 
 import (
@@ -33,8 +45,8 @@ var (
 )
 
 // Spec represents a parsed version specification.
-// The type parameter A holds service-specific absolute version info
-// (e.g., version number for SSM Parameter Store, version ID or label for Secrets Manager).
+// The type parameter A holds grammar-specific absolute version info
+// (NumericAbsolute, OpaqueAbsolute, or BareAbsolute).
 type Spec[A any] struct {
 	Name     string // Parameter/secret name (e.g., "/my/param", "my-secret")
 	Absolute A      // Absolute version specifier (type-specific, zero value if not specified)
@@ -57,10 +69,11 @@ func (s *Spec[A]) ShiftSuffix() string {
 }
 
 // SpecifierParser defines how to parse a single type of absolute specifier.
-// Each service (SSM Parameter Store/Secrets Manager) defines its own set of SpecifierParsers.
+// Each grammar defines its own set of SpecifierParsers.
 //
-// For example, SSM Parameter Store has one parser for "#" (version number),
-// while Secrets Manager has two parsers for "#" (version ID) and ":" (label).
+// For example, NumericGrammar has one parser for "#" (version number), while
+// an OpaqueGrammar with labels has two parsers for "#" (version ID) and ":"
+// (label).
 type SpecifierParser[A any] struct {
 	// PrefixChar is the character that starts this specifier (e.g., '#', ':').
 	PrefixChar byte
@@ -87,7 +100,7 @@ type SpecifierParser[A any] struct {
 }
 
 // AbsoluteParser holds the configuration for parsing absolute specifiers.
-// Each service (SSM Parameter Store/Secrets Manager) creates its own AbsoluteParser instance.
+// Each grammar builds its own AbsoluteParser.
 type AbsoluteParser[A any] struct {
 	// Parsers is the list of specifier parsers to try, in order.
 	Parsers []SpecifierParser[A]
@@ -248,4 +261,21 @@ func matchParser[A any](ch byte, parsers []SpecifierParser[A]) (SpecifierParser[
 	}
 
 	return SpecifierParser[A]{}, false
+}
+
+// rejectingLabelParser is a ':' parser that exists only to reject staging-label
+// syntax, for a grammar without labels. Its IsChar never matches, so any ':'
+// in the name triggers err rather than being folded into the name, and a ':'
+// after an absolute specifier fails in Apply.
+//
+//declscope:package // numeric.go and opaque.go reject ':' with it
+func rejectingLabelParser[A any](err error) SpecifierParser[A] {
+	return SpecifierParser[A]{
+		PrefixChar: ':',
+		IsChar:     func(byte) bool { return false },
+		Error:      err,
+		Apply: func(_ string, abs A) (A, error) {
+			return abs, err
+		},
+	}
 }

@@ -159,7 +159,7 @@ stores through the registry rather than a cloud SDK.
    `internal/provider/<cloud>/**` adapter (keep every SDK import inside it).
 2. Expose a `Register(reg)` from the adapter package and call it from
    `builtin.NewRegistry()` (`internal/provider/builtin/builtin.go`).
-3. Add its version-spec parser under `internal/version/`.
+3. Add its product grammar to `internal/version/products.go`.
 4. Add its detection signal and env hydration in
    `internal/provider/detect/detect.go`, its launch-scope flags in
    `internal/cli/commands/launch.go`, and wire a command group in

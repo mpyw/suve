@@ -9,10 +9,11 @@ import (
 
 	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
+	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/azurekvversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // diffJSONOutput represents the JSON output structure for the diff command.
@@ -30,22 +31,22 @@ type diffJSONOutput struct {
 // diffPresenter renders Azure Key Vault diff output.
 type diffPresenter struct {
 	uc     *secret.DiffUseCase
-	spec1  *azurekvversion.Spec
-	spec2  *azurekvversion.Spec
+	spec1  *version.OpaqueSpec
+	spec2  *version.OpaqueSpec
 	result *secret.DiffOutput
 }
 
 // NewDiffPresenter builds an Azure Key Vault diff presenter over the given reader and specs.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *azurekvversion.Spec) generic.DiffPresenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.OpaqueSpec) generic.DiffPresenter {
 	return &diffPresenter{uc: &secret.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
 	result, err := p.uc.Execute(ctx, secret.DiffInput{
 		Name1:   p.spec1.Name,
-		Suffix1: azurekvversion.Suffix(p.spec1),
+		Suffix1: version.KeyVault.Suffix(p.spec1),
 		Name2:   p.spec2.Name,
-		Suffix2: azurekvversion.Suffix(p.spec2),
+		Suffix2: version.KeyVault.Suffix(p.spec2),
 	})
 	if err != nil {
 		return err
@@ -85,7 +86,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the Azure Key Vault diff command.
 func DiffCommand() *cli.Command {
-	return generic.DiffCommand(generic.DiffConfig[*azurekvversion.Spec]{
+	return generic.DiffCommand(generic.DiffConfig[*version.OpaqueSpec]{
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
 		Description: `Compare two versions of a secret in unified diff format.
@@ -100,8 +101,8 @@ EXAMPLES:
   suve azure secret diff my-secret#abc my-secret#def  Compare two version ids
   suve azure secret diff --parse-json my-secret~      Format JSON values before diffing
   suve azure secret diff --output=json my-secret~     Output comparison as JSON`,
-		ParseDiffArgs: azurekvversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *azurekvversion.Spec) (generic.DiffPresenter, error) {
+		ParseDiffArgs: parseDiffArgs,
+		NewPresenter: func(ctx context.Context, spec1, spec2 *version.OpaqueSpec) (generic.DiffPresenter, error) {
 			store, err := azureinternal.KeyVaultStore(ctx)
 			if err != nil {
 				return nil, err
@@ -110,4 +111,15 @@ EXAMPLES:
 			return NewDiffPresenter(store, spec1, spec2), nil
 		},
 	})
+}
+
+// parseDiffArgs parses the diff arguments with the Azure Key Vault grammar.
+func parseDiffArgs(args []string) (*version.OpaqueSpec, *version.OpaqueSpec, error) {
+	return diffargs.ParseArgs(
+		args,
+		version.KeyVault.Parse,
+		version.OpaqueAbsolute.IsSet,
+		"#~",
+		"usage: suve azure secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
+	)
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/gcloudversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 func TestApp_parseParamSpec(t *testing.T) {
@@ -115,7 +115,7 @@ func TestApp_parseSecretSpec(t *testing.T) {
 			// Google Cloud has no staging labels: a colon specifier must be
 			// rejected, not folded into the name (which the AWS grammar accepts).
 			name: "google cloud label rejected", provider: provider.ProviderGoogleCloud,
-			input: "sec:prod", wantErr: gcloudversion.ErrLabelUnsupported,
+			input: "sec:prod", wantErr: version.ErrSecretManagerLabelUnsupported,
 		},
 		{
 			name: "azure key vault opaque id", provider: provider.ProviderAzure,

@@ -2,6 +2,7 @@ package param
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"github.com/urfave/cli/v3"
@@ -11,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/azureappconfigversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // diffJSONOutput represents the JSON output structure for the diff command.
@@ -30,13 +31,13 @@ type diffJSONOutput struct {
 // two versions of one key.
 type diffPresenter struct {
 	uc     *param.DiffUseCase
-	spec1  *azureappconfigversion.Spec
-	spec2  *azureappconfigversion.Spec
+	spec1  *version.BareSpec
+	spec2  *version.BareSpec
 	result *param.DiffOutput
 }
 
 // NewDiffPresenter builds an Azure App Configuration diff presenter over the given reader and specs.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *azureappconfigversion.Spec) generic.DiffPresenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.BareSpec) generic.DiffPresenter {
 	return &diffPresenter{uc: &param.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
@@ -82,7 +83,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the Azure App Configuration diff command.
 func DiffCommand() *cli.Command {
-	return generic.DiffCommand(generic.DiffConfig[*azureappconfigversion.Spec]{
+	return generic.DiffCommand(generic.DiffConfig[*version.BareSpec]{
 		Usage:     "Show diff between two settings",
 		ArgsUsage: "<key1> [key2]",
 		Description: `Compare two App Configuration settings in unified diff format.
@@ -94,8 +95,8 @@ version specifiers.
 EXAMPLES:
   suve azure param diff key-a key-b                    Compare two settings
   suve azure param diff --output=json key-a key-b      Output comparison as JSON`,
-		ParseDiffArgs: azureappconfigversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *azureappconfigversion.Spec) (generic.DiffPresenter, error) {
+		ParseDiffArgs: parseDiffArgs,
+		NewPresenter: func(ctx context.Context, spec1, spec2 *version.BareSpec) (generic.DiffPresenter, error) {
 			store, err := azureinternal.AppConfigStore(ctx)
 			if err != nil {
 				return nil, err
@@ -104,4 +105,33 @@ EXAMPLES:
 			return NewDiffPresenter(store, spec1, spec2), nil
 		},
 	})
+}
+
+// parseDiffArgs parses the diff arguments for Azure App Configuration.
+//
+// Since keys are unversioned and carry no specifiers, only one or two bare keys
+// are accepted (a single key compares against itself). The generic name+specifier
+// concatenation used by versioned stores does not apply here.
+func parseDiffArgs(args []string) (*version.BareSpec, *version.BareSpec, error) {
+	const usage = "usage: suve azure param diff <key1> [key2]"
+
+	if len(args) == 0 || len(args) > 2 {
+		return nil, nil, errors.New(usage)
+	}
+
+	spec1, err := version.AppConfiguration.Parse(args[0])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(args) == 1 {
+		return spec1, &version.BareSpec{Name: spec1.Name}, nil
+	}
+
+	spec2, err := version.AppConfiguration.Parse(args[1])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return spec1, spec2, nil
 }

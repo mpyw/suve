@@ -1,5 +1,6 @@
 // Package diffargs provides the diff command argument parsing shared by every
-// provider version parser (AWS, Google Cloud, Azure).
+// versioned diff command (AWS, Google Cloud, Azure Key Vault). Each command
+// wraps ParseArgs with its grammar from internal/version and its usage string.
 //
 // The diff command compares two versions of one parameter or secret. The
 // examples below use AWS specs (Parameter Store "#N", Secrets Manager labels).
@@ -73,7 +74,7 @@ import (
 // # Parameters
 //
 //   - args: Command line arguments (1-3 arguments supported)
-//   - parse: Service-specific parser function (e.g., awsparamversion.Parse, awssecretversion.Parse)
+//   - parse: Service-specific parser function (e.g., version.ParameterStore.Parse, version.SecretsManager.Parse)
 //   - hasAbsolute: Returns true if the absolute specifier is set (non-zero).
 //     Used to distinguish "mixed" pattern from "partial spec" pattern in 2-arg case.
 //     For SSM Parameter Store: func(abs) bool { return abs.Version != nil }
@@ -96,8 +97,8 @@ import (
 //
 //	spec1, spec2, err := ParseArgs(
 //	    args,
-//	    awsparamversion.Parse,
-//	    func(abs awsparamversion.AbsoluteSpec) bool { return abs.Version != nil },
+//	    version.ParameterStore.Parse,
+//	    version.NumericAbsolute.IsSet,
 //	    "#~",
 //	    "usage: suve aws param diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 //	)
@@ -106,8 +107,8 @@ import (
 //
 //	spec1, spec2, err := ParseArgs(
 //	    args,
-//	    awssecretversion.Parse,
-//	    func(abs awssecretversion.AbsoluteSpec) bool { return abs.ID != nil || abs.Label != nil },
+//	    version.SecretsManager.Parse,
+//	    version.OpaqueAbsolute.IsSet,
 //	    "#:~",
 //	    "usage: suve aws secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
 //	)

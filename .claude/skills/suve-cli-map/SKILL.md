@@ -23,6 +23,11 @@ options and examples, read the full docs:
 | Azure | Key Vault | `suve azure secret` | Opaque ids; no labels; `#VERSION` `~SHIFT`; modified time is second-granular | Yes | `kv`, `keyvault` | `AZURE_KEYVAULT_NAME` |
 | Azure | App Configuration | `suve azure param` | Unversioned (single current value); last-write-wins | Yes | `appconfig`, `ac`, `appcfg` | `AZURE_APPCONFIG_NAME` |
 
+Each versioning model is a grammar value in `internal/version/products.go`:
+`ParameterStore` and `SecretManager` are numeric, `SecretsManager` and
+`KeyVault` are opaque (only `SecretsManager` has labels), and
+`AppConfiguration` is bare.
+
 ## Command shape
 
 - Explicit group form is always available: `suve <provider> <service> <command>`.

@@ -20,7 +20,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	secretusecase "github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/gcloudversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // TestCommandValidation exercises argument/spec validation that fails before any
@@ -212,7 +212,7 @@ func TestShowPresenter(t *testing.T) {
 		},
 	}
 
-	spec, err := gcloudversion.Parse("my-secret")
+	spec, err := version.SecretManager.Parse("my-secret")
 	require.NoError(t, err)
 
 	presenter := secret.NewShowPresenter(store, spec)
@@ -381,8 +381,8 @@ func TestLogPresenter_Patch(t *testing.T) {
 }
 
 // diffVersionSpec builds a Google Cloud diff spec pinned to an integer version.
-func diffVersionSpec(v int64) *gcloudversion.Spec {
-	return &gcloudversion.Spec{Name: "my-secret", Absolute: gcloudversion.AbsoluteSpec{Version: lo.ToPtr(v)}}
+func diffVersionSpec(v int64) *version.NumericSpec {
+	return &version.NumericSpec{Name: "my-secret", Absolute: version.NumericAbsolute{Version: lo.ToPtr(v)}}
 }
 
 // diffStore resolves each spec suffix ("#N") to a ref and returns the mapped

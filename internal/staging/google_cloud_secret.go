@@ -2,13 +2,13 @@ package staging
 
 import (
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/version/gcloudversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // GoogleCloudSecretStrategy implements the staging strategies for Google Cloud
 // Secret Manager over a provider.Store. Secret Manager specifics:
 //
-//   - Versions are immutable integers, parsed with gcloudversion (#N, ~SHIFT); a
+//   - Versions are immutable integers, parsed with version.SecretManager (#N, ~SHIFT); a
 //     staged "edit" applies as a new version via Put.
 //   - There are no delete options (no force / recovery window), so
 //     HasDeleteOptions reports false and Delete ignores staged DeleteOptions.
@@ -46,10 +46,10 @@ func (googleCloudSecretHooks) traits() versionedTraits {
 }
 
 func (googleCloudSecretHooks) parse(input string) (name, suffix string, err error) {
-	spec, err := gcloudversion.Parse(input)
+	spec, err := version.SecretManager.Parse(input)
 	if err != nil {
 		return "", "", err
 	}
 
-	return spec.Name, gcloudversion.Suffix(spec), nil
+	return spec.Name, version.SecretManager.Suffix(spec), nil
 }

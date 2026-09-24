@@ -9,10 +9,12 @@ import (
 
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
+	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // diffJSONOutput represents the JSON output structure for the diff command.
@@ -30,21 +32,21 @@ type diffJSONOutput struct {
 // diffPresenter renders Secrets Manager diff output byte-for-byte as before.
 type diffPresenter struct {
 	uc     *secret.DiffUseCase
-	spec1  *awssecretversion.Spec
-	spec2  *awssecretversion.Spec
+	spec1  *version.OpaqueSpec
+	spec2  *version.OpaqueSpec
 	result *secret.DiffOutput
 }
 
 // NewDiffPresenter builds a secret diff presenter over the given reader and specs.
 // It is exported for the shared golden-output test harness.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *awssecretversion.Spec) generic.DiffPresenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.OpaqueSpec) generic.DiffPresenter {
 	return &diffPresenter{uc: &secret.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
 	result, err := p.uc.Execute(ctx, secret.DiffInput{
-		Name1: p.spec1.Name, Suffix1: awssecretversion.Suffix(p.spec1),
-		Name2: p.spec2.Name, Suffix2: awssecretversion.Suffix(p.spec2),
+		Name1: p.spec1.Name, Suffix1: version.SecretsManager.Suffix(p.spec1),
+		Name2: p.spec2.Name, Suffix2: version.SecretsManager.Suffix(p.spec2),
 	})
 	if err != nil {
 		return err
@@ -59,8 +61,8 @@ func (p *diffPresenter) OldValue() string { return p.result.OldValue }
 func (p *diffPresenter) NewValue() string { return p.result.NewValue }
 
 func (p *diffPresenter) Labels() (string, string) {
-	return fmt.Sprintf("%s#%s", p.result.OldName, awssecretversion.TruncateVersionID(p.result.OldVersion)),
-		fmt.Sprintf("%s#%s", p.result.NewName, awssecretversion.TruncateVersionID(p.result.NewVersion))
+	return fmt.Sprintf("%s#%s", p.result.OldName, secretsmanager.TruncateVersionID(p.result.OldVersion)),
+		fmt.Sprintf("%s#%s", p.result.NewName, secretsmanager.TruncateVersionID(p.result.NewVersion))
 }
 
 func (p *diffPresenter) RenderJSON(stdout io.Writer, oldValue, newValue string, identical bool, diff string) error {
@@ -85,7 +87,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the Secrets Manager diff command.
 func DiffCommand() *cli.Command {
-	return generic.DiffCommand(generic.DiffConfig[*awssecretversion.Spec]{
+	return generic.DiffCommand(generic.DiffConfig[*version.OpaqueSpec]{
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
 		Description: `Compare two versions of a secret in unified diff format.
@@ -107,8 +109,8 @@ EXAMPLES:
   suve aws secret diff --output=json my-secret~          Output comparison as JSON
 
 For comparing staged values, use: suve aws stage secret diff`,
-		ParseDiffArgs: awssecretversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *awssecretversion.Spec) (generic.DiffPresenter, error) {
+		ParseDiffArgs: parseDiffArgs,
+		NewPresenter: func(ctx context.Context, spec1, spec2 *version.OpaqueSpec) (generic.DiffPresenter, error) {
 			store, err := awsinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
@@ -117,4 +119,15 @@ For comparing staged values, use: suve aws stage secret diff`,
 			return NewDiffPresenter(store, spec1, spec2), nil
 		},
 	})
+}
+
+// parseDiffArgs parses the diff arguments with the Secrets Manager grammar.
+func parseDiffArgs(args []string) (*version.OpaqueSpec, *version.OpaqueSpec, error) {
+	return diffargs.ParseArgs(
+		args,
+		version.SecretsManager.Parse,
+		version.OpaqueAbsolute.IsSet,
+		"#:~",
+		"usage: suve aws secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
+	)
 }

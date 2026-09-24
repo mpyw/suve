@@ -7,13 +7,13 @@ import (
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // AWSSecretStrategy implements ServiceStrategy for Secrets Manager over a
 // provider.Store. Secrets Manager specifics:
 //
-//   - Versions are ids or staging labels, parsed with awssecretversion
+//   - Versions are ids or staging labels, parsed with version.SecretsManager
 //     (#ID, :LABEL, ~SHIFT); ids render truncated.
 //   - Delete takes force / recovery-window options.
 //   - A staged string edit refuses to overwrite a binary secret.
@@ -51,16 +51,16 @@ func (awsSecretHooks) traits() versionedTraits {
 }
 
 func (awsSecretHooks) parse(input string) (name, suffix string, err error) {
-	spec, err := awssecretversion.Parse(input)
+	spec, err := version.SecretsManager.Parse(input)
 	if err != nil {
 		return "", "", err
 	}
 
-	return spec.Name, awssecretversion.Suffix(spec), nil
+	return spec.Name, version.SecretsManager.Suffix(spec), nil
 }
 
 func (awsSecretHooks) versionLabel(id string) string {
-	return "#" + awssecretversion.TruncateVersionID(id)
+	return "#" + secretsmanager.TruncateVersionID(id)
 }
 
 // deleteOptions translates staged delete options into provider delete options.
