@@ -34,7 +34,7 @@ func TestParamStrategy_BasicMethods(t *testing.T) {
 
 	t.Run("ServiceName", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, "SSM Parameter Store", s.ServiceName())
+		assert.Equal(t, "Parameter Store", s.ServiceName())
 	})
 
 	t.Run("ItemName", func(t *testing.T) {

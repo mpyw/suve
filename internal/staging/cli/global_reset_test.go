@@ -53,7 +53,7 @@ func TestGlobalReset_UnstageAll(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	// Stage SSM Parameter Store parameters
+	// Stage Parameter Store parameters
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value1"),
@@ -84,7 +84,7 @@ func TestGlobalReset_UnstageAll(t *testing.T) {
 
 	err := r.Run(t.Context())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM Parameter Store, 1 Secrets Manager)")
+	assert.Contains(t, buf.String(), "Unstaged all changes (2 Parameter Store, 1 Secrets Manager)")
 
 	// Verify all unstaged
 	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1", Namespace: ""})
@@ -100,7 +100,7 @@ func TestGlobalReset_UnstageParamOnly(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	// Stage only SSM Parameter Store parameters
+	// Stage only Parameter Store parameters
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
@@ -118,7 +118,7 @@ func TestGlobalReset_UnstageParamOnly(t *testing.T) {
 
 	err := r.Run(t.Context())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Unstaged all changes (1 SSM Parameter Store, 0 Secrets Manager)")
+	assert.Contains(t, buf.String(), "Unstaged all changes (1 Parameter Store, 0 Secrets Manager)")
 }
 
 func TestGlobalReset_UnstageSecretOnly(t *testing.T) {
@@ -144,7 +144,7 @@ func TestGlobalReset_UnstageSecretOnly(t *testing.T) {
 
 	err := r.Run(t.Context())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Unstaged all changes (0 SSM Parameter Store, 1 Secrets Manager)")
+	assert.Contains(t, buf.String(), "Unstaged all changes (0 Parameter Store, 1 Secrets Manager)")
 }
 
 func TestGlobalReset_StoreError(t *testing.T) {
@@ -194,7 +194,7 @@ func TestGlobalReset_UnstageTagsOnly(t *testing.T) {
 
 	err := r.Run(t.Context())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "Unstaged all changes (1 SSM Parameter Store, 1 Secrets Manager)")
+	assert.Contains(t, buf.String(), "Unstaged all changes (1 Parameter Store, 1 Secrets Manager)")
 
 	// Verify all unstaged
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
@@ -246,7 +246,7 @@ func TestGlobalReset_UnstageEntriesAndTags(t *testing.T) {
 	err := r.Run(t.Context())
 	require.NoError(t, err)
 	// 1 entry + 1 tag = 2 for param, 1 entry + 1 tag = 2 for secret
-	assert.Contains(t, buf.String(), "Unstaged all changes (2 SSM Parameter Store, 2 Secrets Manager)")
+	assert.Contains(t, buf.String(), "Unstaged all changes (2 Parameter Store, 2 Secrets Manager)")
 
 	// Verify all unstaged
 	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})

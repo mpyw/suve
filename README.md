@@ -570,7 +570,7 @@ user@host:~$ suve stage param delete /app/config/old-param
 
 ```ShellSession
 user@host:~$ suve stage status
-Staged SSM Parameter Store changes (3):
+Staged Parameter Store changes (3):
   A /app/config/new-param
   M /app/config/database-url
   D /app/config/old-param
@@ -602,10 +602,10 @@ Output will look like:
 
 ```ShellSession
 user@host:~$ suve stage apply
-Applying SSM Parameter Store parameters...
-✓ Created /app/config/new-param
-✓ Updated /app/config/database-url
-✓ Deleted /app/config/old-param
+Applying Parameter Store...
+✓ Parameter Store: Created /app/config/new-param
+✓ Parameter Store: Updated /app/config/database-url
+✓ Parameter Store: Deleted /app/config/old-param
 ```
 
 **Reset if needed**:

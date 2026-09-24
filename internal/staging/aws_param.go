@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/version"
 )
 
-// AWSParamStrategy implements ServiceStrategy for SSM Parameter Store over a
+// AWSParamStrategy implements ServiceStrategy for AWS Parameter Store over a
 // provider.Store. Parameter Store specifics:
 //
 //   - Versions are integers, parsed with version.AWSParameterStore (#N, ~SHIFT).
@@ -26,7 +26,7 @@ type AWSParamStrategy struct {
 	versionedStrategy[awsParamHooks]
 }
 
-// NewAWSParamStrategy creates a new SSM Parameter Store strategy over the given
+// NewAWSParamStrategy creates a new AWS Parameter Store strategy over the given
 // provider store. A nil store is allowed for parser-only use.
 func NewAWSParamStrategy(store provider.Store) *AWSParamStrategy {
 	return &AWSParamStrategy{versionedStrategy[awsParamHooks]{store: store}}
@@ -44,7 +44,7 @@ type awsParamHooks struct{}
 func (awsParamHooks) traits() versionedTraits {
 	return versionedTraits{
 		service:        ServiceParam,
-		serviceName:    "SSM Parameter Store",
+		serviceName:    "Parameter Store",
 		itemName:       "parameter",
 		tagsFetchError: "failed to get tags",
 	}

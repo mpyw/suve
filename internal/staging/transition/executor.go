@@ -26,7 +26,7 @@ func NewExecutor(store store.ReadWriteOperator) *Executor {
 type EntryExecutorOptions struct {
 	BaseModifiedAt *time.Time       // Base modification time for conflict detection
 	Description    *string          // Optional description for the staged entry
-	ValueType      domain.ValueType // Provider-neutral value type (e.g. an SSM Parameter Store type); empty means unset
+	ValueType      domain.ValueType // Provider-neutral value type (e.g. an AWS Parameter Store type); empty means unset
 }
 
 // ExecuteEntry executes an entry action and persists the result.

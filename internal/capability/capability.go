@@ -24,7 +24,8 @@ const (
 type ServiceCapability struct {
 	// Service is the internal key ("param" or "secret").
 	Service string `json:"service"`
-	// DisplayName is the label shown in the UI (e.g. "Key Vault").
+	// DisplayName is the label shown in the UI (e.g. "Key Vault"). It matches
+	// the staging strategy's ServiceName, so the CLI staging output agrees.
 	DisplayName string `json:"displayName"`
 	// ItemNoun names one item of the service in prompts and titles
 	// ("parameter", "setting", "secret"). It matches the staging strategy's

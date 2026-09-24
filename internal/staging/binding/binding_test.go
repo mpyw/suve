@@ -59,6 +59,22 @@ func TestLookup_ItemNameMatchesCapability(t *testing.T) {
 	}
 }
 
+// TestLookup_ServiceNameMatchesCapability pins that every capability service's
+// DisplayName (the TUI and GUI label) equals its staging strategy's ServiceName
+// (the CLI `stage status`/`stage apply` label), so the product name cannot drift
+// between frontends.
+func TestLookup_ServiceNameMatchesCapability(t *testing.T) {
+	t.Parallel()
+
+	for _, pc := range capability.All() {
+		for _, sc := range pc.Services {
+			b, err := binding.Lookup(provider.Provider(pc.Provider), provider.Kind(sc.Service))
+			require.NoError(t, err, "%s %s", pc.Provider, sc.Service)
+			assert.Equal(t, sc.DisplayName, b.Parser().ServiceName(), "%s %s", pc.Provider, sc.Service)
+		}
+	}
+}
+
 // TestBinding_SplitSpec pins each product's grammar: the same input splits
 // differently per (provider, kind).
 func TestBinding_SplitSpec(t *testing.T) {

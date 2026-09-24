@@ -245,7 +245,7 @@ func TestGlobalImport(t *testing.T) {
 //nolint:paralleltest // uses t.Setenv (HOME/SUVE_STAGING_KEY); cannot run in parallel
 func TestGlobalImport_ProviderMismatch(t *testing.T) {
 	// Mirrors the failure scenario: an Azure App Config param envelope
-	// {Provider: azure} imported into an AWS SSM param working area.
+	// {Provider: azure} imported into an AWS Parameter Store working area.
 	setupExportImportEnv(t)
 
 	azureScope := provider.AzureAppConfigScope("mystore")

@@ -27,7 +27,7 @@ func TestApplyUseCase_Execute_Empty(t *testing.T) {
 
 	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
 	require.NoError(t, err)
-	assert.Equal(t, "SSM Parameter Store", output.ServiceName)
+	assert.Equal(t, "Parameter Store", output.ServiceName)
 	assert.Equal(t, "parameter", output.ItemName)
 	assert.Empty(t, output.EntryResults)
 	assert.Equal(t, 0, output.EntrySucceeded)

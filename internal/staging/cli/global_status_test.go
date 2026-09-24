@@ -65,7 +65,7 @@ func TestGlobalStatus_ShowParamChangesOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "Staged SSM Parameter Store changes")
+	assert.Contains(t, output, "Staged Parameter Store changes")
 	assert.Contains(t, output, "/app/config")
 	assert.NotContains(t, output, "Staged Secrets Manager changes")
 }
@@ -97,7 +97,7 @@ func TestGlobalStatus_ShowSecretChangesOnly(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "Staged Secrets Manager changes")
 	assert.Contains(t, output, "my-secret")
-	assert.NotContains(t, output, "Staged SSM Parameter Store changes")
+	assert.NotContains(t, output, "Staged Parameter Store changes")
 }
 
 func TestGlobalStatus_ShowBothParamAndSecretChanges(t *testing.T) {
@@ -130,7 +130,7 @@ func TestGlobalStatus_ShowBothParamAndSecretChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "Staged SSM Parameter Store changes")
+	assert.Contains(t, output, "Staged Parameter Store changes")
 	assert.Contains(t, output, "/app/config")
 	assert.Contains(t, output, "M")
 	assert.Contains(t, output, "Staged Secrets Manager changes")
@@ -286,7 +286,7 @@ func TestGlobalStatus_ShowParamTagChangesOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "Staged SSM Parameter Store changes")
+	assert.Contains(t, output, "Staged Parameter Store changes")
 	assert.Contains(t, output, "/app/config")
 	assert.Contains(t, output, "T")
 	assert.Contains(t, output, "+2 tag(s)")
@@ -323,7 +323,7 @@ func TestGlobalStatus_ShowSecretTagChangesOnly(t *testing.T) {
 	assert.Contains(t, output, "T")
 	assert.Contains(t, output, "+1 tag(s)")
 	assert.Contains(t, output, "-1 tag(s)")
-	assert.NotContains(t, output, "Staged SSM Parameter Store changes")
+	assert.NotContains(t, output, "Staged Parameter Store changes")
 }
 
 func TestGlobalStatus_ShowMixedEntryAndTagChanges(t *testing.T) {
@@ -358,7 +358,7 @@ func TestGlobalStatus_ShowMixedEntryAndTagChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "Staged SSM Parameter Store changes (2)")
+	assert.Contains(t, output, "Staged Parameter Store changes (2)")
 	assert.Contains(t, output, "/app/config")
 	assert.Contains(t, output, "M")
 	assert.Contains(t, output, "/app/other")
@@ -429,7 +429,7 @@ func TestGlobalStatus_TagOnlyChangesNoEntries(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "Staged SSM Parameter Store changes (1)")
+	assert.Contains(t, output, "Staged Parameter Store changes (1)")
 	assert.Contains(t, output, "/app/param")
 	assert.Contains(t, output, "Staged Secrets Manager changes (1)")
 	assert.Contains(t, output, "my-secret")

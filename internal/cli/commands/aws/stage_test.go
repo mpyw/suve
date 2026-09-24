@@ -107,7 +107,7 @@ func TestStageGlobalConfig(t *testing.T) {
 	}
 
 	// Parser factories are carried through and are network-free.
-	assert.Equal(t, "SSM Parameter Store", cfg.Services[0].ParserFactory().ServiceName())
+	assert.Equal(t, "Parameter Store", cfg.Services[0].ParserFactory().ServiceName())
 	assert.Equal(t, "Secrets Manager", cfg.Services[1].ParserFactory().ServiceName())
 }
 
