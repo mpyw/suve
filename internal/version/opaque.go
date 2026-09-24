@@ -52,7 +52,7 @@ type OpaqueGrammar struct {
 //   - ~~    go back 2 versions (same as ~1~1)
 //   - ~1~2  cumulative: go back 3 versions
 func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
-	parsers := []SpecifierParser[OpaqueAbsolute]{
+	parsers := []specifierParser[OpaqueAbsolute]{
 		{
 			PrefixChar: '#',
 			IsChar:     g.IsIDChar,
@@ -67,7 +67,7 @@ func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
 	}
 
 	if g.Labels {
-		parsers = append(parsers, SpecifierParser[OpaqueAbsolute]{
+		parsers = append(parsers, specifierParser[OpaqueAbsolute]{
 			PrefixChar: ':',
 			IsChar:     isOpaqueLabelChar,
 			Error:      g.LabelError,
@@ -82,7 +82,7 @@ func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
 		parsers = append(parsers, rejectingLabelParser[OpaqueAbsolute](g.LabelError))
 	}
 
-	return Parse(input, AbsoluteParser[OpaqueAbsolute]{
+	return parseSpec(input, absoluteParser[OpaqueAbsolute]{
 		Parsers: parsers,
 		Zero:    func() OpaqueAbsolute { return OpaqueAbsolute{} },
 	})

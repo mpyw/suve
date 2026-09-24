@@ -49,7 +49,7 @@ type NumericGrammar struct {
 //   - ~~     go back 2 versions (same as ~1~1)
 //   - ~1~2   cumulative: go back 3 versions
 func (g NumericGrammar) Parse(input string) (*NumericSpec, error) {
-	parsers := []SpecifierParser[NumericAbsolute]{
+	parsers := []specifierParser[NumericAbsolute]{
 		{
 			PrefixChar: '#',
 			IsChar:     internal.IsDigit,
@@ -71,7 +71,7 @@ func (g NumericGrammar) Parse(input string) (*NumericSpec, error) {
 		parsers = append(parsers, rejectingLabelParser[NumericAbsolute](g.LabelError))
 	}
 
-	return Parse(input, AbsoluteParser[NumericAbsolute]{
+	return parseSpec(input, absoluteParser[NumericAbsolute]{
 		Parsers: parsers,
 		Zero:    func() NumericAbsolute { return NumericAbsolute{} },
 	})

@@ -1,7 +1,7 @@
-// shift.go is a part of parse.go: it reads the <shift> clause (~ and ~N) and
-// nothing else, and parse.go is its only caller. It is one piece of the core
-// version spec parser, so it is core too.
-//declscope:core
+// shift.go is the part of the parse engine that reads the <shift> clause (~
+// and ~N) and nothing else. parse.go is its only caller, so it shares parse.go's
+// namespace.
+//declscope:namespace parse
 
 package version
 
@@ -41,7 +41,7 @@ func parseShift(s string) (int, error) {
 		if numStart == i {
 			// Bare ~ means ~1.
 			if total == math.MaxInt {
-				return 0, errShiftOutOfRange
+				return 0, errParseShiftOutOfRange
 			}
 
 			total++
@@ -56,7 +56,7 @@ func parseShift(s string) (int, error) {
 			// HasShift() then reads as "no shift" and silently resolves to latest
 			// (e.g. `~MAX~MAX`). Reject instead.
 			if n > math.MaxInt-total {
-				return 0, errShiftOutOfRange
+				return 0, errParseShiftOutOfRange
 			}
 
 			total += n
@@ -66,12 +66,12 @@ func parseShift(s string) (int, error) {
 	return total, nil
 }
 
-// errShiftOutOfRange is returned when a ~N shift (or a cumulative ~N~M sum)
+// errParseShiftOutOfRange is returned when a ~N shift (or a cumulative ~N~M sum)
 // exceeds what an int can hold.
-var errShiftOutOfRange = fmt.Errorf("shift out of range")
+var errParseShiftOutOfRange = fmt.Errorf("shift out of range")
 
-// isShiftStart returns true if position i in string s looks like the start of a shift.
-func isShiftStart(s string, i int) bool {
+// parsesAsShift returns true if position i in string s looks like the start of a shift.
+func parsesAsShift(s string, i int) bool {
 	if i >= len(s) || s[i] != '~' {
 		return false
 	}
