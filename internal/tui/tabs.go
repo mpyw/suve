@@ -1,6 +1,6 @@
 //declscope:namespace app
 //
-// Tab layout for the App's tab bar, read only by app.go.
+// Tab layout and tab switching for the App's tab bar.
 //
 // The top level of internal/tui holds one device — the app shell — and
 // every separable unit lives in a subpackage, so these files share
@@ -9,9 +9,13 @@
 package tui
 
 import (
+	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/tui/components"
+	"github.com/mpyw/suve/internal/tui/keys"
 )
 
 // Service tab keys: the two capability services plus the synthetic staging tab
@@ -89,4 +93,97 @@ func initialTabIndex(tabs []components.Tab, service string) int {
 	}
 
 	return 0
+}
+
+// numberedTabJump maps a 1/2/3 key press to its zero-based tab index. The index
+// comes from the binding's position, so there are no magic tab numbers.
+func numberedTabJump(k keys.Map, msg tea.KeyPressMsg) (int, bool) {
+	for i, binding := range []key.Binding{k.Tab1, k.Tab2, k.Tab3} {
+		if key.Matches(msg, binding) {
+			return i, true
+		}
+	}
+
+	return 0, false
+}
+
+// cycleTab moves the active tab by delta, wrapping around the ends, and returns
+// the new page's Init command.
+func (m *App) cycleTab(delta int) tea.Cmd {
+	n := len(m.tabs)
+	if n == 0 {
+		return nil
+	}
+
+	return m.setTab(((m.activeTab+delta)%n + n) % n)
+}
+
+// jumpTab selects tab i directly, ignoring an index past the last tab (so "3"
+// with two tabs is a no-op rather than snapping to the last), and returns the
+// new page's Init command.
+func (m *App) jumpTab(i int) tea.Cmd {
+	if i < 0 || i >= len(m.tabs) {
+		return nil
+	}
+
+	return m.setTab(i)
+}
+
+// setTab switches to a valid tab index, swaps in that tab's page (resetting any
+// pushed sub-page), and returns the page's Init command.
+func (m *App) setTab(i int) tea.Cmd {
+	if i == m.activeTab {
+		return nil
+	}
+
+	m.activeTab = i
+
+	p, cmd := m.pageForTab(i)
+	m.pages = []page{p}
+	m.forwardResizeToTop()
+
+	return cmd
+}
+
+// pageForTab builds the page for a tab index: the staging page for the Staging
+// tab (when its seam is wired), a browser page for a param/secret service (when
+// a data source is wired), else the placeholder.
+func (m *App) pageForTab(i int) (page, tea.Cmd) {
+	tab := m.tabs[i]
+
+	if tab.Service == stagingService {
+		if services := m.stagingServicesFor(m.offeredServices()); len(services) > 0 {
+			p := newStagingPage(m.runCtx, services, m.styles, m.keys)
+
+			return p, p.Init()
+		}
+
+		return newPlaceholderPage(m.styles, tab.Title, placeholderNotice(tab)), nil
+	}
+
+	if m.sourceFor != nil {
+		if source, staging := m.sourceFor(tab.Service); source != nil {
+			m.pageGen++
+			p := newBrowserPage(m.runCtx, m.pageGen, source, staging, m.styles, m.keys)
+
+			return p, p.Init()
+		}
+	}
+
+	return newPlaceholderPage(m.styles, tab.Title, placeholderNotice(tab)), nil
+}
+
+// offeredServices returns the service-axis keys the scope offers (the non-staging
+// tabs, in tab order), so the staging page and the apply/reset fan-out iterate
+// exactly the services that have a browser tab.
+func (m *App) offeredServices() []string {
+	var services []string
+
+	for _, t := range m.tabs {
+		if t.Service != stagingService {
+			services = append(services, t.Service)
+		}
+	}
+
+	return services
 }

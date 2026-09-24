@@ -1,3 +1,9 @@
+//declscope:namespace stage
+//
+// The TUI staging seam is one unit across two files: this file holds the
+// read-side probe and the staged-key/store types, and staging.go holds the
+// review/apply/reset service, so both share the "stage" namespace.
+
 package data
 
 import (
