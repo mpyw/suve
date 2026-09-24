@@ -11,9 +11,9 @@ import (
 	"fmt"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/binding"
 )
 
 // registry is the provider registry reachable by every CLI command, built by
@@ -160,68 +160,50 @@ func AzureAppConfigStore(ctx context.Context) (provider.Store, error) {
 	return registry.Store(ctx, scope, provider.KindParam)
 }
 
-// AWSParamStrategyFactory builds a staging FullStrategy for the parameter service,
-// wrapping a provider.Store resolved through the registry. It satisfies
-// staging.StrategyFactory.
-func AWSParamStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
-	store, err := AWSParamStore(ctx)
-	if err != nil {
-		return nil, err
-	}
+// StrategyFactory returns the staging strategy factory for a provider and kind:
+// it resolves the store with store and wraps it in the strategy from the shared
+// staging binding (internal/staging/binding), the same lookup the GUI and TUI
+// use. It panics for a provider/kind without a binding, which is a wiring bug in
+// a static command config.
+func StrategyFactory(
+	p provider.Provider,
+	kind provider.Kind,
+	store func(context.Context) (provider.Store, error),
+) staging.StrategyFactory {
+	b := mustBinding(p, kind)
 
-	return staging.NewAWSParamStrategy(store), nil
+	return func(ctx context.Context) (staging.FullStrategy, error) {
+		s, err := store(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return b.Strategy(s), nil
+	}
 }
 
-// AWSSecretStrategyFactory builds a staging FullStrategy for the secret service,
-// wrapping a provider.Store resolved through the registry. It satisfies
-// staging.StrategyFactory.
-func AWSSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
-	store, err := AWSSecretStore(ctx)
+// ParserFactory returns the store-less parser factory for a provider and kind
+// from the shared staging binding. It panics for a provider/kind without a
+// binding, which is a wiring bug in a static command config.
+func ParserFactory(p provider.Provider, kind provider.Kind) staging.ParserFactory {
+	return mustBinding(p, kind).ParserFactory()
+}
+
+// mustBinding looks up a staging binding for static command wiring.
+func mustBinding(p provider.Provider, kind provider.Kind) binding.Binding {
+	b, err := binding.Lookup(p, kind)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return staging.NewAWSSecretStrategy(store), nil
+	return b
 }
 
 // AWSStagingScopeResolver resolves the AWS staging scope (account + region)
-// from the STS caller identity. It satisfies staging.ScopeResolver.
+// from the STS caller identity, through the shared staging binding. Both AWS
+// services share it. It satisfies staging.ScopeResolver.
 func AWSStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
-	identity, err := infra.GetAWSIdentity(ctx)
-	if err != nil {
-		return staging.ResolvedScope{}, fmt.Errorf("failed to get AWS identity: %w", err)
-	}
-
-	return staging.ResolvedScope{
-		Scope:  provider.AWSScope(identity.AccountID, identity.Region),
-		Target: awsStagingTarget(identity.Profile, identity.AccountID, identity.Region),
-	}, nil
-}
-
-// awsStagingTarget formats the AWS confirmation target line:
-// "profile (account / region)" or "account / region".
-func awsStagingTarget(profile, accountID, region string) string {
-	if accountID == "" || region == "" {
-		return ""
-	}
-
-	if profile != "" {
-		return fmt.Sprintf("%s (%s / %s)", profile, accountID, region)
-	}
-
-	return fmt.Sprintf("%s / %s", accountID, region)
-}
-
-// GoogleCloudSecretStrategyFactory builds a staging FullStrategy for Google Cloud Secret
-// Manager, wrapping a provider.Store resolved for the context's project. It
-// satisfies staging.StrategyFactory.
-func GoogleCloudSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
-	store, err := GoogleCloudSecretStore(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return staging.NewGoogleCloudSecretStrategy(store), nil
+	return binding.StagingScope(ctx, provider.Scope{Provider: provider.ProviderAWS}, provider.KindParam, nil)
 }
 
 // GoogleCloudStagingScopeResolver resolves the Google Cloud staging scope from the
@@ -235,34 +217,7 @@ func GoogleCloudStagingScopeResolver(ctx context.Context) (staging.ResolvedScope
 		)
 	}
 
-	return staging.ResolvedScope{
-		Scope:  provider.GoogleCloudScope(project),
-		Target: "project " + project,
-	}, nil
-}
-
-// AzureKeyVaultSecretStrategyFactory builds a staging FullStrategy for Azure Key
-// Vault secrets, wrapping a provider.Store resolved for the context's vault. It
-// satisfies staging.StrategyFactory.
-func AzureKeyVaultSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
-	store, err := AzureKeyVaultStore(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return staging.NewAzureKeyVaultSecretStrategy(store), nil
-}
-
-// AzureAppConfigParamStrategyFactory builds a staging FullStrategy for Azure App
-// Configuration, wrapping a provider.Store resolved for the context's store. It
-// satisfies staging.StrategyFactory.
-func AzureAppConfigParamStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
-	store, err := AzureAppConfigStore(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return staging.NewAzureAppConfigParamStrategy(store), nil
+	return binding.StagingScope(ctx, provider.GoogleCloudScope(project), provider.KindSecret, nil)
 }
 
 // AzureKeyVaultStagingScopeResolver resolves the Azure Key Vault staging scope
@@ -277,10 +232,7 @@ func AzureKeyVaultStagingScopeResolver(ctx context.Context) (staging.ResolvedSco
 		)
 	}
 
-	return staging.ResolvedScope{
-		Scope:  provider.AzureKeyVaultScope(sc.vaultName),
-		Target: "vault " + sc.vaultName,
-	}, nil
+	return binding.StagingScope(ctx, provider.AzureKeyVaultScope(sc.vaultName), provider.KindSecret, nil)
 }
 
 // AzureAppConfigStagingScopeResolver resolves the Azure App Configuration
@@ -298,13 +250,5 @@ func AzureAppConfigStagingScopeResolver(ctx context.Context) (staging.ResolvedSc
 	scope := provider.AzureAppConfigScope(sc.storeName)
 	scope.AppConfigNamespace = sc.appConfigNamespace
 
-	target := "store " + sc.storeName
-	if sc.appConfigNamespace != "" {
-		target += " (namespace " + sc.appConfigNamespace + ")"
-	}
-
-	return staging.ResolvedScope{
-		Scope:  scope,
-		Target: target,
-	}, nil
+	return binding.StagingScope(ctx, scope, provider.KindParam, nil)
 }

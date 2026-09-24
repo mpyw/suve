@@ -1,6 +1,7 @@
 // Package detect resolves which cloud provider should back the flat `param` /
-// `secret` command aliases (and, later, the GUI's initial provider selection),
-// based purely on environment variables. It performs no network calls and no
+// `secret` command aliases and a bare `suve --tui` / `suve --gui` launch, and
+// hydrates a launch scope's resource fields, based purely on environment
+// variables. It performs no network calls and no
 // credential-chain resolution, so it is safe to run on every process start
 // (including on the shell-completion path, where speed matters).
 //
@@ -29,8 +30,13 @@
 package detect
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+
+	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/provider"
 )
@@ -162,6 +168,63 @@ func Resolve(env Environment) Result {
 
 	return res
 }
+
+// ActiveProviders lists every provider active on any service axis (param,
+// secret, or stage), deduplicated, in stable order (AWS, GoogleCloud, Azure).
+func (r Result) ActiveProviders() []provider.Provider {
+	return lo.Filter(
+		[]provider.Provider{provider.ProviderAWS, provider.ProviderGoogleCloud, provider.ProviderAzure},
+		func(p provider.Provider, _ int) bool {
+			return slices.Contains(r.ParamActive, p) ||
+				slices.Contains(r.SecretActive, p) ||
+				slices.Contains(r.StageActive, p)
+		},
+	)
+}
+
+// UniqueProvider returns the sole provider active on any service axis, or ""
+// when zero or two-plus are active. It is the "exactly one active provider"
+// rule for a bare UI launch (`suve --tui`, `suve --gui`).
+func (r Result) UniqueProvider() provider.Provider {
+	return unique(r.ActiveProviders())
+}
+
+// HydrateScope fills the empty resource fields of a launch scope from the
+// environment, so a flag-supplied value wins and an unset one falls back to
+// GOOGLE_CLOUD_PROJECT / AZURE_KEYVAULT_NAME / AZURE_APPCONFIG_NAME /
+// AZURE_APPCONFIG_NAMESPACE. AWS carries no resource field (the region comes
+// from the ambient AWS config). An unknown provider is an error.
+func HydrateScope(env Environment, s provider.Scope) (provider.Scope, error) {
+	getenv := env.Getenv
+	if getenv == nil {
+		getenv = func(string) string { return "" }
+	}
+
+	fill := func(field *string, name string) {
+		if *field == "" {
+			*field = getenv(name)
+		}
+	}
+
+	switch s.Provider {
+	case provider.ProviderGoogleCloud:
+		fill(&s.ProjectID, "GOOGLE_CLOUD_PROJECT")
+	case provider.ProviderAzure:
+		fill(&s.VaultName, "AZURE_KEYVAULT_NAME")
+		fill(&s.StoreName, "AZURE_APPCONFIG_NAME")
+		fill(&s.AppConfigNamespace, "AZURE_APPCONFIG_NAMESPACE")
+	case provider.ProviderAWS:
+		// The region comes from the ambient AWS config; nothing to hydrate.
+	default:
+		return provider.Scope{}, fmt.Errorf("%w %q", ErrUnknownProvider, s.Provider)
+	}
+
+	return s, nil
+}
+
+// ErrUnknownProvider is returned by HydrateScope for an unknown or empty
+// provider.
+var ErrUnknownProvider = errors.New("unknown provider")
 
 // unique returns the sole element of ps, or "" when ps has zero or 2+ elements.
 func unique(ps []provider.Provider) provider.Provider {

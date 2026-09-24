@@ -24,11 +24,12 @@ func TestApp_stagingScope_NoSTSForResolvableScopes(t *testing.T) {
 	tests := []struct {
 		name  string
 		scope provider.Scope
+		kind  provider.Kind
 	}{
-		{"google cloud", provider.GoogleCloudScope("proj")},
-		{"azure key vault", provider.AzureKeyVaultScope("vault")},
-		{"azure app config", provider.AzureAppConfigScope("store")},
-		{"aws with account+region", provider.AWSScope("123456789012", "us-east-1")},
+		{"google cloud", provider.GoogleCloudScope("proj"), provider.KindSecret},
+		{"azure key vault", provider.AzureKeyVaultScope("vault"), provider.KindSecret},
+		{"azure app config", provider.AzureAppConfigScope("store"), provider.KindParam},
+		{"aws with account+region", provider.AWSScope("123456789012", "us-east-1"), provider.KindParam},
 	}
 
 	for _, tt := range tests {
@@ -39,7 +40,7 @@ func TestApp_stagingScope_NoSTSForResolvableScopes(t *testing.T) {
 
 			// No AWS credentials configured in the test env; this must not error,
 			// proving no STS round-trip occurred.
-			got, err := app.stagingScopeScoped(tt.scope)
+			got, err := app.stagingScopeForKindScoped(tt.scope, tt.kind)
 			require.NoError(t, err)
 			assert.Equal(t, tt.scope, got)
 			assert.Equal(t, tt.scope.Key(), got.Key())
@@ -88,8 +89,10 @@ func TestApp_UnknownProviderHasNoStagingDefault(t *testing.T) {
 	for _, p := range []provider.Provider{"", "oracle"} {
 		sc := provider.Scope{Provider: p}
 
-		_, err := app.stagingScopeScoped(sc)
-		require.ErrorIs(t, err, errInvalidProvider, "provider %q", p)
+		for _, kind := range []provider.Kind{provider.KindParam, provider.KindSecret} {
+			_, err := app.stagingScopeForKindScoped(sc, kind)
+			require.ErrorIs(t, err, errInvalidProvider, "provider %q, kind %q", p, kind)
+		}
 
 		for _, service := range []string{"param", "secret"} {
 			_, err := app.getParserScoped(sc, service)

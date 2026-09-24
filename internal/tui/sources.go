@@ -17,8 +17,8 @@ import (
 
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/binding"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/tui/data"
@@ -34,27 +34,28 @@ type sourceFactory struct {
 	ctx   context.Context //nolint:containedctx // the TUI resolves stores lazily against the Run context
 	scope provider.Scope
 
-	// resolveAWSIdentity resolves the AWS caller identity that keys the AWS staging
-	// scope. It is a field so tests can substitute a call-counting stub; production
-	// wires infra.GetAWSIdentity.
-	resolveAWSIdentity func(context.Context) (*infra.AWSIdentity, error)
+	// resolveIdentity resolves the account-level identity that keys staging for a
+	// provider whose launch scope does not carry it (AWS: the STS caller
+	// identity). It is a field so tests can substitute a call-counting stub;
+	// production wires the provider's binding.DefaultIdentity.
+	resolveIdentity binding.IdentityLookup
 
 	mu            sync.Mutex
 	stagingStores map[string]store.ReadWriteOperator
-	// awsStagingScope memoizes the AWS staging scope resolved from the STS caller
-	// identity. The launched provider/scope are fixed for the process lifetime, so
-	// the identity is resolved once — not on every staging-store access. A
-	// transient STS failure is not cached, so it retries on the next access.
-	awsStagingScope *provider.Scope
+	// identityScope memoizes the staging scope resolved by resolveIdentity. The
+	// launched provider/scope are fixed for the process lifetime, so the identity
+	// is resolved once — not on every staging-store access. A transient failure
+	// is not cached, so it retries on the next access.
+	identityScope *staging.ResolvedScope
 }
 
 // newSourceFactory builds a factory for a launched scope and Run context.
 func newSourceFactory(ctx context.Context, scope provider.Scope) *sourceFactory {
 	return &sourceFactory{
-		ctx:                ctx,
-		scope:              scope,
-		resolveAWSIdentity: infra.GetAWSIdentity,
-		stagingStores:      map[string]store.ReadWriteOperator{},
+		ctx:             ctx,
+		scope:           scope,
+		resolveIdentity: binding.DefaultIdentity(scope.Provider),
+		stagingStores:   map[string]store.ReadWriteOperator{},
 	}
 }
 
@@ -85,8 +86,8 @@ func (f *sourceFactory) sourceFor(service string) (data.Source, data.StagingProb
 
 // mutatorFor returns the write-path Mutator for a service tab, or nil when the
 // service is unavailable for the scope. It pairs the immediate param/secret use
-// cases with the staged-write strategy and the per-scope-cached staging store,
-// mirroring the GUI's serviceStrategyScoped discipline.
+// cases with the staged-write strategy (from the shared staging binding) and the
+// per-scope-cached staging store.
 func (f *sourceFactory) mutatorFor(service string) data.Mutator {
 	svcCap, ok := capabilityFor(f.scope.Provider, service)
 	if !ok {
@@ -95,14 +96,14 @@ func (f *sourceFactory) mutatorFor(service string) data.Mutator {
 
 	switch service {
 	case string(staging.ServiceParam):
-		return data.NewParamMutator(svcCap, f.paramResolver(), f.paramStrategyBuilder(), f.stagingStoreResolver(svcCap, provider.KindParam))
+		return data.NewParamMutator(svcCap, f.paramResolver(), f.strategyBuilder(provider.KindParam), f.stagingStoreResolver(svcCap, provider.KindParam))
 	case string(staging.ServiceSecret):
 		store, err := registry.Store(f.ctx, f.scope, provider.KindSecret)
 		if err != nil {
 			return nil
 		}
 
-		return data.NewSecretMutator(svcCap, store, f.secretStrategyBuilder(), f.stagingStoreResolver(svcCap, provider.KindSecret))
+		return data.NewSecretMutator(svcCap, store, f.strategyBuilder(provider.KindSecret), f.stagingStoreResolver(svcCap, provider.KindSecret))
 	default:
 		return nil
 	}
@@ -134,7 +135,7 @@ func (f *sourceFactory) stagingService(service string) data.StagingService {
 // strategy resolver for Azure App Configuration (whose settings share one store
 // across namespaces).
 func (f *sourceFactory) paramStagingResolver() data.StagingResolver {
-	build := f.paramStrategyBuilder()
+	build := f.strategyBuilder(provider.KindParam)
 	resolveStore := f.paramResolver()
 
 	return func(ctx context.Context) (data.StagingResources, error) {
@@ -155,7 +156,7 @@ func (f *sourceFactory) paramStagingResolver() data.StagingResolver {
 
 		res := data.StagingResources{Store: st, Strategy: strategy}
 
-		if f.scope.Provider == provider.ProviderAzure && f.scope.StoreName != "" {
+		if b, err := binding.Lookup(f.scope.Provider, provider.KindParam); err == nil && b.Namespaced(f.scope) {
 			res.StrategyFor = func(namespace string) (staging.FullStrategy, error) {
 				s, err := resolveStore(ctx, namespace)
 				if err != nil {
@@ -173,7 +174,7 @@ func (f *sourceFactory) paramStagingResolver() data.StagingResolver {
 // secretStagingResolver builds the secret service's staging resources (no
 // namespace axis, so a single strategy handles every entry).
 func (f *sourceFactory) secretStagingResolver() data.StagingResolver {
-	build := f.secretStrategyBuilder()
+	build := f.strategyBuilder(provider.KindSecret)
 
 	return func(ctx context.Context) (data.StagingResources, error) {
 		st, err := f.stagingStore(provider.KindSecret)
@@ -208,48 +209,27 @@ func (f *sourceFactory) stagingStoreResolver(svcCap capability.ServiceCapability
 	}
 }
 
-// paramStrategyBuilder builds the provider-specific param staging strategy over a
-// resolved store (AWS SSM vs Azure App Configuration), mirroring the GUI's
-// serviceStrategyScoped. A provider without a param service is an error.
-func (f *sourceFactory) paramStrategyBuilder() data.StrategyBuilder {
+// strategyBuilder builds the provider-specific staging strategy for kind over a
+// resolved store, through the shared staging binding. A provider without that
+// service (or an unknown provider) is an error.
+func (f *sourceFactory) strategyBuilder(kind provider.Kind) data.StrategyBuilder {
 	return func(s provider.Store) (staging.FullStrategy, error) {
-		switch f.scope.Provider {
-		case provider.ProviderAWS:
-			return staging.NewAWSParamStrategy(s), nil
-		case provider.ProviderAzure:
-			return staging.NewAzureAppConfigParamStrategy(s), nil
-		default:
-			return nil, fmt.Errorf("no param staging strategy for provider %q", f.scope.Provider)
+		b, err := binding.Lookup(f.scope.Provider, kind)
+		if err != nil {
+			return nil, fmt.Errorf("no %s staging strategy: %w", kind, err)
 		}
+
+		return b.Strategy(s), nil
 	}
 }
 
-// secretStrategyBuilder builds the provider-specific secret staging strategy over
-// a resolved store (AWS Secrets Manager / Google Cloud / Azure Key Vault). An
-// unknown provider is an error.
-func (f *sourceFactory) secretStrategyBuilder() data.StrategyBuilder {
-	return func(s provider.Store) (staging.FullStrategy, error) {
-		switch f.scope.Provider {
-		case provider.ProviderAWS:
-			return staging.NewAWSSecretStrategy(s), nil
-		case provider.ProviderGoogleCloud:
-			return staging.NewGoogleCloudSecretStrategy(s), nil
-		case provider.ProviderAzure:
-			return staging.NewAzureKeyVaultSecretStrategy(s), nil
-		default:
-			return nil, fmt.Errorf("no secret staging strategy for provider %q", f.scope.Provider)
-		}
-	}
-}
-
-// paramResolver resolves the param store for an App Configuration namespace,
-// mirroring the GUI's paramStoreForNamespace (the namespace is harmless for
-// other providers).
+// paramResolver resolves the param store for a namespace. The binding applies
+// the namespace only to a service with a namespace axis (App Configuration).
 func (f *sourceFactory) paramResolver() data.StoreResolver {
 	return func(ctx context.Context, namespace string) (provider.Store, error) {
 		sc := f.scope
-		if sc.Provider == provider.ProviderAzure && sc.StoreName != "" {
-			sc.AppConfigNamespace = namespace
+		if b, err := binding.Lookup(sc.Provider, provider.KindParam); err == nil {
+			sc = b.NamespaceScope(sc, namespace)
 		}
 
 		return registry.Store(ctx, sc, provider.KindParam)
@@ -308,54 +288,38 @@ func (f *sourceFactory) stagingStore(kind provider.Kind) (store.ReadWriteOperato
 	return s, nil
 }
 
-// stagingScope resolves the service-specific scope that keys staging state,
-// mirroring the GUI's stagingScopeForKind: Azure's two services live in separate
-// buckets, and AWS is keyed by the STS caller identity.
+// stagingScope resolves the service-specific scope that keys staging state
+// through the shared staging binding, so the key matches the CLI and GUI.
 func (f *sourceFactory) stagingScope(kind provider.Kind) (provider.Scope, error) {
-	if f.scope.Provider == provider.ProviderAzure {
-		if kind == provider.KindParam {
-			scope := provider.AzureAppConfigScope(f.scope.StoreName)
-			scope.AppConfigNamespace = f.scope.AppConfigNamespace
-
-			return scope, nil
-		}
-
-		return provider.AzureKeyVaultScope(f.scope.VaultName), nil
-	}
-
-	if f.scope.Provider != provider.ProviderAWS {
-		return f.scope, nil
-	}
-
-	if f.scope.AccountID != "" && f.scope.Region != "" {
-		return f.scope, nil
-	}
-
-	return f.resolveAWSStagingScope()
-}
-
-// resolveAWSStagingScope resolves (and memoizes) the AWS staging scope from the
-// STS caller identity. Because the launched provider/scope are fixed for the
-// process lifetime, the identity is resolved once and reused across every
-// staging-store access rather than issuing a fresh GetCallerIdentity per probe.
-// Only a successful resolution is cached, so a transient STS failure retries.
-func (f *sourceFactory) resolveAWSStagingScope() (provider.Scope, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	if f.awsStagingScope != nil {
-		return *f.awsStagingScope, nil
-	}
-
-	identity, err := f.resolveAWSIdentity(f.ctx)
+	resolved, err := binding.StagingScope(f.ctx, f.scope, kind, f.memoizedIdentity)
 	if err != nil {
 		return provider.Scope{}, err
 	}
 
-	scope := provider.AWSScope(identity.AccountID, identity.Region)
-	f.awsStagingScope = &scope
+	return resolved.Scope, nil
+}
 
-	return scope, nil
+// memoizedIdentity resolves (and memoizes) the identity-keyed staging scope.
+// Because the launched provider/scope are fixed for the process lifetime, the
+// identity is resolved once and reused across every staging-store access rather
+// than issuing a fresh network lookup per probe. Only a successful resolution is
+// cached, so a transient failure retries.
+func (f *sourceFactory) memoizedIdentity(ctx context.Context) (staging.ResolvedScope, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.identityScope != nil {
+		return *f.identityScope, nil
+	}
+
+	resolved, err := f.resolveIdentity(ctx)
+	if err != nil {
+		return staging.ResolvedScope{}, err
+	}
+
+	f.identityScope = &resolved
+
+	return resolved, nil
 }
 
 // lazyStagingProbe defers building the real probe (and thus the on-disk store)
@@ -394,34 +358,14 @@ func capabilityFor(prov provider.Provider, service string) (capability.ServiceCa
 	return capability.ServiceCapability{}, false
 }
 
-// parserFor returns the store-less staging strategy (parser) for a
-// provider+service, mirroring the GUI's getParserScoped.
+// parserFor returns the store-less staging parser for a provider+service
+// through the shared staging binding. An unknown provider, or one that does not
+// offer the service, is an error.
 func parserFor(prov provider.Provider, service string) (staging.Parser, error) {
-	switch service {
-	case string(staging.ServiceParam):
-		if prov == provider.ProviderAzure {
-			return &staging.AzureAppConfigParamStrategy{}, nil
-		}
-
-		return &staging.AWSParamStrategy{}, nil
-	case string(staging.ServiceSecret):
-		switch prov {
-		case provider.ProviderGoogleCloud:
-			return &staging.GoogleCloudSecretStrategy{}, nil
-		case provider.ProviderAzure:
-			return &staging.AzureKeyVaultSecretStrategy{}, nil
-		default:
-			return &staging.AWSSecretStrategy{}, nil
-		}
-	default:
-		return nil, errUnknownService
+	b, err := binding.Lookup(prov, provider.Kind(service))
+	if err != nil {
+		return nil, err
 	}
+
+	return b.Parser(), nil
 }
-
-// errUnknownService is returned by parserFor for an unrecognized service.
-var errUnknownService = stringError("tui: unknown staging service")
-
-// stringError is a small sentinel error type.
-type stringError string
-
-func (e stringError) Error() string { return string(e) }

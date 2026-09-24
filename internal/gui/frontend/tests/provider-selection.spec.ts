@@ -37,6 +37,26 @@ test.describe('Provider selection', () => {
       await expect(nav(page)).toHaveCount(0);
     });
 
+    test('a second provider on the stage axis alone is ambiguous too', async ({ page }) => {
+      // The unique-active rule counts param + secret + stage, the same rule as
+      // `suve --tui` and the backend (detect.Result.UniqueProvider).
+      await setupWailsMocks(page, {
+        ...createAmbiguousProviderState(),
+        detectResult: {
+          param: 'aws',
+          secret: 'aws',
+          stage: '',
+          paramActive: ['aws'],
+          secretActive: ['aws'],
+          stageActive: ['aws', 'azure'],
+        },
+      });
+      await page.goto('/');
+
+      await expect(page.getByText('Select a provider to begin.')).toBeVisible();
+      await expect(page.locator('#provider-select')).toHaveValue('');
+    });
+
     test('zero active providers → prompt, no crash', async ({ page }) => {
       await setupWailsMocks(page, createNoActiveProviderState());
       await page.goto('/');

@@ -5,7 +5,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
-	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/provider"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
@@ -18,8 +18,8 @@ var config = stgcli.CommandConfig{
 	ItemName:       nounSecret,
 	ProviderLabel:  "AWS",
 	CommandPath:    "suve aws stage secret",
-	Factory:        cliinternal.AWSSecretStrategyFactory,
-	ParserFactory:  staging.AWSSecretParserFactory,
+	Factory:        cliinternal.StrategyFactory(provider.ProviderAWS, provider.KindSecret, cliinternal.AWSSecretStore),
+	ParserFactory:  cliinternal.ParserFactory(provider.ProviderAWS, provider.KindSecret),
 	ScopeResolver:  cliinternal.AWSStagingScopeResolver,
 	HasDescription: true,
 }

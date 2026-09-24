@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/detect"
@@ -220,5 +221,140 @@ func TestResolve(t *testing.T) {
 			assert.Equal(t, wantStage, got.Stage, "Stage")
 			assert.Equal(t, wantStage != "", got.FlatStage(), "FlatStage")
 		})
+	}
+}
+
+func TestResult_UniqueProvider(t *testing.T) {
+	t.Parallel()
+
+	aws := provider.ProviderAWS
+	gcloud := provider.ProviderGoogleCloud
+	az := provider.ProviderAzure
+
+	tests := []struct {
+		name   string
+		result detect.Result
+		want   provider.Provider
+	}{
+		{
+			name:   "none active -> empty",
+			result: detect.Result{},
+			want:   "",
+		},
+		{
+			name:   "single provider (secret only) -> that provider",
+			result: detect.Result{SecretActive: []provider.Provider{gcloud}},
+			want:   gcloud,
+		},
+		{
+			name:   "single provider (param only) -> that provider",
+			result: detect.Result{ParamActive: []provider.Provider{az}},
+			want:   az,
+		},
+		{
+			name: "same provider across both services -> that provider",
+			result: detect.Result{
+				ParamActive:  []provider.Provider{aws},
+				SecretActive: []provider.Provider{aws},
+			},
+			want: aws,
+		},
+		{
+			name: "two distinct providers -> empty (ambiguous)",
+			result: detect.Result{
+				ParamActive:  []provider.Provider{aws},
+				SecretActive: []provider.Provider{gcloud},
+			},
+			want: "",
+		},
+		{
+			// The stage axis counts too, so `suve --tui` and `suve --gui` agree.
+			name:   "stage-only provider -> that provider",
+			result: detect.Result{StageActive: []provider.Provider{az}},
+			want:   az,
+		},
+		{
+			name: "stage axis adds a second provider -> empty (ambiguous)",
+			result: detect.Result{
+				SecretActive: []provider.Provider{aws},
+				StageActive:  []provider.Provider{aws, gcloud},
+			},
+			want: "",
+		},
+		{
+			name:   "two active in one service -> empty (ambiguous)",
+			result: detect.Result{SecretActive: []provider.Provider{aws, az}},
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tt.result.UniqueProvider(); got != tt.want {
+				t.Errorf("UniqueProvider() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResult_ActiveProviders_UnionStableOrder(t *testing.T) {
+	t.Parallel()
+
+	r := detect.Result{
+		ParamActive:  []provider.Provider{provider.ProviderAzure, provider.ProviderAWS},
+		SecretActive: []provider.Provider{provider.ProviderGoogleCloud, provider.ProviderAzure},
+		StageActive:  []provider.Provider{provider.ProviderAWS},
+	}
+
+	assert.Equal(t, []provider.Provider{
+		provider.ProviderAWS,
+		provider.ProviderGoogleCloud,
+		provider.ProviderAzure,
+	}, r.ActiveProviders())
+	assert.Empty(t, detect.Result{}.ActiveProviders())
+}
+
+func TestHydrateScope(t *testing.T) {
+	t.Parallel()
+
+	hydrateEnv := detect.Environment{Getenv: func(k string) string {
+		return map[string]string{
+			"GOOGLE_CLOUD_PROJECT":      "env-project",
+			"AZURE_KEYVAULT_NAME":       "env-vault",
+			"AZURE_APPCONFIG_NAME":      "env-store",
+			"AZURE_APPCONFIG_NAMESPACE": "env-ns",
+		}[k]
+	}}
+
+	hydrate := func(s provider.Scope) provider.Scope {
+		t.Helper()
+
+		got, err := detect.HydrateScope(hydrateEnv, s)
+		require.NoError(t, err)
+
+		return got
+	}
+
+	// Empty fields fall back to env.
+	assert.Equal(t, provider.GoogleCloudScope("env-project"), hydrate(provider.Scope{Provider: provider.ProviderGoogleCloud}))
+	assert.Equal(t, provider.Scope{
+		Provider: provider.ProviderAzure, VaultName: "env-vault", StoreName: "env-store", AppConfigNamespace: "env-ns",
+	}, hydrate(provider.Scope{Provider: provider.ProviderAzure}))
+
+	// A flag-supplied value wins; the unset side still falls back to env.
+	assert.Equal(t, provider.Scope{
+		Provider: provider.ProviderAzure, VaultName: "env-vault", StoreName: "flag-store", AppConfigNamespace: "flag-ns",
+	}, hydrate(provider.Scope{Provider: provider.ProviderAzure, StoreName: "flag-store", AppConfigNamespace: "flag-ns"}))
+	assert.Equal(t, "flag-project", hydrate(provider.GoogleCloudScope("flag-project")).ProjectID)
+
+	// AWS carries no resource field.
+	assert.Equal(t, provider.Scope{Provider: provider.ProviderAWS}, hydrate(provider.Scope{Provider: provider.ProviderAWS}))
+
+	// An unknown or empty provider is an error, never a silent default.
+	for _, p := range []provider.Provider{"", "oracle"} {
+		_, err := detect.HydrateScope(hydrateEnv, provider.Scope{Provider: p})
+		require.ErrorIs(t, err, detect.ErrUnknownProvider, "provider %q", p)
 	}
 }

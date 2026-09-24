@@ -4,7 +4,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
-	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/provider"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
@@ -18,8 +18,8 @@ func gcloudStageConfig() stgcli.CommandConfig {
 		ItemName:       nounSecret,
 		ProviderLabel:  "Google Cloud",
 		CommandPath:    "suve gcloud stage",
-		Factory:        cliinternal.GoogleCloudSecretStrategyFactory,
-		ParserFactory:  staging.GoogleCloudSecretParserFactory,
+		Factory:        cliinternal.StrategyFactory(provider.ProviderGoogleCloud, provider.KindSecret, cliinternal.GoogleCloudSecretStore),
+		ParserFactory:  cliinternal.ParserFactory(provider.ProviderGoogleCloud, provider.KindSecret),
 		ScopeResolver:  cliinternal.GoogleCloudStagingScopeResolver,
 		HasDescription: true,
 	}

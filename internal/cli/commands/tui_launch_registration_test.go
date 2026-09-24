@@ -89,16 +89,16 @@ func assertAzureSubgroupsHaveTUI(t *testing.T) {
 	var sawParam, sawSecret bool
 
 	for _, sub := range azure.Commands {
-		if svc := tuiService(sub.Name); svc != "" {
-			assert.Truef(t, hasTUIFlag(sub), "--tui is registered on the azure %s subgroup", sub.Name)
-
-			switch svc {
-			case "param":
-				sawParam = true
-			case "secret":
-				sawSecret = true
-			}
+		switch sub.Name {
+		case "param":
+			sawParam = true
+		case "secret":
+			sawSecret = true
+		default:
+			continue
 		}
+
+		assert.Truef(t, hasTUIFlag(sub), "--tui is registered on the azure %s subgroup", sub.Name)
 	}
 
 	assert.True(t, sawParam, "the azure param subgroup must exist")

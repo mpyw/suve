@@ -44,37 +44,12 @@ func (a *App) DetectProviders() *DetectResult {
 }
 
 // InitialProviderFromEnv resolves the initial provider for a bare `suve --gui`
-// (and the standalone Wails entry) from the environment: the uniquely-active
-// provider across services, or "" when zero or two-plus are active (the
-// frontend then shows the selector). Env-only; no network calls.
+// (and the standalone Wails entry) from the environment: the sole active
+// provider (detect.Result.UniqueProvider, the rule `suve --tui` shares), or ""
+// when zero or two-plus are active (the frontend then shows the selector).
+// Env-only; no network calls.
 func InitialProviderFromEnv() provider.Provider {
-	return uniqueActiveProvider(detect.Resolve(detect.OSEnvironment()))
-}
-
-// uniqueActiveProvider returns the sole provider active across the param and
-// secret services, or "" when zero or two-or-more distinct providers are
-// active. Mirrors the CLI's per-service "exactly one active" rule, applied to
-// the union across services for the GUI's initial provider pick.
-func uniqueActiveProvider(r detect.Result) provider.Provider {
-	seen := make(map[provider.Provider]struct{})
-
-	for _, p := range r.SecretActive {
-		seen[p] = struct{}{}
-	}
-
-	for _, p := range r.ParamActive {
-		seen[p] = struct{}{}
-	}
-
-	if len(seen) != 1 {
-		return ""
-	}
-
-	for p := range seen {
-		return p
-	}
-
-	return ""
+	return detect.Resolve(detect.OSEnvironment()).UniqueProvider()
 }
 
 func providerStrings(ps []provider.Provider) []string {

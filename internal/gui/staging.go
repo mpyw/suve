@@ -331,9 +331,9 @@ func (a *App) StagingApply(service string, ignoreConflicts bool) (*StagingApplyR
 
 	// App Configuration stages entries across namespaces in one store; apply each
 	// under its own namespace via a namespace-scoped strategy.
-	if service == string(staging.ServiceParam) && isAppConfigParamScope(sc) {
+	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
 		uc.StrategyFor = func(namespace string) (staging.ApplyStrategy, error) {
-			return a.appConfigParamStrategyForNamespaceScoped(sc, namespace)
+			return a.paramStrategyForNamespaceScoped(sc, namespace)
 		}
 	}
 
@@ -487,13 +487,13 @@ func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddRes
 // scoped to the target namespace (rejecting a `*`/`,` filter value); for every
 // other service the base strategy is returned and the namespace is empty.
 func (a *App) editStrategyForNamespace(sc provider.Scope, service, namespace string) (staging.EditStrategy, string, error) {
-	if service == string(staging.ServiceParam) && isAppConfigParamScope(sc) {
+	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
 		literal, err := a.validateParamNamespaceScoped(sc, namespace)
 		if err != nil {
 			return nil, "", err
 		}
 
-		strategy, err := a.appConfigParamStrategyForNamespaceScoped(sc, literal)
+		strategy, err := a.paramStrategyForNamespaceScoped(sc, literal)
 		if err != nil {
 			return nil, "", err
 		}
@@ -554,13 +554,13 @@ func (a *App) StagingDelete(service, name string, force bool, recoveryWindow int
 
 	var strategy staging.DeleteStrategy
 
-	if service == string(staging.ServiceParam) && isAppConfigParamScope(sc) {
+	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
 		namespace, err = a.validateParamNamespaceScoped(sc, namespace)
 		if err != nil {
 			return nil, err
 		}
 
-		strategy, err = a.appConfigParamStrategyForNamespaceScoped(sc, namespace)
+		strategy, err = a.paramStrategyForNamespaceScoped(sc, namespace)
 	} else {
 		namespace = ""
 		strategy, err = a.strategyAsScoped[staging.DeleteStrategy](sc, service)
@@ -811,9 +811,9 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 	}
 
 	// App Configuration diffs each staged entry against its own namespace.
-	if service == string(staging.ServiceParam) && isAppConfigParamScope(sc) {
+	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
 		uc.StrategyFor = func(namespace string) (staging.DiffStrategy, error) {
-			return a.appConfigParamStrategyForNamespaceScoped(sc, namespace)
+			return a.paramStrategyForNamespaceScoped(sc, namespace)
 		}
 	}
 
@@ -1213,9 +1213,9 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 // store, so it resolves a strategy per namespace like the apply path; every
 // other service resolves a single strategy built once.
 func (a *App) importReAnchorResolverScoped(sc provider.Scope, service string) (stagingusecase.ReAnchorResolver, error) {
-	if service == string(staging.ServiceParam) && isAppConfigParamScope(sc) {
+	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
 		return func(_ staging.Service, namespace string) (staging.ApplyStrategy, error) {
-			return a.appConfigParamStrategyForNamespaceScoped(sc, namespace)
+			return a.paramStrategyForNamespaceScoped(sc, namespace)
 		}, nil
 	}
 

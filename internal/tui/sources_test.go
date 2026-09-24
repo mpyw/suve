@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -32,10 +31,10 @@ func TestStagingScope_AWSIdentityMemoized(t *testing.T) {
 	var calls int
 
 	f := newSourceFactory(t.Context(), provider.Scope{Provider: provider.ProviderAWS})
-	f.resolveAWSIdentity = func(context.Context) (*infra.AWSIdentity, error) {
+	f.resolveIdentity = func(context.Context) (staging.ResolvedScope, error) {
 		calls++
 
-		return &infra.AWSIdentity{AccountID: "123456789012", Region: "us-east-1"}, nil
+		return staging.ResolvedScope{Scope: provider.AWSScope("123456789012", "us-east-1")}, nil
 	}
 
 	want := provider.AWSScope("123456789012", "us-east-1").Key()
@@ -61,13 +60,13 @@ func TestStagingScope_AWSIdentityErrorNotCached(t *testing.T) {
 	var calls int
 
 	f := newSourceFactory(t.Context(), provider.Scope{Provider: provider.ProviderAWS})
-	f.resolveAWSIdentity = func(context.Context) (*infra.AWSIdentity, error) {
+	f.resolveIdentity = func(context.Context) (staging.ResolvedScope, error) {
 		calls++
 		if calls == 1 {
-			return nil, errors.New("transient STS failure")
+			return staging.ResolvedScope{}, errors.New("transient STS failure")
 		}
 
-		return &infra.AWSIdentity{AccountID: "123456789012", Region: "us-east-1"}, nil
+		return staging.ResolvedScope{Scope: provider.AWSScope("123456789012", "us-east-1")}, nil
 	}
 
 	_, err := f.stagingScope(provider.KindParam)
@@ -92,10 +91,10 @@ func TestStagingScope_AWSPrehydratedSkipsResolution(t *testing.T) {
 
 	scope := provider.AWSScope("999999999999", "eu-west-1")
 	f := newSourceFactory(t.Context(), scope)
-	f.resolveAWSIdentity = func(context.Context) (*infra.AWSIdentity, error) {
+	f.resolveIdentity = func(context.Context) (staging.ResolvedScope, error) {
 		calls++
 
-		return &infra.AWSIdentity{AccountID: "123456789012", Region: "us-east-1"}, nil
+		return staging.ResolvedScope{Scope: provider.AWSScope("123456789012", "us-east-1")}, nil
 	}
 
 	got, err := f.stagingScope(provider.KindParam)
@@ -128,7 +127,7 @@ func TestStrategyBuilders_PerProvider(t *testing.T) {
 
 			f := newSourceFactory(t.Context(), provider.Scope{Provider: tt.provider})
 
-			param, err := f.paramStrategyBuilder()(nil)
+			param, err := f.strategyBuilder(provider.KindParam)(nil)
 			if tt.wantParam == nil {
 				require.Error(t, err)
 			} else {
@@ -136,13 +135,51 @@ func TestStrategyBuilders_PerProvider(t *testing.T) {
 				assert.IsType(t, tt.wantParam, param)
 			}
 
-			secret, err := f.secretStrategyBuilder()(nil)
+			secret, err := f.strategyBuilder(provider.KindSecret)(nil)
 			if tt.wantSecret == nil {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				assert.IsType(t, tt.wantSecret, secret)
 			}
+		})
+	}
+}
+
+// TestParserFor_PerProvider pins the store-less parser each provider gets, and
+// that an unknown provider (or one without the service) is an error rather than
+// a silent AWS parser.
+func TestParserFor_PerProvider(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		provider provider.Provider
+		service  string
+		want     staging.Parser
+	}{
+		{"aws param", provider.ProviderAWS, "param", &staging.AWSParamStrategy{}},
+		{"aws secret", provider.ProviderAWS, "secret", &staging.AWSSecretStrategy{}},
+		{"google cloud secret", provider.ProviderGoogleCloud, "secret", &staging.GoogleCloudSecretStrategy{}},
+		{"azure param", provider.ProviderAzure, "param", &staging.AzureAppConfigParamStrategy{}},
+		{"azure secret", provider.ProviderAzure, "secret", &staging.AzureKeyVaultSecretStrategy{}},
+		{"google cloud param", provider.ProviderGoogleCloud, "param", nil},
+		{"unknown secret", provider.Provider("oracle"), "secret", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parserFor(tt.provider, tt.service)
+			if tt.want == nil {
+				require.Error(t, err)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.IsType(t, tt.want, got)
 		})
 	}
 }
