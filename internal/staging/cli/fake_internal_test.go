@@ -1,7 +1,6 @@
 // Shared test doubles for the in-package tests (TTY fakes, an erroring reader,
-// a generic leaf-command runner). They belong to no single command file, so the
-// file joins the core namespace and shares its declarations package-wide.
-//declscope:core
+// a generic leaf-command runner). They belong to no single command file.
+//declscope:namespace fake
 //declscope:package // consumed by the export and import in-package tests
 
 package cli
@@ -35,21 +34,21 @@ type fakeTTY struct {
 
 func (f *fakeTTY) Fd() uintptr { return ^uintptr(0) }
 
-// errReader always fails, so a stdin read surfaces a non-EOF error.
-type errReader struct{}
+// fakeFailingReader always fails, so a stdin read surfaces a non-EOF error.
+type fakeFailingReader struct{}
 
-func (errReader) Read([]byte) (int, error) { return 0, errors.New("read boom") }
+func (fakeFailingReader) Read([]byte) (int, error) { return 0, errors.New("read boom") }
 
-// stubFullStrategy is a sentinel staging.FullStrategy. It embeds the interface so
+// fakeFullStrategy is a sentinel staging.FullStrategy. It embeds the interface so
 // it satisfies the type without implementing every method; the re-anchor resolver
 // only stores and returns it, never invoking a method.
-type stubFullStrategy struct {
+type fakeFullStrategy struct {
 	staging.FullStrategy
 }
 
-// mockTTY forces terminal.IsTTY to report a terminal for the duration of the
+// fakeIsTTY forces terminal.IsTTY to report a terminal for the duration of the
 // test. It mutates a global, so callers must not run in parallel.
-func mockTTY(t *testing.T) {
+func fakeIsTTY(t *testing.T) {
 	t.Helper()
 
 	orig := terminal.IsTTY
@@ -59,10 +58,10 @@ func mockTTY(t *testing.T) {
 	terminal.IsTTY = func(uintptr) bool { return true }
 }
 
-// runWithCmd wires reader/writer/errWriter onto a root app and parses args into a
+// runFakeLeafCommand wires reader/writer/errWriter onto a root app and parses args into a
 // leaf command carrying flags, then invokes fn from inside the leaf's action so
 // fn sees fully-parsed flag values and a resolvable cmd.Root().
-func runWithCmd(
+func runFakeLeafCommand(
 	t *testing.T,
 	flags []cli.Flag,
 	reader io.Reader,

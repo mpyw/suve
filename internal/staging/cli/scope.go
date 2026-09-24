@@ -1,7 +1,3 @@
-// The scope/store plumbing (resolveScope, workingStore) is part of the
-// package's shared command-building layer.
-//declscope:core
-
 package cli
 
 import (
@@ -29,11 +25,11 @@ func resolveScope(ctx context.Context, resolver staging.ScopeResolver) (staging.
 	return resolver(ctx)
 }
 
-// workingStore resolves the staging scope via the resolver and
+// openScopedWorkingStore resolves the staging scope via the resolver and
 // opens the working store keyed by that scope.
 //
 //declscope:package // global.go opens each service's own working store for the all-service commands
-func workingStore(ctx context.Context, resolver staging.ScopeResolver) (*file.Store, staging.ResolvedScope, error) {
+func openScopedWorkingStore(ctx context.Context, resolver staging.ScopeResolver) (*file.Store, staging.ResolvedScope, error) {
 	resolved, err := resolveScope(ctx, resolver)
 	if err != nil {
 		return nil, staging.ResolvedScope{}, err

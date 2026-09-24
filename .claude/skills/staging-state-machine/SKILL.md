@@ -33,9 +33,11 @@ it.
 The state machine lives in `internal/staging/transition/`:
 
 - `state.go` — state type definitions
+- `staged_tags.go` — the staged tag changes (`StagedTags`)
 - `action.go` — action type definitions
 - `reducer.go` — pure reducer functions (`ReduceEntry`, `ReduceTag`)
 - `executor.go` — persists reducer results to the store
+- `load.go` — loads the current entry and tag state from the store (`LoadEntryState`, `LoadStagedTags`)
 
 Conflict detection is `CheckEntryAndTagConflicts` in `internal/staging/conflict.go`,
 called from `usecase/staging.ApplyUseCase` and, for the all-service apply,

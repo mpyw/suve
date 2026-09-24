@@ -1,7 +1,7 @@
-// The long help texts are the command builders' working parts: every description
-// here is consumed by command.go alone, so the file joins the core namespace
-// instead of standing as a unit of its own.
-//declscope:core
+// help.go holds the stage subcommands' long help texts. command.go builds each
+// subcommand from them, and export.go and import.go render theirs with
+// renderHelp, so the whole file is package-wide.
+//declscope:package
 
 package cli
 
@@ -11,32 +11,32 @@ import "strings"
 // stage subcommands. Each text is a template rendered by renderHelp:
 //
 //	{path}     the service's stage command path (CommandConfig.CommandPath)
-//	{service}  the service's immediate command path (servicePath)
+//	{service}  the service's immediate command path (helpServicePath)
 //	{item}     the item noun (CommandConfig.ItemName)
 //	{name}     the service command name (CommandConfig.CommandName)
 //	{provider} the provider label (CommandConfig.ProviderLabel)
 
 // renderHelp fills the help-text placeholders from the command config.
-//
-//declscope:package // shared by design with the export/import help text
 func renderHelp(cfg CommandConfig, text string) string {
 	return strings.NewReplacer(
 		"{path}", cfg.CommandPath,
-		"{service}", cfg.servicePath(),
+		"{service}", helpServicePath(cfg),
 		"{item}", cfg.ItemName,
 		"{name}", cfg.CommandName,
 		"{provider}", remoteName(cfg.ProviderLabel),
 	).Replace(text)
 }
 
-// servicePath derives the immediate (non-staging) command path of the service
-// from its stage path, e.g. "suve aws stage secret" -> "suve aws secret".
-func (c CommandConfig) servicePath() string {
-	return strings.Replace(c.CommandPath, " stage", "", 1)
+// helpServicePath derives the immediate (non-staging) command path of the
+// service from its stage path, e.g. "suve aws stage secret" -> "suve aws secret".
+//
+//declscope:private
+func helpServicePath(cfg CommandConfig) string {
+	return strings.Replace(cfg.CommandPath, " stage", "", 1)
 }
 
-// statusDescription returns the Description text for the status command.
-func statusDescription(cfg CommandConfig) string {
+// statusHelp returns the Description text for the status command.
+func statusHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Display staged {item} changes.
 
 Without arguments, shows all staged {item} changes.
@@ -50,8 +50,8 @@ EXAMPLES:
    {path} status --verbose    Show detailed information`)
 }
 
-// diffDescription returns the Description text for the diff command.
-func diffDescription(cfg CommandConfig) string {
+// diffHelp returns the Description text for the diff command.
+func diffHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Compare staged values against current {provider} values.
 
 If a {item} name is specified, shows diff for that {item} only.
@@ -63,8 +63,8 @@ EXAMPLES:
    {path} diff --parse-json      Show diff with JSON formatting`)
 }
 
-// addDescription returns the Description text for the add command.
-func addDescription(cfg CommandConfig) string {
+// addHelp returns the Description text for the add command.
+func addHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Create a new {item} value and stage the change.
 
 If value is provided as an argument, uses that value directly.
@@ -81,8 +81,8 @@ EXAMPLES:
    {path} add <name> <value>      Create new {item} with given value`)
 }
 
-// editDescription returns the Description text for the edit command.
-func editDescription(cfg CommandConfig) string {
+// editHelp returns the Description text for the edit command.
+func editHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Modify a {item} value and stage the change.
 
 If value is provided as an argument, uses that value directly.
@@ -101,8 +101,8 @@ EXAMPLES:
    {path} edit <name> <value>      Set {item} to given value`)
 }
 
-// applyDescription returns the Description text for the apply command.
-func applyDescription(cfg CommandConfig) string {
+// applyHelp returns the Description text for the apply command.
+func applyHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Apply all staged {item} changes to {provider}.
 
 If a {item} name is specified, only that {item}'s staged changes are applied.
@@ -125,8 +125,8 @@ EXAMPLES:
    {path} apply --ignore-conflicts   Apply even if {provider} was modified after staging`)
 }
 
-// resetDescription returns the Description text for the reset command.
-func resetDescription(cfg CommandConfig) string {
+// resetHelp returns the Description text for the reset command.
+func resetHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Remove a {item} from staging area or restore to a specific version.
 
 Without a version specifier, the {item} is simply removed from staging.
@@ -146,10 +146,10 @@ EXAMPLES:
    {path} reset --all               Unstage all {item}s`)
 }
 
-// deleteDescription returns the Description text for the delete command.
+// deleteHelp returns the Description text for the delete command.
 // Services with delete options (AWS Secrets Manager) expose recovery-window
 // details that the others do not.
-func deleteDescription(cfg CommandConfig, hasDeleteOptions bool) string {
+func deleteHelp(cfg CommandConfig, hasDeleteOptions bool) string {
 	if hasDeleteOptions {
 		return renderHelp(cfg, `Stage a {item} for deletion.
 
@@ -182,8 +182,8 @@ EXAMPLES:
    {path} delete <name>  Stage {item} for deletion`)
 }
 
-// tagDescription returns the Description text for the tag command.
-func tagDescription(cfg CommandConfig) string {
+// tagHelp returns the Description text for the tag command.
+func tagHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Stage tags to add or update for a {item}.
 
 Tags are staged locally and applied when you run '{path} apply'.
@@ -197,8 +197,8 @@ EXAMPLES:
    {path} tag <name> env=prod team=api     Stage multiple tags`)
 }
 
-// untagDescription returns the Description text for the untag command.
-func untagDescription(cfg CommandConfig) string {
+// untagHelp returns the Description text for the untag command.
+func untagHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Stage tags to remove from a {item}.
 
 Tag removals are staged locally and applied when you run '{path} apply'.

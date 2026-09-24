@@ -40,7 +40,7 @@ func (azureKeyVaultSecretHooks) traits() versionedTraits {
 	return versionedTraits{
 		service:        ServiceSecret,
 		serviceName:    "Key Vault",
-		itemName:       itemNameSecret,
+		itemName:       secretServiceItemName,
 		tagsFetchError: "failed to get secret",
 	}
 }

@@ -195,7 +195,7 @@ func NewStatusCommand(cfg CommandConfig) *cli.Command {
 		Name:        "status",
 		Usage:       fmt.Sprintf("Show staged %s changes", cfg.ItemName),
 		ArgsUsage:   argsUsageName,
-		Description: statusDescription(cfg),
+		Description: statusHelp(cfg),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "verbose",
@@ -204,7 +204,7 @@ func NewStatusCommand(cfg CommandConfig) *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			store, _, err := workingStore(ctx, cfg.ScopeResolver)
+			store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
 				return err
 			}
@@ -236,7 +236,7 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 		Name:        "diff",
 		Usage:       fmt.Sprintf("Show diff between staged and %s values", remoteName(cfg.ProviderLabel)),
 		ArgsUsage:   argsUsageName,
-		Description: diffDescription(cfg),
+		Description: diffHelp(cfg),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "parse-json",
@@ -266,7 +266,7 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 				name = parsedName
 			}
 
-			store, _, err := workingStore(ctx, cfg.ScopeResolver)
+			store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
 				return err
 			}
@@ -305,7 +305,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 		Name:        "add",
 		Usage:       fmt.Sprintf("Create new %s and stage it", cfg.ItemName),
 		ArgsUsage:   "<name> [value]",
-		Description: addDescription(cfg),
+		Description: addHelp(cfg),
 		// The --description flag is gated on HasDescription (#666: unsupported
 		// providers reject it rather than silently drop it); value-type flags are
 		// appended for providers with a value-type axis (AWS SSM param, #664).
@@ -327,7 +327,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 				return err
 			}
 
-			store, _, err := workingStore(ctx, cfg.ScopeResolver)
+			store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
 				return err
 			}
@@ -363,7 +363,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 		Name:        "edit",
 		Usage:       fmt.Sprintf("Edit %s value and stage changes", cfg.ItemName),
 		ArgsUsage:   "<name> [value]",
-		Description: editDescription(cfg),
+		Description: editHelp(cfg),
 		// The --description flag is gated on HasDescription (#666: unsupported
 		// providers reject it rather than silently drop it); value-type flags are
 		// appended for providers with a value-type axis (AWS SSM param, #664).
@@ -385,7 +385,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 				return err
 			}
 
-			store, _, err := workingStore(ctx, cfg.ScopeResolver)
+			store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
 				return err
 			}
@@ -423,7 +423,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 		Aliases:     []string{cmdNamePush},
 		Usage:       fmt.Sprintf("Apply staged %s changes to %s", cfg.ItemName, remoteName(cfg.ProviderLabel)),
 		ArgsUsage:   argsUsageName,
-		Description: applyDescription(cfg),
+		Description: applyHelp(cfg),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  flagYes,
@@ -435,7 +435,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			store, resolved, err := workingStore(ctx, cfg.ScopeResolver)
+			store, resolved, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
 				return err
 			}
@@ -485,7 +485,7 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 		Name:        "reset",
 		Usage:       fmt.Sprintf("Unstage %s or restore to specific version", cfg.ItemName),
 		ArgsUsage:   "[spec]",
-		Description: resetDescription(cfg),
+		Description: resetHelp(cfg),
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "all",
@@ -523,7 +523,7 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 				}
 			}
 
-			store, _, err := workingStore(ctx, cfg.ScopeResolver)
+			store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
 				return err
 			}
@@ -580,14 +580,14 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 		Name:        "delete",
 		Usage:       fmt.Sprintf("Stage a %s for deletion", cfg.ItemName),
 		ArgsUsage:   "<name>",
-		Description: deleteDescription(cfg, hasDeleteOptions),
+		Description: deleteHelp(cfg, hasDeleteOptions),
 		Flags:       flags,
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
 				return fmt.Errorf("usage: %s delete <name>", cfg.CommandPath)
 			}
 
-			store, _, err := workingStore(ctx, cfg.ScopeResolver)
+			store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
 			if err != nil {
 				return err
 			}
@@ -639,7 +639,7 @@ func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func
 		name := cmd.Args().First()
 		args := cmd.Args().Slice()[1:]
 
-		store, _, err := workingStore(ctx, cfg.ScopeResolver)
+		store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
 		if err != nil {
 			return err
 		}
@@ -680,7 +680,7 @@ func NewTagCommand(cfg CommandConfig) *cli.Command {
 		Name:        "tag",
 		Usage:       fmt.Sprintf("Stage tags for a %s", cfg.ItemName),
 		ArgsUsage:   "<name> <key>=<value>...",
-		Description: tagDescription(cfg),
+		Description: tagHelp(cfg),
 		Action:      tagAction(cfg, "tag <name> <key>=<value>", runner),
 	}
 }
@@ -707,7 +707,7 @@ func NewUntagCommand(cfg CommandConfig) *cli.Command {
 		Name:        "untag",
 		Usage:       fmt.Sprintf("Stage tag removal for a %s", cfg.ItemName),
 		ArgsUsage:   "<name> <key>...",
-		Description: untagDescription(cfg),
+		Description: untagHelp(cfg),
 		Action:      tagAction(cfg, "untag <name> <key>", runner),
 	}
 }

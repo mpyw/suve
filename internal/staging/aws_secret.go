@@ -44,7 +44,7 @@ func (awsSecretHooks) traits() versionedTraits {
 	return versionedTraits{
 		service:          ServiceSecret,
 		serviceName:      "Secrets Manager",
-		itemName:         itemNameSecret,
+		itemName:         secretServiceItemName,
 		tagsFetchError:   "failed to describe secret",
 		hasDeleteOptions: true,
 	}

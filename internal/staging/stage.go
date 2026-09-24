@@ -1,4 +1,4 @@
-// The staged-state model (State, Entry, Service, ...) is the unit this package
+// The staged-state model (State, Entry, EntryKey, ...) is the unit this package
 // is named for; a "stage" prefix on these names would only stutter at the
 // staging.X call sites.
 //declscope:core
@@ -527,17 +527,22 @@ func (s *State) RemoveService(service Service) {
 	s.Tags[service] = make(map[EntryKey]TagEntry)
 }
 
-// Service is the provider-neutral service axis a staged change belongs to.
-type Service string
+// ResourceNotFoundError indicates a resource was not found in the remote store.
+type ResourceNotFoundError struct {
+	Err error
+}
 
-const (
-	// ServiceParam is the parameter service (e.g. AWS SSM Parameter Store,
-	// Azure App Configuration).
-	ServiceParam Service = "param"
-	// ServiceSecret is the secret service (e.g. AWS Secrets Manager, Google
-	// Cloud Secret Manager, Azure Key Vault).
-	ServiceSecret Service = "secret"
-)
+func (e *ResourceNotFoundError) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+
+	return "resource not found"
+}
+
+func (e *ResourceNotFoundError) Unwrap() error {
+	return e.Err
+}
 
 var (
 	// ErrNotStaged is returned when a parameter/secret is not staged.

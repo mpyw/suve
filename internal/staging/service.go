@@ -1,43 +1,31 @@
-// The strategy contract (Parser, ApplyStrategy, FullStrategy, ...) is the other
-// half of the package's core: every provider strategy file implements it and
-// every caller spells it as staging.X, so no file prefix fits these names.
-//declscope:core
-
 package staging
 
 import (
-	"context"
 	"errors"
-	"time"
 
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/provider"
 )
 
-// itemNameSecret is the display item name shared by the secret staging
+// Service is the provider-neutral service axis a staged change belongs to.
+type Service string
+
+const (
+	// ServiceParam is the parameter service (e.g. AWS SSM Parameter Store,
+	// Azure App Configuration).
+	ServiceParam Service = "param"
+	// ServiceSecret is the secret service (e.g. AWS Secrets Manager, Google
+	// Cloud Secret Manager, Azure Key Vault).
+	ServiceSecret Service = "secret"
+)
+
+// secretServiceItemName is the display item name shared by the secret staging
 // strategies (AWS Secrets Manager, Google Cloud Secret Manager, Azure Key
 // Vault). Centralizing it avoids repeating the literal across strategies.
 //
 //declscope:package // shared by design across the per-provider secret strategy files
-const itemNameSecret = "secret"
-
-// ResourceNotFoundError indicates a resource was not found in the remote store.
-type ResourceNotFoundError struct {
-	Err error
-}
-
-func (e *ResourceNotFoundError) Error() string {
-	if e.Err != nil {
-		return e.Err.Error()
-	}
-
-	return "resource not found"
-}
-
-func (e *ResourceNotFoundError) Unwrap() error {
-	return e.Err
-}
+const secretServiceItemName = "secret"
 
 // ServiceStrategy defines the common interface for service-specific operations.
 // This enables Strategy Pattern to consolidate duplicate code across SSM Parameter Store and Secrets Manager commands.
@@ -55,123 +43,6 @@ type ServiceStrategy interface {
 	HasDeleteOptions() bool
 }
 
-// Parser provides name/spec parsing without provider access.
-// Use this interface when only parsing is needed (e.g., status, add commands).
-type Parser interface {
-	ServiceStrategy
-
-	// ParseName parses and validates a name, returning only the base name without version specifiers.
-	// Returns an error if version specifiers are present.
-	ParseName(input string) (string, error)
-
-	// ParseSpec parses a version spec string.
-	// Returns the base name and whether a version/shift was specified.
-	ParseSpec(input string) (name string, hasVersion bool, err error)
-}
-
-// ParserFactory creates a Parser without a provider client.
-type ParserFactory func() Parser
-
-// ApplyStrategy defines service-specific apply operations.
-type ApplyStrategy interface {
-	ServiceStrategy
-
-	// Apply applies a staged entry operation to the remote store.
-	// Handles OperationCreate, OperationUpdate, and OperationDelete based on entry.Operation.
-	Apply(ctx context.Context, name string, entry Entry) error
-
-	// ApplyTags applies staged tag changes to the remote store.
-	ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error
-
-	// FetchLastModified returns the last modified time of the resource in the remote store.
-	// It returns a *ResourceNotFoundError when the resource does not exist, so
-	// callers can distinguish "missing" from "exists but has no modification
-	// time" (the latter returns a zero time with a nil error). Providers that
-	// disable conflict detection may always return a zero time with a nil error.
-	FetchLastModified(ctx context.Context, name string) (time.Time, error)
-}
-
-// FetchResult holds the result of fetching a value from the remote store.
-type FetchResult struct {
-	// Value is the current remote value.
-	Value string
-	// Identifier is a display string for the version (e.g., "#3" for SSM Parameter Store, "#abc123" for Secrets Manager).
-	Identifier string
-	// Secret reports whether the fetched value is secret material (a Secrets
-	// Manager/Key Vault/Secret Manager value, or a SecureString param), so a
-	// staged-diff consumer masks it. A SecureString param is a secret on the
-	// value-type axis even though it lives on the param service (#677).
-	Secret bool
-}
-
-// EditFetchResult holds the result of fetching a value for editing.
-type EditFetchResult struct {
-	// Value is the current remote value.
-	Value string
-	// LastModified is the last modification time of the resource.
-	// Used for conflict detection when applying staged changes.
-	LastModified time.Time
-}
-
-// DiffStrategy defines service-specific diff/fetch operations.
-type DiffStrategy interface {
-	ServiceStrategy
-
-	// FetchCurrent fetches the current value from the remote store for diffing.
-	FetchCurrent(ctx context.Context, name string) (*FetchResult, error)
-
-	// FetchCurrentTags fetches the current tags from the remote store for showing in diff output.
-	// Returns nil map if the resource doesn't exist or has no tags.
-	FetchCurrentTags(ctx context.Context, name string) (map[string]string, error)
-}
-
-// EditStrategy defines service-specific edit operations.
-type EditStrategy interface {
-	Parser
-
-	// FetchCurrentValue fetches the current value from the remote store for editing.
-	// Returns the value and last modified time for conflict detection.
-	FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error)
-}
-
-// ResetStrategy defines service-specific reset operations.
-type ResetStrategy interface {
-	Parser
-
-	// FetchVersion fetches the value for a specific version.
-	// Returns the value and a version label for display.
-	FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error)
-
-	// FetchCurrentValue fetches the current value from the remote store for auto-skip detection.
-	// Uses same signature as EditStrategy for implementation reuse.
-	FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error)
-}
-
-// DeleteStrategy defines service-specific delete staging operations.
-type DeleteStrategy interface {
-	ServiceStrategy
-
-	// FetchLastModified returns the last modified time of the resource in the remote store.
-	// Used for existence and conflict detection when applying delete operations.
-	// It returns a *ResourceNotFoundError when the resource does not exist, so
-	// callers can distinguish "missing" from "exists but has no modification
-	// time" (the latter returns a zero time with a nil error).
-	FetchLastModified(ctx context.Context, name string) (time.Time, error)
-}
-
-// FullStrategy combines all service-specific strategy interfaces.
-// This enables unified stage commands that work with any provider service.
-type FullStrategy interface {
-	ApplyStrategy
-	DiffStrategy
-	EditStrategy
-	ResetStrategy
-}
-
-// StrategyFactory creates a FullStrategy for a given context.
-// Used to defer provider client initialization until command execution.
-type StrategyFactory func(ctx context.Context) (FullStrategy, error)
-
 // ErrServiceNotConfigured is returned by a ScopeResolver when the active scope
 // does not name this service's backing resource (e.g. no Azure Key Vault while
 // only App Configuration is configured). A single-service command treats it as
@@ -179,12 +50,6 @@ type StrategyFactory func(ctx context.Context) (FullStrategy, error)
 // command treats it as "skip this service" — an unconfigured service can hold no
 // staged state, since staging is keyed by the resource name.
 var ErrServiceNotConfigured = errors.New("staging service not configured")
-
-// ApplyStrategyResolver resolves the ApplyStrategy for a given namespace. It
-// mirrors the per-namespace resolution the apply path uses so a namespaced
-// provider (Azure App Configuration) probes each entry against the remote state
-// of its OWN namespace rather than the default one.
-type ApplyStrategyResolver func(namespace string) (ApplyStrategy, error)
 
 // KindToService maps a provider Kind to the equivalent staging Service.
 func KindToService(k provider.Kind) Service {
