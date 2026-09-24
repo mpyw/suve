@@ -69,7 +69,7 @@ Each versioning model is a grammar value in `internal/version/products.go`:
 
 | Provider | Service commands | Stage commands | Adapters (`internal/provider/...`) |
 |----------|------------------|----------------|------------------------------------|
-| AWS | `internal/cli/commands/aws/{param,secret}` | `aws/stage` (`param.go`, `secret.go`, all-service `command.go`) | `aws/parameterstore`, `aws/secretsmanager` |
+| AWS | `internal/cli/commands/aws/{param,secret}` | `aws/stage.go` | `aws/parameterstore`, `aws/secretsmanager` |
 | Google Cloud | `internal/cli/commands/gcloud/secret` | `gcloud/stage.go` | `gcloud/secretmanager` |
 | Azure | `internal/cli/commands/azure/{param,secret}` | `azure/stage.go` | `azure/appconfig`, `azure/keyvault` |
 

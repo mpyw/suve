@@ -18,9 +18,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/cli/commands/aws"
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	awsstage "github.com/mpyw/suve/internal/cli/commands/aws/stage"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
@@ -29,7 +29,7 @@ import (
 // awsStageGlobalConfig builds the AWS provider config for the global stage
 // commands (param + secret), used by the e2e tests.
 func awsStageGlobalConfig() stgcli.GlobalConfig {
-	return awsstage.GlobalConfig()
+	return aws.StageGlobalConfig()
 }
 
 // =============================================================================
@@ -194,7 +194,7 @@ func TestAWSGlobal_StageCommand(t *testing.T) {
 
 	// Test that global stage command has correct subcommands
 	t.Run("has-subcommands", func(t *testing.T) {
-		cmd := awsstage.Command()
+		cmd := aws.StageCommand()
 		assert.Equal(t, "stage", cmd.Name)
 
 		subCmdNames := make([]string, len(cmd.Commands))
@@ -216,7 +216,7 @@ func TestAWSStaging_ErrorCases(t *testing.T) {
 
 	// Push when nothing staged - warning goes to stdout
 	t.Run("apply-nothing-staged", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
+		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
 		// Message might say "No SSM Parameter Store changes staged" or similar
 		assert.Contains(t, stdout, "No")
@@ -228,7 +228,7 @@ func TestAWSStaging_ErrorCases(t *testing.T) {
 	// success rather than an error. (The "<name> is not staged" error only
 	// surfaces when other items are staged but the requested name is not.)
 	t.Run("apply-nonexistent", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes", "/nonexistent/param")
+		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes", "/nonexistent/param")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No")
 		assert.Contains(t, stdout, "changes staged")
@@ -236,7 +236,7 @@ func TestAWSStaging_ErrorCases(t *testing.T) {
 
 	// Reset when nothing staged - message goes to stdout
 	t.Run("reset-all-nothing-staged", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "reset", "--all")
+		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "reset", "--all")
 		require.NoError(t, err)
 		// Message might say "No SSM Parameter Store parameters staged" or similar
 		assert.Contains(t, stdout, "No")
@@ -245,7 +245,7 @@ func TestAWSStaging_ErrorCases(t *testing.T) {
 
 	// Diff with non-staged parameter
 	t.Run("diff-not-staged", func(t *testing.T) {
-		_, stderr, err := runSubCommand(t, awsstage.ParamCommand(), "diff", "/nonexistent/param")
+		_, stderr, err := runSubCommand(t, aws.StageParamCommand(), "diff", "/nonexistent/param")
 		// Per-item diff does not error for an unstaged name; it warns on stderr.
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "not staged")
@@ -348,7 +348,7 @@ func TestAWSGlobal_TagConflictDetection(t *testing.T) {
 
 	// Apply without --ignore-conflicts: rejected as a conflict; tag stays staged.
 	t.Run("apply-rejected-on-conflict", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
+		_, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
 
@@ -358,7 +358,7 @@ func TestAWSGlobal_TagConflictDetection(t *testing.T) {
 
 	// Apply with --ignore-conflicts: forced through and unstaged.
 	t.Run("apply-forced-with-ignore-conflicts", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes", "--ignore-conflicts")
+		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes", "--ignore-conflicts")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Tagged")
 
@@ -437,14 +437,14 @@ func TestAWSGlobal_ExportImport(t *testing.T) {
 	})
 
 	// Stage a parameter in the working staging area.
-	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "test-value")
+	_, _, err := runSubCommand(t, aws.StageParamCommand(), "add", paramName, "test-value")
 	require.NoError(t, err)
 
 	dir := filepath.Join(t.TempDir(), "backup")
 
 	// Export writes <dir>/param.json and clears the working area.
 	t.Run("export", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.Command(), "export", dir)
+		stdout, _, err := runSubCommand(t, aws.StageCommand(), "export", dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "exported")
 
@@ -461,7 +461,7 @@ func TestAWSGlobal_ExportImport(t *testing.T) {
 
 	// Import restores the working area.
 	t.Run("import", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.Command(), "import", dir)
+		stdout, _, err := runSubCommand(t, aws.StageCommand(), "import", dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "imported")
 	})
@@ -485,12 +485,12 @@ func TestAWSGlobal_ExportKeep(t *testing.T) {
 		_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	})
 
-	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "keep-value")
+	_, _, err := runSubCommand(t, aws.StageParamCommand(), "add", paramName, "keep-value")
 	require.NoError(t, err)
 
 	dir := filepath.Join(t.TempDir(), "backup")
 
-	stdout, _, err := runSubCommand(t, awsstage.Command(), "export", dir, "--keep")
+	stdout, _, err := runSubCommand(t, aws.StageCommand(), "export", dir, "--keep")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "kept in the working staging area")
 
@@ -514,19 +514,19 @@ func TestAWSGlobal_ImportMerge(t *testing.T) {
 	})
 
 	// Stage param1 and export it (clears the working area).
-	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName1, "value1")
+	_, _, err := runSubCommand(t, aws.StageParamCommand(), "add", paramName1, "value1")
 	require.NoError(t, err)
 
 	dir := filepath.Join(t.TempDir(), "backup")
-	_, _, err = runSubCommand(t, awsstage.Command(), "export", dir)
+	_, _, err = runSubCommand(t, aws.StageCommand(), "export", dir)
 	require.NoError(t, err)
 
 	// Stage param2 in the working area.
-	_, _, err = runSubCommand(t, awsstage.ParamCommand(), "add", paramName2, "value2")
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "add", paramName2, "value2")
 	require.NoError(t, err)
 
 	// Import merges param1 back in.
-	stdout, _, err := runSubCommand(t, awsstage.Command(), "import", dir, "--merge")
+	stdout, _, err := runSubCommand(t, aws.StageCommand(), "import", dir, "--merge")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "merged")
 
@@ -549,11 +549,11 @@ func TestAWSGlobal_ImportScopeMismatch(t *testing.T) {
 		_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	})
 
-	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "value")
+	_, _, err := runSubCommand(t, aws.StageParamCommand(), "add", paramName, "value")
 	require.NoError(t, err)
 
 	dir := filepath.Join(t.TempDir(), "backup")
-	_, _, err = runSubCommand(t, awsstage.Command(), "export", dir)
+	_, _, err = runSubCommand(t, aws.StageCommand(), "export", dir)
 	require.NoError(t, err)
 
 	// Tamper the exported envelope's scope so it no longer matches.
@@ -572,14 +572,14 @@ func TestAWSGlobal_ImportScopeMismatch(t *testing.T) {
 
 	// Import is refused by default.
 	t.Run("refused", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.Command(), "import", dir)
+		_, _, err := runSubCommand(t, aws.StageCommand(), "import", dir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "scope")
 	})
 
 	// --allow-scope-mismatch overrides.
 	t.Run("forced", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.Command(), "import", dir, "--allow-scope-mismatch")
+		_, _, err := runSubCommand(t, aws.StageCommand(), "import", dir, "--allow-scope-mismatch")
 		require.NoError(t, err)
 
 		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
@@ -597,7 +597,7 @@ func TestAWSGlobal_ExportEmpty(t *testing.T) {
 
 	dir := filepath.Join(t.TempDir(), "backup")
 
-	stdout, _, err := runSubCommand(t, awsstage.Command(), "export", dir)
+	stdout, _, err := runSubCommand(t, aws.StageCommand(), "export", dir)
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "No staged changes to export.")
 
@@ -618,21 +618,21 @@ func TestAWSGlobal_ExportImportEncrypted(t *testing.T) {
 		_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	})
 
-	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "secret-value")
+	_, _, err := runSubCommand(t, aws.StageParamCommand(), "add", paramName, "secret-value")
 	require.NoError(t, err)
 
 	dir := filepath.Join(t.TempDir(), "backup")
 
 	// Export encrypted.
 	stdout, stderr, err := runSubCommandWithStdin(
-		t, awsstage.Command(), strings.NewReader("testpass\n"), "export", dir, "--passphrase-stdin",
+		t, aws.StageCommand(), strings.NewReader("testpass\n"), "export", dir, "--passphrase-stdin",
 	)
 	require.NoError(t, err, "export failed: stdout=%s stderr=%s", stdout, stderr)
 	assert.Contains(t, stdout, "encrypted")
 
 	// Import back with the same passphrase.
 	stdout, stderr, err = runSubCommandWithStdin(
-		t, awsstage.Command(), strings.NewReader("testpass\n"), "import", dir, "--passphrase-stdin",
+		t, aws.StageCommand(), strings.NewReader("testpass\n"), "import", dir, "--passphrase-stdin",
 	)
 	require.NoError(t, err, "import failed: stdout=%s stderr=%s", stdout, stderr)
 	assert.Contains(t, stdout, "imported")
@@ -1106,13 +1106,13 @@ func TestAWSAgentLifecycle_StatusDoesNotStartAgent(t *testing.T) {
 
 	// Service-specific status should return appropriate message
 	t.Run("param-status-empty", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
+		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No")
 	})
 
 	t.Run("secret-status-empty", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "status")
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No")
 	})
@@ -1139,7 +1139,7 @@ func TestAWSAgentLifecycle_DiffDoesNotStartAgent(t *testing.T) {
 	// Service-specific diff should show warning
 	// Message is either "nothing staged" (lifecycle) or "no parameters staged" (runner)
 	t.Run("param-diff-empty", func(t *testing.T) {
-		_, stderr, err := runSubCommand(t, awsstage.ParamCommand(), "diff")
+		_, stderr, err := runSubCommand(t, aws.StageParamCommand(), "diff")
 		require.NoError(t, err)
 		assert.True(t, strings.Contains(stderr, "nothing staged") || strings.Contains(stderr, "no parameters staged"),
 			"expected 'nothing staged' or 'no parameters staged', got: %s", stderr)
@@ -1166,7 +1166,7 @@ func TestAWSAgentLifecycle_ApplyDoesNotStartAgent(t *testing.T) {
 
 	// Service-specific apply should return appropriate message
 	t.Run("param-apply-empty", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
+		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No")
 	})
@@ -1192,7 +1192,7 @@ func TestAWSAgentLifecycle_ResetDoesNotStartAgent(t *testing.T) {
 
 	// Service-specific reset should return appropriate message
 	t.Run("param-reset-all-empty", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "reset", "--all")
+		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "reset", "--all")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No")
 	})

@@ -9,7 +9,6 @@ import (
 
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -120,7 +119,7 @@ For comparing staged values, use: suve aws stage param diff`,
 
 // parseDiffArgs parses the diff arguments with the SSM Parameter Store grammar.
 func parseDiffArgs(args []string) (*version.NumericSpec, *version.NumericSpec, error) {
-	return diffargs.ParseArgs(
+	return generic.ParseDiffArgs(
 		args,
 		version.ParameterStore.Parse,
 		version.NumericAbsolute.IsSet,
