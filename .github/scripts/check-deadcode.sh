@@ -61,4 +61,24 @@ if [ -n "${offenders}" ]; then
   exit 1
 fi
 
+# An allowlist entry that no longer matches a finding waives nothing (its func
+# was renamed, moved or deleted), so it must go too.
+stale=""
+IFS='
+'
+for entry in ${allow}; do
+  if ! printf '%s\n' "${findings}" | grep -Fxq "${entry}"; then
+    stale="${stale}${entry}
+"
+  fi
+done
+IFS=$old_ifs
+
+if [ -n "${stale}" ]; then
+  echo "Stale entries in ${ALLOWLIST} (no matching deadcode finding):" >&2
+  printf '%s' "${stale}" >&2
+  echo "Remove them." >&2
+  exit 1
+fi
+
 echo "Dead code gate OK: no unreachable funcs outside ${ALLOWLIST}."

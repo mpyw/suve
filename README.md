@@ -426,6 +426,9 @@ The target is addressed by its **globally-unique name**, so no subscription or r
   <img src="demo/cli-demo.gif" alt="CLI Demo" width="800">
 </p>
 
+> [!NOTE]
+> The examples in this section use AWS Parameter Store and Secrets Manager through the bare `suve param` / `suve stage` aliases. Those aliases exist only when AWS is the only active backend for the service (see [Bare Aliases](#bare-aliases)). Otherwise, use the explicit group, such as `suve aws param show`. See [Google Cloud](docs/gcloud.md) and [Azure](docs/azure.md) for those backends.
+
 ### Basic Commands
 
 ```ShellSession
@@ -1225,10 +1228,14 @@ mise run bash --azure-keyvault    # Azure Key Vault
 mise run bash --azure             # both Azure services
 mise run bash --aws --gcloud --azure   # everything at once
 
-# inside the shell:
+# inside the shell (with one provider active):
 suve --gui        # auto-detects the active provider
 suve param ls
 suve secret list
+
+# with several providers active, name the group:
+suve aws param ls
+suve gcloud secret list
 ```
 
 Containers keep running after you exit the shell; stop them with

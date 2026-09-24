@@ -17,6 +17,7 @@ staging:
       - any-glob-to-any-file:
           - "internal/staging/**"
           - "internal/usecase/staging/**"
+          - "internal/cli/commands/*/stage.go"
 
 param:
   - changed-files:
@@ -34,10 +35,10 @@ secret:
       - any-glob-to-any-file:
           - "internal/cli/commands/aws/secret/**"
           - "internal/cli/commands/azure/secret/**"
-          - "internal/cli/commands/gcloud/**"
+          - "internal/cli/commands/gcloud/secret/**"
           - "internal/provider/aws/secretsmanager/**"
           - "internal/provider/azure/keyvault/**"
-          - "internal/provider/gcloud/**"
+          - "internal/provider/gcloud/secretmanager/**"
           - "internal/usecase/secret/**"
           - "internal/version/**"
 
