@@ -4,9 +4,10 @@
   interface Props {
     tags: Array<{ key: string; value: string }> | undefined;
     serviceClass: 'param' | 'secret';
-    // Secondary hint naming the cloud's own term for tags (e.g. "(= Google
-    // Cloud: labels)"), or '' for none.
-    nativeHint?: string;
+    // The cloud's own term for tags (the capability's nativeTagName, e.g.
+    // "labels"), or '' when it also says tags; providerName names the cloud.
+    nativeTagName?: string;
+    providerName?: string;
     onadd: () => void;
     onremove: (key: string) => void;
   }
@@ -14,7 +15,9 @@
   // suve uses one metadata vocabulary ("Tags") across every provider. A cloud
   // with its own term for the same key=value metadata (the capability's
   // nativeTagName) gets a secondary, non-primary hint without renaming the field.
-  let { tags, serviceClass, nativeHint = '', onadd, onremove }: Props = $props();
+  let { tags, serviceClass, nativeTagName = '', providerName = '', onadd, onremove }: Props = $props();
+
+  const nativeHint = $derived(nativeTagName ? `(= ${providerName}: ${nativeTagName})` : '');
 </script>
 
 <div class="detail-section">

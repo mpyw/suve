@@ -14,7 +14,8 @@
   import './common.css';
 
   interface Props {
-    capability?: capabilityModel.ServiceCapability;
+    // App mounts a view only for a service the provider offers.
+    capability: capabilityModel.ServiceCapability;
     // The provider's display name, for the tags hint.
     providerName?: string;
     // selectedNamespace is the App Configuration namespace filter, owned by App
@@ -30,9 +31,6 @@
 
   let { capability, providerName = '', selectedNamespace = NS_NULL, onnamespaces, onnavigatetostaging, onstagingchange }: Props = $props();
 
-  // The cloud's own term for tags, as a hint next to "Tags".
-  const tagHint = $derived(capability?.nativeTagName ? `(= ${providerName}: ${capability.nativeTagName})` : '');
-
   // Capability-driven visibility. Absent capability defaults to AWS-like (true)
   // so the component degrades safely if mounted without one.
   const stagingEnabled = $derived(capability?.hasStaging ?? true);
@@ -45,7 +43,7 @@
 
   // The namespace axis (Azure App Configuration calls it a "label") exists only
   // for a service with hasNamespaces.
-  const hasNamespaces = $derived(capability?.hasNamespaces ?? false);
+  const hasNamespaces = $derived(capability.hasNamespaces);
 
   // The namespace of the currently selected row, shown in the detail panel.
   let selectedEntryNamespace = $state('');
@@ -144,7 +142,7 @@
   const immediate = $derived(immediateMode || !stagingEnabled);
   // The Type dropdown shows for a service with typed values (hasValueType) once
   // the backend has listed its options.
-  const typeEnabled = $derived((capability?.hasValueType ?? false) && paramTypeOptions.length > 0);
+  const typeEnabled = $derived(capability.hasValueType && paramTypeOptions.length > 0);
 
   // Diff state
   let diffResult: gui.ParamDiffResult | null = $state(null);
@@ -636,7 +634,7 @@
             {/if}
 
             {#if tagsEnabled}
-              <TagList tags={paramDetail.tags} serviceClass="param" nativeHint={tagHint} onadd={openTagModal} onremove={openRemoveTagModal} />
+              <TagList tags={paramDetail.tags} serviceClass="param" nativeTagName={capability.nativeTagName} {providerName} onadd={openTagModal} onremove={openRemoveTagModal} />
             {/if}
 
             {#if historyEnabled && paramLog.length > 0}
