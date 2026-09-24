@@ -51,7 +51,7 @@ func runAzureParam(t *testing.T, args ...string) (string, error) {
 	}
 
 	full := append([]string{"suve", "azure", "param"}, args...)
-	err := app.Run(t.Context(), full)
+	err := app.Run(testContext(t), full)
 
 	return outBuf.String(), err
 }

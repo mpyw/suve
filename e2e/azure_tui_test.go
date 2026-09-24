@@ -92,10 +92,10 @@ func newAzureTUIModel(t *testing.T, scope provider.Scope, service string) tea.Mo
 // isolating a single target entry so it becomes the selected row. Emulators are
 // shared across a sequential suite, so the browser list can hold other tests'
 // entries: Key Vault deletes are SOFT (lowkey-vault keeps a deleted secret listed
-// until purged), and a t.Cleanup delete runs after t.Context() is canceled, so it
-// may never commit. The list would then auto-select the first entry rather than
-// the seeded target. Filtering to the target's unique name makes the selection
-// (and thus the detail/history it drives) deterministic regardless of leftovers.
+// until purged), and an interrupted run may skip its t.Cleanup deletes. The list
+// would then auto-select the first entry rather than the seeded target. Filtering
+// to the target's unique name makes the selection (and thus the detail/history it
+// drives) deterministic regardless of leftovers.
 // The AWS TUI e2e (aws_tui_test.go) reuses this helper and settleReload.
 func filterBrowser(t *testing.T, tm *teatest.TestModel, substr string) {
 	t.Helper()
@@ -518,8 +518,8 @@ func TestTUIAzureAppConfig_DetailNoHistory(t *testing.T) {
 	// advance one step to a view that includes the dev entries ("dev" or the
 	// all-namespaces "*"), then wait for the setting to be listed. That view is not
 	// guaranteed to hold only this setting: sibling tests' settings (e.g. the
-	// Namespaces test's, whose t.Cleanup deletes run after t.Context() is canceled
-	// and so may not commit) can share it and take the default selection. Filter to
+	// Namespaces test's, which stay listed if a run skips its t.Cleanup deletes)
+	// can share it and take the default selection. Filter to
 	// this setting's unique name so it becomes the selected row, then let the
 	// filter's reselection detail load settle so the value has landed before we
 	// capture — so the assert never races the detail read on a slow CI runner.

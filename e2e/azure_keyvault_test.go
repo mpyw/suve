@@ -53,7 +53,7 @@ func runAzureSecret(t *testing.T, args ...string) (string, error) {
 	}
 
 	full := append([]string{"suve", "azure", "secret"}, args...)
-	err := app.Run(t.Context(), full)
+	err := app.Run(testContext(t), full)
 
 	return outBuf.String(), err
 }
@@ -85,7 +85,7 @@ func runAzureStageCapture(t *testing.T, args ...string) (stdout, stderr string, 
 	}
 
 	full := append([]string{"suve", "azure", "stage"}, args...)
-	err = app.Run(t.Context(), full)
+	err = app.Run(testContext(t), full)
 
 	return outBuf.String(), errBuf.String(), err
 }

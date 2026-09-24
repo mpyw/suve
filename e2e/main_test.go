@@ -10,6 +10,7 @@ package e2e_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"testing"
@@ -54,6 +55,22 @@ func setupTempHome(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 }
 
+// testContext returns the context e2e helpers and cleanups pass to CLI commands
+// and stores. Go cancels t.Context() just before t.Cleanup functions run, so a
+// cleanup that deletes emulator resources under it would fail at once and leak
+// leftovers into later tests. Once the test context is done, keep its values but
+// drop the cancellation so cleanup work still reaches the emulator.
+func testContext(t *testing.T) context.Context {
+	t.Helper()
+
+	ctx := t.Context()
+	if ctx.Err() != nil {
+		return context.WithoutCancel(ctx)
+	}
+
+	return ctx
+}
+
 // runCommand executes a CLI command and returns stdout, stderr, and error.
 func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
@@ -69,7 +86,7 @@ func runCommand(t *testing.T, cmd *cli.Command, args ...string) (stdout, stderr 
 
 	// Build full args: ["suve", "command-name", ...args]
 	fullArgs := append([]string{"suve", cmd.Name}, args...)
-	err = app.Run(t.Context(), fullArgs)
+	err = app.Run(testContext(t), fullArgs)
 
 	return outBuf.String(), errBuf.String(), err
 }
@@ -92,7 +109,7 @@ func runCommandWithStdin(
 	}
 
 	fullArgs := append([]string{"suve", cmd.Name}, args...)
-	err = app.Run(t.Context(), fullArgs)
+	err = app.Run(testContext(t), fullArgs)
 
 	return outBuf.String(), errBuf.String(), err
 }
@@ -112,7 +129,7 @@ func runSubCommand(t *testing.T, parentCmd *cli.Command, subCmdName string, args
 
 	// Build full args: ["suve", "parent-name", "sub-name", ...args]
 	fullArgs := append([]string{"suve", parentCmd.Name, subCmdName}, args...)
-	err = app.Run(t.Context(), fullArgs)
+	err = app.Run(testContext(t), fullArgs)
 
 	return outBuf.String(), errBuf.String(), err
 }
@@ -135,7 +152,7 @@ func runSubCommandWithStdin(
 
 	// Build full args: ["suve", "parent-name", "sub-name", ...args]
 	fullArgs := append([]string{"suve", parentCmd.Name, subCmdName}, args...)
-	err = app.Run(t.Context(), fullArgs)
+	err = app.Run(testContext(t), fullArgs)
 
 	return outBuf.String(), errBuf.String(), err
 }

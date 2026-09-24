@@ -664,7 +664,7 @@ func TestAWSAgentStore_DirectMethods(t *testing.T) {
 	// Clean up first
 	_ = store.UnstageAll(t.Context(), staging.ServiceParam)
 	t.Cleanup(func() {
-		_ = store.UnstageAll(t.Context(), staging.ServiceParam)
+		_ = store.UnstageAll(testContext(t), staging.ServiceParam)
 	})
 
 	// Test StageEntry and GetEntry
@@ -717,7 +717,7 @@ func TestAWSAgentStore_TagMethods(t *testing.T) {
 	// Clean up first
 	_ = store.UnstageAll(t.Context(), staging.ServiceParam)
 	t.Cleanup(func() {
-		_ = store.UnstageAll(t.Context(), staging.ServiceParam)
+		_ = store.UnstageAll(testContext(t), staging.ServiceParam)
 	})
 
 	// Test StageTag and GetTag
@@ -770,7 +770,7 @@ func TestAWSAgentStore_LoadAndWriteState(t *testing.T) {
 	// Clean up first
 	_ = store.UnstageAll(t.Context(), "")
 	t.Cleanup(func() {
-		_ = store.UnstageAll(t.Context(), "")
+		_ = store.UnstageAll(testContext(t), "")
 	})
 
 	// Test Load with empty state
@@ -824,7 +824,7 @@ func TestAWSAgentStore_DrainMethod(t *testing.T) {
 	// Clean up first
 	_ = store.UnstageAll(t.Context(), "")
 	t.Cleanup(func() {
-		_ = store.UnstageAll(t.Context(), "")
+		_ = store.UnstageAll(testContext(t), "")
 	})
 
 	// Stage some data first
@@ -877,7 +877,7 @@ func TestAWSAgentStore_UnstageAll(t *testing.T) {
 	// Clean up first
 	_ = store.UnstageAll(t.Context(), "")
 	t.Cleanup(func() {
-		_ = store.UnstageAll(t.Context(), "")
+		_ = store.UnstageAll(testContext(t), "")
 	})
 
 	// Stage entries for both services
@@ -939,7 +939,7 @@ func TestAWSAgentStore_ListMethods(t *testing.T) {
 	// Clean up first
 	_ = store.UnstageAll(t.Context(), "")
 	t.Cleanup(func() {
-		_ = store.UnstageAll(t.Context(), "")
+		_ = store.UnstageAll(testContext(t), "")
 	})
 
 	// Test ListEntries on empty state
@@ -1021,7 +1021,7 @@ func TestAWSStore_SequentialOperations(t *testing.T) {
 	// Clean up first
 	_ = store.UnstageAll(t.Context(), "")
 	t.Cleanup(func() {
-		_ = store.UnstageAll(t.Context(), "")
+		_ = store.UnstageAll(testContext(t), "")
 	})
 
 	// Multiple sequential operations test IPC reliability
