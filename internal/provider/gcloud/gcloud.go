@@ -134,7 +134,7 @@ func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Ki
 			return nil, fmt.Errorf("failed to create Google Cloud Secret Manager client: %w", err)
 		}
 
-		return secretmanager.New(secretmanager.Wrap(client), scope.ProjectID), nil
+		return secretmanager.New(secretmanager.WrapClient(client), scope.ProjectID), nil
 	case provider.KindParam:
 		return nil, fmt.Errorf("%w: %s (Google Cloud has no parameter store)", provider.ErrUnsupportedKind, kind)
 	default:

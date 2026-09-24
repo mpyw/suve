@@ -1,3 +1,7 @@
+// appconfig.go is this package's subject: the adapter Store and the Client port it
+// drives. Core, so that appconfig.Store does not have to become appconfig.AppconfigStore.
+//declscope:core
+
 // Package appconfig implements the provider.Store contract (Reader/Writer/Tagger)
 // for Azure App Configuration, confining all App Configuration SDK types to this
 // package. Spec PARSING stays generic via version.AzureAppConfiguration.Parse.
@@ -67,7 +71,7 @@ const tagWriteMaxAttempts = 3
 // are always re-sent) and an optional ETag precondition (nil = unconditional).
 // The list method
 // returns a drained slice rather than the SDK's pager so tests can mock the
-// interface trivially; the production adapter (see Wrap) confines the pager
+// interface trivially; the production adapter (see WrapClient) confines the pager
 // draining and the concrete *azappconfig.Client to this package.
 type Client interface {
 	GetSetting(ctx context.Context, key, label string) (azappconfig.GetSettingResponse, error)

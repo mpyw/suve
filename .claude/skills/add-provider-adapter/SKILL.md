@@ -20,9 +20,11 @@ same shape.
   `azure/appconfig`, `azure/keyvault`), not after the service axis: the
   service axis is already `provider.Kind`. The provider root package holds the
   `Factory`, the client bootstrap, and any identity lookup (`aws.LoadIdentity`).
-- Hide SDK paginators and iterators behind a `Wrap()` adapter so the seam
-  returns neutral `domain` types, never SDK types.
-- Map SDK errors to the neutral sentinels in `internal/provider/errors.go`:
+- Hide SDK paginators and iterators behind a `WrapClient()` adapter in the
+  package's `client.go`, so the seam returns neutral `domain` types, never SDK
+  types. The adapter's main file (`keyvault.go`, ...) is the package's
+  `//declscope:core`, and `client.go` keeps its own namespace.
+- Map SDK errors to the neutral sentinels in `internal/provider/err.go`:
   `provider.ErrNotFound` and `provider.ErrAlreadyExists`. Missed error mappings
   are a recurring defect source (#318, #481) — enumerate every not-found and
   already-exists SDK error shape and cover it in unit tests.

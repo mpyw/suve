@@ -1,3 +1,7 @@
+// keyvault.go is this package's subject: the adapter Store and the Client port it
+// drives. Core, so that keyvault.Store does not have to become keyvault.KeyvaultStore.
+//declscope:core
+
 // Package keyvault implements the provider.Store contract (Reader/Writer/Tagger)
 // for Azure Key Vault secrets. It confines all Key Vault SDK types to this
 // package: opaque version-id resolution and tag read-modify-write live here, so
@@ -42,7 +46,7 @@ import (
 
 // Client is the narrow Key Vault secrets surface this adapter needs. The list
 // methods return drained slices rather than the SDK's pagers so tests can mock
-// the interface trivially; the production adapter (see Wrap) confines the pager
+// the interface trivially; the production adapter (see WrapClient) confines the pager
 // draining and the concrete *azsecrets.Client to this package.
 type Client interface {
 	GetSecret(ctx context.Context, name, version string) (azsecrets.GetSecretResponse, error)

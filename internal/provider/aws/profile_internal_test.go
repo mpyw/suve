@@ -1,5 +1,5 @@
-// In-package tests of identity.go's profile-parsing internals.
-//declscope:namespace aws
+// In-package tests of profile.go's profile lookup.
+//declscope:namespace profile
 
 package aws
 
@@ -25,7 +25,7 @@ sso_account_id = 222222222222
 [profile staging]
 sso_account_id = 333333333333
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 
 		profiles := parseAWSConfigProfiles()
@@ -44,7 +44,7 @@ source_profile = default
 [profile cross-account]
 role_arn = arn:aws:iam::555555555555:role/CrossAccount
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 
 		profiles := parseAWSConfigProfiles()
@@ -59,7 +59,7 @@ role_arn = arn:aws:iam::555555555555:role/CrossAccount
 sso_account_id = 666666666666
 role_arn = arn:aws:iam::777777777777:role/ShouldBeIgnored
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 
 		profiles := parseAWSConfigProfiles()
@@ -84,7 +84,7 @@ sso_account_id = 888888888888
 region = ap-northeast-1
 output = json
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 
 		profiles := parseAWSConfigProfiles()
@@ -99,7 +99,7 @@ output = json
 [DEFAULT]
 sso_account_id = 999999999999
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 
 		profiles := parseAWSConfigProfiles()
@@ -118,7 +118,7 @@ sso_account_id = 123456789012
 [profile staging]
 sso_account_id = 234567890123
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 		t.Setenv("AWS_PROFILE", "")
 		t.Setenv("AWS_DEFAULT_PROFILE", "")
@@ -133,7 +133,7 @@ sso_account_id = 234567890123
 [profile production]
 sso_account_id = 123456789012
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 		t.Setenv("AWS_PROFILE", "")
 		t.Setenv("AWS_DEFAULT_PROFILE", "")
@@ -151,7 +151,7 @@ sso_account_id = 123456789012
 [profile beta]
 sso_account_id = 123456789012
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 		t.Setenv("AWS_PROFILE", "beta")
 		t.Setenv("AWS_DEFAULT_PROFILE", "")
@@ -169,7 +169,7 @@ sso_account_id = 111111111111
 [profile correct-account]
 sso_account_id = 123456789012
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 		t.Setenv("AWS_PROFILE", "wrong-account")
 		t.Setenv("AWS_DEFAULT_PROFILE", "")
@@ -190,7 +190,7 @@ sso_account_id = 123456789012
 [profile beta]
 sso_account_id = 123456789012
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 		t.Setenv("AWS_PROFILE", "")
 		t.Setenv("AWS_DEFAULT_PROFILE", "")
@@ -210,7 +210,7 @@ sso_account_id = 123456789012
 [profile beta]
 sso_account_id = 123456789012
 `
-		configPath := createTempConfig(t, configContent)
+		configPath := createTempProfileConfig(t, configContent)
 		t.Setenv("AWS_CONFIG_FILE", configPath)
 		t.Setenv("AWS_PROFILE", "")
 		t.Setenv("AWS_DEFAULT_PROFILE", "beta")
@@ -231,12 +231,12 @@ sso_account_id = 123456789012
 	})
 }
 
-func TestGetAWSConfigPath(t *testing.T) {
+func TestProfileConfigPath(t *testing.T) {
 	// Cannot use t.Parallel() because subtests use t.Setenv
 	t.Run("uses AWS_CONFIG_FILE if set", func(t *testing.T) {
 		t.Setenv("AWS_CONFIG_FILE", "/custom/path/config")
 
-		path := getAWSConfigPath()
+		path := profileConfigPath()
 
 		assert.Equal(t, "/custom/path/config", path)
 	})
@@ -244,7 +244,7 @@ func TestGetAWSConfigPath(t *testing.T) {
 	t.Run("uses default path if AWS_CONFIG_FILE not set", func(t *testing.T) {
 		t.Setenv("AWS_CONFIG_FILE", "")
 
-		path := getAWSConfigPath()
+		path := profileConfigPath()
 
 		home, err := os.UserHomeDir()
 		require.NoError(t, err)
@@ -252,8 +252,8 @@ func TestGetAWSConfigPath(t *testing.T) {
 	})
 }
 
-// createTempConfig creates a temporary AWS config file and returns its path.
-func createTempConfig(t *testing.T, content string) string {
+// createTempProfileConfig creates a temporary AWS config file and returns its path.
+func createTempProfileConfig(t *testing.T, content string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config")

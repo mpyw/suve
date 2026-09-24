@@ -1,7 +1,3 @@
-// Adapts the concrete SDK client to the Client port that appconfig.go
-// declares: one unit with appconfig.go, split out for readability.
-//declscope:namespace appconfig
-
 package appconfig
 
 import (
@@ -24,8 +20,8 @@ type apiClient struct {
 	c *azappconfig.Client
 }
 
-// Wrap adapts a concrete App Configuration client to the narrow Client interface.
-func Wrap(c *azappconfig.Client) Client {
+// WrapClient adapts a concrete App Configuration client to the narrow Client interface.
+func WrapClient(c *azappconfig.Client) Client {
 	return &apiClient{c: c}
 }
 
@@ -83,18 +79,18 @@ func (a *apiClient) DeleteSetting(ctx context.Context, key, label string) (azapp
 	return a.c.DeleteSetting(ctx, key, opts)
 }
 
-// listSettingSelector is the selector used to enumerate settings: all keys,
+// clientSettingSelector is the selector used to enumerate settings: all keys,
 // restricted by the given LabelFilter. The filter is resolved by the store from
 // the raw --namespace value (empty -> the null-label filter, namespaces.Filter).
 // A nil LabelFilter (SettingSelector{}) would enumerate every label.
-func listSettingSelector(filter string) azappconfig.SettingSelector {
+func clientSettingSelector(filter string) azappconfig.SettingSelector {
 	return azappconfig.SettingSelector{
 		LabelFilter: lo.ToPtr(filter),
 	}
 }
 
 func (a *apiClient) ListSettings(ctx context.Context, filter string) ([]azappconfig.Setting, error) {
-	pager := a.c.NewListSettingsPager(listSettingSelector(filter), nil)
+	pager := a.c.NewListSettingsPager(clientSettingSelector(filter), nil)
 
 	var out []azappconfig.Setting
 
