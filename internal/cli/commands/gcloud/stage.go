@@ -42,8 +42,8 @@ Google Cloud is secret-only, so 'suve gcloud stage' operates on secrets directly
    apply     Apply staged changes to Google Cloud
    reset     Unstage changes
    tag/untag Stage label changes
-   export    Export staged changes to a directory
-   import    Import staged changes from a directory
+   export    Export staged changes to a file
+   import    Import staged changes from a file
 
 EXAMPLES:
    suve gcloud stage add my-secret       Stage a new secret
