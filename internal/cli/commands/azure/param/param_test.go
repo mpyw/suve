@@ -206,7 +206,7 @@ func (s *namespaceListerStub) ListWithNamespacesScoped(_ context.Context) ([]app
 
 func nsListRunner(rows []appconfig.KeyNamespace, keyOnlyReader provider.Reader, out, errOut *bytes.Buffer) *param.ListRunner {
 	return &param.ListRunner{
-		Namespace: &paramusecase.ListNamespacesUseCase{Lister: &namespaceListerStub{rows: rows}},
+		Namespace: &paramusecase.ListNamespacesUseCase{Lister: param.NewNamespaceLister(&namespaceListerStub{rows: rows})},
 		KeyOnly:   &paramusecase.ListUseCase{Reader: keyOnlyReader},
 		Stdout:    out,
 		Stderr:    errOut,

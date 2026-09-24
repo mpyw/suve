@@ -9,17 +9,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 // NamespaceLister the namespace-aware list use case depends on.
 type namespaceListerMock struct {
-	rows []appconfig.KeyNamespace
+	rows []param.ListNamespacesRow
 	err  error
 }
 
-func (m *namespaceListerMock) ListWithNamespacesScoped(_ context.Context) ([]appconfig.KeyNamespace, error) {
+func (m *namespaceListerMock) ListNamespaces(_ context.Context) ([]param.ListNamespacesRow, error) {
 	return m.rows, m.err
 }
 
@@ -28,7 +27,7 @@ func TestListNamespacesUseCase(t *testing.T) {
 
 	// The store (service) already sorts by (key, namespace); the use case only
 	// layers the client-side key filters on top and preserves order.
-	rows := []appconfig.KeyNamespace{
+	rows := []param.ListNamespacesRow{
 		{Key: "app/a", Namespace: "", Value: "a-null"},
 		{Key: "app/a", Namespace: "dev", Value: "a-dev"},
 		{Key: "app/b", Namespace: "prd", Value: "b-prd"},

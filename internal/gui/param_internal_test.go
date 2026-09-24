@@ -513,7 +513,7 @@ func TestParamDelete(t *testing.T) {
 }
 
 // TestParamAddTag covers the ParamAddTag binding: it forwards a single key/value
-// as the Add map of param.TagUseCase.
+// as the Add map of tagging.UseCase.
 //
 //nolint:paralleltest // overrides the package-global registry.
 func TestParamAddTag(t *testing.T) {
@@ -540,7 +540,7 @@ func TestParamAddTag(t *testing.T) {
 }
 
 // TestParamRemoveTag covers the ParamRemoveTag binding: it forwards the key as
-// the Remove list of param.TagUseCase.
+// the Remove list of tagging.UseCase.
 //
 //nolint:paralleltest // overrides the package-global registry.
 func TestParamRemoveTag(t *testing.T) {

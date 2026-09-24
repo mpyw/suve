@@ -12,6 +12,7 @@ import (
 	genericlist "github.com/mpyw/suve/internal/cli/commands/generic/list"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -23,6 +24,34 @@ type namespaceListJSONItem struct {
 	Namespace string  `json:"namespace"`
 	Name      string  `json:"name"`
 	Value     *string `json:"value,omitempty"`
+}
+
+// NamespaceListSource is the App Configuration store's namespace-scoped
+// listing, an App-Config-specific extension reached by type-asserting the store.
+type NamespaceListSource interface {
+	ListWithNamespacesScoped(ctx context.Context) ([]appconfig.KeyNamespace, error)
+}
+
+// NewNamespaceLister adapts an App Configuration namespace listing to the use
+// case's neutral rows.
+func NewNamespaceLister(source NamespaceListSource) param.NamespacesLister {
+	return namespaceListAdapter{source: source}
+}
+
+// namespaceListAdapter converts App Configuration rows to param.ListNamespacesRow.
+type namespaceListAdapter struct {
+	source NamespaceListSource
+}
+
+func (a namespaceListAdapter) ListNamespaces(ctx context.Context) ([]param.ListNamespacesRow, error) {
+	rows, err := a.source.ListWithNamespacesScoped(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return lo.Map(rows, func(row appconfig.KeyNamespace, _ int) param.ListNamespacesRow {
+		return param.ListNamespacesRow{Key: row.Key, Namespace: row.Namespace, Value: row.Value}
+	}), nil
 }
 
 // ListOptions holds the parsed flags for the App Configuration list command.
@@ -284,8 +313,8 @@ EXAMPLES:
 			}
 			// Only the App Configuration store implements the namespace extension;
 			// a store that does not keep the NAMESPACE column off entirely.
-			if lister, ok := store.(param.NamespacesLister); ok {
-				runner.Namespace = &param.ListNamespacesUseCase{Lister: lister}
+			if source, ok := store.(NamespaceListSource); ok {
+				runner.Namespace = &param.ListNamespacesUseCase{Lister: NewNamespaceLister(source)}
 			}
 
 			return runner.Run(ctx, ListOptions{

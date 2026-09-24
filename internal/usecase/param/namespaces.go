@@ -9,16 +9,24 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/mpyw/suve/internal/debug"
-	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 )
 
-// NamespacesLister is the App-Config-specific extension that lists per-(key,
-// namespace) rows honoring the store's configured --namespace filter. Only the
-// Azure App Configuration store implements it (via ListWithNamespacesScoped);
-// callers type-assert the resolved store to reach it. The neutral
-// provider.Reader.List contract is untouched.
+// ListNamespacesRow is one (key, namespace) row a NamespacesLister returns. An
+// empty Namespace is the null (default) namespace. Value is the key's current
+// value in that namespace.
+type ListNamespacesRow struct {
+	Key       string
+	Namespace string
+	Value     string
+}
+
+// NamespacesLister lists per-(key, namespace) rows honoring the store's
+// configured namespace filter, sorted by key then namespace. It is an extension
+// outside the neutral provider.Reader.List contract: only a service with a
+// namespace axis (Azure App Configuration) offers it, through an adapter the
+// caller builds over its store.
 type NamespacesLister interface {
-	ListWithNamespacesScoped(ctx context.Context) ([]appconfig.KeyNamespace, error)
+	ListNamespaces(ctx context.Context) ([]ListNamespacesRow, error)
 }
 
 // ListNamespacesInput holds input for the namespace-aware list use case. The
@@ -64,14 +72,14 @@ func (u *ListNamespacesUseCase) Execute(ctx context.Context, input ListNamespace
 		}
 	}
 
-	rows, err := u.Lister.ListWithNamespacesScoped(ctx)
+	rows, err := u.Lister.ListNamespaces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list entries: %w", err)
 	}
 
 	out := &ListNamespacesOutput{}
 
-	out.Entries = lo.FilterMap(rows, func(row appconfig.KeyNamespace, _ int) (ListNamespacesEntry, bool) {
+	out.Entries = lo.FilterMap(rows, func(row ListNamespacesRow, _ int) (ListNamespacesEntry, bool) {
 		if input.Prefix != "" && !strings.HasPrefix(row.Key, input.Prefix) {
 			return ListNamespacesEntry{}, false
 		}

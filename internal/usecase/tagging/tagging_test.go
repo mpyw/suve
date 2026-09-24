@@ -1,17 +1,18 @@
-package param_test
+package tagging_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/provider/providermock"
-	"github.com/mpyw/suve/internal/usecase/param"
+	"github.com/mpyw/suve/internal/usecase/tagging"
 )
 
-func TestTagUseCase_Execute_AddTags(t *testing.T) {
+func TestUseCase_Execute_AddTags(t *testing.T) {
 	t.Parallel()
 
 	var gotAdd map[string]string
@@ -26,9 +27,9 @@ func TestTagUseCase_Execute_AddTags(t *testing.T) {
 		},
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	err := uc.Execute(t.Context(), param.TagInput{
+	err := uc.Execute(t.Context(), tagging.Input{
 		Name: "/app/config",
 		Add:  map[string]string{"env": "prod", "team": "backend"},
 	})
@@ -36,7 +37,7 @@ func TestTagUseCase_Execute_AddTags(t *testing.T) {
 	assert.Equal(t, map[string]string{"env": "prod", "team": "backend"}, gotAdd)
 }
 
-func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
+func TestUseCase_Execute_RemoveTags(t *testing.T) {
 	t.Parallel()
 
 	var gotKeys []string
@@ -51,9 +52,9 @@ func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
 		},
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	err := uc.Execute(t.Context(), param.TagInput{
+	err := uc.Execute(t.Context(), tagging.Input{
 		Name:   "/app/config",
 		Remove: []string{"old-tag", "deprecated"},
 	})
@@ -61,7 +62,7 @@ func TestTagUseCase_Execute_RemoveTags(t *testing.T) {
 	assert.Equal(t, []string{"old-tag", "deprecated"}, gotKeys)
 }
 
-func TestTagUseCase_Execute_AddAndRemoveTags(t *testing.T) {
+func TestUseCase_Execute_AddAndRemoveTags(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
@@ -69,9 +70,9 @@ func TestTagUseCase_Execute_AddAndRemoveTags(t *testing.T) {
 		UntagFunc: func(_ context.Context, _ string, _ []string) error { return nil },
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	err := uc.Execute(t.Context(), param.TagInput{
+	err := uc.Execute(t.Context(), tagging.Input{
 		Name:   "/app/config",
 		Add:    map[string]string{"env": "prod"},
 		Remove: []string{"old-tag"},
@@ -79,20 +80,20 @@ func TestTagUseCase_Execute_AddAndRemoveTags(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestTagUseCase_Execute_NoTags(t *testing.T) {
+func TestUseCase_Execute_NoTags(t *testing.T) {
 	t.Parallel()
 
 	// Neither Tag nor Untag should be called; leaving the funcs nil ensures a
 	// hit would fail with providermock.ErrNotConfigured.
 	store := &providermock.Store{}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	err := uc.Execute(t.Context(), param.TagInput{Name: "/app/config"})
+	err := uc.Execute(t.Context(), tagging.Input{Name: "/app/config"})
 	require.NoError(t, err)
 }
 
-func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
+func TestUseCase_Execute_AddTagsError(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
@@ -101,9 +102,9 @@ func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 		},
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	err := uc.Execute(t.Context(), param.TagInput{
+	err := uc.Execute(t.Context(), tagging.Input{
 		Name: "/app/config",
 		Add:  map[string]string{"env": "prod"},
 	})
@@ -111,7 +112,7 @@ func TestTagUseCase_Execute_AddTagsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to add tags")
 }
 
-func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
+func TestUseCase_Execute_RemoveTagsError(t *testing.T) {
 	t.Parallel()
 
 	store := &providermock.Store{
@@ -120,12 +121,17 @@ func TestTagUseCase_Execute_RemoveTagsError(t *testing.T) {
 		},
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	err := uc.Execute(t.Context(), param.TagInput{
+	err := uc.Execute(t.Context(), tagging.Input{
 		Name:   "/app/config",
 		Remove: []string{"old-tag"},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to remove tags")
 }
+
+var (
+	errAddTagsFailed    = errors.New("add tags failed")
+	errRemoveTagsFailed = errors.New("remove tags failed")
+)

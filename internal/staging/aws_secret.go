@@ -4,113 +4,67 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
-	"time"
 
-	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
 	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
-// AWSSecretStrategy implements ServiceStrategy for Secrets Manager. It is backed by
-// a provider.Store rather than an AWS SDK client, so it carries no cloud SDK
-// dependency of its own. A nil store yields a parser-only strategy.
+// AWSSecretStrategy implements ServiceStrategy for Secrets Manager over a
+// provider.Store. Secrets Manager specifics:
+//
+//   - Versions are ids or staging labels, parsed with awssecretversion
+//     (#ID, :LABEL, ~SHIFT); ids render truncated.
+//   - Delete takes force / recovery-window options.
+//   - A staged string edit refuses to overwrite a binary secret.
+//
+// The zero value (no store) is a parser-only strategy (ParseName/ParseSpec).
 type AWSSecretStrategy struct {
-	store provider.Store
+	versionedStrategy[awsSecretHooks]
 }
 
 // NewAWSSecretStrategy creates a new Secrets Manager strategy over the given
 // provider store. A nil store is allowed for parser-only use.
 func NewAWSSecretStrategy(store provider.Store) *AWSSecretStrategy {
-	return &AWSSecretStrategy{store: store}
+	return &AWSSecretStrategy{versionedStrategy[awsSecretHooks]{store: store}}
 }
 
-// Service returns the service type.
-func (s *AWSSecretStrategy) Service() Service {
-	return ServiceSecret
+// AWSSecretParserFactory creates a Parser without provider access.
+// Use this for operations that don't need AWS access (e.g., status, parsing).
+func AWSSecretParserFactory() Parser {
+	return NewAWSSecretStrategy(nil)
 }
 
-// ServiceName returns the user-friendly service name.
-func (s *AWSSecretStrategy) ServiceName() string {
-	return "Secrets Manager"
+// awsSecretHooks supplies the Secrets Manager specifics.
+type awsSecretHooks struct {
+	versionedSecretHooks
 }
 
-// ItemName returns the item name for messages.
-func (s *AWSSecretStrategy) ItemName() string {
-	return itemNameSecret
-}
-
-// HasDeleteOptions returns true as Secrets Manager has delete options.
-func (s *AWSSecretStrategy) HasDeleteOptions() bool {
-	return true
-}
-
-// Apply applies a staged operation to Secrets Manager.
-func (s *AWSSecretStrategy) Apply(ctx context.Context, name string, entry Entry) error {
-	switch entry.Operation {
-	case OperationCreate:
-		return s.applyCreate(ctx, name, entry)
-	case OperationUpdate:
-		return s.applyUpdate(ctx, name, entry)
-	case OperationDelete:
-		return s.applyDelete(ctx, name, entry)
-	default:
-		return fmt.Errorf("unknown operation: %s", entry.Operation)
+func (awsSecretHooks) traits() versionedTraits {
+	return versionedTraits{
+		service:          ServiceSecret,
+		serviceName:      "Secrets Manager",
+		itemName:         itemNameSecret,
+		tagsFetchError:   "failed to describe secret",
+		hasDeleteOptions: true,
 	}
 }
 
-func (s *AWSSecretStrategy) applyCreate(ctx context.Context, name string, entry Entry) error {
-	if _, err := s.store.Create(ctx, name, lo.FromPtr(entry.Value), domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
-		return fmt.Errorf("failed to create secret: %w", err)
+func (awsSecretHooks) parse(input string) (name, suffix string, err error) {
+	spec, err := awssecretversion.Parse(input)
+	if err != nil {
+		return "", "", err
 	}
 
-	return nil
+	return spec.Name, awssecretversion.Suffix(spec), nil
 }
 
-func (s *AWSSecretStrategy) applyUpdate(ctx context.Context, name string, entry Entry) error {
-	if entry.Value == nil {
-		return nil
-	}
-
-	// Overwrite guard: applying a staged string edit issues UpdateSecret with
-	// SecretString, which silently drops a current SecretBinary value. Probe the
-	// current value and refuse when it is binary (#469). Any other probe failure
-	// is left for Put to surface, so the guard never turns a transient read error
-	// into a spurious apply failure.
-	if _, err := s.store.Get(ctx, name, provider.VersionRef{}); errors.Is(err, provider.ErrBinaryValue) {
-		return fmt.Errorf("refusing to overwrite binary secret %q with a string value: %w", name, err)
-	}
-
-	// Put overwrites the existing secret with a new version and, when provided,
-	// updates the description in the same operation.
-	if _, err := s.store.Put(ctx, name, *entry.Value, domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
-		return fmt.Errorf("failed to update secret: %w", err)
-	}
-
-	return nil
+func (awsSecretHooks) versionLabel(id string) string {
+	return "#" + awssecretversion.TruncateVersionID(id)
 }
 
-func (s *AWSSecretStrategy) applyDelete(ctx context.Context, name string, entry Entry) error {
-	opts := awsSecretDeleteOptions(entry.DeleteOptions)
-
-	if err := s.store.Delete(ctx, name, opts...); err != nil {
-		// Already deleted is considered success.
-		if errors.Is(err, provider.ErrNotFound) {
-			return nil
-		}
-
-		return fmt.Errorf("failed to delete secret: %w", err)
-	}
-
-	return nil
-}
-
-// awsSecretDeleteOptions translates staged delete options into provider delete options.
-func awsSecretDeleteOptions(o *DeleteOptions) []provider.DeleteOption {
+// deleteOptions translates staged delete options into provider delete options.
+func (awsSecretHooks) deleteOptions(o *DeleteOptions) []provider.DeleteOption {
 	if o == nil {
 		return nil
 	}
@@ -125,175 +79,19 @@ func awsSecretDeleteOptions(o *DeleteOptions) []provider.DeleteOption {
 	}
 }
 
-// ApplyTags applies staged tag changes to Secrets Manager.
-func (s *AWSSecretStrategy) ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error {
-	if len(tagEntry.Add) > 0 {
-		if err := s.store.Tag(ctx, name, tagEntry.Add); err != nil {
-			return err
-		}
+func (h awsSecretHooks) update(ctx context.Context, store provider.Store, name string, entry Entry) error {
+	if entry.Value == nil {
+		return nil
 	}
 
-	if tagEntry.Remove.Len() > 0 {
-		if err := s.store.Untag(ctx, name, tagEntry.Remove.Values()); err != nil {
-			return err
-		}
+	// Overwrite guard: applying a staged string edit issues UpdateSecret with
+	// SecretString, which silently drops a current SecretBinary value. Probe the
+	// current value and refuse when it is binary (#469). Any other probe failure
+	// is left for Put to surface, so the guard never turns a transient read error
+	// into a spurious apply failure.
+	if _, err := store.Get(ctx, name, provider.VersionRef{}); errors.Is(err, provider.ErrBinaryValue) {
+		return fmt.Errorf("refusing to overwrite binary secret %q with a string value: %w", name, err)
 	}
 
-	return nil
-}
-
-// FetchLastModified returns the last modified time of the secret. It returns a
-// *ResourceNotFoundError when the secret does not exist, so callers can tell
-// "missing" apart from "exists but has no modification time" (the latter returns
-// a zero time with a nil error).
-func (s *AWSSecretStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
-	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
-	if err != nil {
-		if errors.Is(err, provider.ErrNotFound) {
-			return time.Time{}, &ResourceNotFoundError{Err: err}
-		}
-
-		return time.Time{}, fmt.Errorf("failed to get secret: %w", err)
-	}
-
-	if entry.Modified != nil {
-		return *entry.Modified, nil
-	}
-
-	return time.Time{}, nil
-}
-
-// FetchCurrent fetches the current value from Secrets Manager for diffing.
-func (s *AWSSecretStrategy) FetchCurrent(ctx context.Context, name string) (*FetchResult, error) {
-	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
-	if err != nil {
-		return nil, err
-	}
-
-	return &FetchResult{
-		Value:      entry.Value,
-		Identifier: "#" + awssecretversion.TruncateVersionID(entry.Version.ID),
-		Secret:     true, // Secrets Manager values are always secret material.
-	}, nil
-}
-
-// FetchCurrentTags fetches the current tags from Secrets Manager.
-func (s *AWSSecretStrategy) FetchCurrentTags(ctx context.Context, name string) (map[string]string, error) {
-	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
-	if err != nil {
-		// Secret not found - return nil (no tags available)
-		if errors.Is(err, provider.ErrNotFound) {
-			return nil, nil //nolint:nilnil // intentional: no tags for non-existent resource
-		}
-
-		return nil, fmt.Errorf("failed to describe secret: %w", err)
-	}
-
-	if len(entry.Tags) == 0 {
-		return nil, nil //nolint:nilnil // intentional: resource exists but has no tags
-	}
-
-	tags := make(map[string]string, len(entry.Tags))
-	for _, tag := range entry.Tags {
-		tags[tag.Key] = tag.Value
-	}
-
-	return tags, nil
-}
-
-// ParseName parses and validates a name for editing.
-func (s *AWSSecretStrategy) ParseName(input string) (string, error) {
-	spec, err := awssecretversion.Parse(input)
-	if err != nil {
-		return "", err
-	}
-
-	if spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift > 0 {
-		return "", fmt.Errorf("secret name must not contain a version specifier")
-	}
-
-	return spec.Name, nil
-}
-
-// FetchCurrentValue fetches the current value from Secrets Manager for editing.
-// Returns *ResourceNotFoundError if the secret doesn't exist.
-func (s *AWSSecretStrategy) FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error) {
-	entry, err := s.store.Get(ctx, name, provider.VersionRef{})
-	if err != nil {
-		if errors.Is(err, provider.ErrNotFound) {
-			return nil, &ResourceNotFoundError{Err: err}
-		}
-
-		return nil, err
-	}
-
-	result := &EditFetchResult{
-		Value: entry.Value,
-	}
-
-	if entry.Modified != nil {
-		result.LastModified = *entry.Modified
-	}
-
-	return result, nil
-}
-
-// ParseSpec parses a version spec string for reset.
-func (s *AWSSecretStrategy) ParseSpec(input string) (name string, hasVersion bool, err error) {
-	spec, err := awssecretversion.Parse(input)
-	if err != nil {
-		return "", false, err
-	}
-
-	hasVersion = spec.Absolute.ID != nil || spec.Absolute.Label != nil || spec.Shift > 0
-
-	return spec.Name, hasVersion, nil
-}
-
-// FetchVersion fetches the value for a specific version.
-func (s *AWSSecretStrategy) FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error) {
-	spec, err := awssecretversion.Parse(input)
-	if err != nil {
-		return "", "", err
-	}
-
-	ref, err := s.store.Resolve(ctx, spec.Name, awsSecretSpecSuffix(spec))
-	if err != nil {
-		return "", "", err
-	}
-
-	entry, err := s.store.Get(ctx, spec.Name, ref)
-	if err != nil {
-		return "", "", err
-	}
-
-	return entry.Value, "#" + awssecretversion.TruncateVersionID(entry.Version.ID), nil
-}
-
-// awsSecretSpecSuffix reconstructs the version-spec suffix (the part after the name)
-// so that name+suffix re-parses to an equivalent spec, as provider.Reader.Resolve expects.
-func awsSecretSpecSuffix(spec *awssecretversion.Spec) string {
-	var b strings.Builder
-
-	switch {
-	case spec.Absolute.ID != nil:
-		b.WriteString("#")
-		b.WriteString(*spec.Absolute.ID)
-	case spec.Absolute.Label != nil:
-		b.WriteString(":")
-		b.WriteString(*spec.Absolute.Label)
-	}
-
-	if spec.Shift > 0 {
-		b.WriteString("~")
-		b.WriteString(strconv.Itoa(spec.Shift))
-	}
-
-	return b.String()
-}
-
-// AWSSecretParserFactory creates a Parser without provider access.
-// Use this for operations that don't need AWS access (e.g., status, parsing).
-func AWSSecretParserFactory() Parser {
-	return NewAWSSecretStrategy(nil)
+	return h.versionedSecretHooks.update(ctx, store, name, entry)
 }

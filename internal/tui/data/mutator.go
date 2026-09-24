@@ -15,6 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/usecase/secret"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
+	"github.com/mpyw/suve/internal/usecase/tagging"
 )
 
 // Mutator is the write-path seam the mutation dialogs depend on. Every method is
@@ -210,9 +211,9 @@ func (m *paramMutator) AddTag(
 		return WriteOutcome{}, err
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	return WriteOutcome{}, uc.Execute(ctx, param.TagInput{Name: key.Name, Add: map[string]string{tagKey: tagValue}})
+	return WriteOutcome{}, uc.Execute(ctx, tagging.Input{Name: key.Name, Add: map[string]string{tagKey: tagValue}})
 }
 
 func (m *paramMutator) RemoveTag(
@@ -232,9 +233,9 @@ func (m *paramMutator) RemoveTag(
 		return WriteOutcome{}, err
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	return WriteOutcome{}, uc.Execute(ctx, param.TagInput{Name: key.Name, Remove: []string{tagKey}})
+	return WriteOutcome{}, uc.Execute(ctx, tagging.Input{Name: key.Name, Remove: []string{tagKey}})
 }
 
 func (m *paramMutator) Restore(context.Context, string) (WriteOutcome, error) {
@@ -390,9 +391,9 @@ func (m *secretMutator) AddTag(
 		})
 	}
 
-	uc := &secret.TagUseCase{Tagger: m.store}
+	uc := &tagging.UseCase{Tagger: m.store}
 
-	return WriteOutcome{}, uc.Execute(ctx, secret.TagInput{Name: key.Name, Add: map[string]string{tagKey: tagValue}})
+	return WriteOutcome{}, uc.Execute(ctx, tagging.Input{Name: key.Name, Add: map[string]string{tagKey: tagValue}})
 }
 
 func (m *secretMutator) RemoveTag(
@@ -404,9 +405,9 @@ func (m *secretMutator) RemoveTag(
 		})
 	}
 
-	uc := &secret.TagUseCase{Tagger: m.store}
+	uc := &tagging.UseCase{Tagger: m.store}
 
-	return WriteOutcome{}, uc.Execute(ctx, secret.TagInput{Name: key.Name, Remove: []string{tagKey}})
+	return WriteOutcome{}, uc.Execute(ctx, tagging.Input{Name: key.Name, Remove: []string{tagKey}})
 }
 
 func (m *secretMutator) Restore(ctx context.Context, name string) (WriteOutcome, error) {
