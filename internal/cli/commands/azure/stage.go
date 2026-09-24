@@ -6,6 +6,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
@@ -16,6 +17,14 @@ const stageNounSecret = "secret"
 // stageProviderLabel names Azure in staging prompts and messages.
 const stageProviderLabel = "Azure"
 
+// appConfigStageStrategyFactory builds the App Configuration staging strategy over
+// the store resolved for the context's store name and namespace.
+//
+//nolint:gochecknoglobals // static staging wiring, built once
+var appConfigStageStrategyFactory = cliinternal.StrategyFactory(
+	provider.ProviderAzure, provider.KindParam, cliinternal.AzureAppConfigStore,
+)
+
 // keyVaultStageConfig is the staging config for Azure Key Vault secrets. The
 // ScopeResolver keys on-disk staging state by the resolved vault.
 func keyVaultStageConfig() stgcli.CommandConfig {
@@ -24,8 +33,8 @@ func keyVaultStageConfig() stgcli.CommandConfig {
 		ItemName:      stageNounSecret,
 		ProviderLabel: stageProviderLabel,
 		CommandPath:   "suve azure stage secret",
-		Factory:       cliinternal.AzureKeyVaultSecretStrategyFactory,
-		ParserFactory: staging.AzureKeyVaultSecretParserFactory,
+		Factory:       cliinternal.StrategyFactory(provider.ProviderAzure, provider.KindSecret, cliinternal.AzureKeyVaultStore),
+		ParserFactory: cliinternal.ParserFactory(provider.ProviderAzure, provider.KindSecret),
 		ScopeResolver: cliinternal.AzureKeyVaultStagingScopeResolver,
 	}
 }
@@ -38,8 +47,8 @@ func appConfigStageConfig() stgcli.CommandConfig {
 		ItemName:      "setting",
 		ProviderLabel: stageProviderLabel,
 		CommandPath:   "suve azure stage param",
-		Factory:       cliinternal.AzureAppConfigParamStrategyFactory,
-		ParserFactory: staging.AzureAppConfigParamParserFactory,
+		Factory:       appConfigStageStrategyFactory,
+		ParserFactory: cliinternal.ParserFactory(provider.ProviderAzure, provider.KindParam),
 		ScopeResolver: cliinternal.AzureAppConfigStagingScopeResolver,
 		// App Configuration keys are per-(name, namespace): the --namespace value
 		// (resolved into ctx) is recorded on each staged entry, and status/diff/
@@ -47,9 +56,7 @@ func appConfigStageConfig() stgcli.CommandConfig {
 		// per-store staging file spans every namespace (#431).
 		Namespace: cliinternal.AzureAppConfigNamespace,
 		StrategyForNamespace: func(ctx context.Context, namespace string) (staging.FullStrategy, error) {
-			return cliinternal.AzureAppConfigParamStrategyFactory(
-				cliinternal.WithAzureAppConfigNamespace(ctx, namespace),
-			)
+			return appConfigStageStrategyFactory(cliinternal.WithAzureAppConfigNamespace(ctx, namespace))
 		},
 	}
 }

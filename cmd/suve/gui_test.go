@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -12,70 +11,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/commands"
-	"github.com/mpyw/suve/internal/provider"
 )
-
-// runScope drives a throwaway cli.Command carrying the given flags/args and
-// returns the guiScope it derives for provider p. Running the command is the
-// reliable way to populate urfave/cli flag values.
-func runScope(t *testing.T, p provider.Provider, flags []cli.Flag, args []string) provider.Scope {
-	t.Helper()
-
-	var got provider.Scope
-
-	cmd := &cli.Command{
-		Name:  args[0],
-		Flags: flags,
-		Action: func(_ context.Context, c *cli.Command) error {
-			got = guiScope(c, p)
-
-			return nil
-		},
-	}
-	require.NoError(t, cmd.Run(t.Context(), args))
-
-	return got
-}
-
-func TestGuiScope_CarriesAzureFields(t *testing.T) {
-	t.Parallel()
-
-	flags := []cli.Flag{
-		&cli.StringFlag{Name: "vault-name"},
-		&cli.StringFlag{Name: "store-name"},
-		&cli.StringFlag{Name: "namespace"},
-	}
-	got := runScope(t, provider.ProviderAzure, flags,
-		[]string{"param", "--store-name", "my-store", "--namespace", "dev"})
-
-	assert.Equal(t, provider.ProviderAzure, got.Provider)
-	assert.Equal(t, "my-store", got.StoreName)
-	// The launch scope carries --namespace so the GUI opens on it.
-	assert.Equal(t, "dev", got.AppConfigNamespace)
-}
-
-func TestGuiScope_CarriesGoogleCloudProject(t *testing.T) {
-	t.Parallel()
-
-	flags := []cli.Flag{&cli.StringFlag{Name: "project"}}
-	got := runScope(t, provider.ProviderGoogleCloud, flags,
-		[]string{"secret", "--project", "my-project"})
-
-	assert.Equal(t, provider.ProviderGoogleCloud, got.Provider)
-	assert.Equal(t, "my-project", got.ProjectID)
-}
-
-func TestGuiService(t *testing.T) {
-	t.Parallel()
-
-	// The canonical subgroup names map to their service identifier; anything else
-	// (group level, unknown) carries no specific service.
-	assert.Equal(t, "param", guiService("param"))
-	assert.Equal(t, "secret", guiService("secret"))
-	assert.Empty(t, guiService("azure"))
-	assert.Empty(t, guiService(""))
-	assert.Empty(t, guiService("stage"))
-}
 
 // TestRegisterGUIFlag_AttachesServiceSubgroups verifies --gui is attached to
 // Azure's param/secret subgroups (which carry the launched service), not only

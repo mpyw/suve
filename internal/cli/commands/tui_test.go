@@ -1,4 +1,4 @@
-//nolint:testpackage // white-box: exercises unexported uniqueTUIProvider/activeTUIProviders/hydrate/validate helpers
+//nolint:testpackage // white-box: exercises unexported uniqueTUIProvider/validateTUIScope helpers
 package commands
 
 import (
@@ -97,36 +97,6 @@ func TestUniqueTUIProvider_NoneActive(t *testing.T) {
 	for _, want := range []string{"suve aws --tui", "suve gcloud --tui", "suve azure --tui"} {
 		assert.Contains(t, msg, want)
 	}
-}
-
-// TestActiveTUIProviders_UnionStableOrder pins that the union across service
-// axes is deduplicated and returned in the stable AWS, Google Cloud, Azure
-// order regardless of the order the axes list them.
-func TestActiveTUIProviders_UnionStableOrder(t *testing.T) {
-	t.Parallel()
-
-	det := detect.Result{
-		ParamActive:  []provider.Provider{provider.ProviderAzure, provider.ProviderAWS},
-		SecretActive: []provider.Provider{provider.ProviderGoogleCloud, provider.ProviderAzure},
-		StageActive:  []provider.Provider{provider.ProviderAWS},
-	}
-
-	got := activeTUIProviders(det)
-
-	assert.Equal(t, []provider.Provider{
-		provider.ProviderAWS,
-		provider.ProviderGoogleCloud,
-		provider.ProviderAzure,
-	}, got)
-}
-
-// TestHydrateTUIScope_FillsFromEnv pins that empty resource fields hydrate from
-// the environment (flag values would already be set on the scope and win).
-func TestHydrateTUIScope_FillsFromEnv(t *testing.T) {
-	t.Setenv("GOOGLE_CLOUD_PROJECT", "proj-from-env")
-
-	got := hydrateTUIScope(provider.Scope{Provider: provider.ProviderGoogleCloud})
-	assert.Equal(t, "proj-from-env", got.ProjectID)
 }
 
 // TestValidateTUIScope pins the per-provider scope requirements that produce a

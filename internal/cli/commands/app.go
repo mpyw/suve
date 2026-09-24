@@ -299,7 +299,7 @@ func aliasDescription(det detect.Result) string {
 
 // groupName maps a provider to its command-group name for user-facing messages.
 //
-//declscope:package // tui.go names the group the same way in its launch error
+//declscope:package // tui.go names the group in its launch error; launch.go maps names back
 func groupName(p provider.Provider) string {
 	switch p {
 	case provider.ProviderAWS:

@@ -134,10 +134,16 @@
     }
   });
 
-  // uniqueActiveProvider returns the sole provider active across param+secret,
-  // or '' when zero or two-plus are active (mirrors the backend rule).
+  // uniqueActiveProvider returns the sole provider active across the param,
+  // secret, and stage axes, or '' when zero or two-plus are active. It is the
+  // same rule as the backend's detect.Result.UniqueProvider, which `suve --gui`
+  // and `suve --tui` share.
   function uniqueActiveProvider(d: gui.DetectResult): string {
-    const active = new Set<string>([...(d.paramActive ?? []), ...(d.secretActive ?? [])]);
+    const active = new Set<string>([
+      ...(d.paramActive ?? []),
+      ...(d.secretActive ?? []),
+      ...(d.stageActive ?? []),
+    ]);
     if (active.size !== 1) return '';
     const [only] = active;
     return only ?? '';

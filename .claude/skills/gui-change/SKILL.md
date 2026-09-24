@@ -24,6 +24,17 @@ landed across #273–#282.
 - Security-relevant guards live **server-side in the Go bindings**, not only in
   frontend hiding (#276) — e.g. staging guards and scope validation/readback.
 
+## Provider-specific staging rules
+
+- Do not switch on the provider in `internal/gui` for staging parsers,
+  strategies, staging scopes, or the App Configuration namespace. Look them up
+  in `internal/staging/binding` (the GUI's `stagingBinding`,
+  `stagingScopeForKindScoped`, `effectiveParamScopeScoped`), which the CLI and
+  TUI share.
+- The launch scope and the bare-launch provider come from the shared helpers:
+  `RegisterLaunchMode` (`internal/cli/commands/launch.go`),
+  `detect.HydrateScope`, and `detect.Result.UniqueProvider`.
+
 ## Provider/scope switching
 
 - A provider or scope switch is a **full view remount** driven by

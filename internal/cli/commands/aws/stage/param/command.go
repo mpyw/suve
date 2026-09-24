@@ -8,8 +8,8 @@ import (
 
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws/paramtype"
-	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
@@ -19,8 +19,8 @@ var config = stgcli.CommandConfig{
 	ItemName:         "parameter",
 	ProviderLabel:    "AWS",
 	CommandPath:      "suve aws stage param",
-	Factory:          cliinternal.AWSParamStrategyFactory,
-	ParserFactory:    staging.AWSParamParserFactory,
+	Factory:          cliinternal.StrategyFactory(provider.ProviderAWS, provider.KindParam, cliinternal.AWSParamStore),
+	ParserFactory:    cliinternal.ParserFactory(provider.ProviderAWS, provider.KindParam),
 	ScopeResolver:    cliinternal.AWSStagingScopeResolver,
 	HasDescription:   true,
 	ValueTypeFlags:   valueTypeFlags(),
