@@ -19,6 +19,7 @@ import (
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws/infra"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 // TestStagingScope_AWSIdentityMemoized proves the AWS caller identity that keys
@@ -101,4 +102,47 @@ func TestStagingScope_AWSPrehydratedSkipsResolution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, scope.Key(), got.Key())
 	assert.Equal(t, 0, calls, "a pre-hydrated AWS scope must not call STS")
+}
+
+// TestStrategyBuilders_PerProvider pins the staging strategy each provider gets,
+// and that an unknown provider (or one without the service) is an error rather
+// than a silent AWS strategy.
+func TestStrategyBuilders_PerProvider(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		provider   provider.Provider
+		wantParam  staging.FullStrategy
+		wantSecret staging.FullStrategy
+	}{
+		{"aws", provider.ProviderAWS, &staging.AWSParamStrategy{}, &staging.AWSSecretStrategy{}},
+		{"google cloud", provider.ProviderGoogleCloud, nil, &staging.GoogleCloudSecretStrategy{}},
+		{"azure", provider.ProviderAzure, &staging.AzureAppConfigParamStrategy{}, &staging.AzureKeyVaultSecretStrategy{}},
+		{"unknown", provider.Provider("oracle"), nil, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newSourceFactory(t.Context(), provider.Scope{Provider: tt.provider})
+
+			param, err := f.paramStrategyBuilder()(nil)
+			if tt.wantParam == nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.IsType(t, tt.wantParam, param)
+			}
+
+			secret, err := f.secretStrategyBuilder()(nil)
+			if tt.wantSecret == nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.IsType(t, tt.wantSecret, secret)
+			}
+		})
+	}
 }

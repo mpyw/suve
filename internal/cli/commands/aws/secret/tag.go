@@ -14,7 +14,7 @@ import (
 //
 //declscope:package // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
-	return cliinternal.SecretStore(ctx)
+	return cliinternal.AWSSecretStore(ctx)
 }
 
 // TagCommand returns the Secrets Manager tag command.

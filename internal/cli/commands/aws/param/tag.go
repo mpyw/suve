@@ -14,7 +14,7 @@ import (
 //
 //declscope:package // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
-	return cliinternal.ParamStore(ctx)
+	return cliinternal.AWSParamStore(ctx)
 }
 
 // TagCommand returns the SSM Parameter Store tag command.

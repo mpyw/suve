@@ -1,4 +1,4 @@
-// The scope/store plumbing (AWSScopeResolver, WorkingStore) is part of the
+// The scope/store plumbing (resolveScope, WorkingStore) is part of the
 // package's shared command-building layer; WorkingStore is spelled from outside
 // the package, so a file prefix cannot fit it.
 //declscope:core
@@ -7,55 +7,30 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
-// AWSScopeResolver resolves the AWS staging scope from the STS caller identity.
-// It is the default resolver used when a CommandConfig / GlobalConfig does not
-// specify one, preserving the original AWS-only staging behavior.
-func AWSScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
-	identity, err := infra.GetAWSIdentity(ctx)
-	if err != nil {
-		return staging.ResolvedScope{}, fmt.Errorf("failed to get AWS identity: %w", err)
-	}
+// errNoScopeResolver is returned when a command config carries no
+// ScopeResolver. Every provider must set one: there is no default provider.
+var errNoScopeResolver = errors.New("staging scope resolver is not configured")
 
-	return staging.ResolvedScope{
-		Scope:  provider.AWSScope(identity.AccountID, identity.Region),
-		Target: awsTarget(identity.Profile, identity.AccountID, identity.Region),
-	}, nil
-}
-
-// awsTarget formats the AWS confirmation target line to match the original
-// confirm.Prompter output ("profile (account / region)" or "account / region").
-func awsTarget(profile, accountID, region string) string {
-	if accountID == "" || region == "" {
-		return ""
-	}
-
-	if profile != "" {
-		return fmt.Sprintf("%s (%s / %s)", profile, accountID, region)
-	}
-
-	return fmt.Sprintf("%s / %s", accountID, region)
-}
-
-// resolveScope runs the resolver, defaulting to AWS when nil.
+// resolveScope runs the resolver. A nil resolver is a wiring bug and fails with
+// errNoScopeResolver rather than falling back to any provider.
 //
 //declscope:package // export.go resolves the scope without opening the working store
 func resolveScope(ctx context.Context, resolver staging.ScopeResolver) (staging.ResolvedScope, error) {
 	if resolver == nil {
-		resolver = AWSScopeResolver
+		return staging.ResolvedScope{}, errNoScopeResolver
 	}
 
 	return resolver(ctx)
 }
 
-// workingStore resolves the staging scope via the resolver (default AWS) and
+// workingStore resolves the staging scope via the resolver and
 // opens the working store keyed by that scope.
 func workingStore(ctx context.Context, resolver staging.ScopeResolver) (*file.Store, staging.ResolvedScope, error) {
 	resolved, err := resolveScope(ctx, resolver)
@@ -71,7 +46,7 @@ func workingStore(ctx context.Context, resolver staging.ScopeResolver) (*file.St
 	return store, resolved, nil
 }
 
-// WorkingStore resolves the staging scope via the resolver (default AWS) and
+// WorkingStore resolves the staging scope via the resolver and
 // opens the working store keyed by that scope. It is the exported entry point
 // used by the provider-wide (all-service) stage commands.
 func WorkingStore(ctx context.Context, resolver staging.ScopeResolver) (*file.Store, staging.ResolvedScope, error) {

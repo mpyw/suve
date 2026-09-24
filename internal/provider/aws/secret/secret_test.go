@@ -650,51 +650,6 @@ func TestRestore(t *testing.T) {
 	assert.Equal(t, "my-secret", gotID)
 }
 
-func TestDescribe(t *testing.T) {
-	t.Parallel()
-
-	// The secret was created long before its current version; Describe must
-	// report the VERSION's own CreatedDate, not the secret's (#317).
-	secretCreated := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	currentVersionCreated := time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)
-
-	store := secret.New(&mockClient{
-		describe: func(_ *secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
-			return &secretsmanager.DescribeSecretOutput{
-				Name:               aws.String("my-secret"),
-				Description:        aws.String("the desc"),
-				Tags:               []types.Tag{{Key: aws.String("team"), Value: aws.String("sec")}},
-				CreatedDate:        aws.Time(secretCreated),
-				LastChangedDate:    aws.Time(time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)),
-				VersionIdsToStages: map[string][]string{"id-3": {"AWSCURRENT"}},
-			}, nil
-		},
-		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
-			return &secretsmanager.ListSecretVersionIdsOutput{
-				Versions: []types.SecretVersionsListEntry{
-					{VersionId: aws.String("id-1"), CreatedDate: aws.Time(secretCreated), VersionStages: []string{}},
-					{VersionId: aws.String("id-3"), CreatedDate: aws.Time(currentVersionCreated), VersionStages: []string{"AWSCURRENT"}},
-				},
-			}, nil
-		},
-	})
-
-	entry, err := store.Describe(t.Context(), "my-secret")
-	require.NoError(t, err)
-	assert.Equal(t, "my-secret", entry.Name)
-	assert.Empty(t, entry.Value) // Describe never fetches the value
-	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
-	assert.Equal(t, "the desc", entry.Description)
-	assert.Equal(t, "id-3", entry.Version.ID)
-	assert.Equal(t, []string{"AWSCURRENT"}, entry.Version.StagingLabels)
-	// The version's own creation time, not the secret-level CreatedDate.
-	require.NotNil(t, entry.Version.Created)
-	assert.Equal(t, currentVersionCreated, *entry.Version.Created)
-	assert.NotEqual(t, secretCreated, *entry.Version.Created)
-	require.Len(t, entry.Tags, 1)
-	assert.Equal(t, "team", entry.Tags[0].Key)
-}
-
 func TestTagAndUntag(t *testing.T) {
 	t.Parallel()
 
@@ -795,20 +750,6 @@ func TestGet_BinarySecretRejected(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, provider.ErrBinaryValue)
 	assert.Nil(t, entry)
-}
-
-func TestDescribe_NotFoundMapsSentinel(t *testing.T) {
-	t.Parallel()
-
-	store := secret.New(&mockClient{
-		describe: func(*secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
-			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
-		},
-	})
-
-	_, err := store.Describe(t.Context(), "my-secret")
-	require.Error(t, err)
-	assert.ErrorIs(t, err, provider.ErrNotFound)
 }
 
 // TestResolve_ShiftNotFoundMapsSentinel guards #481: a ~shift (or label) spec

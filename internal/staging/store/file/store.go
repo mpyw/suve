@@ -350,11 +350,7 @@ func plaintextConsentGranted() bool {
 // NewStoreWithPath creates a new single-file Store with a custom state file path.
 // This is primarily for testing.
 func NewStoreWithPath(path string) *Store {
-	return &Store{
-		stateFilePath: path,
-		// A default AWS scope keeps service=="" iteration sensible if ever used.
-		scope: provider.Scope{Provider: provider.ProviderAWS},
-	}
+	return &Store{stateFilePath: path}
 }
 
 // NewStoreWithPassphrase creates a new split (working) file Store for the given
@@ -397,14 +393,17 @@ func (s *Store) pathFor(service staging.Service) string {
 }
 
 // servicesFor returns the services to operate on for the given service filter.
-// An empty filter expands to the scope's supported services (registry-driven),
-// replacing the previous hardcoded {ServiceParam, ServiceSecret} iteration.
+// An empty filter expands to the scope's supported services in split mode. A
+// single-file store has no scope, so it spans every service the file can hold.
 func (s *Store) servicesFor(service staging.Service) []staging.Service {
-	if service != "" {
+	switch {
+	case service != "":
 		return []staging.Service{service}
+	case !s.isSplit():
+		return []staging.Service{staging.ServiceParam, staging.ServiceSecret}
+	default:
+		return staging.SupportedServices(s.scope)
 	}
-
-	return staging.SupportedServices(s.scope)
 }
 
 // readFile reads and decrypts the state from the given file path.

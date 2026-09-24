@@ -187,11 +187,39 @@ func stageGlobalFlags() []cli.Flag {
 	}
 }
 
+// stageGlobalConfig builds the provider-wide stage config for Azure. App
+// Configuration (param) and Key Vault (secret) are independent resources with
+// separate staging buckets, so each service carries its own ScopeResolver. The
+// top-level ScopeResolver keys the global export/import scope under App
+// Configuration; cross-resource scoping is tracked separately (#435).
+func stageGlobalConfig(paramCfg, secretCfg stgcli.CommandConfig) stgcli.GlobalConfig {
+	return stgcli.GlobalConfig{
+		ProviderLabel: "Azure",
+		ScopeResolver: paramCfg.ScopeResolver,
+		Services: []stgcli.GlobalServiceSpec{
+			{
+				Service:              staging.ServiceParam,
+				ParserFactory:        paramCfg.ParserFactory,
+				Factory:              paramCfg.Factory,
+				ScopeResolver:        paramCfg.ScopeResolver,
+				StrategyForNamespace: paramCfg.StrategyForNamespace,
+			},
+			{
+				Service:              staging.ServiceSecret,
+				ParserFactory:        secretCfg.ParserFactory,
+				Factory:              secretCfg.Factory,
+				ScopeResolver:        secretCfg.ScopeResolver,
+				StrategyForNamespace: secretCfg.StrategyForNamespace,
+			},
+		},
+	}
+}
+
 // StageCommand returns the "azure stage" command with the secret (Key Vault) and
 // param (App Configuration) staging subgroups plus the provider-wide global
 // commands (status / diff / apply / reset) spanning both services.
 func StageCommand() *cli.Command {
-	gcfg := stgcli.AzureGlobalConfig(appConfigStageConfig(), keyVaultStageConfig())
+	gcfg := stageGlobalConfig(appConfigStageConfig(), keyVaultStageConfig())
 
 	return &cli.Command{
 		Name:        "stage",

@@ -36,7 +36,7 @@ import (
 // awsStageGlobalConfig builds the AWS provider config for the global stage
 // commands (param + secret), used by the e2e tests.
 func awsStageGlobalConfig() stgcli.GlobalConfig {
-	return stgcli.AWSGlobalConfig(paramstage.Config(), secretstage.Config())
+	return globalstage.GlobalConfig()
 }
 
 // =============================================================================

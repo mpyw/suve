@@ -106,7 +106,7 @@ EXAMPLES:
 For comparing staged values, use: suve stage secret diff`,
 		ParseDiffArgs: awssecretversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *awssecretversion.Spec) (genericdiff.Presenter, error) {
-			store, err := cliinternal.SecretStore(ctx)
+			store, err := cliinternal.AWSSecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

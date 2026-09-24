@@ -10,7 +10,7 @@
 //   - Versions are positive integers ("1", "2", ...) or the "latest" alias;
 //     there are no staging labels (a ":LABEL" spec is rejected by gcloudversion).
 //   - Deletion is permanent (no recovery window), so this store implements
-//     neither provider.Restorer nor provider.Describer.
+//     no provider.Restorer.
 //   - Tags are secret "labels" mutated via an UpdateSecret read-modify-write.
 //   - A description is stored as a secret ANNOTATION under the "description" key.
 //     Google Cloud secrets have no native description field, but annotations
@@ -77,8 +77,8 @@ type Client interface {
 }
 
 // Store is the Secret Manager implementation of provider.Store. Unlike the AWS
-// Secrets Manager store it implements neither Restorer nor Describer: Google
-// Cloud secret deletion is permanent.
+// Secrets Manager store it does not implement Restorer: Google Cloud secret
+// deletion is permanent.
 type Store struct {
 	client  Client
 	project string

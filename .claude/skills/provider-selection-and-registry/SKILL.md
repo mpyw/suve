@@ -43,33 +43,42 @@ Two ways to reach a provider coexist:
 
 ## Registry composition
 
-The registry is built once, with every backend registered
-(`internal/cli/commands/internal/client.go:22-28`):
+The registry is built once per process by `builtin.NewRegistry()`
+(`internal/provider/builtin/builtin.go`), which starts from an empty
+`provider.NewRegistry()` and registers every cloud on equal footing:
 
 ```go
-reg := aws.NewRegistry()
+reg := provider.NewRegistry()
+aws.Register(reg)
 gcloud.Register(reg)
 azure.Register(reg)
 ```
+
+The CLI (`internal/cli/commands/internal/client.go`), GUI (`internal/gui/app.go`)
+and TUI (`internal/tui/run.go`) all use it. No provider is a default: an
+unknown or unselected provider is an error everywhere (registry lookup, staging
+scope resolution, strategy selection), never a silent fallback to AWS.
 
 Each command group resolves its store through this shared registry via
 `registry.Store(ctx, scope, kind)` (`kind` is `provider.KindParam` or
 `provider.KindSecret`). A `Factory` returns `provider.ErrUnsupportedKind` when a
 provider does not offer a requested kind, and the registry returns
 `provider.ErrNoFactory` for an unregistered provider
-(`internal/provider/registry.go:37-56`).
+(`internal/provider/registry.go:17-25`).
 
 ## Scope construction per provider
 
 Each group builds a provider-specific `provider.Scope` (`internal/provider/scope.go`):
 
-- **AWS** — read/write commands use `provider.Scope{Provider: provider.ProviderAWS}`
-  (`client.go:114`). Only the provider field is needed because the AWS factory
-  builds its client from the ambient AWS config (region from env/profile), so no
-  STS `GetCallerIdentity` call is made on the read/write path. The full
+- **AWS** — read/write commands resolve stores through `AWSParamStore` /
+  `AWSSecretStore` (`client.go`) with `provider.Scope{Provider: provider.ProviderAWS}`.
+  Only the provider field is needed because the AWS factory builds its client
+  from the ambient AWS config (region from env/profile), so no STS
+  `GetCallerIdentity` call is made on the read/write path. The full
   account/region identity (`infra.GetAWSIdentity`,
   `internal/provider/aws/infra/client.go:164` → `provider.AWSScope(accountID, region)`)
-  is resolved separately, only where staging state must be keyed.
+  is resolved separately by `AWSStagingScopeResolver`, only where staging state
+  must be keyed.
 - **Google Cloud** — the project id from `--project` or `GOOGLE_CLOUD_PROJECT`
   (`provider.GoogleCloudScope(project)`).
 - **Azure** — the Key Vault name (`--vault-name` / `AZURE_KEYVAULT_NAME`) via
@@ -78,8 +87,13 @@ Each group builds a provider-specific `provider.Scope` (`internal/provider/scope
   `provider.AzureAppConfigScope(store)`. Each is a globally-unique name that
   fully identifies the resource, so no subscription/resource group is needed.
 
-Staging is available on AWS, Google Cloud, and Azure. Each scope keys its
-on-disk staging state (`provider.Scope.Key`, `scope.go:44`), partitioning staged
+Staging is available on AWS, Google Cloud, and Azure. Every staging command
+config (`stgcli.CommandConfig`, `stgcli.GlobalConfig`, `stgcli.GlobalServiceSpec`)
+must set a `ScopeResolver`; the per-provider resolvers live next to the store
+helpers in `internal/cli/commands/internal/client.go`
+(`AWSStagingScopeResolver`, `GoogleCloudStagingScopeResolver`,
+`AzureKeyVaultStagingScopeResolver`, `AzureAppConfigStagingScopeResolver`). A
+nil resolver fails the command. Each scope keys its on-disk staging state (`provider.Scope.Key`, `scope.go:44`), partitioning staged
 changes per scope under `~/.suve/staging/<scope key>/`.
 
 ## SDK-confinement boundary
@@ -102,8 +116,8 @@ stores through the registry rather than a cloud SDK.
 
 1. Implement `provider.Reader` / `Writer` / `Tagger` in a new
    `internal/provider/<cloud>/**` adapter (keep every SDK import inside it).
-2. Register it (`registry.Register(provider.Provider<Cloud>, ...)`) at the
-   composition point in `client.go`.
+2. Expose a `Register(reg)` from the adapter package and call it from
+   `builtin.NewRegistry()` (`internal/provider/builtin/builtin.go`).
 3. Add its version-spec parser under `internal/version/`.
 4. Add its detection signal in `internal/provider/detect/detect.go` and wire a
    command group in `internal/cli/commands/<cloud>/` that builds the provider's

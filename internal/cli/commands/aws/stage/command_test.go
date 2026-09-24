@@ -9,6 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/commands/aws/stage"
+	"github.com/mpyw/suve/internal/staging"
 )
 
 func TestCommand(t *testing.T) {
@@ -85,4 +86,25 @@ func TestCommand_SecretSubcommand(t *testing.T) {
 	require.NotNil(t, secretCmd)
 	assert.Equal(t, "secret", secretCmd.Name)
 	assert.Contains(t, secretCmd.Aliases, "sm")
+}
+
+func TestGlobalConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := stage.GlobalConfig()
+
+	assert.Equal(t, "AWS", cfg.ProviderLabel)
+	assert.NotNil(t, cfg.ScopeResolver)
+	require.Len(t, cfg.Services, 2)
+	assert.Equal(t, staging.ServiceParam, cfg.Services[0].Service)
+	assert.Equal(t, staging.ServiceSecret, cfg.Services[1].Service)
+
+	for _, svc := range cfg.Services {
+		assert.NotNil(t, svc.ScopeResolver, svc.Service)
+		assert.NotNil(t, svc.Factory, svc.Service)
+	}
+
+	// Parser factories are carried through and are network-free.
+	assert.Equal(t, "SSM Parameter Store", cfg.Services[0].ParserFactory().ServiceName())
+	assert.Equal(t, "Secrets Manager", cfg.Services[1].ParserFactory().ServiceName())
 }

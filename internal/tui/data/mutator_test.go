@@ -84,7 +84,9 @@ func TestParamMutator_RejectsFilterNamespace(t *testing.T) {
 
 			return nil, errors.New("store must not be resolved for an invalid namespace")
 		},
-		func(provider.Store) staging.FullStrategy { return nil },
+		func(provider.Store) (staging.FullStrategy, error) {
+			return nil, errors.New("strategy must not be built for an invalid namespace")
+		},
 		func() (store.ReadWriteOperator, error) {
 			return nil, errors.New("staging store must not be resolved for an invalid namespace")
 		},
@@ -158,7 +160,7 @@ func newParamMutator(t *testing.T, provStore provider.Store) (data.Mutator, stor
 	mut := data.NewParamMutator(
 		awsParamCap(t),
 		func(context.Context, string) (provider.Store, error) { return provStore, nil },
-		func(s provider.Store) staging.FullStrategy { return staging.NewAWSParamStrategy(s) },
+		func(s provider.Store) (staging.FullStrategy, error) { return staging.NewAWSParamStrategy(s), nil },
 		resolve,
 	)
 
@@ -478,4 +480,39 @@ func TestParamMutator_RestoreUnsupported(t *testing.T) {
 
 	_, err := mut.Restore(context.Background(), existingParamName)
 	require.ErrorIs(t, err, data.ErrRestoreUnsupported, "param restore is always unsupported")
+}
+
+// TestMutators_StrategyBuildErrorPropagates pins that a staged write fails with
+// the builder's error (e.g. an unknown provider) instead of proceeding.
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv
+func TestMutators_StrategyBuildErrorPropagates(t *testing.T) {
+	ctx := context.Background()
+	errBuild := errors.New("no staging strategy for provider")
+	var failBuild data.StrategyBuilder = func(provider.Store) (staging.FullStrategy, error) {
+		return nil, errBuild
+	}
+	notFound := &providermock.Store{
+		GetFunc: func(context.Context, string, provider.VersionRef) (*domain.Entry, error) {
+			return nil, provider.ErrNotFound
+		},
+	}
+
+	t.Run("param", func(t *testing.T) {
+		resolve, _ := tempStagingStore(t)
+		mut := data.NewParamMutator(awsParamCap(t),
+			func(context.Context, string) (provider.Store, error) { return notFound, nil },
+			failBuild, resolve)
+
+		_, err := mut.Create(ctx, data.StagedKey{Name: "/app/NEW"}, "v1", "String", "", true)
+		require.ErrorIs(t, err, errBuild)
+	})
+
+	t.Run("secret", func(t *testing.T) {
+		resolve, _ := tempStagingStore(t)
+		mut := data.NewSecretMutator(awsSecretCap(t), notFound, failBuild, resolve)
+
+		_, err := mut.Create(ctx, data.StagedKey{Name: "app/NEW"}, "v1", "", "", true)
+		require.ErrorIs(t, err, errBuild)
+	})
 }

@@ -1,4 +1,8 @@
-package cli_test
+// These are stage.go's tests: stageGlobalConfig is private to the stage
+// namespace.
+//declscope:namespace stage
+
+package azure
 
 import (
 	"context"
@@ -11,25 +15,7 @@ import (
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
-func TestAWSGlobalConfig(t *testing.T) {
-	t.Parallel()
-
-	param := stgcli.CommandConfig{Factory: nil, ParserFactory: staging.AWSParamParserFactory}
-	secret := stgcli.CommandConfig{Factory: nil, ParserFactory: staging.AWSSecretParserFactory}
-
-	cfg := stgcli.AWSGlobalConfig(param, secret)
-
-	assert.Equal(t, "AWS", cfg.ProviderLabel)
-	assert.NotNil(t, cfg.ScopeResolver)
-	assert.Len(t, cfg.Services, 2)
-	assert.Equal(t, staging.ServiceParam, cfg.Services[0].Service)
-	assert.Equal(t, staging.ServiceSecret, cfg.Services[1].Service)
-	// Parser factories are carried through and are network-free.
-	assert.Equal(t, "SSM Parameter Store", cfg.Services[0].ParserFactory().ServiceName())
-	assert.Equal(t, "Secrets Manager", cfg.Services[1].ParserFactory().ServiceName())
-}
-
-func TestAzureGlobalConfig(t *testing.T) {
+func TestStageGlobalConfig(t *testing.T) {
 	t.Parallel()
 
 	// App Configuration (param) and Key Vault (secret) are independent resources,
@@ -55,7 +41,7 @@ func TestAzureGlobalConfig(t *testing.T) {
 		ScopeResolver: secretResolver,
 	}
 
-	cfg := stgcli.AzureGlobalConfig(param, secret)
+	cfg := stageGlobalConfig(param, secret)
 
 	assert.Equal(t, "Azure", cfg.ProviderLabel)
 	require.Len(t, cfg.Services, 2)

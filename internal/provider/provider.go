@@ -142,7 +142,7 @@ type Tagger interface {
 
 // Store is the full provider contract for one service (e.g. AWS SSM or
 // Secrets Manager). Providers may additionally implement the optional
-// Restorer/Describer capabilities.
+// Restorer capability.
 type Store interface {
 	Reader
 	Writer
@@ -153,12 +153,6 @@ type Store interface {
 type Restorer interface {
 	// Restore cancels a pending deletion for an entry.
 	Restore(ctx context.Context, name string) error
-}
-
-// Describer returns entry metadata without the value. Optional.
-type Describer interface {
-	// Describe returns an entry's metadata without fetching its value.
-	Describe(ctx context.Context, name string) (*domain.Entry, error)
 }
 
 // Factory builds a Store for a scope + kind. It returns ErrUnsupportedKind if

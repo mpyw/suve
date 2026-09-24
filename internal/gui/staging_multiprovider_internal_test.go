@@ -35,11 +35,11 @@ func TestApp_stagingScope_NoSTSForResolvableScopes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			app := &App{scope: tt.scope}
+			app := &App{}
 
 			// No AWS credentials configured in the test env; this must not error,
 			// proving no STS round-trip occurred.
-			got, err := app.stagingScope()
+			got, err := app.stagingScopeScoped(tt.scope)
 			require.NoError(t, err)
 			assert.Equal(t, tt.scope, got)
 			assert.Equal(t, tt.scope.Key(), got.Key())
@@ -69,13 +69,37 @@ func TestApp_getParser_PerProvider(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			app := &App{scope: provider.Scope{Provider: tt.provider}}
+			app := &App{}
 
-			parser, err := app.getParser(tt.service)
+			parser, err := app.getParserScoped(provider.Scope{Provider: tt.provider}, tt.service)
 			require.NoError(t, err)
 			assert.IsType(t, tt.want, parser)
 		})
 	}
+}
+
+// TestApp_UnknownProviderHasNoStagingDefault pins that an unknown (or not yet
+// selected) provider fails staging resolution instead of silently acting as AWS.
+func TestApp_UnknownProviderHasNoStagingDefault(t *testing.T) {
+	t.Parallel()
+
+	app := &App{ctx: t.Context()}
+
+	for _, p := range []provider.Provider{"", "oracle"} {
+		sc := provider.Scope{Provider: p}
+
+		_, err := app.stagingScopeScoped(sc)
+		require.ErrorIs(t, err, errInvalidProvider, "provider %q", p)
+
+		for _, service := range []string{"param", "secret"} {
+			_, err := app.getParserScoped(sc, service)
+			require.ErrorIs(t, err, errUnsupportedService, "provider %q, service %q", p, service)
+		}
+	}
+
+	// Google Cloud offers no param service.
+	_, err := app.getParserScoped(provider.GoogleCloudScope("proj"), "param")
+	require.ErrorIs(t, err, errUnsupportedService)
 }
 
 // TestApp_getStagingStore_ScopeKeyed verifies that the working store is keyed by
@@ -86,7 +110,7 @@ func TestApp_getStagingStore_ScopeKeyed(t *testing.T) {
 	t.Setenv("SUVE_STAGING_KEY", base64.StdEncoding.EncodeToString(make([]byte, 32)))
 	t.Setenv("HOME", t.TempDir())
 
-	app := NewApp(provider.Scope{Provider: provider.ProviderGoogleCloud}, "")
+	app := newTestApp(t, provider.Scope{Provider: provider.ProviderGoogleCloud}, "")
 	app.Startup(t.Context())
 	app.scope = provider.GoogleCloudScope("proj-a")
 
@@ -121,7 +145,7 @@ func TestApp_getStagingStore_ScopeKeyed(t *testing.T) {
 //   - AzureAppConfigStagingScopeResolver -> provider.AzureAppConfigScope(store)
 //   - AzureKeyVaultStagingScopeResolver  -> provider.AzureKeyVaultScope(vault)
 //   - GoogleCloudStagingScopeResolver    -> provider.GoogleCloudScope(project)
-//   - AWSScopeResolver                   -> provider.AWSScope(account, region)
+//   - AWSStagingScopeResolver            -> provider.AWSScope(account, region)
 func TestStagingScope_GUICLIParity(t *testing.T) {
 	t.Parallel()
 
@@ -168,4 +192,27 @@ func TestStagingScope_GUICLIParity(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, paramScope.Key(), secretScope.Key(),
 		"Azure App Configuration and Key Vault staging must not collide")
+}
+
+// TestApp_serviceStrategyScoped_UnknownProvider pins that even when a store
+// resolves, a provider with no staging strategy for the service is an error
+// rather than an AWS strategy.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestApp_serviceStrategyScoped_UnknownProvider(t *testing.T) {
+	orig := registry
+	registry = provider.NewRegistry()
+	registry.Register(provider.Provider("oracle"), fakeFactory{})
+	registry.Register(provider.ProviderGoogleCloud, fakeFactory{})
+	t.Cleanup(func() { registry = orig })
+
+	app := &App{ctx: t.Context()}
+
+	for _, service := range []string{"param", "secret"} {
+		_, err := app.serviceStrategyScoped(provider.Scope{Provider: provider.Provider("oracle")}, service)
+		require.ErrorIs(t, err, errUnsupportedService, "service %q", service)
+	}
+
+	_, err := app.serviceStrategyScoped(provider.GoogleCloudScope("proj"), "param")
+	require.ErrorIs(t, err, errUnsupportedService)
 }

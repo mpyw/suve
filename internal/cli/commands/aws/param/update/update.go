@@ -166,7 +166,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	store, err := internal.ParamStore(ctx)
+	store, err := internal.AWSParamStore(ctx)
 	if err != nil {
 		return err
 	}

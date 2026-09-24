@@ -18,6 +18,7 @@ var config = stgcli.CommandConfig{
 	ItemName:       nounSecret,
 	Factory:        cliinternal.AWSSecretStrategyFactory,
 	ParserFactory:  staging.AWSSecretParserFactory,
+	ScopeResolver:  cliinternal.AWSStagingScopeResolver,
 	HasDescription: true,
 }
 

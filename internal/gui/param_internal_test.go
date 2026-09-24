@@ -339,20 +339,20 @@ func TestParamNamespaceHelpers(t *testing.T) {
 		assert.Equal(t, "*", ns)
 	})
 
-	t.Run("effectiveParamScope overrides the namespace without mutating the read scope", func(t *testing.T) {
+	t.Run("effectiveParamScopeScoped overrides the namespace without mutating the read scope", func(t *testing.T) {
 		t.Parallel()
 
 		app := &App{ctx: t.Context(), scope: appConfigScope()}
-		eff := app.effectiveParamScope("dev")
+		eff := app.effectiveParamScopeScoped(app.currentScope(), "dev")
 		assert.Equal(t, "dev", eff.AppConfigNamespace)
 		assert.Empty(t, app.currentScope().AppConfigNamespace, "the shared read scope must be untouched")
 	})
 
-	t.Run("effectiveParamScope leaves non-App-Config scopes alone", func(t *testing.T) {
+	t.Run("effectiveParamScopeScoped leaves non-App-Config scopes alone", func(t *testing.T) {
 		t.Parallel()
 
 		app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
-		eff := app.effectiveParamScope("dev")
+		eff := app.effectiveParamScopeScoped(app.currentScope(), "dev")
 		assert.Empty(t, eff.AppConfigNamespace)
 	})
 }

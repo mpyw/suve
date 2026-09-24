@@ -30,7 +30,7 @@ import (
 func setupWriteBindingApp(t *testing.T, scope provider.Scope, store provider.Store) *App {
 	t.Helper()
 
-	app := NewApp(scope, "")
+	app := newTestApp(t, scope, "")
 	app.Startup(t.Context())
 	app.stagingStore = testutil.NewMockStore()
 

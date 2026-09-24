@@ -11,12 +11,38 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/aws/stage/secret"
 	"github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
+// GlobalConfig builds the provider-wide stage config for AWS: param + secret
+// share one account/region staging scope.
+func GlobalConfig() stgcli.GlobalConfig {
+	paramCfg, secretCfg := param.Config(), secret.Config()
+
+	return stgcli.GlobalConfig{
+		ProviderLabel: "AWS",
+		ScopeResolver: cliinternal.AWSStagingScopeResolver,
+		Services: []stgcli.GlobalServiceSpec{
+			{
+				Service:       staging.ServiceParam,
+				ParserFactory: paramCfg.ParserFactory,
+				Factory:       paramCfg.Factory,
+				ScopeResolver: paramCfg.ScopeResolver,
+			},
+			{
+				Service:       staging.ServiceSecret,
+				ParserFactory: secretCfg.ParserFactory,
+				Factory:       secretCfg.Factory,
+				ScopeResolver: secretCfg.ScopeResolver,
+			},
+		},
+	}
+}
+
 // Command returns the global stage command with subcommands.
 func Command() *cli.Command {
-	gcfg := stgcli.AWSGlobalConfig(param.Config(), secret.Config())
+	gcfg := GlobalConfig()
 
 	return &cli.Command{
 		Name:    "stage",

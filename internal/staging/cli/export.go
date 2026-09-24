@@ -299,7 +299,7 @@ func exportAction(service staging.Service, resolver staging.ScopeResolver) func(
 // NewGlobalExportCommand creates the global `stage export <dir>` command. It
 // writes <dir>/param.json and <dir>/secret.json, one file per service that has
 // staged changes (empty services are skipped). The resolver determines the
-// provider staging scope (nil defaults to AWS).
+// provider staging scope.
 func NewGlobalExportCommand(resolver staging.ScopeResolver) *cli.Command {
 	return &cli.Command{
 		Name:      "export",

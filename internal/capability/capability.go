@@ -28,8 +28,7 @@ type ServiceCapability struct {
 	HasVersionHistory bool `json:"hasVersionHistory"`
 	// HasVersionSpecifiers is true when #VERSION/~SHIFT specifiers apply.
 	HasVersionSpecifiers bool `json:"hasVersionSpecifiers"`
-	// HasTags is true when tag/label read+write is supported (false for Azure
-	// App Configuration).
+	// HasTags is true when tag/label read+write is supported.
 	HasTags bool `json:"hasTags"`
 	// TagsPerVersion is true when tags are scoped to a specific version rather
 	// than the resource (Azure Key Vault only): each version has its own tags,
@@ -37,7 +36,7 @@ type ServiceCapability struct {
 	// latest version. Every other provider keeps tags at the resource level.
 	TagsPerVersion bool `json:"tagsPerVersion"`
 	// HasRestore is true when a soft-deleted item can be restored (AWS Secrets
-	// Manager only).
+	// Manager and Azure Key Vault).
 	HasRestore bool `json:"hasRestore"`
 	// HasStaging is true when the frontend's staging workflow applies to this
 	// service (every provider service today); the frontend hides the staging

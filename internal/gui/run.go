@@ -16,7 +16,10 @@ import (
 // it. service ("param"/"secret", or "" for none) is the launched service the
 // frontend opens on.
 func Run(initial provider.Scope, service string) error {
-	app := NewApp(initial, service)
+	app, err := NewApp(initial, service)
+	if err != nil {
+		return err
+	}
 
 	opts := &options.App{
 		Title:  "suve",

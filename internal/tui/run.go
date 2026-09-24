@@ -19,30 +19,19 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/provider/aws/infra"
-	"github.com/mpyw/suve/internal/provider/azure"
-	"github.com/mpyw/suve/internal/provider/gcloud"
+	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/tui/components"
 )
 
 // registry is the provider registry backing the TUI's read/write operations. It
-// is the same composition point the CLI and GUI use
-// (internal/cli/commands/internal/client.go, internal/gui/app.go): AWS (param +
-// secret), Google Cloud (secret), and Azure (Key Vault secret + App
-// Configuration param) are registered so any launched scope resolves a store.
-// The TUI composes it through the provider packages — never a cloud SDK
-// directly — keeping the SDK-confinement boundary intact.
+// is built by builtin.NewRegistry, the same composition the CLI and GUI use, so
+// any launched scope resolves a store. The TUI reaches the clouds through the
+// provider packages, never a cloud SDK directly.
 //
 //nolint:gochecknoglobals // process-wide provider registry, built once
-var registry = func() *provider.Registry {
-	reg := aws.NewRegistry()
-	gcloud.Register(reg)
-	azure.Register(reg)
-
-	return reg
-}()
+var registry = builtin.NewRegistry()
 
 // Run starts the TUI for a fixed provider scope and initial service. Provider
 // and scope are resolved by the caller (the --tui launch wiring) and never
@@ -160,7 +149,7 @@ func ensureResolvable(ctx context.Context, scope provider.Scope) error {
 
 // awsIdentityFetcher builds the status bar's AWS identity fetcher as a closure
 // over the Run context, so the model never stores a context nor imports the AWS
-// provider package. It is the only TUI seam that touches internal/provider/aws.
+// provider package.
 func awsIdentityFetcher(ctx context.Context) identityFetcher {
 	return func() (components.AWSIdentity, error) {
 		id, err := infra.GetAWSIdentity(ctx)

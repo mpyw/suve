@@ -511,7 +511,7 @@ func globalImportReAnchorSpecs(gcfg GlobalConfig) map[staging.Service]importReAn
 // NewGlobalImportCommand creates the global `stage import <dir>` command. It
 // reads <dir>/param.json and <dir>/secret.json (missing files are skipped; an
 // error only when neither exists) into the working staging area. The config's
-// ScopeResolver determines the provider staging scope (nil defaults to AWS); its
+// ScopeResolver determines the provider staging scope; its
 // per-service factories re-anchor conflict-detection timestamps on a cross-scope
 // import.
 func NewGlobalImportCommand(gcfg GlobalConfig) *cli.Command {

@@ -325,7 +325,7 @@ EXAMPLES:
 			},
 		},
 		NewPresenter: func(ctx context.Context, req genericlog.Request) (genericlog.Presenter, error) {
-			store, err := cliinternal.ParamStore(ctx)
+			store, err := cliinternal.AWSParamStore(ctx)
 			if err != nil {
 				return nil, err
 			}

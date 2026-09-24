@@ -59,8 +59,7 @@ type Client interface {
 }
 
 // Store is the Key Vault implementation of provider.Store. It also implements
-// the optional Restorer capability (soft-delete recovery); it does not
-// implement Describer.
+// the optional Restorer capability (soft-delete recovery).
 type Store struct {
 	client Client
 }

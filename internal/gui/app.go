@@ -10,11 +10,9 @@ import (
 	"sync"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/provider/aws/infra"
-	"github.com/mpyw/suve/internal/provider/azure"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
-	"github.com/mpyw/suve/internal/provider/gcloud"
+	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
@@ -25,19 +23,11 @@ import (
 // =============================================================================
 
 // registry is the provider registry backing the GUI's read/write operations.
-// It mirrors the CLI composition point (internal/cli/commands/internal): AWS
-// (param + secret), Google Cloud (secret), and Azure (Key Vault secret + App
-// Configuration param) are all registered, so the GUI can browse any backend
-// once a scope is selected.
+// It is built by builtin.NewRegistry, the same composition the CLI and TUI use,
+// so the GUI can browse any backend once a scope is selected.
 //
 //nolint:gochecknoglobals // process-wide provider registry, built once
-var registry = func() *provider.Registry {
-	reg := aws.NewRegistry()
-	gcloud.Register(reg)
-	azure.Register(reg)
-
-	return reg
-}()
+var registry = builtin.NewRegistry()
 
 // errInvalidProvider is returned when SelectScope is given an unknown provider.
 var errInvalidProvider = stringError("invalid provider: must be 'aws', 'googlecloud', or 'azure'")
@@ -54,13 +44,6 @@ var (
 	// resolved.
 	errAzureScopeRequired = stringError("Azure requires a Key Vault name (for secrets) and/or an App Configuration store name (for parameters)")
 )
-
-// defaultScope is the initial read/write scope (AWS). The AWS factory builds
-// its SSM/Secrets Manager client from the ambient AWS config (region from
-// env/profile), so only the Provider field is needed.
-//
-//nolint:gochecknoglobals // immutable default selector
-var defaultScope = provider.Scope{Provider: provider.ProviderAWS}
 
 // =============================================================================
 // App Struct
@@ -86,7 +69,8 @@ type App struct {
 	initialService string
 
 	// scope is the current read/write provider scope, selected from the
-	// frontend via SelectScope. Guarded by scopeMu.
+	// frontend via SelectScope. It is the zero Scope (no provider) until a
+	// provider is chosen. Guarded by scopeMu.
 	scope   provider.Scope
 	scopeMu sync.RWMutex
 
@@ -106,22 +90,34 @@ type App struct {
 // NewApp creates a new App with the given initial launch scope and service.
 // Empty resource fields on the scope are hydrated from the ambient environment,
 // so an explicit selection (e.g. from a --project / --vault-name / --store-name
-// flag) wins, while an unset one still falls back to env. service is the launch
-// service ("param"/"secret", or "" for none) surfaced via InitialService.
-func NewApp(initial provider.Scope, service string) *App {
+// flag) wins, while an unset one still falls back to env. A zero Provider means
+// no provider is selected yet: the scope stays zero until SelectScope. An
+// unknown provider is an error. service is the launch service
+// ("param"/"secret", or "" for none) surfaced via InitialService.
+func NewApp(initial provider.Scope, service string) (*App, error) {
+	scope := initial
+	if initial.Provider != "" {
+		var err error
+
+		scope, err = hydrateScope(initial)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &App{
 		initialProvider: initial.Provider,
 		initialService:  service,
-		scope:           hydrateScope(initial),
-	}
+		scope:           scope,
+	}, nil
 }
 
 // hydrateScope fills empty resource fields on an initial launch scope from the
 // environment. Flag-supplied values take precedence; unset ones fall back to
 // GOOGLE_CLOUD_PROJECT / AZURE_KEYVAULT_NAME / AZURE_APPCONFIG_NAME /
 // AZURE_APPCONFIG_NAMESPACE. AWS carries no resource field (region comes from
-// the ambient AWS config).
-func hydrateScope(s provider.Scope) provider.Scope {
+// the ambient AWS config). An unknown provider fails with errInvalidProvider.
+func hydrateScope(s provider.Scope) (provider.Scope, error) {
 	switch s.Provider {
 	case provider.ProviderGoogleCloud:
 		if s.ProjectID == "" {
@@ -142,10 +138,10 @@ func hydrateScope(s provider.Scope) provider.Scope {
 	case provider.ProviderAWS:
 		// region comes from the ambient AWS config; nothing to hydrate.
 	default:
-		return defaultScope
+		return provider.Scope{}, fmt.Errorf("%w: %q", errInvalidProvider, s.Provider)
 	}
 
-	return s
+	return s, nil
 }
 
 // InitialProvider returns the provider the GUI was launched with (empty when no
@@ -253,10 +249,14 @@ func (a *App) GetCurrentScope() *ScopeSelection {
 // independently of detect, so an explicitly-selected provider always resolves its
 // scope from env even in a mixed-env shell. GetCurrentScope only surfaces the
 // launch provider's env-derived scope; the frontend calls this to fill the scope
-// form for any OTHER provider it switches to. An unknown provider yields the AWS
-// default (hydrateScope's fallback).
-func (a *App) EnvScope(providerName string) *ScopeSelection {
-	return selectionFromScope(hydrateScope(provider.Scope{Provider: provider.Provider(providerName)}))
+// form for any OTHER provider it switches to. An unknown provider is an error.
+func (a *App) EnvScope(providerName string) (*ScopeSelection, error) {
+	scope, err := hydrateScope(provider.Scope{Provider: provider.Provider(providerName)})
+	if err != nil {
+		return nil, err
+	}
+
+	return selectionFromScope(scope), nil
 }
 
 // selectionFromScope is the inverse of scopeFromSelection: it projects a
@@ -272,37 +272,34 @@ func selectionFromScope(s provider.Scope) *ScopeSelection {
 	}
 }
 
-// stagingScope resolves the provider.Scope that keys on-disk staging state for
-// the active provider. It mirrors the CLI's ScopeResolvers: AWS is keyed by the
-// STS caller identity (account/region), while Google Cloud and Azure are keyed
-// purely from the already-selected scope (project / vault or store) with no
-// network call. Deriving the staging store AND the apply/diff
-// strategy from this one scope keeps them structurally in sync — the invariant
-// that replaces #276's interim non-AWS guard.
-func (a *App) stagingScope() (provider.Scope, error) {
-	return a.stagingScopeScoped(a.currentScope())
-}
-
-// stagingScopeScoped is stagingScope resolved from an already-snapshotted scope,
-// so a staging binding can pair its store and strategy against the SAME scope
-// even if SelectScope lands between the two resolutions (#560).
+// stagingScopeScoped resolves the provider.Scope that keys on-disk staging
+// state for an already-snapshotted scope, so a staging binding can pair its
+// store and strategy against the SAME scope even if SelectScope lands between
+// the two resolutions (#560). It mirrors the CLI's ScopeResolvers: AWS is keyed
+// by the STS caller identity (account/region), while Google Cloud and Azure are
+// keyed purely from the already-selected scope (project / vault or store) with
+// no network call. An unknown (or unselected) provider is an error.
 func (a *App) stagingScopeScoped(sc provider.Scope) (provider.Scope, error) {
-	// Non-AWS scopes already carry their keying fields — no network call.
-	if sc.Provider != provider.ProviderAWS {
+	switch sc.Provider {
+	case provider.ProviderGoogleCloud, provider.ProviderAzure:
+		// These scopes already carry their keying fields — no network call.
 		return sc, nil
-	}
-	// An AWS scope that already carries account+region (e.g. injected in tests)
-	// needs no STS round-trip.
-	if sc.AccountID != "" && sc.Region != "" {
-		return sc, nil
-	}
+	case provider.ProviderAWS:
+		// An AWS scope that already carries account+region (e.g. injected in
+		// tests) needs no STS round-trip.
+		if sc.AccountID != "" && sc.Region != "" {
+			return sc, nil
+		}
 
-	identity, err := infra.GetAWSIdentity(a.ctx)
-	if err != nil {
-		return provider.Scope{}, err
-	}
+		identity, err := infra.GetAWSIdentity(a.ctx)
+		if err != nil {
+			return provider.Scope{}, err
+		}
 
-	return provider.AWSScope(identity.AccountID, identity.Region), nil
+		return provider.AWSScope(identity.AccountID, identity.Region), nil
+	default:
+		return provider.Scope{}, fmt.Errorf("%w: %q", errInvalidProvider, sc.Provider)
+	}
 }
 
 // stagingScopeForKind resolves the staging scope for ONE service kind. It exists
@@ -344,6 +341,10 @@ func (a *App) stagingScopeForKindScoped(sc provider.Scope, kind provider.Kind) (
 // errInvalidService is returned when an invalid service is specified.
 var errInvalidService = stringError("invalid service: must be 'param' or 'secret'")
 
+// errUnsupportedService is returned when the selected provider (or no provider)
+// does not offer the requested service.
+var errUnsupportedService = stringError("service is not offered by the selected provider")
+
 type stringError string
 
 func (e stringError) Error() string { return string(e) }
@@ -353,7 +354,7 @@ func (e stringError) Error() string { return string(e) }
 // =============================================================================
 
 // paramStore resolves a provider.Store for the parameter service via the
-// registry (AWS by default).
+// registry for the current scope.
 func (a *App) paramStore() (provider.Store, error) {
 	return a.paramStoreScoped(a.currentScope())
 }
@@ -364,7 +365,7 @@ func (a *App) paramStoreScoped(sc provider.Scope) (provider.Store, error) {
 }
 
 // secretStore resolves a provider.Store for the secret service via the
-// registry (AWS by default).
+// registry for the current scope.
 func (a *App) secretStore() (provider.Store, error) {
 	return a.secretStoreScoped(a.currentScope())
 }
@@ -374,16 +375,10 @@ func (a *App) secretStoreScoped(sc provider.Scope) (provider.Store, error) {
 	return registry.Store(a.ctx, sc, provider.KindSecret)
 }
 
-// effectiveParamScope returns the active param scope with the App Configuration
-// namespace overridden to ns, so a create/stage can target one concrete
-// (key, namespace) without mutating the shared read scope. It is a no-op for
-// non-App-Configuration scopes (which have no namespace axis).
-func (a *App) effectiveParamScope(ns string) provider.Scope {
-	return a.effectiveParamScopeScoped(a.currentScope(), ns)
-}
-
-// effectiveParamScopeScoped is effectiveParamScope applied to an
-// already-snapshotted scope (#560).
+// effectiveParamScopeScoped returns an already-snapshotted param scope (#560)
+// with the App Configuration namespace overridden to ns, so a create/stage can
+// target one concrete (key, namespace) without mutating the shared read scope.
+// It is a no-op for non-App-Configuration scopes (which have no namespace axis).
 func (a *App) effectiveParamScopeScoped(sc provider.Scope, ns string) provider.Scope {
 	if sc.Provider == provider.ProviderAzure && sc.StoreName != "" {
 		sc.AppConfigNamespace = ns
@@ -507,35 +502,42 @@ func (a *App) getService(service string) (staging.Service, error) {
 	}
 }
 
-// getParser returns a store-less strategy used to interpret staged entries
-// (status/reset): the per-provider strategy so ServiceName/ItemName/delete-option
-// semantics match the active provider (e.g. Azure "App Configuration"/"setting",
-// no delete options). Selection is by the active provider + service.
-func (a *App) getParser(service string) (staging.Parser, error) {
-	return a.getParserScoped(a.currentScope(), service)
-}
-
-// getParserScoped is getParser resolved from an already-snapshotted scope (#560).
+// getParserScoped returns a store-less strategy used to interpret staged
+// entries (status/reset) for an already-snapshotted scope (#560): the
+// per-provider strategy so ServiceName/ItemName/delete-option semantics match
+// the provider (e.g. Azure "App Configuration"/"setting", no delete options).
+// A provider that does not offer the service is an error.
 func (a *App) getParserScoped(sc provider.Scope, service string) (staging.Parser, error) {
 	switch service {
 	case string(staging.ServiceParam):
-		if sc.Provider == provider.ProviderAzure {
+		switch sc.Provider {
+		case provider.ProviderAWS:
+			return &staging.AWSParamStrategy{}, nil
+		case provider.ProviderAzure:
 			return &staging.AzureAppConfigParamStrategy{}, nil
+		default:
+			return nil, unsupportedStagingProvider(sc, service)
 		}
-
-		return &staging.AWSParamStrategy{}, nil
 	case string(staging.ServiceSecret):
 		switch sc.Provider {
+		case provider.ProviderAWS:
+			return &staging.AWSSecretStrategy{}, nil
 		case provider.ProviderGoogleCloud:
 			return &staging.GoogleCloudSecretStrategy{}, nil
 		case provider.ProviderAzure:
 			return &staging.AzureKeyVaultSecretStrategy{}, nil
 		default:
-			return &staging.AWSSecretStrategy{}, nil
+			return nil, unsupportedStagingProvider(sc, service)
 		}
 	default:
 		return nil, errInvalidService
 	}
+}
+
+// unsupportedStagingProvider reports that sc's provider has no staging strategy
+// for service (an unknown provider, or one that does not offer the service).
+func unsupportedStagingProvider(sc provider.Scope, service string) error {
+	return fmt.Errorf("%w: provider %q, service %q", errUnsupportedService, sc.Provider, service)
 }
 
 // serviceStrategyScoped builds the staging strategy for a service, wrapping a
@@ -553,11 +555,14 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 			return nil, err
 		}
 
-		if sc.Provider == provider.ProviderAzure {
+		switch sc.Provider {
+		case provider.ProviderAWS:
+			return staging.NewAWSParamStrategy(s), nil
+		case provider.ProviderAzure:
 			return staging.NewAzureAppConfigParamStrategy(s), nil
+		default:
+			return nil, unsupportedStagingProvider(sc, service)
 		}
-
-		return staging.NewAWSParamStrategy(s), nil
 	case string(staging.ServiceSecret):
 		s, err := a.secretStoreScoped(sc)
 		if err != nil {
@@ -565,12 +570,14 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 		}
 
 		switch sc.Provider {
+		case provider.ProviderAWS:
+			return staging.NewAWSSecretStrategy(s), nil
 		case provider.ProviderGoogleCloud:
 			return staging.NewGoogleCloudSecretStrategy(s), nil
 		case provider.ProviderAzure:
 			return staging.NewAzureKeyVaultSecretStrategy(s), nil
 		default:
-			return staging.NewAWSSecretStrategy(s), nil
+			return nil, unsupportedStagingProvider(sc, service)
 		}
 	default:
 		return nil, errInvalidService

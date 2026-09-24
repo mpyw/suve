@@ -12,6 +12,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/mpyw/suve/internal/capability"
@@ -147,7 +148,12 @@ func (f *sourceFactory) paramStagingResolver() data.StagingResolver {
 			return data.StagingResources{}, err
 		}
 
-		res := data.StagingResources{Store: st, Strategy: build(base)}
+		strategy, err := build(base)
+		if err != nil {
+			return data.StagingResources{}, err
+		}
+
+		res := data.StagingResources{Store: st, Strategy: strategy}
 
 		if f.scope.Provider == provider.ProviderAzure && f.scope.StoreName != "" {
 			res.StrategyFor = func(namespace string) (staging.FullStrategy, error) {
@@ -156,7 +162,7 @@ func (f *sourceFactory) paramStagingResolver() data.StagingResolver {
 					return nil, err
 				}
 
-				return build(s), nil
+				return build(s)
 			}
 		}
 
@@ -180,7 +186,12 @@ func (f *sourceFactory) secretStagingResolver() data.StagingResolver {
 			return data.StagingResources{}, err
 		}
 
-		return data.StagingResources{Store: st, Strategy: build(base)}, nil
+		strategy, err := build(base)
+		if err != nil {
+			return data.StagingResources{}, err
+		}
+
+		return data.StagingResources{Store: st, Strategy: strategy}, nil
 	}
 }
 
@@ -198,29 +209,35 @@ func (f *sourceFactory) stagingStoreResolver(svcCap capability.ServiceCapability
 }
 
 // paramStrategyBuilder builds the provider-specific param staging strategy over a
-// resolved store (Azure App Configuration vs AWS SSM), mirroring the GUI's
-// serviceStrategyScoped.
+// resolved store (AWS SSM vs Azure App Configuration), mirroring the GUI's
+// serviceStrategyScoped. A provider without a param service is an error.
 func (f *sourceFactory) paramStrategyBuilder() data.StrategyBuilder {
-	return func(s provider.Store) staging.FullStrategy {
-		if f.scope.Provider == provider.ProviderAzure {
-			return staging.NewAzureAppConfigParamStrategy(s)
+	return func(s provider.Store) (staging.FullStrategy, error) {
+		switch f.scope.Provider {
+		case provider.ProviderAWS:
+			return staging.NewAWSParamStrategy(s), nil
+		case provider.ProviderAzure:
+			return staging.NewAzureAppConfigParamStrategy(s), nil
+		default:
+			return nil, fmt.Errorf("no param staging strategy for provider %q", f.scope.Provider)
 		}
-
-		return staging.NewAWSParamStrategy(s)
 	}
 }
 
 // secretStrategyBuilder builds the provider-specific secret staging strategy over
-// a resolved store (Google Cloud / Azure Key Vault / AWS Secrets Manager).
+// a resolved store (AWS Secrets Manager / Google Cloud / Azure Key Vault). An
+// unknown provider is an error.
 func (f *sourceFactory) secretStrategyBuilder() data.StrategyBuilder {
-	return func(s provider.Store) staging.FullStrategy {
+	return func(s provider.Store) (staging.FullStrategy, error) {
 		switch f.scope.Provider {
+		case provider.ProviderAWS:
+			return staging.NewAWSSecretStrategy(s), nil
 		case provider.ProviderGoogleCloud:
-			return staging.NewGoogleCloudSecretStrategy(s)
+			return staging.NewGoogleCloudSecretStrategy(s), nil
 		case provider.ProviderAzure:
-			return staging.NewAzureKeyVaultSecretStrategy(s)
+			return staging.NewAzureKeyVaultSecretStrategy(s), nil
 		default:
-			return staging.NewAWSSecretStrategy(s)
+			return nil, fmt.Errorf("no secret staging strategy for provider %q", f.scope.Provider)
 		}
 	}
 }

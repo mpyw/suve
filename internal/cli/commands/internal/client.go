@@ -1,6 +1,6 @@
 // client.go is this package's subject: the wiring that assembles each
 // provider's store, strategy and scope, which every command goes through. Core,
-// so that internal.ParamStore does not have to become ClientParamStore.
+// so that internal.AWSParamStore does not have to become ClientAWSParamStore.
 //declscope:core
 
 package internal
@@ -11,26 +11,17 @@ import (
 	"fmt"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws"
-	"github.com/mpyw/suve/internal/provider/azure"
-	"github.com/mpyw/suve/internal/provider/gcloud"
+	"github.com/mpyw/suve/internal/provider/aws/infra"
+	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/staging"
 )
 
-// registry is the provider registry reachable by every CLI command. It is the
-// single composition point where cloud backends are wired in: AWS (param +
-// secret), Google Cloud (secret only), and Azure (Key Vault secret + App
-// Configuration param) are registered here. Top-level command groups build their
-// own provider.Scope and resolve stores through this same registry.
+// registry is the provider registry reachable by every CLI command, built by
+// builtin.NewRegistry (the composition the GUI and TUI share). Top-level command
+// groups build their own provider.Scope and resolve stores through it.
 //
 //nolint:gochecknoglobals // process-wide provider registry, built once
-var registry = func() *provider.Registry {
-	reg := aws.NewRegistry()
-	gcloud.Register(reg)
-	azure.Register(reg)
-
-	return reg
-}()
+var registry = builtin.NewRegistry()
 
 // gcloudProjectContextKey keys the resolved Google Cloud project id stored in the
 // context by the gcloud command group's Before hook.
@@ -108,26 +99,18 @@ func AzureAppConfigNamespace(ctx context.Context) string {
 	return azureScopeFromContext(ctx).appConfigNamespace
 }
 
-// storeScope is the provider selector for read/write commands. Only the
-// Provider field is needed: the AWS factory builds its SSM/Secrets Manager
-// client from the ambient AWS config (region from env/profile), so no
-// account/region lookup — and therefore no STS GetCallerIdentity call — is
-// required here. (Account/region only matter for staging-state file keying,
-// which the staging commands build from the AWS identity separately.)
-//
-//nolint:gochecknoglobals // immutable provider selector for read/write commands
-var storeScope = provider.Scope{Provider: provider.ProviderAWS}
-
-// ParamStore resolves a provider.Store for the parameter service via the
-// registry (AWS by default).
-func ParamStore(ctx context.Context) (provider.Store, error) {
-	return storeForKind(ctx, provider.KindParam)
+// AWSParamStore resolves a provider.Store for AWS SSM Parameter Store via the
+// registry. The AWS factory builds its client from the ambient AWS config
+// (region from env/profile), so the scope carries only the provider.
+func AWSParamStore(ctx context.Context) (provider.Store, error) {
+	return registry.Store(ctx, provider.Scope{Provider: provider.ProviderAWS}, provider.KindParam)
 }
 
-// SecretStore resolves a provider.Store for the secret service via the
-// registry (AWS by default).
-func SecretStore(ctx context.Context) (provider.Store, error) {
-	return storeForKind(ctx, provider.KindSecret)
+// AWSSecretStore resolves a provider.Store for AWS Secrets Manager via the
+// registry. The AWS factory builds its client from the ambient AWS config
+// (region from env/profile), so the scope carries only the provider.
+func AWSSecretStore(ctx context.Context) (provider.Store, error) {
+	return registry.Store(ctx, provider.Scope{Provider: provider.ProviderAWS}, provider.KindSecret)
 }
 
 // GoogleCloudSecretStore resolves a provider.Store for the Google Cloud Secret Manager
@@ -177,20 +160,11 @@ func AzureAppConfigStore(ctx context.Context) (provider.Store, error) {
 	return registry.Store(ctx, scope, provider.KindParam)
 }
 
-func storeForKind(ctx context.Context, kind provider.Kind) (provider.Store, error) {
-	store, err := registry.Store(ctx, storeScope, kind)
-	if err != nil {
-		return nil, err
-	}
-
-	return store, nil
-}
-
 // AWSParamStrategyFactory builds a staging FullStrategy for the parameter service,
 // wrapping a provider.Store resolved through the registry. It satisfies
 // staging.StrategyFactory.
 func AWSParamStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
-	store, err := ParamStore(ctx)
+	store, err := AWSParamStore(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -202,12 +176,40 @@ func AWSParamStrategyFactory(ctx context.Context) (staging.FullStrategy, error) 
 // wrapping a provider.Store resolved through the registry. It satisfies
 // staging.StrategyFactory.
 func AWSSecretStrategyFactory(ctx context.Context) (staging.FullStrategy, error) {
-	store, err := SecretStore(ctx)
+	store, err := AWSSecretStore(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return staging.NewAWSSecretStrategy(store), nil
+}
+
+// AWSStagingScopeResolver resolves the AWS staging scope (account + region)
+// from the STS caller identity. It satisfies staging.ScopeResolver.
+func AWSStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
+	identity, err := infra.GetAWSIdentity(ctx)
+	if err != nil {
+		return staging.ResolvedScope{}, fmt.Errorf("failed to get AWS identity: %w", err)
+	}
+
+	return staging.ResolvedScope{
+		Scope:  provider.AWSScope(identity.AccountID, identity.Region),
+		Target: awsStagingTarget(identity.Profile, identity.AccountID, identity.Region),
+	}, nil
+}
+
+// awsStagingTarget formats the AWS confirmation target line:
+// "profile (account / region)" or "account / region".
+func awsStagingTarget(profile, accountID, region string) string {
+	if accountID == "" || region == "" {
+		return ""
+	}
+
+	if profile != "" {
+		return fmt.Sprintf("%s (%s / %s)", profile, accountID, region)
+	}
+
+	return fmt.Sprintf("%s / %s", accountID, region)
 }
 
 // GoogleCloudSecretStrategyFactory builds a staging FullStrategy for Google Cloud Secret

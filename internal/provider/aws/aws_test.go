@@ -34,16 +34,6 @@ func TestFactory_UnsupportedKind(t *testing.T) {
 	assert.ErrorIs(t, err, provider.ErrUnsupportedKind)
 }
 
-func TestNewRegistry_ResolvesAWS(t *testing.T) {
-	t.Parallel()
-
-	reg := awsprovider.NewRegistry()
-
-	store, err := reg.Store(t.Context(), provider.AWSScope("123456789012", "eu-west-1"), provider.KindParam)
-	require.NoError(t, err)
-	require.NotNil(t, store)
-}
-
 func TestRegister_AddsFactory(t *testing.T) {
 	t.Parallel()
 
