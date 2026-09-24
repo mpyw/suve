@@ -193,3 +193,26 @@ func TestStagingScope_GUICLIParity(t *testing.T) {
 	assert.NotEqual(t, paramScope.Key(), secretScope.Key(),
 		"Azure App Configuration and Key Vault staging must not collide")
 }
+
+// TestApp_serviceStrategyScoped_UnknownProvider pins that even when a store
+// resolves, a provider with no staging strategy for the service is an error
+// rather than an AWS strategy.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestApp_serviceStrategyScoped_UnknownProvider(t *testing.T) {
+	orig := registry
+	registry = provider.NewRegistry()
+	registry.Register(provider.Provider("oracle"), fakeFactory{})
+	registry.Register(provider.ProviderGoogleCloud, fakeFactory{})
+	t.Cleanup(func() { registry = orig })
+
+	app := &App{ctx: t.Context()}
+
+	for _, service := range []string{"param", "secret"} {
+		_, err := app.serviceStrategyScoped(provider.Scope{Provider: provider.Provider("oracle")}, service)
+		require.ErrorIs(t, err, errUnsupportedService, "service %q", service)
+	}
+
+	_, err := app.serviceStrategyScoped(provider.GoogleCloudScope("proj"), "param")
+	require.ErrorIs(t, err, errUnsupportedService)
+}
