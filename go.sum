@@ -260,10 +260,10 @@ github.com/wailsapp/mimetype v1.4.1 h1:pQN9ycO7uo4vsUUuPeHEYoUkLVkaRntMnHJxVwYhw
 github.com/wailsapp/mimetype v1.4.1/go.mod h1:9aV5k31bBOv5z6u+QP8TltzvNGJPmNJD4XlAL3U+j3o=
 github.com/wailsapp/wails/v2 v2.16.0 h1:hLYrSHUUq6hRXl3rWT9ZXiyFIgM94nVN9Ns6iEJzxyw=
 github.com/wailsapp/wails/v2 v2.16.0/go.mod h1:scxrgwfsv6yR6fE6cCF+Flfl+JeU+SR87T9x4kILJ6M=
-github.com/walles/moor/v2 v2.19.1 h1:ySDQqX7u1yjvG/05ZfHw4N0hc4eoI1kdUKAmIDUTy2Y=
-github.com/walles/moor/v2 v2.19.1/go.mod h1:i5Jc6jbmfm+98poU3uooeLbgx1VLGCc6Xsn6wlY6gaE=
-github.com/walles/twin v0.9.3 h1:nCH0PEfJ+mm+hf40RsPF/bWIyR+1rXk6AyzypGZUKXY=
-github.com/walles/twin v0.9.3/go.mod h1:3iGyRE6bnLVsQuIPMyW2i1YXe6e9VDjGHcAGOHi/mcA=
+github.com/walles/moor/v2 v2.19.2 h1:SH3Ww+gL93hygO8/v92A8NTrS4SB7u7Mo+mA4yLJ1Gk=
+github.com/walles/moor/v2 v2.19.2/go.mod h1:SezDWHBB8Ws1bnf69RLT0HL120pkcA2AW+m9gE/K5MM=
+github.com/walles/twin v0.9.4 h1:v9GCxlCDJ0exTRZRGkq7ok2tgaHNwGoEthiQ0e4sj/g=
+github.com/walles/twin v0.9.4/go.mod h1:3iGyRE6bnLVsQuIPMyW2i1YXe6e9VDjGHcAGOHi/mcA=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
 github.com/zalando/go-keyring v0.2.8 h1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=
