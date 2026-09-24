@@ -16,7 +16,6 @@ import (
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
 	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
-	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
@@ -72,7 +71,7 @@ func assertParamSpec(t *testing.T, label string, got *version.NumericSpec, want 
 	assert.Equal(t, want.shift, got.Shift, "%s.Shift", label)
 }
 
-func TestParseArgsParam(t *testing.T) {
+func TestParseDiffArgsParam(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -196,7 +195,7 @@ func TestParseArgsParam(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec1, spec2, err := diffargs.ParseArgs(
+			spec1, spec2, err := generic.ParseDiffArgs(
 				tt.args,
 				version.ParameterStore.Parse,
 				func(abs version.NumericAbsolute) bool { return abs.Version != nil },
@@ -235,7 +234,7 @@ func assertSecretSpec(t *testing.T, label string, got *version.OpaqueSpec, want 
 	assert.Equal(t, want.shift, got.Shift, "%s.Shift", label)
 }
 
-func TestParseArgsSecret(t *testing.T) {
+func TestParseDiffArgsSecret(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -355,7 +354,7 @@ func TestParseArgsSecret(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec1, spec2, err := diffargs.ParseArgs(
+			spec1, spec2, err := generic.ParseDiffArgs(
 				tt.args,
 				version.SecretsManager.Parse,
 				func(abs version.OpaqueAbsolute) bool { return abs.ID != nil || abs.Label != nil },
@@ -802,4 +801,361 @@ func TestSecretIdenticalWarning(t *testing.T) {
 	assert.Contains(t, stderr, "Hint:")
 	assert.Contains(t, stderr, "my-secret~1")
 	assert.Contains(t, stderr, "my-secret:AWSPREVIOUS")
+}
+
+func TestParseDiffArgs_Param(t *testing.T) {
+	t.Parallel()
+
+	parse := version.ParameterStore.Parse
+	hasAbsolute := func(abs version.NumericAbsolute) bool { return abs.Version != nil }
+	prefixes := "#~"
+	usage := "usage: suve param diff"
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantSpec1  *version.NumericSpec
+		wantSpec2  *version.NumericSpec
+		wantErrMsg string
+	}{
+		// Error cases
+		{
+			name:       "no arguments",
+			args:       []string{},
+			wantErrMsg: "usage:",
+		},
+		{
+			name:       "too many arguments",
+			args:       []string{"/app/param", "#1", "#2", "#3"},
+			wantErrMsg: "usage:",
+		},
+
+		// 1 arg: full spec format
+		{
+			name: "one arg with version",
+			args: []string{"/app/param#3"},
+			wantSpec1: &version.NumericSpec{
+				Name:     "/app/param",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
+			},
+			wantSpec2: &version.NumericSpec{
+				Name: "/app/param",
+			},
+		},
+		{
+			name: "one arg with shift",
+			args: []string{"/app/param~1"},
+			wantSpec1: &version.NumericSpec{
+				Name:  "/app/param",
+				Shift: 1,
+			},
+			wantSpec2: &version.NumericSpec{
+				Name: "/app/param",
+			},
+		},
+		{
+			name:       "one arg invalid spec",
+			args:       []string{"/app/param#"},
+			wantErrMsg: "invalid version specification",
+		},
+
+		// 2 args: full spec x2
+		{
+			name: "two args both full spec",
+			args: []string{"/app/param#1", "/app/param#2"},
+			wantSpec1: &version.NumericSpec{
+				Name:     "/app/param",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+			},
+			wantSpec2: &version.NumericSpec{
+				Name:     "/app/param",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+			},
+		},
+		{
+			name: "two args different names",
+			args: []string{"/app/config#1", "/app/secrets#2"},
+			wantSpec1: &version.NumericSpec{
+				Name:     "/app/config",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+			},
+			wantSpec2: &version.NumericSpec{
+				Name:     "/app/secrets",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+			},
+		},
+
+		// 2 args: mixed format (first has specifier, second is specifier-only)
+		{
+			name: "two args mixed format",
+			args: []string{"/app/param#1", "#2"},
+			wantSpec1: &version.NumericSpec{
+				Name:     "/app/param",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+			},
+			wantSpec2: &version.NumericSpec{
+				Name:     "/app/param",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+			},
+		},
+		{
+			name: "two args mixed format with shift",
+			args: []string{"/app/param~1", "~2"},
+			wantSpec1: &version.NumericSpec{
+				Name:  "/app/param",
+				Shift: 1,
+			},
+			wantSpec2: &version.NumericSpec{
+				Name:  "/app/param",
+				Shift: 2,
+			},
+		},
+
+		// 2 args: partial spec format (first is name-only, second is specifier-only)
+		{
+			name: "two args partial spec format",
+			args: []string{"/app/param", "#3"},
+			wantSpec1: &version.NumericSpec{
+				Name:     "/app/param",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
+			},
+			wantSpec2: &version.NumericSpec{
+				Name: "/app/param",
+			},
+		},
+		{
+			name: "two args partial spec with shift",
+			args: []string{"/app/param", "~2"},
+			wantSpec1: &version.NumericSpec{
+				Name:  "/app/param",
+				Shift: 2,
+			},
+			wantSpec2: &version.NumericSpec{
+				Name: "/app/param",
+			},
+		},
+		{
+			name:       "two args first invalid",
+			args:       []string{"/app/param#", "#2"},
+			wantErrMsg: "invalid first argument",
+		},
+		{
+			name:       "two args second invalid specifier",
+			args:       []string{"/app/param", "#"},
+			wantErrMsg: "invalid second argument",
+		},
+		{
+			name:       "two args second invalid full spec",
+			args:       []string{"/app/param#1", "/other#"},
+			wantErrMsg: "invalid second argument",
+		},
+
+		// 3 args: partial spec format
+		{
+			name: "three args",
+			args: []string{"/app/param", "#1", "#2"},
+			wantSpec1: &version.NumericSpec{
+				Name:     "/app/param",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+			},
+			wantSpec2: &version.NumericSpec{
+				Name:     "/app/param",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+			},
+		},
+		{
+			name: "three args with shifts",
+			args: []string{"/app/param", "~2", "~1"},
+			wantSpec1: &version.NumericSpec{
+				Name:  "/app/param",
+				Shift: 2,
+			},
+			wantSpec2: &version.NumericSpec{
+				Name:  "/app/param",
+				Shift: 1,
+			},
+		},
+		{
+			name:       "three args invalid version1",
+			args:       []string{"/app/param", "#", "#2"},
+			wantErrMsg: "invalid version1",
+		},
+		{
+			name:       "three args invalid version2",
+			args:       []string{"/app/param", "#1", "#"},
+			wantErrMsg: "invalid version2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec1, spec2, err := generic.ParseDiffArgs(tt.args, parse, hasAbsolute, prefixes, usage)
+
+			if tt.wantErrMsg != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSpec1, spec1)
+			assert.Equal(t, tt.wantSpec2, spec2)
+		})
+	}
+}
+
+// TestParseArgs_ThreeArgRequiresSpecifier covers the fix for #482: in the 3-arg
+// form each version argument must start with a specifier prefix so that a bare
+// token (e.g. "3") is rejected instead of being concatenated onto the name.
+func TestParseDiffArgs_ThreeArgRequiresSpecifier(t *testing.T) {
+	t.Parallel()
+
+	parse := version.ParameterStore.Parse
+	hasAbsolute := func(abs version.NumericAbsolute) bool { return abs.Version != nil }
+	prefixes := "#~"
+	usage := "usage: suve param diff"
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantSpec1  *version.NumericSpec
+		wantSpec2  *version.NumericSpec
+		wantErrMsg string
+	}{
+		{
+			name:       "bare version1 rejected",
+			args:       []string{"/p", "3", "1"},
+			wantErrMsg: "must start with a version specifier",
+		},
+		{
+			name:       "bare version2 rejected",
+			args:       []string{"/p", "#3", "1"},
+			wantErrMsg: "must start with a version specifier",
+		},
+		{
+			name: "hash specifiers keep name",
+			args: []string{"/p", "#3", "#1"},
+			wantSpec1: &version.NumericSpec{
+				Name:     "/p",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
+			},
+			wantSpec2: &version.NumericSpec{
+				Name:     "/p",
+				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec1, spec2, err := generic.ParseDiffArgs(tt.args, parse, hasAbsolute, prefixes, usage)
+
+			if tt.wantErrMsg != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSpec1, spec1)
+			assert.Equal(t, tt.wantSpec2, spec2)
+		})
+	}
+}
+
+func TestParseDiffArgs_Secret(t *testing.T) {
+	t.Parallel()
+
+	parse := version.SecretsManager.Parse
+	hasAbsolute := func(abs version.OpaqueAbsolute) bool { return abs.ID != nil || abs.Label != nil }
+	prefixes := "#:~"
+	usage := "usage: suve secret diff"
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantSpec1  *version.OpaqueSpec
+		wantSpec2  *version.OpaqueSpec
+		wantErrMsg string
+	}{
+		// 1 arg with label
+		{
+			name: "one arg with label",
+			args: []string{"my-secret:AWSPREVIOUS"},
+			wantSpec1: &version.OpaqueSpec{
+				Name:     "my-secret",
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
+			},
+			wantSpec2: &version.OpaqueSpec{
+				Name: "my-secret",
+			},
+		},
+
+		// 2 args with labels
+		{
+			name: "two args mixed with labels",
+			args: []string{"my-secret:AWSPREVIOUS", ":AWSCURRENT"},
+			wantSpec1: &version.OpaqueSpec{
+				Name:     "my-secret",
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
+			},
+			wantSpec2: &version.OpaqueSpec{
+				Name:     "my-secret",
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")},
+			},
+		},
+
+		// 2 args with version ID
+		{
+			name: "two args with version ID",
+			args: []string{"my-secret#abc123", "#def456"},
+			wantSpec1: &version.OpaqueSpec{
+				Name:     "my-secret",
+				Absolute: version.OpaqueAbsolute{ID: lo.ToPtr("abc123")},
+			},
+			wantSpec2: &version.OpaqueSpec{
+				Name:     "my-secret",
+				Absolute: version.OpaqueAbsolute{ID: lo.ToPtr("def456")},
+			},
+		},
+
+		// 3 args
+		{
+			name: "three args with labels",
+			args: []string{"my-secret", ":AWSPREVIOUS", ":AWSCURRENT"},
+			wantSpec1: &version.OpaqueSpec{
+				Name:     "my-secret",
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
+			},
+			wantSpec2: &version.OpaqueSpec{
+				Name:     "my-secret",
+				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec1, spec2, err := generic.ParseDiffArgs(tt.args, parse, hasAbsolute, prefixes, usage)
+
+			if tt.wantErrMsg != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrMsg)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSpec1, spec1)
+			assert.Equal(t, tt.wantSpec2, spec2)
+		})
+	}
 }

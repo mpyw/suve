@@ -9,7 +9,6 @@ import (
 
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
@@ -123,7 +122,7 @@ For comparing staged values, use: suve aws stage secret diff`,
 
 // parseDiffArgs parses the diff arguments with the Secrets Manager grammar.
 func parseDiffArgs(args []string) (*version.OpaqueSpec, *version.OpaqueSpec, error) {
-	return diffargs.ParseArgs(
+	return generic.ParseDiffArgs(
 		args,
 		version.SecretsManager.Parse,
 		version.OpaqueAbsolute.IsSet,

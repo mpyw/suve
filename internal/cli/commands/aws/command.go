@@ -12,7 +12,6 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/commands/aws/param"
 	"github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 )
 
@@ -33,7 +32,7 @@ shared config/credentials files, or an instance role).`,
 		Commands: []*cli.Command{
 			param.Command(),
 			secret.Command(),
-			stage.Command(),
+			StageCommand(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
@@ -55,17 +54,6 @@ func FlatParamCommand(name string) *cli.Command {
 // alias when AWS is the uniquely active secret provider.
 func FlatSecretCommand(name string) *cli.Command {
 	c := secret.Command()
-	c.Name = name
-
-	return c
-}
-
-// FlatStageCommand returns the AWS stage command as a standalone top-level
-// command named `name` (e.g. "stage"), carrying the per-service subgroups and
-// the all-service commands. Used for the flat `suve stage` alias when AWS is
-// the uniquely active staging provider.
-func FlatStageCommand(name string) *cli.Command {
-	c := stage.Command()
 	c.Name = name
 
 	return c

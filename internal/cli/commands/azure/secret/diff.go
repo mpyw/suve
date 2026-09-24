@@ -9,7 +9,6 @@ import (
 
 	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -115,7 +114,7 @@ EXAMPLES:
 
 // parseDiffArgs parses the diff arguments with the Azure Key Vault grammar.
 func parseDiffArgs(args []string) (*version.OpaqueSpec, *version.OpaqueSpec, error) {
-	return diffargs.ParseArgs(
+	return generic.ParseDiffArgs(
 		args,
 		version.KeyVault.Parse,
 		version.OpaqueAbsolute.IsSet,

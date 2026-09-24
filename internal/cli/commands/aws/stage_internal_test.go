@@ -1,7 +1,7 @@
-// White-box tests for param.go's resolveParamValueType.
-//declscope:namespace param
+// White-box tests for stage.go's resolveStageParamValueType.
+//declscope:namespace stage
 
-package stage
+package aws
 
 import (
 	"context"
@@ -16,8 +16,8 @@ import (
 
 // runResolve builds a throwaway command carrying the value-type flags, runs it
 // with the given args so the flags are populated, and returns what
-// resolveParamValueType produced.
-func runResolveParam(t *testing.T, args []string) (domain.ValueType, error) {
+// resolveStageParamValueType produced.
+func runResolveStageParam(t *testing.T, args []string) (domain.ValueType, error) {
 	t.Helper()
 
 	var (
@@ -27,9 +27,9 @@ func runResolveParam(t *testing.T, args []string) (domain.ValueType, error) {
 
 	cmd := &cli.Command{
 		Name:  "add",
-		Flags: paramValueTypeFlags(),
+		Flags: stageParamValueTypeFlags(),
 		Action: func(_ context.Context, c *cli.Command) error {
-			got, gotErr = resolveParamValueType(c)
+			got, gotErr = resolveStageParamValueType(c)
 
 			return nil
 		},
@@ -40,13 +40,13 @@ func runResolveParam(t *testing.T, args []string) (domain.ValueType, error) {
 	return got, gotErr
 }
 
-func TestResolveValueType(t *testing.T) {
+func TestResolveStageParamValueType(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no flags is unset", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := runResolveParam(t, nil)
+		got, err := runResolveStageParam(t, nil)
 		require.NoError(t, err)
 		assert.Empty(t, string(got))
 	})
@@ -54,7 +54,7 @@ func TestResolveValueType(t *testing.T) {
 	t.Run("--secure is SecureString", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := runResolveParam(t, []string{"--secure"})
+		got, err := runResolveStageParam(t, []string{"--secure"})
 		require.NoError(t, err)
 		assert.Equal(t, domain.ValueTypeSecret, got)
 	})
@@ -62,7 +62,7 @@ func TestResolveValueType(t *testing.T) {
 	t.Run("--type SecureString is secret", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := runResolveParam(t, []string{"--type", "SecureString"})
+		got, err := runResolveStageParam(t, []string{"--type", "SecureString"})
 		require.NoError(t, err)
 		assert.Equal(t, domain.ValueTypeSecret, got)
 	})
@@ -70,7 +70,7 @@ func TestResolveValueType(t *testing.T) {
 	t.Run("--type StringList is list", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := runResolveParam(t, []string{"--type", "StringList"})
+		got, err := runResolveStageParam(t, []string{"--type", "StringList"})
 		require.NoError(t, err)
 		assert.Equal(t, domain.ValueTypeList, got)
 	})
@@ -78,7 +78,7 @@ func TestResolveValueType(t *testing.T) {
 	t.Run("--type String is plaintext", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := runResolveParam(t, []string{"--type", "String"})
+		got, err := runResolveStageParam(t, []string{"--type", "String"})
 		require.NoError(t, err)
 		assert.Equal(t, domain.ValueTypePlaintext, got)
 	})
@@ -86,7 +86,7 @@ func TestResolveValueType(t *testing.T) {
 	t.Run("--type with an invalid value errors", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := runResolveParam(t, []string{"--type", "Sekret"})
+		_, err := runResolveStageParam(t, []string{"--type", "Sekret"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid --type")
 	})
@@ -94,7 +94,7 @@ func TestResolveValueType(t *testing.T) {
 	t.Run("--secure with --type conflicts", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := runResolveParam(t, []string{"--secure", "--type", "String"})
+		_, err := runResolveStageParam(t, []string{"--secure", "--type", "String"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use --secure with --type")
 	})

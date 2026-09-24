@@ -49,7 +49,7 @@ same shape.
   `version.<Product>.Suffix(spec)`. There is no per-provider use case package.
 - The diff command's argument parsing lives in the CLI, not in
   `internal/version`: `diff.go` in each service package defines
-  `parseDiffArgs`, which wraps `internal/cli/diffargs.ParseArgs` with the
+  `parseDiffArgs`, which wraps `generic.ParseDiffArgs` with the
   grammar and the usage string.
 
 ## Wiring
@@ -120,8 +120,9 @@ Staging is a distinct increment on top of read/write (#247 → #261, #262):
   stage path, e.g. `"suve gcloud stage"`) on every `stgcli.CommandConfig` and
   `stgcli.GlobalConfig`. The shared staging help, usage errors, and prompts
   render from them, so a missing value shows up as a blank path or "remote".
-- Keep one file per staged service, not a subpackage per service (the flat
-  `aws/stage` package has `param.go` and `secret.go`).
+- Put the staging wiring in one `stage.go` in the provider root package, not
+  in a subpackage (`aws/stage.go` and `azure/stage.go` each hold both
+  services).
 - Register the service spec in `GlobalConfig` (#261).
 
 ## PR conventions

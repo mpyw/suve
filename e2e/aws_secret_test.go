@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/cli/commands/aws"
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	awsstage "github.com/mpyw/suve/internal/cli/commands/aws/stage"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -256,7 +256,7 @@ func TestAWSSecret_StagingWorkflow(t *testing.T) {
 
 	// 3. Status
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "status")
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 		assert.Contains(t, stdout, "M")
@@ -265,7 +265,7 @@ func TestAWSSecret_StagingWorkflow(t *testing.T) {
 
 	// 4. Diff
 	t.Run("diff", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "diff", secretName)
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "diff", secretName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-original-secret")
 		assert.Contains(t, stdout, "+staged-secret")
@@ -273,7 +273,7 @@ func TestAWSSecret_StagingWorkflow(t *testing.T) {
 
 	// 5. Push
 	t.Run("apply", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.SecretCommand(), "apply", "--yes")
+		_, _, err := runSubCommand(t, aws.StageSecretCommand(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
@@ -286,13 +286,13 @@ func TestAWSSecret_StagingWorkflow(t *testing.T) {
 
 	// 7. Stage delete with options
 	t.Run("stage-delete-with-force", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.SecretCommand(), "delete", "--force", secretName)
+		_, _, err := runSubCommand(t, aws.StageSecretCommand(), "delete", "--force", secretName)
 		require.NoError(t, err)
 	})
 
 	// 8. Status shows delete
 	t.Run("status-delete", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "status")
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 		assert.Contains(t, stdout, "D")
@@ -300,7 +300,7 @@ func TestAWSSecret_StagingWorkflow(t *testing.T) {
 
 	// 9. Push delete
 	t.Run("apply-delete", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.SecretCommand(), "apply", "--yes")
+		_, _, err := runSubCommand(t, aws.StageSecretCommand(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
@@ -329,7 +329,7 @@ func TestAWSSecret_StagingDeleteOptions(t *testing.T) {
 
 	// Test delete with recovery window
 	t.Run("delete-with-recovery-window", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.SecretCommand(), "delete", "--recovery-window", "14", secretName)
+		_, _, err := runSubCommand(t, aws.StageSecretCommand(), "delete", "--recovery-window", "14", secretName)
 		require.NoError(t, err)
 
 		// Verify options are stored
@@ -414,7 +414,7 @@ func TestAWSSecret_StagingAddViaCLI(t *testing.T) {
 
 	// 1. Stage add via CLI
 	t.Run("add-via-cli", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "add", secretName, "cli-staged-secret")
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "add", secretName, "cli-staged-secret")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 		t.Logf("stage add output: %s", stdout)
@@ -422,7 +422,7 @@ func TestAWSSecret_StagingAddViaCLI(t *testing.T) {
 
 	// 2. Verify status
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "status")
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 		assert.Contains(t, stdout, "A")
@@ -430,7 +430,7 @@ func TestAWSSecret_StagingAddViaCLI(t *testing.T) {
 
 	// 3. Push to create
 	t.Run("apply", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.SecretCommand(), "apply", "--yes")
+		_, _, err := runSubCommand(t, aws.StageSecretCommand(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
@@ -461,7 +461,7 @@ func TestAWSSecret_StagingAddExistingResourceFails(t *testing.T) {
 
 	// Try to stage add - should fail because resource already exists
 	t.Run("add-existing-fails", func(t *testing.T) {
-		_, _, err := runSubCommand(t, awsstage.SecretCommand(), "add", secretName, "new-value")
+		_, _, err := runSubCommand(t, aws.StageSecretCommand(), "add", secretName, "new-value")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 		t.Logf("expected error: %v", err)
@@ -851,12 +851,12 @@ func TestAWSSecret_ExportImport(t *testing.T) {
 	exportPath := filepath.Join(t.TempDir(), "secret.json")
 
 	// Stage a secret in the working staging area.
-	_, _, err := runSubCommand(t, awsstage.SecretCommand(), "add", secretName, "secret-value")
+	_, _, err := runSubCommand(t, aws.StageSecretCommand(), "add", secretName, "secret-value")
 	require.NoError(t, err)
 
 	// Export writes the file and clears the working area.
 	t.Run("export", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "export", exportPath)
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "export", exportPath)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "exported")
 
@@ -866,20 +866,20 @@ func TestAWSSecret_ExportImport(t *testing.T) {
 
 	// The working area is now empty.
 	t.Run("working-cleared", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "status")
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, secretName)
 	})
 
 	// Import restores the working area.
 	t.Run("import", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "import", exportPath)
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "import", exportPath)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "imported")
 	})
 
 	t.Run("working-restored", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, awsstage.SecretCommand(), "status")
+		stdout, _, err := runSubCommand(t, aws.StageSecretCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, secretName)
 	})

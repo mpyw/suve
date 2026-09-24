@@ -9,7 +9,6 @@ import (
 
 	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	"github.com/mpyw/suve/internal/cli/diffargs"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -113,7 +112,7 @@ EXAMPLES:
 
 // parseDiffArgs parses the diff arguments with the Google Cloud Secret Manager grammar.
 func parseDiffArgs(args []string) (*version.NumericSpec, *version.NumericSpec, error) {
-	return diffargs.ParseArgs(
+	return generic.ParseDiffArgs(
 		args,
 		version.SecretManager.Parse,
 		version.NumericAbsolute.IsSet,
