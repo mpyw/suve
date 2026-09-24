@@ -40,19 +40,19 @@ func Command() *cli.Command {
 This creates a new version of the secret. The previous version will
 have its AWSCURRENT label moved to AWSPREVIOUS.
 
-Use 'suve secret create' to create a new secret.
-To manage tags, use 'suve secret tag' and 'suve secret untag' commands.
+Use 'suve aws secret create' to create a new secret.
+To manage tags, use 'suve aws secret tag' and 'suve aws secret untag' commands.
 
 The value may be given as a positional argument, read from stdin with
 --value-stdin (so it never appears in argv/ps or shell history), or, when
 omitted, typed into $EDITOR.
 
 EXAMPLES:
-  suve secret update my-api-key "new-key-value"         Update with new value
-  suve secret update my-config '{"host":"new-db.com"}'  Update JSON secret
-  suve secret update --yes my-api-key "new-key-value"   Update without confirmation
-  printf '%s' "$VALUE" | suve secret update --yes my-key --value-stdin  Read value from stdin
-  suve secret update my-key                             Type value into $EDITOR`,
+  suve aws secret update my-api-key "new-key-value"         Update with new value
+  suve aws secret update my-config '{"host":"new-db.com"}'  Update JSON secret
+  suve aws secret update --yes my-api-key "new-key-value"   Update without confirmation
+  printf '%s' "$VALUE" | suve aws secret update --yes my-key --value-stdin  Read value from stdin
+  suve aws secret update my-key                             Type value into $EDITOR`,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "description",
@@ -71,7 +71,7 @@ EXAMPLES:
 func action(ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args()
 	if args.Len() < 1 {
-		return errors.New("usage: suve secret update <name> [<value>]")
+		return errors.New("usage: suve aws secret update <name> [<value>]")
 	}
 
 	name := args.Get(0)

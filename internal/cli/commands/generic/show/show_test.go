@@ -30,9 +30,9 @@ func TestCommand_Validation(t *testing.T) {
 		args    []string
 		wantSub string
 	}{
-		{"param missing name", []string{"suve", "param", "show"}, "usage: suve param show"},
+		{"param missing name", []string{"suve", "param", "show"}, "usage: suve aws param show"},
 		{"param invalid version spec", []string{"suve", "param", "show", "/app/param#"}, "must be followed by"},
-		{"secret missing name", []string{"suve", "secret", "show"}, "usage: suve secret show"},
+		{"secret missing name", []string{"suve", "secret", "show"}, "usage: suve aws secret show"},
 		{"secret invalid version spec", []string{"suve", "secret", "show", "my-secret#"}, "must be followed by"},
 	}
 

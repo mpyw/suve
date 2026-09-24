@@ -209,14 +209,14 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-   suve secret log my-secret                             Show last 10 versions
-   suve secret log --patch my-secret                     Show versions with diffs
-   suve secret log --patch --parse-json my-secret        Show diffs with JSON formatting
-   suve secret log --oneline my-secret                   Compact one-line format
-   suve secret log --number 5 my-secret                  Show last 5 versions
-   suve secret log --since 2024-01-01T00:00:00Z my-secret  Show versions since date
-   suve secret log --output=json my-secret               Output as JSON`,
-		UsageError: "usage: suve secret log <name>",
+   suve aws secret log my-secret                             Show last 10 versions
+   suve aws secret log --patch my-secret                     Show versions with diffs
+   suve aws secret log --patch --parse-json my-secret        Show diffs with JSON formatting
+   suve aws secret log --oneline my-secret                   Compact one-line format
+   suve aws secret log --number 5 my-secret                  Show last 5 versions
+   suve aws secret log --since 2024-01-01T00:00:00Z my-secret  Show versions since date
+   suve aws secret log --output=json my-secret               Output as JSON`,
+		UsageError: "usage: suve aws secret log <name>",
 		Flags: []cli.Flag{
 			&cli.Int32Flag{
 				Name:    "number",

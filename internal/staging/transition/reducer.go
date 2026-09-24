@@ -89,7 +89,7 @@ func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 		return EntryTransitionResult{NewState: state, Error: ErrCannotAddToDelete}
 	}
 
-	// Check if resource already exists on AWS
+	// Check if resource already exists remotely
 	if state.CurrentValue != nil {
 		return EntryTransitionResult{NewState: state, Error: ErrCannotAddToExisting}
 	}
@@ -109,25 +109,25 @@ func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 // reduceEdit handles the EDIT action.
 //
 // Transition rules:
-//   - NotStaged → Update     (if value != AWS)
-//   - NotStaged → NotStaged  (if value == AWS, auto-skip)
+//   - NotStaged → Update     (if value != remote)
+//   - NotStaged → NotStaged  (if value == remote, auto-skip)
 //   - Create    → Create     (update draft value)
-//   - Update    → Update     (if value != AWS)
-//   - Update    → NotStaged  (if value == AWS, auto-unstage)
+//   - Update    → Update     (if value != remote)
+//   - Update    → NotStaged  (if value == remote, auto-unstage)
 //   - Delete    → ERROR      (must reset first to edit)
 func reduceEdit(state EntryState, action EntryActionEdit) EntryTransitionResult {
 	var err error
 
 	switch state.StagedState.(type) {
 	case EntryStagedStateNotStaged:
-		// Auto-skip if value matches AWS current value
+		// Auto-skip if value matches the current remote value
 		if state.CurrentValue == nil || *state.CurrentValue != action.Value {
 			state.StagedState = EntryStagedStateUpdate{DraftValue: action.Value}
 		}
 	case EntryStagedStateCreate:
 		state.StagedState = EntryStagedStateCreate{DraftValue: action.Value}
 	case EntryStagedStateUpdate:
-		// Auto-unstage if value matches AWS current value
+		// Auto-unstage if value matches the current remote value
 		if state.CurrentValue != nil && *state.CurrentValue == action.Value {
 			state.StagedState = EntryStagedStateNotStaged{}
 		} else {
@@ -158,7 +158,7 @@ func reduceEdit(state EntryState, action EntryActionEdit) EntryTransitionResult 
 func reduceDelete(state EntryState) EntryTransitionResult {
 	var discardTags bool
 
-	// Check if resource exists on AWS or is staged for CREATE
+	// Check if resource exists remotely or is staged for CREATE
 	_, isCreate := state.StagedState.(EntryStagedStateCreate)
 	if state.CurrentValue == nil && !isCreate {
 		// A staged Update whose remote was deleted out-of-band can never apply;
@@ -208,7 +208,7 @@ func reduceReset(state EntryState) EntryTransitionResult {
 // Transition rules:
 //   - Entry=Delete                        → ERROR  (cannot tag resource staged for deletion)
 //   - CurrentValue=nil + Entry=NotStaged  → ERROR  (resource not found)
-//   - AWS same                            → skip   (auto-skip tags matching AWS, unless CurrentAWSTags is nil)
+//   - Same as remote                      → skip   (auto-skip tags matching remote, unless CurrentRemoteTags is nil)
 //   - Otherwise                           → ToSet  (add to staged tags)
 func reduceTag(entryState EntryState, stagedTags StagedTags, action TagActionTag) TagTransitionResult {
 	// Block tagging if entry is staged for deletion
@@ -231,14 +231,14 @@ func reduceTag(entryState EntryState, stagedTags StagedTags, action TagActionTag
 	// Clone existing staged tags
 	cloned := stagedTags.Clone()
 
-	// Process tags with auto-skip for matching AWS values
+	// Process tags with auto-skip for matching remote values
 	for key, value := range action.Tags {
 		// Always clear from ToUnset (user wants to set this key)
 		cloned.ToUnset.Remove(key)
 
-		// Auto-skip if value matches AWS current value (unless CurrentAWSTags is nil)
-		if action.CurrentAWSTags != nil {
-			if awsValue, exists := action.CurrentAWSTags[key]; exists && awsValue == value {
+		// Auto-skip if value matches the current remote value (unless CurrentRemoteTags is nil)
+		if action.CurrentRemoteTags != nil {
+			if remoteValue, exists := action.CurrentRemoteTags[key]; exists && remoteValue == value {
 				delete(cloned.ToSet, key)
 
 				continue
@@ -256,7 +256,7 @@ func reduceTag(entryState EntryState, stagedTags StagedTags, action TagActionTag
 // Transition rules:
 //   - Entry=Delete                        → ERROR  (cannot untag resource staged for deletion)
 //   - CurrentValue=nil + Entry=NotStaged  → ERROR  (resource not found)
-//   - Not on AWS                          → skip   (auto-skip non-existent tags, unless CurrentAWSTagKeys is nil)
+//   - Not present remotely                → skip   (auto-skip non-existent tags, unless CurrentRemoteTagKeys is nil)
 //   - Otherwise                           → ToUnset (add to staged untags)
 func reduceUntag(entryState EntryState, stagedTags StagedTags, action TagActionUntag) TagTransitionResult {
 	// Block untagging if entry is staged for deletion
@@ -279,13 +279,13 @@ func reduceUntag(entryState EntryState, stagedTags StagedTags, action TagActionU
 	// Clone existing staged tags
 	cloned := stagedTags.Clone()
 
-	// Process untag keys with auto-skip for non-existent AWS tags
+	// Process untag keys with auto-skip for non-existent remote tags
 	for key := range action.Keys {
 		// Always clear from ToSet (user wants to remove this key)
 		delete(cloned.ToSet, key)
 
-		// Auto-skip if tag doesn't exist on AWS (unless CurrentAWSTagKeys is nil)
-		if action.CurrentAWSTagKeys != nil && !action.CurrentAWSTagKeys.Contains(key) {
+		// Auto-skip if tag does not exist remotely (unless CurrentRemoteTagKeys is nil)
+		if action.CurrentRemoteTagKeys != nil && !action.CurrentRemoteTagKeys.Contains(key) {
 			cloned.ToUnset.Remove(key)
 
 			continue

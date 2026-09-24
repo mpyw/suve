@@ -29,7 +29,7 @@ const (
 	ResetResultRestored
 	ResetResultNotStaged
 	ResetResultNothingStaged
-	ResetResultSkipped     // Restore was skipped because value matches current AWS
+	ResetResultSkipped     // Restore was skipped because value matches the current remote value
 	ResetResultUnstagedTag // Only staged tag changes were unstaged (entry itself not staged)
 )
 
@@ -111,7 +111,7 @@ func (u *ResetUseCase) unstage(ctx context.Context, name, namespace, _, _ string
 	service := u.Parser.Service()
 	key := staging.EntryKey{Name: name, Namespace: namespace}
 
-	// Load current state (nil CurrentValue since we don't care about AWS state for reset)
+	// Load current state (nil CurrentValue since we don't care about remote state for reset)
 	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, nil)
 	if err != nil {
 		return nil, err
@@ -170,26 +170,26 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name, namespace string
 		return nil, err
 	}
 
-	// Fetch current AWS value for auto-skip detection
+	// Fetch the current remote value for auto-skip detection
 	fetchResult, err := u.Fetcher.FetchCurrentValue(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	// Always use the value pointer - empty string is a valid AWS value
+	// Always use the value pointer - empty string is a valid remote value
 	currentValue := &fetchResult.Value
 
-	// Load current state with AWS value for auto-skip, keeping any existing
+	// Load current state with the remote value for auto-skip, keeping any existing
 	// staged base so conflict detection is preserved across the restore.
 	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(ctx, u.Store, service, key, currentValue)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if value matches current AWS (would be auto-skipped)
+	// Check if value matches the current remote value (would be auto-skipped)
 	_, wasNotStaged := entryState.StagedState.(transition.EntryStagedStateNotStaged)
 
 	// Anchor the conflict base: reuse an existing staged base when present,
-	// otherwise fall back to the current AWS LastModified (zero-time → nil),
+	// otherwise fall back to the current remote last-modified time (zero-time → nil),
 	// mirroring the edit use case.
 	baseModifiedAt := existingBaseModifiedAt
 	if baseModifiedAt == nil && !fetchResult.LastModified.IsZero() {

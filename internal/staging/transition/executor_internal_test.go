@@ -354,8 +354,8 @@ func TestExecuteTag_Add(t *testing.T) {
 
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	action := TagActionTag{
-		Tags:           map[string]string{"env": "prod"},
-		CurrentAWSTags: nil, // nil disables auto-skip
+		Tags:              map[string]string{"env": "prod"},
+		CurrentRemoteTags: nil, // nil disables auto-skip
 	}
 	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
@@ -382,8 +382,8 @@ func TestExecuteTag_Remove(t *testing.T) {
 	executor := NewExecutor(store)
 
 	action := TagActionUntag{
-		Keys:              maputil.NewSet("deprecated"),
-		CurrentAWSTagKeys: nil, // nil disables auto-skip
+		Keys:                 maputil.NewSet("deprecated"),
+		CurrentRemoteTagKeys: nil, // nil disables auto-skip
 	}
 	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
@@ -435,8 +435,8 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 		ToSet: map[string]string{"env": "prod"},
 	}
 	action := TagActionUntag{
-		Keys:              maputil.NewSet("env"),
-		CurrentAWSTagKeys: maputil.NewSet("env"),
+		Keys:                 maputil.NewSet("env"),
+		CurrentRemoteTagKeys: maputil.NewSet("env"),
 	}
 	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
@@ -473,8 +473,8 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 		ToSet: map[string]string{"env": "prod"},
 	}
 	action := TagActionTag{
-		Tags:           map[string]string{"env": "prod"},
-		CurrentAWSTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
+		Tags:              map[string]string{"env": "prod"},
+		CurrentRemoteTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
 	}
 	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
@@ -501,8 +501,8 @@ func TestExecuteTag_UnstageWhenAlreadyNotStaged(t *testing.T) {
 	// No pre-staged tags, and action with auto-skip results in empty tags
 	existingTags := StagedTags{}
 	action := TagActionTag{
-		Tags:           map[string]string{"env": "prod"},
-		CurrentAWSTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
+		Tags:              map[string]string{"env": "prod"},
+		CurrentRemoteTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
 	}
 	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
@@ -678,8 +678,8 @@ func TestExecuteTag_PersistError(t *testing.T) {
 	executor := NewExecutor(store)
 
 	action := TagActionTag{
-		Tags:           map[string]string{"env": "prod"},
-		CurrentAWSTags: nil, // nil disables auto-skip
+		Tags:              map[string]string{"env": "prod"},
+		CurrentRemoteTags: nil, // nil disables auto-skip
 	}
 	existingValue := testExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}

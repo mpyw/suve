@@ -53,8 +53,8 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName, namespace st
 
 	key := staging.EntryKey{Name: name, Namespace: namespace}
 
-	// Fetch AWS resource to check existence and get base modified time
-	currentValue, awsBaseModifiedAt, err := u.fetchAWSCurrentValue(ctx, name)
+	// Fetch the remote resource to check existence and get base modified time
+	currentValue, remoteBaseModifiedAt, err := u.fetchRemoteCurrentValue(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -71,9 +71,9 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName, namespace st
 		return nil, err
 	}
 
-	// Use AWS base modified time if we don't have one yet
+	// Use the remote base modified time if we don't have one yet
 	if baseModifiedAt == nil {
-		baseModifiedAt = awsBaseModifiedAt
+		baseModifiedAt = remoteBaseModifiedAt
 	}
 
 	return &tagContext{
@@ -85,9 +85,9 @@ func (u *TagUseCase) loadTagContext(ctx context.Context, inputName, namespace st
 	}, nil
 }
 
-// fetchAWSCurrentValue fetches the current value from AWS.
+// fetchRemoteCurrentValue fetches the current value from the remote store.
 // Returns (value, lastModified, nil) if resource exists, (nil, nil, nil) if not found.
-func (u *TagUseCase) fetchAWSCurrentValue(ctx context.Context, name string) (*string, *time.Time, error) {
+func (u *TagUseCase) fetchRemoteCurrentValue(ctx context.Context, name string) (*string, *time.Time, error) {
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
 		// If resource doesn't exist, return nil
@@ -118,11 +118,11 @@ func (u *TagUseCase) Tag(ctx context.Context, input TagInput) (*TagOutput, error
 	}
 
 	// Build tag action
-	// CurrentAWSTags is nil to disable auto-skip (conservative approach)
+	// CurrentRemoteTags is nil to disable auto-skip (conservative approach)
 	// TODO: Extend Strategy interface to fetch current tags for proper auto-skip
 	action := transition.TagActionTag{
-		Tags:           input.Tags,
-		CurrentAWSTags: nil,
+		Tags:              input.Tags,
+		CurrentRemoteTags: nil,
 	}
 
 	// Execute the transition
@@ -147,17 +147,17 @@ func (u *TagUseCase) Untag(ctx context.Context, input UntagInput) (*UntagOutput,
 		return nil, err
 	}
 
-	// For CREATE, use empty set (no tags on AWS) to enable auto-skip
+	// For CREATE, use empty set (no remote tags) to enable auto-skip
 	// For others, use nil to disable auto-skip (conservative approach)
-	var currentAWSTagKeys maputil.Set[string]
+	var currentRemoteTagKeys maputil.Set[string]
 	if _, isCreate := tc.entryState.StagedState.(transition.EntryStagedStateCreate); isCreate {
-		currentAWSTagKeys = maputil.NewSet[string]()
+		currentRemoteTagKeys = maputil.NewSet[string]()
 	}
 
 	// Build untag action
 	action := transition.TagActionUntag{
-		Keys:              input.TagKeys,
-		CurrentAWSTagKeys: currentAWSTagKeys,
+		Keys:                 input.TagKeys,
+		CurrentRemoteTagKeys: currentRemoteTagKeys,
 	}
 
 	// Execute the transition

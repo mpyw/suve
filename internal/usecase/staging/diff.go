@@ -35,14 +35,14 @@ type DiffEntry struct {
 	Name string
 	// Namespace is the App Configuration namespace of the entry (empty for the
 	// null/default namespace and every other provider).
-	Namespace     string
-	Type          DiffEntryType
-	Operation     staging.Operation
-	AWSValue      string
-	AWSIdentifier string
-	StagedValue   string
-	Description   *string
-	Warning       string // For warnings like "already deleted in AWS"
+	Namespace        string
+	Type             DiffEntryType
+	Operation        staging.Operation
+	RemoteValue      string
+	RemoteIdentifier string
+	StagedValue      string
+	Description      *string
+	Warning          string // For warnings like "already deleted in Key Vault"
 	// Secret reports whether the entry's values are secret material (a secret
 	// service, or a SecureString param), so a consumer masks both the remote and
 	// staged values in the review. Keyed off the value type, not the service, so
@@ -57,7 +57,7 @@ type DiffTagEntry struct {
 	// the null/default namespace and every other provider).
 	Namespace string
 	Add       map[string]string // Tags to add or update
-	Remove    map[string]string // Tags to remove (key=current value from AWS)
+	Remove    map[string]string // Tags to remove (key=current remote value)
 }
 
 // DiffOutput holds the result of the diff use case.
@@ -222,7 +222,7 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 	}
 
 	fetchResult := result.Value
-	awsValue := fetchResult.Value
+	remoteValue := fetchResult.Value
 	stagedValue := lo.FromPtr(entry.Value)
 
 	// For delete operation, staged value is empty
@@ -234,7 +234,7 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 	// deleting a resource is not a no-op just because its current value happens
 	// to be the empty string (legal in Azure App Configuration / Key Vault /
 	// Google Cloud), so an empty-valued delete must not be silently cancelled.
-	if entry.Operation != staging.OperationDelete && awsValue == stagedValue {
+	if entry.Operation != staging.OperationDelete && remoteValue == stagedValue {
 		// A failed unstage would leave the entry staged while we report it as
 		// auto-unstaged, so surface the error rather than discarding it.
 		if err := u.Store.UnstageEntry(ctx, service, key); err != nil {
@@ -245,20 +245,20 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 			Name:      key.Name,
 			Namespace: key.Namespace,
 			Type:      DiffEntryAutoUnstaged,
-			Warning:   "identical to AWS current",
+			Warning:   "identical to " + u.Strategy.ServiceName() + " current",
 		}, nil
 	}
 
 	return DiffEntry{
-		Name:          key.Name,
-		Namespace:     key.Namespace,
-		Type:          DiffEntryNormal,
-		Operation:     entry.Operation,
-		AWSValue:      awsValue,
-		AWSIdentifier: fetchResult.Identifier,
-		StagedValue:   stagedValue,
-		Description:   entry.Description,
-		Secret:        fetchResult.Secret,
+		Name:             key.Name,
+		Namespace:        key.Namespace,
+		Type:             DiffEntryNormal,
+		Operation:        entry.Operation,
+		RemoteValue:      remoteValue,
+		RemoteIdentifier: fetchResult.Identifier,
+		StagedValue:      stagedValue,
+		Description:      entry.Description,
+		Secret:           fetchResult.Secret,
 	}, nil
 }
 
@@ -282,7 +282,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
-				Warning:   "already deleted in AWS",
+				Warning:   "already deleted in " + u.Strategy.ServiceName(),
 			}, nil
 		}
 
@@ -310,7 +310,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
-				Warning:   "item no longer exists in AWS",
+				Warning:   "item no longer exists in " + u.Strategy.ServiceName(),
 			}, nil
 		}
 	}

@@ -147,14 +147,14 @@ VERSION SPECIFIERS:
   ~SHIFT    N versions ago; ~ alone means ~1
 
 EXAMPLES:
-  suve secret show my-secret                              Show current version
-  suve secret show my-secret~                             Show previous version
-  suve secret show my-secret:AWSPREVIOUS                  Show AWSPREVIOUS label
-  suve secret show --raw my-secret                        Output raw value (for piping)
-  suve secret show --parse-json my-secret                 Pretty print JSON value
-  suve secret show --output=json my-secret                Output as JSON
-  API_KEY=$(suve secret show --raw my-secret)             Use in shell variable`,
-		UsageError: "usage: suve secret show <name>",
+  suve aws secret show my-secret                              Show current version
+  suve aws secret show my-secret~                             Show previous version
+  suve aws secret show my-secret:AWSPREVIOUS                  Show AWSPREVIOUS label
+  suve aws secret show --raw my-secret                        Output raw value (for piping)
+  suve aws secret show --parse-json my-secret                 Pretty print JSON value
+  suve aws secret show --output=json my-secret                Output as JSON
+  API_KEY=$(suve aws secret show --raw my-secret)             Use in shell variable`,
+		UsageError: "usage: suve aws secret show <name>",
 		ParseSpec:  awssecretversion.Parse,
 		NewPresenter: func(ctx context.Context, spec *awssecretversion.Spec) (genericshow.Presenter, error) {
 			store, err := cliinternal.AWSSecretStore(ctx)

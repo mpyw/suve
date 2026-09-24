@@ -32,7 +32,7 @@ type EditInput struct {
 // EditOutput holds the result of the edit use case.
 type EditOutput struct {
 	Name     string
-	Skipped  bool // True if the edit was skipped because value matches AWS
+	Skipped  bool // True if the edit was skipped because value matches the remote value
 	Unstaged bool // True if the entry was auto-unstaged
 }
 
@@ -59,7 +59,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 		return nil, err
 	}
 
-	// Check staged state first to avoid unnecessary AWS fetch
+	// Check staged state first to avoid unnecessary remote fetch
 	var stagedEntry *staging.Entry
 
 	key := staging.EntryKey{Name: name, Namespace: input.Key.Namespace}
@@ -71,20 +71,20 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 
 	stagedEntry = entry
 
-	// Determine if we need to fetch from AWS
+	// Determine if we need to fetch from the remote store
 	var currentValue *string
 
-	var awsBaseModifiedAt *time.Time
+	var remoteBaseModifiedAt *time.Time
 
 	if stagedEntry != nil && stagedEntry.Operation == staging.OperationCreate {
-		// Staged as Create → resource doesn't exist in AWS, skip fetch
+		// Staged as Create → resource does not exist remotely, skip fetch
 		currentValue = nil
-		awsBaseModifiedAt = nil
+		remoteBaseModifiedAt = nil
 	} else {
-		// Not staged or staged as Update/Delete → fetch from AWS
+		// Not staged or staged as Update/Delete → fetch from the remote store
 		var err error
 
-		currentValue, awsBaseModifiedAt, err = u.fetchCurrentState(ctx, key.Name)
+		currentValue, remoteBaseModifiedAt, err = u.fetchCurrentState(ctx, key.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -93,10 +93,10 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	// Build entry state from already-fetched data (avoid redundant GetEntry call)
 	entryState, existingBaseModifiedAt := u.buildEntryState(stagedEntry, currentValue)
 
-	// Use existing BaseModifiedAt if available, otherwise use AWS
+	// Use existing BaseModifiedAt if available, otherwise use the remote one
 	baseModifiedAt := existingBaseModifiedAt
 	if baseModifiedAt == nil {
-		baseModifiedAt = awsBaseModifiedAt
+		baseModifiedAt = remoteBaseModifiedAt
 	}
 
 	// Resolve the staged value type. When the caller specifies none, preserve a
@@ -138,10 +138,10 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	return output, nil
 }
 
-// buildEntryState constructs EntryState from already-fetched staged entry and AWS value.
-func (u *EditUseCase) buildEntryState(stagedEntry *staging.Entry, currentAWSValue *string) (transition.EntryState, *time.Time) {
+// buildEntryState constructs EntryState from already-fetched staged entry and remote value.
+func (u *EditUseCase) buildEntryState(stagedEntry *staging.Entry, currentRemoteValue *string) (transition.EntryState, *time.Time) {
 	state := transition.EntryState{
-		CurrentValue: currentAWSValue,
+		CurrentValue: currentRemoteValue,
 		StagedState:  transition.EntryStagedStateNotStaged{},
 	}
 
@@ -167,14 +167,14 @@ func (u *EditUseCase) buildEntryState(stagedEntry *staging.Entry, currentAWSValu
 	return state, baseModifiedAt
 }
 
-// fetchCurrentState fetches the current AWS value and last modified time.
+// fetchCurrentState fetches the current remote value and last modified time.
 func (u *EditUseCase) fetchCurrentState(ctx context.Context, name string) (*string, *time.Time, error) {
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Always use the value pointer - empty string is a valid AWS value
+	// Always use the value pointer - empty string is a valid remote value
 	currentValue := &result.Value
 
 	var baseModifiedAt *time.Time

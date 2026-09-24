@@ -72,7 +72,7 @@ func Command() *cli.Command {
 		Description: `Schedule a secret for deletion in AWS Secrets Manager.
 
 By default, secrets are scheduled for deletion after a 30-day recovery
-window. During this period, you can restore the secret using 'suve secret restore'.
+window. During this period, you can restore the secret using 'suve aws secret restore'.
 
 Use --force for immediate permanent deletion without a recovery window.
 This action cannot be undone.
@@ -83,10 +83,10 @@ RECOVERY WINDOW:
    Default: 30 days
 
 EXAMPLES:
-   suve secret delete my-secret                      Delete with 30-day recovery (with confirmation)
-   suve secret delete --recovery-window 7 my-secret  Delete with 7-day recovery
-   suve secret delete --force my-secret              Permanently delete immediately
-   suve secret delete --yes my-secret                Delete without confirmation`,
+   suve aws secret delete my-secret                      Delete with 30-day recovery (with confirmation)
+   suve aws secret delete --recovery-window 7 my-secret  Delete with 7-day recovery
+   suve aws secret delete --force my-secret              Permanently delete immediately
+   suve aws secret delete --yes my-secret                Delete without confirmation`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "force",
@@ -108,7 +108,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("usage: suve secret delete <name>")
+		return fmt.Errorf("usage: suve aws secret delete <name>")
 	}
 
 	name := cmd.Args().First()

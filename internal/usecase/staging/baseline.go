@@ -18,10 +18,10 @@ type BaselineInput struct {
 // BaselineOutput holds the baseline value for editing.
 type BaselineOutput struct {
 	Value        string
-	IsStagedEdit bool // True if the baseline is from a staged edit (not AWS)
+	IsStagedEdit bool // True if the baseline is from a staged edit (not the remote store)
 }
 
-// Baseline returns the baseline value for editing (staged value if exists, otherwise from AWS).
+// Baseline returns the baseline value for editing (staged value if exists, otherwise from the remote store).
 func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*BaselineOutput, error) {
 	service := u.Strategy.Service()
 
@@ -44,12 +44,12 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 		}
 	}
 
-	// Not staged → fetch from AWS
-	return u.fetchBaselineFromAWS(ctx, input.Key.Name)
+	// Not staged → fetch from the remote store
+	return u.fetchBaselineFromRemote(ctx, input.Key.Name)
 }
 
-// fetchBaselineFromAWS fetches the baseline value from AWS.
-func (u *EditUseCase) fetchBaselineFromAWS(ctx context.Context, name string) (*BaselineOutput, error) {
+// fetchBaselineFromRemote fetches the baseline value from the remote store.
+func (u *EditUseCase) fetchBaselineFromRemote(ctx context.Context, name string) (*BaselineOutput, error) {
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
 	if err != nil {
 		return nil, err

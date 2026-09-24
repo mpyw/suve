@@ -28,11 +28,11 @@ Tags are key=value pairs. If a tag key already exists, its value will be updated
 You can specify multiple tags in a single command.
 
 EXAMPLES:
-   suve secret tag my-api-key env=prod                   Add single tag
-   suve secret tag my-api-key env=prod team=backend      Add multiple tags
-   suve secret tag my-api-key env=staging                Update existing tag`,
+   suve aws secret tag my-api-key env=prod                   Add single tag
+   suve aws secret tag my-api-key env=prod team=backend      Add multiple tags
+   suve aws secret tag my-api-key env=staging                Update existing tag`,
 		Noun:       nounSecret,
-		UsageError: "usage: suve secret tag <name> <key=value> [key=value]",
+		UsageError: "usage: suve aws secret tag <name> <key=value> [key=value]",
 		NewTagger:  newTagger,
 	})
 }

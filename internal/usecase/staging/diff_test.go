@@ -98,9 +98,9 @@ func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 	entry := output.Entries[0]
 	assert.Equal(t, "/app/config", entry.Name)
 	assert.Equal(t, usecasestaging.DiffEntryNormal, entry.Type)
-	assert.Equal(t, "old-value", entry.AWSValue)
+	assert.Equal(t, "old-value", entry.RemoteValue)
 	assert.Equal(t, "new-value", entry.StagedValue)
-	assert.Equal(t, "#5", entry.AWSIdentifier)
+	assert.Equal(t, "#5", entry.RemoteIdentifier)
 	assert.False(t, entry.Secret, "a plaintext param staged diff is not secret")
 }
 
@@ -219,7 +219,7 @@ func TestDiffUseCase_Execute_DeleteDiff(t *testing.T) {
 	entry := output.Entries[0]
 	assert.Equal(t, usecasestaging.DiffEntryNormal, entry.Type)
 	assert.Equal(t, staging.OperationDelete, entry.Operation)
-	assert.Equal(t, "existing-value", entry.AWSValue)
+	assert.Equal(t, "existing-value", entry.RemoteValue)
 	assert.Empty(t, entry.StagedValue) // Delete has no staged value
 }
 
@@ -683,7 +683,7 @@ func TestDiffUseCase_Execute_PerNamespaceResolver(t *testing.T) {
 
 	require.Contains(t, byNamespace, "dev")
 	require.Contains(t, byNamespace, "prd")
-	assert.Equal(t, "dev-remote", byNamespace["dev"].AWSValue)
-	assert.Equal(t, "prd-remote", byNamespace["prd"].AWSValue)
+	assert.Equal(t, "dev-remote", byNamespace["dev"].RemoteValue)
+	assert.Equal(t, "prd-remote", byNamespace["prd"].RemoteValue)
 	assert.Equal(t, "dev-staged", byNamespace["dev"].StagedValue)
 }

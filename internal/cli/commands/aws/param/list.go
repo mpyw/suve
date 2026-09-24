@@ -36,13 +36,13 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-   suve param list                          List all parameters
-   suve param list /app                     List parameters directly under /app
-   suve param list --recursive /app         List all parameters under /app recursively
-   suve param list /app/config/             List parameters under /app/config
-   suve param list --filter '\.prod\.'      List parameters matching regex
-   suve param list --show /app              List with values
-   suve param list --output=json /app       List as JSON`,
+   suve aws param list                          List all parameters
+   suve aws param list /app                     List parameters directly under /app
+   suve aws param list --recursive /app         List all parameters under /app recursively
+   suve aws param list /app/config/             List parameters under /app/config
+   suve aws param list --filter '\.prod\.'      List parameters matching regex
+   suve aws param list --show /app              List with values
+   suve aws param list --output=json /app       List as JSON`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "recursive",

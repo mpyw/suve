@@ -31,13 +31,16 @@ type GlobalServiceSpec struct {
 }
 
 // GlobalConfig configures the provider-wide stage commands so a single set of
-// implementations serves every provider: AWS iterates param + secret, Google
-// Cloud iterates secret only. The ScopeResolver keys on-disk staging state for
+// implementations serves every multi-service provider: AWS and Azure each
+// iterate param + secret. The ScopeResolver keys on-disk staging state for
 // the active provider.
 type GlobalConfig struct {
 	// ProviderLabel is the human-readable provider name used in prompts and
-	// messages (e.g. "AWS", "Google Cloud").
+	// messages (e.g. "AWS", "Azure").
 	ProviderLabel string
+	// CommandPath is the explicit command path of the provider's stage group,
+	// used in help text and usage errors (e.g. "suve aws stage").
+	CommandPath string
 	// ScopeResolver resolves the provider staging scope. Required.
 	ScopeResolver staging.ScopeResolver
 	// Services lists the provider's services in stable display order.

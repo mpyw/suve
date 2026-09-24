@@ -26,11 +26,11 @@ func TestOutputDiff(t *testing.T) {
 		}
 
 		entry := stagingusecase.DiffEntry{
-			Name:          "/app/config",
-			Operation:     staging.OperationDelete,
-			AWSValue:      "old-value",
-			StagedValue:   "",
-			AWSIdentifier: "#5",
+			Name:             "/app/config",
+			Operation:        staging.OperationDelete,
+			RemoteValue:      "old-value",
+			StagedValue:      "",
+			RemoteIdentifier: "#5",
 		}
 
 		r.OutputDiff(cli.DiffOptions{}, entry)
@@ -50,11 +50,11 @@ func TestOutputDiff(t *testing.T) {
 		}
 
 		entry := stagingusecase.DiffEntry{
-			Name:          "/app/config",
-			Operation:     staging.OperationUpdate,
-			AWSValue:      `{"b":2,"a":1}`,
-			StagedValue:   `{"c":3,"d":4}`,
-			AWSIdentifier: "#5",
+			Name:             "/app/config",
+			Operation:        staging.OperationUpdate,
+			RemoteValue:      `{"b":2,"a":1}`,
+			StagedValue:      `{"c":3,"d":4}`,
+			RemoteIdentifier: "#5",
 		}
 
 		r.OutputDiff(cli.DiffOptions{ParseJSON: true}, entry)

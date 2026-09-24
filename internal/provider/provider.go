@@ -5,12 +5,12 @@
 //declscope:core
 
 // Package provider defines the provider-neutral storage seam: the interfaces
-// and opaque reference types that every backend (AWS SSM, AWS Secrets Manager,
-// and future providers) implements.
+// and opaque reference types that every backend (AWS, Google Cloud, and Azure
+// services) implements.
 //
 // It imports only internal/domain and the standard library; it has ZERO
-// knowledge of any cloud SDK. AWS-specific concerns (ARNs, staging labels,
-// version-id semantics) live behind these interfaces inside the AWS adapter.
+// knowledge of any cloud SDK. Provider-specific concerns (ARNs, staging labels,
+// version-id semantics) live behind these interfaces inside each adapter.
 package provider
 
 import (
@@ -92,9 +92,9 @@ const (
 type Kind string
 
 const (
-	// KindParam selects a parameter store (e.g. AWS SSM Parameter Store).
+	// KindParam selects a parameter store (e.g. AWS SSM Parameter Store, Azure App Configuration).
 	KindParam Kind = "param"
-	// KindSecret selects a secret store (e.g. AWS Secrets Manager).
+	// KindSecret selects a secret store (e.g. AWS Secrets Manager, Azure Key Vault).
 	KindSecret Kind = "secret"
 )
 
@@ -140,8 +140,8 @@ type Tagger interface {
 	Untag(ctx context.Context, name string, keys []string) error
 }
 
-// Store is the full provider contract for one service (e.g. AWS SSM or
-// Secrets Manager). Providers may additionally implement the optional
+// Store is the full provider contract for one service (e.g. AWS SSM, Google
+// Cloud Secret Manager, or Azure App Configuration). Providers may additionally implement the optional
 // Restorer capability.
 type Store interface {
 	Reader

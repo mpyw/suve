@@ -28,11 +28,11 @@ Tags are key=value pairs. If a tag key already exists, its value will be updated
 You can specify multiple tags in a single command.
 
 EXAMPLES:
-   suve param tag /app/config env=prod                     Add single tag
-   suve param tag /app/config env=prod team=backend        Add multiple tags
-   suve param tag /app/config env=staging                  Update existing tag`,
+   suve aws param tag /app/config env=prod                     Add single tag
+   suve aws param tag /app/config env=prod team=backend        Add multiple tags
+   suve aws param tag /app/config env=staging                  Update existing tag`,
 		Noun:       "parameter",
-		UsageError: "usage: suve param tag <name> <key=value> [key=value]",
+		UsageError: "usage: suve aws param tag <name> <key=value> [key=value]",
 		NewTagger:  newTagger,
 	})
 }

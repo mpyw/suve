@@ -33,7 +33,7 @@ func exportDir(t *testing.T, scope provider.Scope, stage func()) string {
 	stage()
 
 	dir := filepath.Join(t.TempDir(), "backup")
-	_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), nil, dir)
+	_, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
 	require.NoError(t, err)
 
 	return dir
@@ -176,7 +176,7 @@ func TestGlobalImport(t *testing.T) {
 		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := filepath.Join(t.TempDir(), "backup")
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
+		_, _, err := runLeafCmd(t, globalExportCmd(scope), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
 		require.NoError(t, err)
 
 		// No --passphrase-stdin and a non-TTY writer: cannot prompt.
@@ -190,7 +190,7 @@ func TestGlobalImport(t *testing.T) {
 		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := filepath.Join(t.TempDir(), "backup")
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), bytes.NewBufferString("right-pw\n"), dir, "--passphrase-stdin")
+		_, _, err := runLeafCmd(t, globalExportCmd(scope), bytes.NewBufferString("right-pw\n"), dir, "--passphrase-stdin")
 		require.NoError(t, err)
 
 		_, _, err = runLeafCmd(t, globalImportCmd(fixedResolver(scope)), bytes.NewBufferString("wrong-pw\n"), dir, "--passphrase-stdin")
@@ -205,7 +205,7 @@ func TestGlobalImport(t *testing.T) {
 		stageEntry(t, scope, staging.ServiceParam, "/app/param1", "v1")
 
 		dir := filepath.Join(t.TempDir(), "backup")
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
+		_, _, err := runLeafCmd(t, globalExportCmd(scope), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
 		require.NoError(t, err)
 		require.True(t, workingState(t, scope).IsEmpty())
 
@@ -227,7 +227,7 @@ func TestGlobalImport(t *testing.T) {
 		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := filepath.Join(t.TempDir(), "backup")
-		_, _, err := runLeafCmd(t, stgcli.NewGlobalExportCommand(fixedResolver(scope)), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
+		_, _, err := runLeafCmd(t, globalExportCmd(scope), bytes.NewBufferString("pw123\n"), dir, "--passphrase-stdin")
 		require.NoError(t, err)
 		require.True(t, workingState(t, scope).IsEmpty())
 

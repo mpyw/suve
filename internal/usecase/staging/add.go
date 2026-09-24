@@ -51,7 +51,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 		return nil, err
 	}
 
-	// Check if resource already exists on AWS
+	// Check if resource already exists remotely
 	var currentValue *string
 
 	result, err := u.Strategy.FetchCurrentValue(ctx, name)
@@ -83,7 +83,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 		}
 	}
 
-	// Load current state with AWS existence check
+	// Load current state with the remote existence check
 	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
 	if err != nil {
 		return nil, err

@@ -1,5 +1,5 @@
 // Package domain defines provider-neutral value types shared across every
-// storage backend (AWS SSM, AWS Secrets Manager, and future providers).
+// storage backend (AWS, Google Cloud, and Azure services).
 //
 // It has ZERO knowledge of any cloud SDK: no ARNs, no staging labels, no
 // provider metadata bags. Types here carry only cross-provider essentials so
@@ -13,12 +13,13 @@ import "time"
 type ValueType string
 
 const (
-	// ValueTypePlaintext is a plain, non-secret value (AWS String).
-	ValueTypePlaintext ValueType = "plaintext" // AWS String, plain values
-	// ValueTypeSecret is an encrypted/secret value (AWS SecureString, Secrets Manager).
-	ValueTypeSecret ValueType = "secret" // AWS SecureString, Secrets Manager
-	// ValueTypeList is a list of values (AWS StringList).
-	ValueTypeList ValueType = "list" // AWS StringList
+	// ValueTypePlaintext is a plain, non-secret value (e.g. an AWS SSM String).
+	ValueTypePlaintext ValueType = "plaintext"
+	// ValueTypeSecret is an encrypted/secret value (e.g. an AWS SSM SecureString,
+	// or any value of a secret service such as Secrets Manager or Key Vault).
+	ValueTypeSecret ValueType = "secret"
+	// ValueTypeList is a list of values (e.g. an AWS SSM StringList).
+	ValueTypeList ValueType = "list"
 )
 
 // Version identifies one version of an entry.

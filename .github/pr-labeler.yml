@@ -21,18 +21,27 @@ staging:
 param:
   - changed-files:
       - any-glob-to-any-file:
-          - "internal/api/paramapi/**"
-          - "internal/cli/commands/param/**"
+          - "internal/cli/commands/aws/param/**"
+          - "internal/cli/commands/azure/param/**"
+          - "internal/provider/aws/param/**"
+          - "internal/provider/azure/appconfig/**"
           - "internal/usecase/param/**"
-          - "internal/version/paramversion/**"
+          - "internal/version/awsparamversion/**"
+          - "internal/version/azureappconfigversion/**"
 
 secret:
   - changed-files:
       - any-glob-to-any-file:
-          - "internal/api/secretapi/**"
-          - "internal/cli/commands/secret/**"
+          - "internal/cli/commands/aws/secret/**"
+          - "internal/cli/commands/azure/secret/**"
+          - "internal/cli/commands/gcloud/**"
+          - "internal/provider/aws/secret/**"
+          - "internal/provider/azure/keyvault/**"
+          - "internal/provider/gcloud/**"
           - "internal/usecase/secret/**"
-          - "internal/version/secretversion/**"
+          - "internal/version/awssecretversion/**"
+          - "internal/version/azurekvversion/**"
+          - "internal/version/gcloudversion/**"
 
 documentation:
   - changed-files:

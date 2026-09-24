@@ -22,7 +22,7 @@ import (
 //declscope:package // shared by design across the per-provider secret strategy files
 const itemNameSecret = "secret"
 
-// ResourceNotFoundError indicates a resource was not found in AWS.
+// ResourceNotFoundError indicates a resource was not found in the remote store.
 type ResourceNotFoundError struct {
 	Err error
 }
@@ -55,7 +55,7 @@ type ServiceStrategy interface {
 	HasDeleteOptions() bool
 }
 
-// Parser provides name/spec parsing without AWS access.
+// Parser provides name/spec parsing without provider access.
 // Use this interface when only parsing is needed (e.g., status, add commands).
 type Parser interface {
 	ServiceStrategy
@@ -69,21 +69,21 @@ type Parser interface {
 	ParseSpec(input string) (name string, hasVersion bool, err error)
 }
 
-// ParserFactory creates a Parser without AWS client.
+// ParserFactory creates a Parser without a provider client.
 type ParserFactory func() Parser
 
 // ApplyStrategy defines service-specific apply operations.
 type ApplyStrategy interface {
 	ServiceStrategy
 
-	// Apply applies a staged entry operation to AWS.
+	// Apply applies a staged entry operation to the remote store.
 	// Handles OperationCreate, OperationUpdate, and OperationDelete based on entry.Operation.
 	Apply(ctx context.Context, name string, entry Entry) error
 
-	// ApplyTags applies staged tag changes to AWS.
+	// ApplyTags applies staged tag changes to the remote store.
 	ApplyTags(ctx context.Context, name string, tagEntry TagEntry) error
 
-	// FetchLastModified returns the last modified time of the resource in AWS.
+	// FetchLastModified returns the last modified time of the resource in the remote store.
 	// It returns a *ResourceNotFoundError when the resource does not exist, so
 	// callers can distinguish "missing" from "exists but has no modification
 	// time" (the latter returns a zero time with a nil error). Providers that
@@ -91,9 +91,9 @@ type ApplyStrategy interface {
 	FetchLastModified(ctx context.Context, name string) (time.Time, error)
 }
 
-// FetchResult holds the result of fetching a value from AWS.
+// FetchResult holds the result of fetching a value from the remote store.
 type FetchResult struct {
-	// Value is the current value in AWS.
+	// Value is the current remote value.
 	Value string
 	// Identifier is a display string for the version (e.g., "#3" for SSM Parameter Store, "#abc123" for Secrets Manager).
 	Identifier string
@@ -106,7 +106,7 @@ type FetchResult struct {
 
 // EditFetchResult holds the result of fetching a value for editing.
 type EditFetchResult struct {
-	// Value is the current value in AWS.
+	// Value is the current remote value.
 	Value string
 	// LastModified is the last modification time of the resource.
 	// Used for conflict detection when applying staged changes.
@@ -117,10 +117,10 @@ type EditFetchResult struct {
 type DiffStrategy interface {
 	ServiceStrategy
 
-	// FetchCurrent fetches the current value from AWS for diffing.
+	// FetchCurrent fetches the current value from the remote store for diffing.
 	FetchCurrent(ctx context.Context, name string) (*FetchResult, error)
 
-	// FetchCurrentTags fetches the current tags from AWS for showing in diff output.
+	// FetchCurrentTags fetches the current tags from the remote store for showing in diff output.
 	// Returns nil map if the resource doesn't exist or has no tags.
 	FetchCurrentTags(ctx context.Context, name string) (map[string]string, error)
 }
@@ -129,7 +129,7 @@ type DiffStrategy interface {
 type EditStrategy interface {
 	Parser
 
-	// FetchCurrentValue fetches the current value from AWS for editing.
+	// FetchCurrentValue fetches the current value from the remote store for editing.
 	// Returns the value and last modified time for conflict detection.
 	FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error)
 }
@@ -142,7 +142,7 @@ type ResetStrategy interface {
 	// Returns the value and a version label for display.
 	FetchVersion(ctx context.Context, input string) (value string, versionLabel string, err error)
 
-	// FetchCurrentValue fetches the current value from AWS for auto-skip detection.
+	// FetchCurrentValue fetches the current value from the remote store for auto-skip detection.
 	// Uses same signature as EditStrategy for implementation reuse.
 	FetchCurrentValue(ctx context.Context, name string) (*EditFetchResult, error)
 }
@@ -151,7 +151,7 @@ type ResetStrategy interface {
 type DeleteStrategy interface {
 	ServiceStrategy
 
-	// FetchLastModified returns the last modified time of the resource in AWS.
+	// FetchLastModified returns the last modified time of the resource in the remote store.
 	// Used for existence and conflict detection when applying delete operations.
 	// It returns a *ResourceNotFoundError when the resource does not exist, so
 	// callers can distinguish "missing" from "exists but has no modification
@@ -160,7 +160,7 @@ type DeleteStrategy interface {
 }
 
 // FullStrategy combines all service-specific strategy interfaces.
-// This enables unified stage commands that work with either SSM Parameter Store or Secrets Manager.
+// This enables unified stage commands that work with any provider service.
 type FullStrategy interface {
 	ApplyStrategy
 	DiffStrategy
@@ -169,7 +169,7 @@ type FullStrategy interface {
 }
 
 // StrategyFactory creates a FullStrategy for a given context.
-// Used to defer AWS client initialization until command execution.
+// Used to defer provider client initialization until command execution.
 type StrategyFactory func(ctx context.Context) (FullStrategy, error)
 
 // ErrServiceNotConfigured is returned by a ScopeResolver when the active scope

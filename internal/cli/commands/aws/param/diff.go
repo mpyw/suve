@@ -76,7 +76,7 @@ func (p *diffPresenter) RenderJSON(stdout io.Writer, oldValue, newValue string, 
 }
 
 func (p *diffPresenter) Hints(stderr io.Writer) {
-	output.Hint(stderr, "To compare with previous version, use: suve param diff %s~1", p.spec1.Name)
+	output.Hint(stderr, "To compare with previous version, use: suve aws param diff %s~1", p.spec1.Name)
 }
 
 // DiffCommand returns the SSM Parameter Store diff command.
@@ -95,13 +95,13 @@ OUTPUT FORMAT:
    Use --output=json for structured JSON output.
 
 EXAMPLES:
-  suve param diff /app/config~                    Compare previous with latest
-  suve param diff /app/config#3                   Compare version 3 with latest
-  suve param diff /app/config#1 /app/config#2     Compare version 1 and 2
-  suve param diff --parse-json /app/config~       Format JSON values before diffing
-  suve param diff --output=json /app/config~      Output comparison as JSON
+  suve aws param diff /app/config~                    Compare previous with latest
+  suve aws param diff /app/config#3                   Compare version 3 with latest
+  suve aws param diff /app/config#1 /app/config#2     Compare version 1 and 2
+  suve aws param diff --parse-json /app/config~       Format JSON values before diffing
+  suve aws param diff --output=json /app/config~      Output comparison as JSON
 
-For comparing staged values, use: suve stage param diff`,
+For comparing staged values, use: suve aws stage param diff`,
 		ParseDiffArgs: awsparamversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *awsparamversion.Spec) (genericdiff.Presenter, error) {
 			store, err := cliinternal.AWSParamStore(ctx)

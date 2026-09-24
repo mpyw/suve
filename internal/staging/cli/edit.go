@@ -14,10 +14,13 @@ import (
 
 // EditRunner executes edit operations using a usecase.
 type EditRunner struct {
-	UseCase    *stagingusecase.EditUseCase
-	Stdout     io.Writer
-	Stderr     io.Writer
-	OpenEditor editor.OpenFunc // Optional: defaults to editor.Open if nil
+	UseCase *stagingusecase.EditUseCase
+	// ProviderLabel names the remote store in messages (e.g. "AWS"); empty
+	// renders as "remote".
+	ProviderLabel string
+	Stdout        io.Writer
+	Stderr        io.Writer
+	OpenEditor    editor.OpenFunc // Optional: defaults to editor.Open if nil
 }
 
 // EditOptions holds options for the edit command.
@@ -35,7 +38,7 @@ type EditOptions struct {
 
 // Run executes the edit command.
 func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
-	// Get baseline value (staged value if exists, otherwise from AWS)
+	// Get baseline value (staged value if exists, otherwise from the remote store)
 	baseline, err := r.UseCase.Baseline(ctx, stagingusecase.BaselineInput{Key: staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace}})
 	if err != nil {
 		return err
@@ -78,9 +81,9 @@ func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
 
 	switch {
 	case result.Skipped:
-		output.Warn(r.Stdout, "Skipped %s (same as AWS)", result.Name)
+		output.Warn(r.Stdout, "Skipped %s (same as %s)", result.Name, remoteName(r.ProviderLabel))
 	case result.Unstaged:
-		output.Success(r.Stdout, "Unstaged %s (reverted to AWS)", result.Name)
+		output.Success(r.Stdout, "Unstaged %s (reverted to %s)", result.Name, remoteName(r.ProviderLabel))
 	default:
 		output.Success(r.Stdout, "Staged: %s", result.Name)
 	}

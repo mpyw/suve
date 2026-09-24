@@ -41,8 +41,8 @@ WARNING: This action is irreversible. The parameter and all its version
 history will be permanently deleted.
 
 EXAMPLES:
-   suve param delete /app/config/old-param       Delete a parameter (with confirmation)
-   suve param delete --yes /app/config/old-param Delete without confirmation`,
+   suve aws param delete /app/config/old-param       Delete a parameter (with confirmation)
+   suve aws param delete --yes /app/config/old-param Delete without confirmation`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "yes",
@@ -55,7 +55,7 @@ EXAMPLES:
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return errors.New("usage: suve param delete <name>")
+		return errors.New("usage: suve aws param delete <name>")
 	}
 
 	name := cmd.Args().First()

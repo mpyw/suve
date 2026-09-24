@@ -17,12 +17,17 @@ import (
 // stageNounSecret is the command / item name used across the Key Vault stage subgroup.
 const stageNounSecret = "secret"
 
+// stageProviderLabel names Azure in staging prompts and messages.
+const stageProviderLabel = "Azure"
+
 // keyVaultStageConfig is the staging config for Azure Key Vault secrets. The
 // ScopeResolver keys on-disk staging state by the resolved vault.
 func keyVaultStageConfig() stgcli.CommandConfig {
 	return stgcli.CommandConfig{
 		CommandName:   stageNounSecret,
 		ItemName:      stageNounSecret,
+		ProviderLabel: stageProviderLabel,
+		CommandPath:   "suve azure stage secret",
 		Factory:       cliinternal.AzureKeyVaultSecretStrategyFactory,
 		ParserFactory: staging.AzureKeyVaultSecretParserFactory,
 		ScopeResolver: cliinternal.AzureKeyVaultStagingScopeResolver,
@@ -35,6 +40,8 @@ func appConfigStageConfig() stgcli.CommandConfig {
 	return stgcli.CommandConfig{
 		CommandName:   "param",
 		ItemName:      "setting",
+		ProviderLabel: stageProviderLabel,
+		CommandPath:   "suve azure stage param",
 		Factory:       cliinternal.AzureAppConfigParamStrategyFactory,
 		ParserFactory: staging.AzureAppConfigParamParserFactory,
 		ScopeResolver: cliinternal.AzureAppConfigStagingScopeResolver,
@@ -194,7 +201,8 @@ func stageGlobalFlags() []cli.Flag {
 // Configuration; cross-resource scoping is tracked separately (#435).
 func stageGlobalConfig(paramCfg, secretCfg stgcli.CommandConfig) stgcli.GlobalConfig {
 	return stgcli.GlobalConfig{
-		ProviderLabel: "Azure",
+		ProviderLabel: stageProviderLabel,
+		CommandPath:   "suve azure stage",
 		ScopeResolver: paramCfg.ScopeResolver,
 		Services: []stgcli.GlobalServiceSpec{
 			{

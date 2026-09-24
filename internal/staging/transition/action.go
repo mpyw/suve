@@ -42,21 +42,21 @@ type TagAction interface {
 }
 
 // TagActionTag represents adding or updating tags.
-// CurrentAWSTags is used to auto-skip tags that match AWS current values.
-// Pass nil to disable auto-skip (e.g., when AWS tags couldn't be fetched).
+// CurrentRemoteTags is used to auto-skip tags that match current remote values.
+// Pass nil to disable auto-skip (e.g., when remote tags could not be fetched).
 type TagActionTag struct {
-	Tags           map[string]string // Tags to add or update
-	CurrentAWSTags map[string]string // Current AWS tag values for auto-skip (nil to disable)
+	Tags              map[string]string // Tags to add or update
+	CurrentRemoteTags map[string]string // Current remote tag values for auto-skip (nil to disable)
 }
 
 func (TagActionTag) isTagAction() {}
 
 // TagActionUntag represents removing tags.
-// CurrentAWSTagKeys is used to auto-skip tag keys that don't exist on AWS.
-// Pass nil to disable auto-skip (e.g., when AWS tags couldn't be fetched).
+// CurrentRemoteTagKeys is used to auto-skip tag keys that do not exist remotely.
+// Pass nil to disable auto-skip (e.g., when remote tags could not be fetched).
 type TagActionUntag struct {
-	Keys              maputil.Set[string] // Tag keys to remove
-	CurrentAWSTagKeys maputil.Set[string] // Current AWS tag keys for auto-skip (nil to disable)
+	Keys                 maputil.Set[string] // Tag keys to remove
+	CurrentRemoteTagKeys maputil.Set[string] // Current remote tag keys for auto-skip (nil to disable)
 }
 
 func (TagActionUntag) isTagAction() {}

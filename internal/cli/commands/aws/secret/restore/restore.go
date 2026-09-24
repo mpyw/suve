@@ -39,14 +39,14 @@ and haven't been permanently deleted yet. Secrets deleted with --force
 cannot be restored.
 
 EXAMPLES:
-   suve secret restore my-secret    Restore a deleted secret`,
+   suve aws secret restore my-secret    Restore a deleted secret`,
 		Action: action,
 	}
 }
 
 func action(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Args().Len() < 1 {
-		return fmt.Errorf("usage: suve secret restore <name>")
+		return fmt.Errorf("usage: suve aws secret restore <name>")
 	}
 
 	store, err := internal.AWSSecretStore(ctx)
