@@ -1,10 +1,10 @@
 package staging
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/samber/lo"
 
@@ -243,14 +243,10 @@ func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service
 	}
 
 	// Results are collected in map iteration order, which is nondeterministic;
-	// sort by (Namespace, Name) so every consumer (including the GUI) renders a
-	// stable order that matches the CLI presenters.
+	// sort by (Name, Namespace), the order of staging.SortedEntryKeys, so every
+	// consumer (the CLI presenters and the GUI) renders the same stable order.
 	slices.SortFunc(output.EntryResults, func(a, b ApplyEntryResult) int {
-		if c := strings.Compare(a.Namespace, b.Namespace); c != 0 {
-			return c
-		}
-
-		return strings.Compare(a.Name, b.Name)
+		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.Namespace, b.Namespace))
 	})
 }
 
@@ -292,13 +288,9 @@ func (u *ApplyUseCase) applyTags(ctx context.Context, service staging.Service, t
 		output.TagResults = append(output.TagResults, resultTag)
 	}
 
-	// Sort by (Namespace, Name) for a stable order across consumers (see
+	// Sort by (Name, Namespace) for a stable order across consumers (see
 	// applyEntries).
 	slices.SortFunc(output.TagResults, func(a, b ApplyTagResult) int {
-		if c := strings.Compare(a.Namespace, b.Namespace); c != 0 {
-			return c
-		}
-
-		return strings.Compare(a.Name, b.Name)
+		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.Namespace, b.Namespace))
 	})
 }

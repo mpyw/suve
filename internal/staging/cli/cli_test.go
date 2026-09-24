@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -50,6 +51,8 @@ type fullMockStrategy struct {
 	fetchVersionLbl string
 	//declscope:private
 	applyErr error
+	//declscope:private
+	applyTagsErr error
 	//declscope:private
 	fetchLastModifiedVal time.Time
 	//declscope:private
@@ -105,7 +108,7 @@ func (m *fullMockStrategy) Apply(_ context.Context, _ string, _ staging.Entry) e
 	return m.applyErr
 }
 func (m *fullMockStrategy) ApplyTags(_ context.Context, _ string, _ staging.TagEntry) error {
-	return nil
+	return m.applyTagsErr
 }
 func (m *fullMockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
 	if m.fetchLastModifiedErr != nil {
@@ -2905,4 +2908,108 @@ func TestApplyRunner_TagSummaryEdgeCases(t *testing.T) {
 		assert.Contains(t, output, "Tagged")
 		assert.Contains(t, output, "-3")
 	})
+}
+
+// TestApplyRunner_Namespaces verifies that a key staged under several App
+// Configuration namespaces is reported once per namespace, each line carrying
+// its namespace badge, rather than collapsing into one line per name.
+func TestApplyRunner_Namespaces(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	for _, ns := range []string{"", "prod"} {
+		key := staging.EntryKey{Name: "/app/config", Namespace: ns}
+		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr("new-value"),
+			StagedAt:  time.Now(),
+		}))
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			StagedAt: time.Now(),
+		}))
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	r := &cli.ApplyRunner{
+		UseCase: &stagingusecase.ApplyUseCase{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam},
+			Store:    store,
+		},
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err := r.Run(t.Context(), cli.ApplyOptions{})
+	require.NoError(t, err)
+
+	output := stdout.String()
+	assert.Contains(t, output, "Updated /app/config\n")
+	assert.Contains(t, output, "Updated /app/config [prod]\n")
+	assert.Contains(t, output, "Tagged /app/config [+1]\n")
+	assert.Contains(t, output, "Tagged /app/config [prod] [+1]\n")
+	assert.Less(t, strings.Index(output, "Updated /app/config\n"), strings.Index(output, "Updated /app/config [prod]\n"))
+}
+
+// TestApplyRunner_NamespacedFailure verifies that a failed apply names the
+// namespace it failed under, for both value and tag changes.
+func TestApplyRunner_NamespacedFailure(t *testing.T) {
+	t.Parallel()
+
+	key := staging.EntryKey{Name: "/app/config", Namespace: "prod"}
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("new-value"),
+		StagedAt:  time.Now(),
+	}))
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
+	}))
+
+	var stdout, stderr bytes.Buffer
+
+	r := &cli.ApplyRunner{
+		UseCase: &stagingusecase.ApplyUseCase{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, applyErr: errors.New("boom"), applyTagsErr: errors.New("tag boom")},
+			Store:    store,
+		},
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	err := r.Run(t.Context(), cli.ApplyOptions{})
+	require.Error(t, err)
+	assert.Contains(t, stderr.String(), "/app/config [prod]: boom")
+	assert.Contains(t, stderr.String(), "/app/config [prod] (tags): tag boom")
+}
+
+// TestDiffRunner_NamespacedAutoUnstage verifies that the auto-unstaged warning
+// names the namespace of the entry it unstaged.
+func TestDiffRunner_NamespacedAutoUnstage(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: "prod"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     lo.ToPtr("same-value"),
+		StagedAt:  time.Now(),
+	}))
+
+	var stdout, stderr bytes.Buffer
+
+	r := &cli.DiffRunner{
+		UseCase: &stagingusecase.DiffUseCase{
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "same-value"},
+			Store:    store,
+		},
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}
+
+	require.NoError(t, r.Run(t.Context(), cli.DiffOptions{}))
+	assert.Contains(t, stderr.String(), "unstaged /app/config [prod]: identical")
 }

@@ -12,7 +12,7 @@ Default to declarative transforms. A `out := make([]T, 0, len(xs)); for _, x := 
 - **slice → slice, pure 1:1** — `lo.Map(xs, func(x T, _ int) U { return ... })`
 - **slice → slice, filtered** — `lo.Filter(xs, func(x T, _ int) bool { ... })`; **filter + transform in one pass** — `lo.FilterMap(xs, func(x T, _ int) (U, bool) { ...; return u, keep })`
 - **iterator (`iter.Seq`) → slice** — `slices.Collect(it.Map(seq, func(x T) U { ... }))`, where `it` is `github.com/samber/lo/it` (range-over-func iterators)
-- **sorted map keys** — `maputil.SortedKeys(m)` returns `iter.Seq[K]` (ascending); `maputil.SortedNames(items, getName)` returns the unique names as `iter.Seq[string]`. Under the hood these are `slices.Sorted(maps.Keys(m))` — use the stdlib form directly when you don't want the helper.
+- **sorted map keys** — `maputil.SortedKeys(m)` returns `iter.Seq[K]` (ascending). Under the hood it is `slices.Sorted(maps.Keys(m))` — use the stdlib form directly when you don't want the helper.
 - **stdlib building blocks** — `slices.Collect`, `slices.Sorted`, `slices.SortFunc`, `slices.Values`, `maps.Keys`, `maps.Values`
 - **lookup** — `lo.Find`, `lo.FindIndexOf`, `lo.MaxBy`
 

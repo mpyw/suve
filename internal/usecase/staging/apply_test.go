@@ -670,3 +670,35 @@ func TestApplyUseCase_Execute_PerNamespaceResolver(t *testing.T) {
 	got := []string{output.EntryResults[0].Namespace, output.EntryResults[1].Namespace}
 	assert.ElementsMatch(t, []string{"dev", "prd"}, got)
 }
+
+// TestApplyUseCase_Execute_ResultOrder pins the result order to (name,
+// namespace), so a name staged under several namespaces is reported in
+// adjacent results, matching staging.SortedEntryKeys.
+func TestApplyUseCase_Execute_ResultOrder(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	keys := []staging.EntryKey{{Name: "b"}, {Name: "a", Namespace: "z"}, {Name: "a"}}
+	for _, key := range keys {
+		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
+			Operation: staging.OperationCreate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+		}))
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+			Add: map[string]string{"env": "prod"}, StagedAt: time.Now(),
+		}))
+	}
+
+	uc := &usecasestaging.ApplyUseCase{Strategy: newMockApplyStrategy(), Store: store}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{IgnoreConflicts: true})
+	require.NoError(t, err)
+
+	want := []staging.EntryKey{{Name: "a"}, {Name: "a", Namespace: "z"}, {Name: "b"}}
+	assert.Equal(t, want, lo.Map(output.EntryResults, func(r usecasestaging.ApplyEntryResult, _ int) staging.EntryKey {
+		return staging.EntryKey{Name: r.Name, Namespace: r.Namespace}
+	}))
+	assert.Equal(t, want, lo.Map(output.TagResults, func(r usecasestaging.ApplyTagResult, _ int) staging.EntryKey {
+		return staging.EntryKey{Name: r.Name, Namespace: r.Namespace}
+	}))
+}

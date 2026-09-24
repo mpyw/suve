@@ -5,17 +5,16 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
@@ -144,8 +143,8 @@ func globalApplyAction(ctx context.Context, cmd *cli.Command, gcfg GlobalConfig,
 }
 
 // Run applies every service's staged changes and reports the results: value
-// changes service by service, then tag changes service by service, each result
-// sorted by (name, namespace).
+// changes service by service, then tag changes service by service, each in the
+// usecase's (name, namespace) order.
 func (r *GlobalApplyRunner) Run(ctx context.Context) error {
 	result, err := r.UseCase.Execute(ctx, stagingusecase.GlobalApplyInput{IgnoreConflicts: r.IgnoreConflicts})
 	if result == nil {
@@ -179,52 +178,46 @@ func (r *GlobalApplyRunner) Run(ctx context.Context) error {
 }
 
 func (r *GlobalApplyRunner) printEntryResults(svc *stagingusecase.ApplyOutput) {
-	results := slices.Clone(svc.EntryResults)
-	slices.SortFunc(results, func(a, b stagingusecase.ApplyEntryResult) int {
-		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.Namespace, b.Namespace))
-	})
+	for _, entry := range svc.EntryResults {
+		label := staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}.Label()
 
-	for _, entry := range results {
 		if entry.Error != nil {
-			output.Failed(r.Stderr, svc.ServiceName+": "+entry.Name, entry.Error)
+			output.Failed(r.Stderr, svc.ServiceName+": "+label, entry.Error)
 
 			continue
 		}
 
 		switch entry.Status {
 		case stagingusecase.ApplyResultCreated:
-			output.Success(r.Stdout, "%s: Created %s", svc.ServiceName, entry.Name)
+			output.Success(r.Stdout, "%s: Created %s", svc.ServiceName, label)
 		case stagingusecase.ApplyResultUpdated:
-			output.Success(r.Stdout, "%s: Updated %s", svc.ServiceName, entry.Name)
+			output.Success(r.Stdout, "%s: Updated %s", svc.ServiceName, label)
 		case stagingusecase.ApplyResultDeleted:
-			output.Success(r.Stdout, "%s: Deleted %s", svc.ServiceName, entry.Name)
+			output.Success(r.Stdout, "%s: Deleted %s", svc.ServiceName, label)
 		case stagingusecase.ApplyResultFailed:
 			// Unreachable: a Failed status always carries an Error (handled above).
 		}
 
 		if entry.UnstageError != nil {
-			output.Warning(r.Stderr, "failed to clear staging for %s: %v", entry.Name, entry.UnstageError)
+			output.Warning(r.Stderr, "failed to clear staging for %s: %v", label, entry.UnstageError)
 		}
 	}
 }
 
 func (r *GlobalApplyRunner) printTagResults(svc *stagingusecase.ApplyOutput) {
-	results := slices.Clone(svc.TagResults)
-	slices.SortFunc(results, func(a, b stagingusecase.ApplyTagResult) int {
-		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.Namespace, b.Namespace))
-	})
+	for _, tag := range svc.TagResults {
+		label := staging.EntryKey{Name: tag.Name, Namespace: tag.Namespace}.Label()
 
-	for _, tag := range results {
 		if tag.Error != nil {
-			output.Failed(r.Stderr, svc.ServiceName+": "+tag.Name+" (tags)", tag.Error)
+			output.Failed(r.Stderr, svc.ServiceName+": "+label+" (tags)", tag.Error)
 
 			continue
 		}
 
-		output.Success(r.Stdout, "%s: Tagged %s%s", svc.ServiceName, tag.Name, FormatTagApplySummary(tag))
+		output.Success(r.Stdout, "%s: Tagged %s%s", svc.ServiceName, label, FormatTagApplySummary(tag))
 
 		if tag.UnstageError != nil {
-			output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", tag.Name, tag.UnstageError)
+			output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", label, tag.UnstageError)
 		}
 	}
 }
