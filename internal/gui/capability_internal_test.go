@@ -111,3 +111,21 @@ func TestApp_ParamTypeOptions_ScopeAware(t *testing.T) {
 		})
 	}
 }
+
+// TestApp_ServiceCapability pins the server-side capability lookup the bindings
+// gate on: it follows the current provider and service, and an unknown
+// provider has no capabilities at all.
+func TestApp_ServiceCapability(t *testing.T) {
+	t.Parallel()
+
+	aws := appWithProvider(provider.ProviderAWS)
+	assert.True(t, aws.serviceCapability(provider.KindParam).HasValueType)
+	assert.True(t, aws.serviceCapability(provider.KindSecret).HasRecoveryWindow)
+
+	azure := appWithProvider(provider.ProviderAzure)
+	assert.False(t, azure.serviceCapability(provider.KindParam).HasDescription)
+	assert.True(t, azure.serviceCapability(provider.KindParam).HasNamespaces)
+
+	unknown := appWithProvider(provider.Provider("mystery"))
+	assert.Equal(t, capability.ServiceCapability{}, unknown.serviceCapability(provider.KindSecret))
+}

@@ -96,7 +96,7 @@ func (m *fakeMutator) Restore(context.Context, string) (data.WriteOutcome, error
 
 // Capability fixtures.
 func awsParamCap() capability.ServiceCapability {
-	return capability.ServiceCapability{Service: "param", HasTags: true, HasStaging: true, HasDescription: true}
+	return capability.ServiceCapability{Service: "param", HasTags: true, HasStaging: true, HasDescription: true, HasValueType: true}
 }
 
 func appConfigCap() capability.ServiceCapability {

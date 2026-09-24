@@ -15,7 +15,8 @@
 
   interface Props {
     capability?: capabilityModel.ServiceCapability;
-    provider?: string;
+    // The provider's display name, for the tags hint.
+    providerName?: string;
     // selectedNamespace is the App Configuration namespace filter, owned by App
     // (the dropdown lives in the sidebar footer). (NULL) → null/default rows, a
     // name → that namespace, * → all. Only meaningful for Azure App Configuration.
@@ -27,7 +28,10 @@
     onstagingchange?: () => void;
   }
 
-  let { capability, provider = '', selectedNamespace = NS_NULL, onnamespaces, onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, providerName = '', selectedNamespace = NS_NULL, onnamespaces, onnavigatetostaging, onstagingchange }: Props = $props();
+
+  // The cloud's own term for tags, as a hint next to "Tags".
+  const tagHint = $derived(capability?.nativeTagName ? `(= ${providerName}: ${capability.nativeTagName})` : '');
 
   // Capability-driven visibility. Absent capability defaults to AWS-like (true)
   // so the component degrades safely if mounted without one.
@@ -39,10 +43,9 @@
   // Default false so a capability object missing the field hides the input.
   const descriptionEnabled = $derived(capability?.hasDescription ?? false);
 
-  // The namespace axis (Azure calls it a "label") exists only for Azure App
-  // Configuration; ParamView under the Azure provider is always App Config
-  // (Key Vault is a secret store, rendered by SecretView).
-  const isAppConfig = $derived(provider === 'azure');
+  // The namespace axis (Azure App Configuration calls it a "label") exists only
+  // for a service with hasNamespaces.
+  const hasNamespaces = $derived(capability?.hasNamespaces ?? false);
 
   // The namespace of the currently selected row, shown in the detail panel.
   let selectedEntryNamespace = $state('');
@@ -82,7 +85,7 @@
   // Distinct namespaces present in the loaded rows (sorted). Feeds both the App
   // footer dropdown (via onnamespaces) and the create form's suggestions.
   const discoveredNamespaces = $derived.by(() => {
-    if (!isAppConfig) return [] as string[];
+    if (!hasNamespaces) return [] as string[];
     const discovered = new Set<string>();
     for (const e of entries) {
       if (e.namespace) discovered.add(e.namespace);
@@ -93,7 +96,7 @@
   // Report them up to App (App Config only), which owns the footer Namespace
   // dropdown and its options.
   $effect(() => {
-    if (!isAppConfig) return;
+    if (!hasNamespaces) return;
     onnamespaces?.(discoveredNamespaces);
   });
 
@@ -102,21 +105,21 @@
   // is blocked until the user narrows the filter (the backend guard is the
   // backstop). Only meaningful for App Config.
   const createNamespaceBlocked = $derived(
-    isAppConfig && (selectedNamespace === NS_ALL || selectedNamespace.includes(',')),
+    hasNamespaces && (selectedNamespace === NS_ALL || selectedNamespace.includes(',')),
   );
 
   // The namespace a new setting is created under, derived from the current
   // filter: a concrete namespace prefills itself; (NULL)/all/multi prefill the
   // null namespace ("") — for all/multi the form is blocked anyway.
   function defaultCreateNamespace(): string {
-    if (!isAppConfig || createNamespaceBlocked || selectedNamespace === NS_NULL) return '';
+    if (!hasNamespaces || createNamespaceBlocked || selectedNamespace === NS_NULL) return '';
     return selectedNamespace;
   }
 
   // Rows actually displayed. Non-App-Config providers show every row; App Config
   // narrows by the selected namespace client-side (like the prefix/regex filters).
   const visibleEntries = $derived.by(() => {
-    if (!isAppConfig || selectedNamespace === NS_ALL) return entries;
+    if (!hasNamespaces || selectedNamespace === NS_ALL) return entries;
     if (selectedNamespace === NS_NULL) return entries.filter((e) => !e.namespace);
     return entries.filter((e) => e.namespace === selectedNamespace);
   });
@@ -139,8 +142,9 @@
   let immediateMode = $state(false);
   // When staging is unavailable, every write is immediate (no staging toggle).
   const immediate = $derived(immediateMode || !stagingEnabled);
-  // The Type dropdown is scope-aware: empty options (Azure App Config) hide it.
-  const typeEnabled = $derived(paramTypeOptions.length > 0);
+  // The Type dropdown shows for a service with typed values (hasValueType) once
+  // the backend has listed its options.
+  const typeEnabled = $derived((capability?.hasValueType ?? false) && paramTypeOptions.length > 0);
 
   // Diff state
   let diffResult: gui.ParamDiffResult | null = $state(null);
@@ -529,7 +533,7 @@
             <li class="item-entry" class:selected={selectedParam === entry.name && selectedEntryNamespace === entry.namespace}>
               <button class="item-button" onclick={() => selectParam(entry.name, entry.namespace)}>
                 <span class="item-name param">{entry.name}</span>
-                {#if isAppConfig}
+                {#if hasNamespaces}
                   <span class="namespace-badge">{entry.namespace || NS_NULL}</span>
                 {/if}
                 {#if entry.value !== undefined}
@@ -606,7 +610,7 @@
                   <span class="meta-value">{paramDetail.version}</span>
                 </div>
               {/if}
-              {#if isAppConfig}
+              {#if hasNamespaces}
                 <div class="meta-item">
                   <span class="meta-label">Namespace</span>
                   <span class="meta-value namespace-value">{selectedEntryNamespace || NS_NULL}</span>
@@ -632,7 +636,7 @@
             {/if}
 
             {#if tagsEnabled}
-              <TagList tags={paramDetail.tags} serviceClass="param" {provider} onadd={openTagModal} onremove={openRemoveTagModal} />
+              <TagList tags={paramDetail.tags} serviceClass="param" nativeHint={tagHint} onadd={openTagModal} onremove={openRemoveTagModal} />
             {/if}
 
             {#if historyEnabled && paramLog.length > 0}
@@ -705,7 +709,7 @@
         disabled={!!paramDetail && selectedParam === setForm.name}
       />
     </div>
-    {#if isAppConfig}
+    {#if hasNamespaces}
       {#if !isEditMode && createNamespaceBlocked}
         <div class="modal-warning" data-testid="ns-blocked">
           Pick a single namespace to create under — currently viewing all namespaces.

@@ -179,7 +179,7 @@ func keyEnterMsg() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyEnter} 
 func keyRightMsg() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeyRight} }
 
 func goldenCap(prov, service string) capability.ServiceCapability {
-	sc, _ := capabilityFor(provider.Provider(prov), service)
+	sc, _ := capability.Service(provider.Provider(prov), service)
 
 	return sc
 }

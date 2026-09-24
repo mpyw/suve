@@ -9,11 +9,12 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
-// StatusBar renders the fixed top line: the provider and its target (see
+// StatusBar renders the fixed top line: the provider's display name and its target (see
 // provider.Target). Provider and scope never change for the process lifetime
 // (they are fixed at launch), so the only mutable input is the target, which a
 // provider may resolve asynchronously (AWS: the STS caller identity).
@@ -31,7 +32,7 @@ func (s StatusBar) View(width int) string {
 	segs := s.targetSegments()
 
 	parts := make([]string, 0, 1+len(segs))
-	parts = append(parts, s.Styles.StatusValue.Render(statusBarProviderLabel(s.Scope.Provider)))
+	parts = append(parts, s.Styles.StatusValue.Render(capability.DisplayName(s.Scope.Provider)))
 	parts = append(parts, segs...)
 
 	line := s.Styles.StatusBar.Render("suve") + s.Styles.StatusKey.Render("  ") +
@@ -53,18 +54,4 @@ func (s StatusBar) targetSegments() []string {
 	}
 
 	return out
-}
-
-// statusBarProviderLabel maps a provider to its status-bar label.
-func statusBarProviderLabel(p provider.Provider) string {
-	switch p {
-	case provider.ProviderAWS:
-		return "aws"
-	case provider.ProviderGoogleCloud:
-		return "googlecloud"
-	case provider.ProviderAzure:
-		return "azure"
-	default:
-		return string(p)
-	}
 }

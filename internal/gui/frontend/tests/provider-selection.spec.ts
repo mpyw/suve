@@ -11,6 +11,7 @@ import {
   waitForViewLoaded,
   navigateTo,
   clickItemByName,
+  defaultCapabilities,
 } from './fixtures/wails-mock';
 
 const nav = (page: import('@playwright/test').Page) => page.locator('.nav');
@@ -141,6 +142,25 @@ test.describe('Provider selection', () => {
       await expect(page.locator('.tags-list')).toContainText('prod');
 
       // New-item modal has no Type dropdown (ParamTypeOptions empty).
+      await page.getByRole('button', { name: '+ New' }).click();
+      await expect(page.locator('#param-type')).toHaveCount(0);
+    });
+
+    test('the Type dropdown follows hasValueType, not the provider', async ({ page }) => {
+      // AWS with a param capability that reports no value type: the dropdown
+      // and the detail Type row must disappear although the provider is AWS.
+      const capabilities = defaultCapabilities.map((c) => ({
+        ...c,
+        services: c.services.map((sv) => (sv.service === 'param' ? { ...sv, hasValueType: false } : sv)),
+      }));
+      await setupWailsMocks(page, { capabilities });
+      await page.goto('/');
+      await waitForItemList(page);
+
+      await page.locator('.item-button').first().click();
+      await expect(page.locator('.detail-panel')).toBeVisible();
+      await expect(page.locator('.meta-label', { hasText: 'Type' })).toHaveCount(0);
+
       await page.getByRole('button', { name: '+ New' }).click();
       await expect(page.locator('#param-type')).toHaveCount(0);
     });

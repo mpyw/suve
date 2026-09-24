@@ -21,6 +21,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/tui/components"
 	"github.com/mpyw/suve/internal/tui/data"
@@ -964,11 +965,11 @@ func (m *App) pushStagingDetail(req nav.OpenStagingDetail) tea.Cmd {
 	return p.Init()
 }
 
-// applyTargetLine renders the apply target (the provider plus its resolved
-// target segments) shown on the apply confirmation — parity with the CLI's
+// applyTargetLine renders the apply target (the provider's display name plus
+// its resolved target segments) shown on the apply confirmation — parity with the CLI's
 // prompt.
 func (m *App) applyTargetLine() string {
-	parts := []string{string(m.scope.Provider)}
+	parts := []string{capability.DisplayName(m.scope.Provider)}
 	if target := m.target.String(); target != "" {
 		parts = append(parts, target)
 	}

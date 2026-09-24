@@ -15,12 +15,16 @@
 
   interface Props {
     capability?: capabilityModel.ServiceCapability;
-    provider?: string;
+    // The provider's display name, for the tags hint.
+    providerName?: string;
     onnavigatetostaging?: () => void;
     onstagingchange?: () => void;
   }
 
-  let { capability, provider = '', onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, providerName = '', onnavigatetostaging, onstagingchange }: Props = $props();
+
+  // The cloud's own term for tags, as a hint next to "Tags".
+  const tagHint = $derived(capability?.nativeTagName ? `(= ${providerName}: ${capability.nativeTagName})` : '');
 
   // Capability-driven visibility. Absent capability defaults to AWS-like (true).
   const stagingEnabled = $derived(capability?.hasStaging ?? true);
@@ -623,7 +627,7 @@
             {/if}
 
             {#if tagsEnabled && !tagsPerVersion}
-              <TagList tags={secretDetail.tags} serviceClass="secret" {provider} onadd={openTagModal} onremove={openRemoveTagModal} />
+              <TagList tags={secretDetail.tags} serviceClass="secret" nativeHint={tagHint} onadd={openTagModal} onremove={openRemoveTagModal} />
             {/if}
 
             {#if historyEnabled && secretLog.length > 0}

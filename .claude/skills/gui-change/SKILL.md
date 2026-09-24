@@ -25,7 +25,15 @@ landed across #273–#282.
   `internal/capability`, bound by `Capabilities` in `internal/gui/capability.go`;
   the generated TypeScript types live in the `capability` namespace of
   `wailsjs/go/models.ts`). Hide unsupported controls via the descriptor; never hardcode
-  provider conditionals in Svelte.
+  provider conditionals in Svelte. The descriptor also carries the data a
+  provider switch used to hold: `hasValueType` (the param Type dropdown),
+  `hasNamespaces` (the namespace axis), `scopeField` (the scope field a service
+  needs, so Azure shows a tab only for the vault or store that is set), and
+  `nativeTagName` (the "(= Google Cloud: labels)" hint).
+- Go code looks capabilities up with `capability.Service(p, service)`,
+  `capability.Provider(p)` and `capability.DisplayName(p)`. The bindings gate
+  on `a.serviceCapability(kind)` (`internal/gui/capability.go`) rather than on
+  `Provider == provider.ProviderX`.
 - The sidebar's scope target comes from `GetScopeTarget` (no network) and,
   while it is pending, `ResolveScopeTarget` (AWS: STS). Both wrap
   `provider.Target` (`internal/gui/target.go`); render its segments, never a

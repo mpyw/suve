@@ -18,6 +18,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/staging/store/file"
@@ -127,7 +128,7 @@ func newModel(ctx context.Context, scope provider.Scope, service string) (*App, 
 func ensureResolvable(ctx context.Context, scope provider.Scope) error {
 	kinds := scope.SupportedKinds()
 	if len(kinds) == 0 {
-		return fmt.Errorf("no service is available for the %s scope; check the launch flags/environment", scope.Provider)
+		return fmt.Errorf("no service is available for the %s scope; check the launch flags/environment", capability.DisplayName(scope.Provider))
 	}
 
 	var lastErr error
