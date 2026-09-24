@@ -63,10 +63,13 @@ echo "Demo data ready:"
 echo ""
 echo "=== Recording CLI demo ==="
 # Create temp tape with correct endpoint URL
-TEMP_TAPE=$(mktemp)
+# vhs appends ".tape" to a path without that extension, so the temp file must
+# end in .tape (BSD mktemp cannot add a suffix, hence the temp directory).
+TEMP_DIR=$(mktemp -d)
+TEMP_TAPE="$TEMP_DIR/cli-demo.tape"
 sed "s|http://localhost:4566|$AWS_ENDPOINT_URL|g" demo/cli-demo.tape > "$TEMP_TAPE"
 PATH="$PROJECT_DIR/bin:$PATH" vhs "$TEMP_TAPE"
-rm -f "$TEMP_TAPE"
+rm -rf "$TEMP_DIR"
 
 echo ""
 echo "=== Done ==="
