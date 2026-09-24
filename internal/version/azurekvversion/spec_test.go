@@ -285,3 +285,33 @@ func TestParseDiffArgs(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// TestSuffix pins that Suffix rebuilds the part after the name, normalized, and
+// that name+suffix re-parses to an equivalent spec.
+func TestSuffix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "my-secret", want: ""},
+		{input: "my-secret#abc123", want: "#abc123"},
+		{input: "my-secret~~", want: "~2"},
+		{input: "my-secret#abc123~1", want: "#abc123~1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
+			spec, err := azurekvversion.Parse(tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, azurekvversion.Suffix(spec))
+
+			reparsed, err := azurekvversion.Parse(spec.Name + azurekvversion.Suffix(spec))
+			require.NoError(t, err)
+			assert.Equal(t, spec, reparsed)
+		})
+	}
+}

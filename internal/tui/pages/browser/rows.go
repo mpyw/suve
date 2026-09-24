@@ -123,8 +123,8 @@ func historyEntries(_ styles.Styles, rows []data.HistoryRow, tagsPerVersion bool
 // historyBadges returns the version's state OR its staging labels — whichever is
 // populated — never inferring one axis from the other (#419).
 func historyBadges(r data.HistoryRow) []string {
-	if len(r.StagingLabels) > 0 {
-		return r.StagingLabels
+	if len(r.Labels) > 0 {
+		return r.Labels
 	}
 
 	if r.State != "" {

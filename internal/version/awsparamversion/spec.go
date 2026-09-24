@@ -72,6 +72,21 @@ func Parse(input string) (*Spec, error) {
 	return version.Parse(input, parser)
 }
 
+// Suffix reconstructs the version-spec suffix (the part after the name) from a
+// parsed spec, so that spec.Name+Suffix(spec) re-parses to an equivalent spec.
+// It is what callers hand to provider.Reader.Resolve alongside the name.
+//
+// Examples: {Version:3} -> "#3"; {Shift:2} -> "~2"; {Version:5, Shift:2} ->
+// "#5~2"; {} -> "" (latest).
+func Suffix(spec *Spec) string {
+	var abs string
+	if spec.Absolute.Version != nil {
+		abs = "#" + strconv.FormatInt(*spec.Absolute.Version, 10)
+	}
+
+	return abs + spec.ShiftSuffix()
+}
+
 // ParseDiffArgs parses diff command arguments for SSM Parameter Store parameters.
 // This is a convenience wrapper around diff.ParseArgs with SSM Parameter Store-specific settings.
 func ParseDiffArgs(args []string) (*Spec, *Spec, error) {

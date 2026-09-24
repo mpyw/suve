@@ -12,7 +12,6 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
-	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
 // showStore builds a mock reader that resolves to the latest ref and returns the
@@ -28,16 +27,6 @@ func showStore(entry *domain.Entry) *providermock.Store {
 	}
 }
 
-//declscope:package // a fixture diff's tests share
-func mustParseSpec(t *testing.T, s string) *awssecretversion.Spec {
-	t.Helper()
-
-	spec, err := awssecretversion.Parse(s)
-	require.NoError(t, err)
-
-	return spec
-}
-
 func TestShowUseCase_Execute(t *testing.T) {
 	t.Parallel()
 
@@ -48,28 +37,28 @@ func TestShowUseCase_Execute(t *testing.T) {
 		Type:  domain.ValueTypeSecret,
 		// Multiple staging labels (unsorted) must all surface, deterministically
 		// sorted for stable output (#419).
-		Version: domain.Version{ID: "abc123", StagingLabels: []string{"AWSCURRENT", "custom"}, Created: &now},
+		Version: domain.Version{ID: "abc123", Labels: []string{"AWSCURRENT", "custom"}, Created: &now},
 		Extra:   []domain.Field{{Label: "ARN", Value: "arn:aws:secretsmanager:us-east-1:123:secret:my-secret"}},
 	})
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	output, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret")})
+	output, err := uc.Execute(t.Context(), secret.ShowInput{Name: "my-secret"})
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", output.Name)
 	assert.Equal(t, "secret-value", output.Value)
-	assert.Equal(t, "abc123", output.VersionID)
-	assert.Equal(t, []string{"AWSCURRENT", "custom"}, output.VersionStage)
+	assert.Equal(t, "abc123", output.Version)
+	assert.Equal(t, []string{"AWSCURRENT", "custom"}, output.Labels)
 	// AWS Secrets Manager carries staging labels, not a per-version state (#419).
 	assert.Empty(t, output.State)
 	assert.NotNil(t, output.CreatedDate)
-	// Regression guard: the ARN must be surfaced from the entry's Extra metadata.
-	assert.Equal(t, "arn:aws:secretsmanager:us-east-1:123:secret:my-secret", output.ARN)
+	// The provider's display-only metadata (the ARN here) passes through verbatim.
+	assert.Equal(t, []domain.Field{{Label: "ARN", Value: "arn:aws:secretsmanager:us-east-1:123:secret:my-secret"}}, output.Extra)
 }
 
 // TestShowUseCase_Execute_State asserts that a GCloud/Key Vault-style version
 // (per-version State set, no staging labels) surfaces State and leaves
-// VersionStage empty — the two concepts must not be conflated (#419).
+// Labels empty — the two concepts must not be conflated (#419).
 func TestShowUseCase_Execute_State(t *testing.T) {
 	t.Parallel()
 
@@ -82,10 +71,10 @@ func TestShowUseCase_Execute_State(t *testing.T) {
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	output, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret")})
+	output, err := uc.Execute(t.Context(), secret.ShowInput{Name: "my-secret"})
 	require.NoError(t, err)
 	assert.Equal(t, "enabled", output.State)
-	assert.Empty(t, output.VersionStage)
+	assert.Empty(t, output.Labels)
 }
 
 func TestShowUseCase_Execute_WithVersionID(t *testing.T) {
@@ -94,15 +83,15 @@ func TestShowUseCase_Execute_WithVersionID(t *testing.T) {
 	store := showStore(&domain.Entry{
 		Name:    "my-secret",
 		Value:   "old-value",
-		Version: domain.Version{ID: "old-version-id", StagingLabels: []string{"AWSPREVIOUS"}},
+		Version: domain.Version{ID: "old-version-id", Labels: []string{"AWSPREVIOUS"}},
 	})
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	output, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret#old-version-id")})
+	output, err := uc.Execute(t.Context(), secret.ShowInput{Name: "my-secret", Suffix: "#old-version-id"})
 	require.NoError(t, err)
 	assert.Equal(t, "old-value", output.Value)
-	assert.Equal(t, "old-version-id", output.VersionID)
+	assert.Equal(t, "old-version-id", output.Version)
 }
 
 func TestShowUseCase_Execute_WithLabel(t *testing.T) {
@@ -111,12 +100,12 @@ func TestShowUseCase_Execute_WithLabel(t *testing.T) {
 	store := showStore(&domain.Entry{
 		Name:    "my-secret",
 		Value:   "current-value",
-		Version: domain.Version{ID: "current-id", StagingLabels: []string{"AWSCURRENT"}},
+		Version: domain.Version{ID: "current-id", Labels: []string{"AWSCURRENT"}},
 	})
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	output, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret:AWSCURRENT")})
+	output, err := uc.Execute(t.Context(), secret.ShowInput{Name: "my-secret", Suffix: ":AWSCURRENT"})
 	require.NoError(t, err)
 	assert.Equal(t, "current-value", output.Value)
 }
@@ -135,7 +124,7 @@ func TestShowUseCase_Execute_Error(t *testing.T) {
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	_, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret")})
+	_, err := uc.Execute(t.Context(), secret.ShowInput{Name: "my-secret"})
 	assert.Error(t, err)
 }
 
@@ -150,7 +139,7 @@ func TestShowUseCase_Execute_NoCreatedDate(t *testing.T) {
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	output, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret")})
+	output, err := uc.Execute(t.Context(), secret.ShowInput{Name: "my-secret"})
 	require.NoError(t, err)
 	assert.Nil(t, output.CreatedDate)
 }
@@ -166,9 +155,9 @@ func TestShowUseCase_Execute_WithShift(t *testing.T) {
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	output, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret~1")})
+	output, err := uc.Execute(t.Context(), secret.ShowInput{Name: "my-secret", Suffix: "~1"})
 	require.NoError(t, err)
-	assert.Equal(t, "v2-id", output.VersionID)
+	assert.Equal(t, "v2-id", output.Version)
 	assert.Equal(t, "v2-value", output.Value)
 }
 
@@ -187,7 +176,7 @@ func TestShowUseCase_Execute_WithTags(t *testing.T) {
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	output, err := uc.Execute(t.Context(), secret.ShowInput{Spec: mustParseSpec(t, "my-secret")})
+	output, err := uc.Execute(t.Context(), secret.ShowInput{Name: "my-secret"})
 	require.NoError(t, err)
 	require.Len(t, output.Tags, 2)
 	assert.Equal(t, "env", output.Tags[0].Key)

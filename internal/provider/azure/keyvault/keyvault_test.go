@@ -160,9 +160,9 @@ func TestGet(t *testing.T) {
 	assert.Equal(t, "s3cr3t", entry.Value)
 	assert.Equal(t, domain.ValueTypeSecret, entry.Type)
 	assert.Equal(t, "v1", entry.Version.ID)
-	// State carries the per-version enable/disable; StagingLabels is not a Key Vault concept.
+	// State carries the per-version enable/disable; Labels is not a Key Vault concept.
 	assert.Equal(t, "enabled", entry.Version.State)
-	assert.Empty(t, entry.Version.StagingLabels)
+	assert.Empty(t, entry.Version.Labels)
 	assert.Equal(t, []domain.Tag{{Key: "env", Value: "prod"}}, entry.Tags)
 }
 
@@ -202,10 +202,13 @@ func TestHistory(t *testing.T) {
 	// Newest first.
 	assert.Equal(t, "new", versions[0].ID)
 	assert.Equal(t, "enabled", versions[0].State)
-	assert.Empty(t, versions[0].StagingLabels)
+	assert.Empty(t, versions[0].Labels)
 	assert.Equal(t, "old", versions[1].ID)
 	assert.Equal(t, "disabled", versions[1].State)
-	assert.Empty(t, versions[1].StagingLabels)
+	assert.Empty(t, versions[1].Labels)
+	// The newest version is current (what an unversioned Get serves).
+	assert.True(t, versions[0].Current)
+	assert.False(t, versions[1].Current)
 }
 
 func TestList(t *testing.T) {

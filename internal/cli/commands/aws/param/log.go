@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"unicode"
 
@@ -69,7 +68,7 @@ func (p *logPresenter) RenderJSON(stdout io.Writer) error {
 
 	for i, entry := range entries {
 		items[i] = logJSONItem{
-			Version: entry.Version,
+			Version: versionNumber(entry.Version),
 		}
 		if entry.LastModified != nil {
 			items[i].Modified = timeutil.FormatRFC3339(*entry.LastModified)
@@ -123,7 +122,7 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, maxValueLength int) {
 	}
 
 	output.Printf(stdout, "%s%s  %s  %s\n",
-		colors.For(stdout).Version(strconv.FormatInt(entry.Version, 10)),
+		colors.For(stdout).Version(entry.Version),
 		currentMark,
 		colors.For(stdout).FieldLabel(dateStr),
 		value,
@@ -133,7 +132,7 @@ func (p *logPresenter) RenderOneline(stdout io.Writer, i, maxValueLength int) {
 func (p *logPresenter) RenderHeader(stdout io.Writer, i int) {
 	entry := p.result.Entries[i]
 
-	versionLabel := fmt.Sprintf("Version %d", entry.Version)
+	versionLabel := fmt.Sprintf("Version %s", entry.Version)
 	if entry.IsCurrent {
 		versionLabel += " " + colors.For(stdout).Current("(current)")
 	}
@@ -199,14 +198,14 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 		}
 
 		oldValue = oldEntry.Value
-		oldName = fmt.Sprintf("%s#%d", p.result.Name, oldEntry.Version)
+		oldName = fmt.Sprintf("%s#%s", p.result.Name, oldEntry.Version)
 
 		if parseJSON {
 			oldValue, newValue = jsonutil.TryFormatOrWarn2(oldValue, newValue, stderr, "")
 		}
 	}
 
-	newName := fmt.Sprintf("%s#%d", p.result.Name, newEntry.Version)
+	newName := fmt.Sprintf("%s#%s", p.result.Name, newEntry.Version)
 
 	diff := output.Diff(stdout, oldName, newName, oldValue, newValue)
 	if diff != "" {

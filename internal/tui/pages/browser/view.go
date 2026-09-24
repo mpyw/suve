@@ -396,8 +396,8 @@ func (m *Model) metaLines(width int) []string {
 // populated — as a "State"/"Labels" row, never inferring one from the other.
 func (m *Model) stateBadgeLine(width int) string {
 	switch {
-	case len(m.detail.StagingLabels) > 0:
-		return fieldLine(m.styles, "Labels", strings.Join(m.detail.StagingLabels, " "), width)
+	case len(m.detail.Labels) > 0:
+		return fieldLine(m.styles, "Labels", strings.Join(m.detail.Labels, " "), width)
 	case m.detail.State != "":
 		return fieldLine(m.styles, "State", m.detail.State, width)
 	default:

@@ -18,6 +18,7 @@ package version
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mpyw/suve/internal/version/internal"
@@ -43,6 +44,16 @@ type Spec[A any] struct {
 // HasShift returns true if a relative shift is specified (Shift > 0).
 func (s *Spec[A]) HasShift() bool {
 	return s.Shift > 0
+}
+
+// ShiftSuffix renders the shift clause ("~N", or "" without a shift), the tail
+// of the suffix each service's Suffix rebuilds from a parsed spec.
+func (s *Spec[A]) ShiftSuffix() string {
+	if !s.HasShift() {
+		return ""
+	}
+
+	return "~" + strconv.Itoa(s.Shift)
 }
 
 // SpecifierParser defines how to parse a single type of absolute specifier.

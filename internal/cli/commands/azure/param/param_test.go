@@ -20,7 +20,7 @@ import (
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	paramusecase "github.com/mpyw/suve/internal/usecase/param"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
 
@@ -161,7 +161,7 @@ func TestCreateRunner(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &param.CreateRunner{
-		UseCase: &azure.CreateUseCase{Writer: store},
+		UseCase: &paramusecase.CreateUseCase{Writer: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
@@ -185,7 +185,7 @@ func TestDeleteRunner(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &param.DeleteRunner{
-		UseCase: &azure.DeleteUseCase{Store: store},
+		UseCase: &paramusecase.DeleteUseCase{Store: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
@@ -206,8 +206,8 @@ func (s *namespaceListerStub) ListWithNamespacesScoped(_ context.Context) ([]app
 
 func nsListRunner(rows []appconfig.KeyNamespace, keyOnlyReader provider.Reader, out, errOut *bytes.Buffer) *param.ListRunner {
 	return &param.ListRunner{
-		Namespace: &azure.ListNamespacesUseCase{Lister: &namespaceListerStub{rows: rows}},
-		KeyOnly:   &azure.ListUseCase{Reader: keyOnlyReader},
+		Namespace: &paramusecase.ListNamespacesUseCase{Lister: &namespaceListerStub{rows: rows}},
+		KeyOnly:   &paramusecase.ListUseCase{Reader: keyOnlyReader},
 		Stdout:    out,
 		Stderr:    errOut,
 	}
@@ -356,7 +356,7 @@ func TestListRunner_NonAppConfigNoColumn(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &param.ListRunner{
-		KeyOnly: &azure.ListUseCase{Reader: reader},
+		KeyOnly: &paramusecase.ListUseCase{Reader: reader},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
@@ -379,11 +379,11 @@ func TestShowPresenter_RenderJSON(t *testing.T) {
 		},
 		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
 			return &domain.Entry{
-				Name:    name,
-				Value:   "30",
-				Type:    domain.ValueTypePlaintext,
-				Version: domain.Version{Created: &modified}, // unversioned, but carries a modified time
-				Tags:    []domain.Tag{{Key: "env", Value: "prod"}},
+				Name:     name,
+				Value:    "30",
+				Type:     domain.ValueTypePlaintext,
+				Modified: &modified, // unversioned, but carries a modified time
+				Tags:     []domain.Tag{{Key: "env", Value: "prod"}},
 			}, nil
 		},
 	}

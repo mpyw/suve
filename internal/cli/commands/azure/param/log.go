@@ -2,6 +2,7 @@ package param
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/urfave/cli/v3"
@@ -9,7 +10,7 @@ import (
 	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/param"
 )
 
 // logPresenter renders Azure App Configuration log output. App Configuration has
@@ -17,26 +18,29 @@ import (
 // ErrVersioningUnsupported error, so the render methods are never reached (they
 // exist only to satisfy the genericlog.Presenter interface).
 type logPresenter struct {
-	uc  *azure.LogUseCase
+	uc  *param.LogUseCase
 	req genericlog.Request
 }
 
 // NewLogPresenter builds an Azure App Configuration log presenter over the given reader and request.
 func NewLogPresenter(reader provider.Reader, req genericlog.Request) genericlog.Presenter {
-	return &logPresenter{uc: &azure.LogUseCase{Reader: reader}, req: req}
+	return &logPresenter{uc: &param.LogUseCase{Reader: reader}, req: req}
 }
 
 // Fetch always returns an error: App Configuration keeps no version history.
 func (p *logPresenter) Fetch(ctx context.Context) error {
-	_, err := p.uc.Execute(ctx, azure.LogInput{
+	_, err := p.uc.Execute(ctx, param.LogInput{
 		Name:       p.req.Name,
 		MaxResults: p.req.MaxResults,
 		Since:      p.req.Since,
 		Until:      p.req.Until,
 		Reverse:    p.req.Reverse,
 	})
+	if err != nil {
+		return fmt.Errorf("failed to fetch version history: %w", err)
+	}
 
-	return err
+	return nil
 }
 
 func (p *logPresenter) Len() int                            { return 0 }

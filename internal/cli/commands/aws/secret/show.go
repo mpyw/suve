@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	genericshow "github.com/mpyw/suve/internal/cli/commands/generic/show"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
@@ -34,6 +36,9 @@ type showPresenter struct {
 	uc     *secret.ShowUseCase
 	spec   *awssecretversion.Spec
 	result *secret.ShowOutput
+	// arn is the Secrets Manager ARN the adapter surfaces in the entry's Extra
+	// metadata ("" when absent).
+	arn string
 }
 
 // NewShowPresenter builds a secret show presenter over the given reader and spec.
@@ -43,12 +48,13 @@ func NewShowPresenter(reader provider.Reader, spec *awssecretversion.Spec) gener
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, secret.ShowInput{Spec: p.spec})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: awssecretversion.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
 
 	p.result = result
+	p.arn = lo.FindOrElse(result.Extra, domain.Field{}, func(f domain.Field) bool { return f.Label == "ARN" }).Value
 
 	return nil
 }
@@ -69,14 +75,14 @@ func (p *showPresenter) RenderText(stdout io.Writer, value string) {
 
 	out := output.New(stdout)
 	out.Field("Name", result.Name)
-	out.Field("ARN", result.ARN)
+	out.Field("ARN", p.arn)
 
-	if result.VersionID != "" {
-		out.Field("VersionId", result.VersionID)
+	if result.Version != "" {
+		out.Field("VersionId", result.Version)
 	}
 
-	if len(result.VersionStage) > 0 {
-		out.Field("Stages", fmt.Sprintf("%v", result.VersionStage))
+	if len(result.Labels) > 0 {
+		out.Field("Stages", fmt.Sprintf("%v", result.Labels))
 	}
 
 	if result.CreatedDate != nil {
@@ -104,15 +110,15 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 	jsonOut := showJSONOutput{
 		Name:  result.Name,
-		ARN:   result.ARN,
+		ARN:   p.arn,
 		Value: value,
 	}
-	if result.VersionID != "" {
-		jsonOut.VersionID = result.VersionID
+	if result.Version != "" {
+		jsonOut.VersionID = result.Version
 	}
 
-	if len(result.VersionStage) > 0 {
-		jsonOut.Stages = result.VersionStage
+	if len(result.Labels) > 0 {
+		jsonOut.Stages = result.Labels
 	}
 
 	if result.CreatedDate != nil {

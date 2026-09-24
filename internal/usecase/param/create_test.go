@@ -35,7 +35,7 @@ func TestCreateUseCase_Execute(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/new", output.Name)
-	assert.Equal(t, int64(1), output.Version)
+	assert.Equal(t, "1", output.Version)
 }
 
 func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
@@ -59,7 +59,7 @@ func TestCreateUseCase_Execute_WithDescription(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/new", output.Name)
-	assert.Equal(t, int64(1), output.Version)
+	assert.Equal(t, "1", output.Version)
 }
 
 // TestCreateUseCase_Execute_AlreadyExists verifies the create-only behavior:

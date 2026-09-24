@@ -105,7 +105,7 @@ func awsParamStore() *providermock.Store {
 		},
 		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
 			return []domain.Version{
-				{ID: "14", Created: &fxT1},
+				{ID: "14", Current: true, Created: &fxT1},
 				{ID: "13", Created: &fxT2},
 				{ID: "12", Created: &fxT3},
 			}, nil
@@ -214,7 +214,7 @@ func awsParamJSONSource() data.Source {
 			}, nil
 		},
 		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
-			return []domain.Version{{ID: "3", Created: &fxT1}}, nil
+			return []domain.Version{{ID: "3", Current: true, Created: &fxT1}}, nil
 		},
 	}
 
@@ -246,15 +246,15 @@ func awsSecretStore() *providermock.Store {
 				Value: "token-abcdef",
 				Type:  domain.ValueTypeSecret,
 				Version: domain.Version{
-					ID: id, StagingLabels: []string{"AWSCURRENT"}, Created: &fxT1,
+					ID: id, Labels: []string{"AWSCURRENT"}, Created: &fxT1,
 				},
 				Extra: []domain.Field{{Label: "ARN", Value: "arn:aws:secretsmanager:ap-northeast-1:123456789012:secret:prod/api/key"}},
 			}, nil
 		},
 		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
 			return []domain.Version{
-				{ID: "a1b2c3d4-1111-2222-3333-444455556666", StagingLabels: []string{"AWSCURRENT"}, Created: &fxT1},
-				{ID: "e5f6a7b8-9999-8888-7777-666655554444", StagingLabels: []string{"AWSPREVIOUS"}, Created: &fxT2},
+				{ID: "a1b2c3d4-1111-2222-3333-444455556666", Labels: []string{"AWSCURRENT"}, Current: true, Created: &fxT1},
+				{ID: "e5f6a7b8-9999-8888-7777-666655554444", Labels: []string{"AWSPREVIOUS"}, Created: &fxT2},
 			}, nil
 		},
 	}
@@ -300,7 +300,7 @@ func gcloudSecretStore() *providermock.Store {
 		},
 		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
 			return []domain.Version{
-				{ID: "3", State: "enabled", Created: &fxT1},
+				{ID: "3", State: "enabled", Current: true, Created: &fxT1},
 				{ID: "2", State: "disabled", Created: &fxT2},
 				{ID: "1", State: "destroyed", Created: &fxT3},
 			}, nil
@@ -340,7 +340,7 @@ func azureKVStore() *providermock.Store {
 		},
 		HistoryFunc: func(context.Context, string) ([]domain.Version, error) {
 			return []domain.Version{
-				{ID: "9f8e7d6c5b4a", State: "enabled", Created: &fxT1, Tags: []domain.Tag{{Key: "rotation", Value: "2026Q2"}}},
+				{ID: "9f8e7d6c5b4a", State: "enabled", Current: true, Created: &fxT1, Tags: []domain.Tag{{Key: "rotation", Value: "2026Q2"}}},
 				{ID: "4c3b2a1908f7", State: "disabled", Created: &fxT2, Tags: []domain.Tag{{Key: "rotation", Value: "2026Q1"}}},
 			}, nil
 		},

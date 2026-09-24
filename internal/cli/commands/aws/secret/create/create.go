@@ -115,7 +115,7 @@ func (r *Runner) Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	output.Success(r.Stdout, "Created secret %s (version: %s)", result.Name, result.VersionID)
+	output.Success(r.Stdout, "Created secret %s (version: %s)", result.Name, result.Version)
 
 	return nil
 }

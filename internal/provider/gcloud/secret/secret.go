@@ -243,7 +243,8 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 
 // History returns the secret's version history, newest first. The per-version
 // state (enabled/disabled/destroyed) is surfaced in the neutral Version.State
-// for display; destroyed/disabled versions have no accessible value.
+// for display; destroyed/disabled versions have no accessible value. The newest
+// version is the current one (what the "latest" alias serves).
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
 	versions, err := s.client.ListSecretVersions(ctx, &secretmanagerpb.ListSecretVersionsRequest{
 		Parent: s.secretPath(name),
@@ -254,10 +255,11 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 
 	sortNewestFirst(versions)
 
-	return lo.Map(versions, func(v *secretmanagerpb.SecretVersion, _ int) domain.Version {
+	return lo.Map(versions, func(v *secretmanagerpb.SecretVersion, i int) domain.Version {
 		return domain.Version{
 			ID:      versionNumber(v.GetName()),
 			State:   stateLabel(v.GetState()),
+			Current: i == 0,
 			Created: toTime(v.GetCreateTime()),
 		}
 	}), nil

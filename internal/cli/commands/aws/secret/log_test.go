@@ -26,8 +26,8 @@ func logStore() *providermock.Store {
 	return &providermock.Store{
 		HistoryFunc: func(_ context.Context, _ string) ([]domain.Version, error) {
 			return []domain.Version{
-				{ID: "new-version-id-long", StagingLabels: []string{"AWSCURRENT"}, Created: &created},
-				{ID: "old-version-id-long", StagingLabels: []string{"AWSPREVIOUS"}, Created: &created},
+				{ID: "new-version-id-long", Labels: []string{"AWSCURRENT"}, Created: &created},
+				{ID: "old-version-id-long", Labels: []string{"AWSPREVIOUS"}, Created: &created},
 			}, nil
 		},
 		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {

@@ -22,7 +22,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/timeutil"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	secretusecase "github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/azurekvversion"
 )
 
@@ -100,7 +100,7 @@ func TestCreateRunner(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &secret.CreateRunner{
-		UseCase: &azure.CreateUseCase{Writer: store},
+		UseCase: &secretusecase.CreateUseCase{Writer: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
@@ -121,12 +121,12 @@ func TestUpdateRunner_NotFound(t *testing.T) {
 	var buf, errBuf bytes.Buffer
 
 	r := &secret.UpdateRunner{
-		UseCase: &azure.UpdateUseCase{Store: store},
+		UseCase: &secretusecase.UpdateUseCase{Store: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
 	err := r.Run(t.Context(), secret.UpdateOptions{Name: "missing", Value: "new"})
-	require.ErrorIs(t, err, azure.ErrEntryNotFound)
+	require.ErrorIs(t, err, secretusecase.ErrSecretNotFound)
 }
 
 func TestShowPresenter(t *testing.T) {

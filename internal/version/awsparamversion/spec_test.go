@@ -397,3 +397,34 @@ func TestParseDiffArgs(t *testing.T) {
 		})
 	}
 }
+
+// TestSuffix pins that Suffix rebuilds the part after the name, normalized, and
+// that name+suffix re-parses to an equivalent spec.
+func TestSuffix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "/app/config", want: ""},
+		{input: "/app/config#3", want: "#3"},
+		{input: "/app/config~", want: "~1"},
+		{input: "/app/config~~", want: "~2"},
+		{input: "/app/config#5~1~1", want: "#5~2"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
+			spec, err := awsparamversion.Parse(tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, awsparamversion.Suffix(spec))
+
+			reparsed, err := awsparamversion.Parse(spec.Name + awsparamversion.Suffix(spec))
+			require.NoError(t, err)
+			assert.Equal(t, spec, reparsed)
+		})
+	}
+}

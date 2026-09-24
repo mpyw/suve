@@ -14,14 +14,14 @@ type CreateInput struct {
 	Value       string
 	Description string
 	// Options carries provider-specific write options (e.g. AWS Secrets Manager
-	// KMS key, rotation). They are passed through to the provider unchanged.
+	// KMS key). They are passed through to the provider unchanged.
 	Options []provider.WriteOption
 }
 
 // CreateOutput holds the result of the create use case.
 type CreateOutput struct {
-	Name      string
-	VersionID string
+	Name    string
+	Version string // opaque version id
 }
 
 // CreateUseCase executes create operations.
@@ -41,7 +41,7 @@ func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*Create
 	}
 
 	return &CreateOutput{
-		Name:      input.Name,
-		VersionID: version.ID,
+		Name:    input.Name,
+		Version: version.ID,
 	}, nil
 }

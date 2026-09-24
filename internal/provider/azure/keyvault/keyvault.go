@@ -185,16 +185,18 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 
 // History returns the secret's version history, newest first. The per-version
 // enabled/disabled state is surfaced in the neutral Version.State for display.
+// The newest version is the current one (what an unversioned Get serves).
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
 	versions, err := s.versionsNewestFirst(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return lo.Map(versions, func(v secretVersion, _ int) domain.Version {
+	return lo.Map(versions, func(v secretVersion, i int) domain.Version {
 		return domain.Version{
 			ID:      v.id,
 			State:   boolLabel(v.enabled),
+			Current: i == 0,
 			Created: v.created,
 			Tags:    v.tags,
 		}

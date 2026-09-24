@@ -10,13 +10,12 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/domain"
-	"github.com/mpyw/suve/internal/usecase/azure"
+	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 // UpdateRunner executes the update command.
 type UpdateRunner struct {
-	UseCase *azure.UpdateUseCase
+	UseCase *secret.UpdateUseCase
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
@@ -91,7 +90,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	uc := &azure.UpdateUseCase{Store: store}
+	uc := &secret.UpdateUseCase{Store: store}
 
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)
@@ -129,11 +128,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 
 // Run executes the update command.
 func (r *UpdateRunner) Run(ctx context.Context, opts UpdateOptions) error {
-	result, err := r.UseCase.Execute(ctx, azure.UpdateInput{
-		Name:      opts.Name,
-		Value:     opts.Value,
-		ValueType: domain.ValueTypeSecret,
-	})
+	result, err := r.UseCase.Execute(ctx, secret.UpdateInput{Name: opts.Name, Value: opts.Value})
 	if err != nil {
 		return err
 	}

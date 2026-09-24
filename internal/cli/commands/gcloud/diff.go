@@ -11,7 +11,7 @@ import (
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/usecase/gcloud"
+	"github.com/mpyw/suve/internal/usecase/secret"
 	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
 
@@ -29,19 +29,22 @@ type diffJSONOutput struct {
 
 // diffPresenter renders Google Cloud Secret Manager diff output.
 type diffPresenter struct {
-	uc     *gcloud.DiffUseCase
+	uc     *secret.DiffUseCase
 	spec1  *gcloudversion.Spec
 	spec2  *gcloudversion.Spec
-	result *gcloud.DiffOutput
+	result *secret.DiffOutput
 }
 
 // NewDiffPresenter builds a Google Cloud diff presenter over the given reader and specs.
 func NewDiffPresenter(reader provider.Reader, spec1, spec2 *gcloudversion.Spec) genericdiff.Presenter {
-	return &diffPresenter{uc: &gcloud.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
+	return &diffPresenter{uc: &secret.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, gcloud.DiffInput{Spec1: p.spec1, Spec2: p.spec2})
+	result, err := p.uc.Execute(ctx, secret.DiffInput{
+		Name1: p.spec1.Name, Suffix1: gcloudversion.Suffix(p.spec1),
+		Name2: p.spec2.Name, Suffix2: gcloudversion.Suffix(p.spec2),
+	})
 	if err != nil {
 		return err
 	}

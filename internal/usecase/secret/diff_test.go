@@ -34,15 +34,15 @@ func TestDiffUseCase_Execute(t *testing.T) {
 	uc := &secret.DiffUseCase{Reader: store}
 
 	output, err := uc.Execute(t.Context(), secret.DiffInput{
-		Spec1: mustParseSpec(t, "my-secret#v1-id"),
-		Spec2: mustParseSpec(t, "my-secret"),
+		Name1: "my-secret", Suffix1: "#v1-id",
+		Name2: "my-secret", Suffix2: "",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", output.OldName)
-	assert.Equal(t, "v1-id", output.OldVersionID)
+	assert.Equal(t, "v1-id", output.OldVersion)
 	assert.Equal(t, "old-value", output.OldValue)
 	assert.Equal(t, "my-secret", output.NewName)
-	assert.Equal(t, "v2-id", output.NewVersionID)
+	assert.Equal(t, "v2-id", output.NewVersion)
 	assert.Equal(t, "new-value", output.NewValue)
 }
 
@@ -58,8 +58,8 @@ func TestDiffUseCase_Execute_ResolveError(t *testing.T) {
 	uc := &secret.DiffUseCase{Reader: store}
 
 	_, err := uc.Execute(t.Context(), secret.DiffInput{
-		Spec1: mustParseSpec(t, "my-secret"),
-		Spec2: mustParseSpec(t, "my-secret~1"),
+		Name1: "my-secret", Suffix1: "",
+		Name2: "my-secret", Suffix2: "~1",
 	})
 	assert.Error(t, err)
 }
@@ -79,8 +79,8 @@ func TestDiffUseCase_Execute_GetError(t *testing.T) {
 	uc := &secret.DiffUseCase{Reader: store}
 
 	_, err := uc.Execute(t.Context(), secret.DiffInput{
-		Spec1: mustParseSpec(t, "my-secret"),
-		Spec2: mustParseSpec(t, "my-secret~1"),
+		Name1: "my-secret", Suffix1: "",
+		Name2: "my-secret", Suffix2: "~1",
 	})
 	assert.Error(t, err)
 }

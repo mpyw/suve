@@ -45,8 +45,8 @@ func TestLogUseCase_Execute(t *testing.T) {
 	now := time.Now()
 	versions := []domain.Version{
 		// Unsorted, multi-valued staging labels: all must surface, sorted (#419).
-		{ID: "v3", StagingLabels: []string{"custom", "AWSCURRENT"}, Created: &now},
-		{ID: "v2", StagingLabels: []string{"AWSPREVIOUS"}, Created: tp(now, -time.Hour)},
+		{ID: "v3", Labels: []string{"custom", "AWSCURRENT"}, Current: true, Created: &now},
+		{ID: "v2", Labels: []string{"AWSPREVIOUS"}, Created: tp(now, -time.Hour)},
 		{ID: "v1", Created: tp(now, -2*time.Hour)},
 	}
 	values := map[string]string{"v1": "value1", "v2": "value2", "v3": "value3"}
@@ -57,10 +57,10 @@ func TestLogUseCase_Execute(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 3)
 	// Newest first.
-	assert.Equal(t, "v3", output.Entries[0].VersionID)
-	// IsCurrent is a membership test: AWSCURRENT alongside a custom label.
+	assert.Equal(t, "v3", output.Entries[0].Version)
+	// IsCurrent mirrors the adapter's Current mark.
 	assert.True(t, output.Entries[0].IsCurrent)
-	assert.Equal(t, []string{"AWSCURRENT", "custom"}, output.Entries[0].VersionStage)
+	assert.Equal(t, []string{"AWSCURRENT", "custom"}, output.Entries[0].Labels)
 	// AWS Secrets Manager carries staging labels, not a per-version state (#419).
 	assert.Empty(t, output.Entries[0].State)
 	assert.Equal(t, "value3", output.Entries[0].Value)
@@ -69,14 +69,16 @@ func TestLogUseCase_Execute(t *testing.T) {
 
 // TestLogUseCase_Execute_State asserts that a GCloud/Key Vault-style history
 // (per-version State set, no staging labels) surfaces State on each entry and
-// leaves VersionStage empty — the two concepts must not be conflated (#419).
+// leaves Labels empty — the two concepts must not be conflated (#419).
 func TestLogUseCase_Execute_State(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
 	versions := []domain.Version{
 		{ID: "2", State: "enabled", Created: &now, Tags: []domain.Tag{{Key: "env", Value: "prod"}}},
-		{ID: "1", State: "disabled", Created: tp(now, -time.Hour)},
+		// The adapter decides which version is current; the use case never infers
+		// it from position or labels, so a non-newest mark is honored as-is.
+		{ID: "1", State: "disabled", Current: true, Created: tp(now, -time.Hour)},
 	}
 	values := map[string]string{"1": "value1", "2": "value2"}
 
@@ -86,15 +88,12 @@ func TestLogUseCase_Execute_State(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 2)
 	assert.Equal(t, "enabled", output.Entries[0].State)
-	assert.Empty(t, output.Entries[0].VersionStage)
+	assert.Empty(t, output.Entries[0].Labels)
 	assert.Equal(t, "disabled", output.Entries[1].State)
-	assert.Empty(t, output.Entries[1].VersionStage)
+	assert.Empty(t, output.Entries[1].Labels)
 
-	// No AWSCURRENT staging label (Google Cloud / Azure Key Vault): the newest
-	// version is current. Regression guard — this used to be always-false for
-	// those providers, so nothing offered "current"/add-tag in the GUI history.
-	assert.True(t, output.Entries[0].IsCurrent, "newest version is current when there is no AWSCURRENT")
-	assert.False(t, output.Entries[1].IsCurrent)
+	assert.False(t, output.Entries[0].IsCurrent)
+	assert.True(t, output.Entries[1].IsCurrent, "IsCurrent follows the adapter's Current mark")
 
 	// Per-version tags flow through (Azure Key Vault scopes tags per version).
 	require.Len(t, output.Entries[0].Tags, 1)
@@ -133,8 +132,8 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 
 	now := time.Now()
 	versions := []domain.Version{
-		{ID: "v2", StagingLabels: []string{"AWSCURRENT"}, Created: &now},
-		{ID: "v1", StagingLabels: []string{"AWSPREVIOUS"}, Created: tp(now, -time.Hour)},
+		{ID: "v2", Labels: []string{"AWSCURRENT"}, Created: &now},
+		{ID: "v1", Labels: []string{"AWSPREVIOUS"}, Created: tp(now, -time.Hour)},
 	}
 
 	uc := &secret.LogUseCase{Reader: logStore(versions, map[string]string{}, nil)}
@@ -142,8 +141,8 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 	output, err := uc.Execute(t.Context(), secret.LogInput{Name: "my-secret", MaxResults: 10, Reverse: true})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 2)
-	assert.Equal(t, "v1", output.Entries[0].VersionID)
-	assert.Equal(t, "v2", output.Entries[1].VersionID)
+	assert.Equal(t, "v1", output.Entries[0].Version)
+	assert.Equal(t, "v2", output.Entries[1].Version)
 }
 
 // TestLogUseCase_Execute_MaxResults caps to the newest N versions.
@@ -162,8 +161,8 @@ func TestLogUseCase_Execute_MaxResults(t *testing.T) {
 	output, err := uc.Execute(t.Context(), secret.LogInput{Name: "my-secret", MaxResults: 2})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 2)
-	assert.Equal(t, "v3", output.Entries[0].VersionID)
-	assert.Equal(t, "v2", output.Entries[1].VersionID)
+	assert.Equal(t, "v3", output.Entries[0].Version)
+	assert.Equal(t, "v2", output.Entries[1].Version)
 }
 
 func TestLogUseCase_Execute_SinceUntil(t *testing.T) {
@@ -186,7 +185,7 @@ func TestLogUseCase_Execute_SinceUntil(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
-	assert.Equal(t, "middle", output.Entries[0].VersionID)
+	assert.Equal(t, "middle", output.Entries[0].Version)
 }
 
 // TestLogUseCase_Execute_FilterBeforeCount asserts date filters run BEFORE the
@@ -212,7 +211,7 @@ func TestLogUseCase_Execute_FilterBeforeCount(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, output.Entries, 1)
-	assert.Equal(t, "middle", output.Entries[0].VersionID)
+	assert.Equal(t, "middle", output.Entries[0].Version)
 }
 
 // TestLogUseCase_Execute_PartialFetchError records a per-version fetch failure

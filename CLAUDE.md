@@ -11,10 +11,10 @@ This file provides guidance to Claude Code when working with code in this reposi
 - **Domain model** — `internal/domain`: the provider-neutral types (`Entry` with `Extra []Field`, `Version`, `Tag`, `ValueType`, `Field`) that every layer speaks.
 - **Provider seam** — `internal/provider`: the `Reader`/`Writer`/`Tagger`/`Store` interfaces, `Registry`, `Scope`, opaque `VersionRef`, and errors. Provider selection lives in `internal/provider/detect` (env-detected flat aliases) + `registry.go`.
 - **Provider adapters** — `internal/provider/{aws,gcloud,azure}`: each cloud's SDK-backed implementation. AWS client init sits at `internal/provider/aws/infra`. `internal/provider/builtin` composes the registry with all three; CLI, GUI and TUI build from it.
-- **Use cases** — `internal/usecase/{param,secret,staging,gcloud,azure}`: business logic. `param`/`secret` are the neutral service-axis core (the GUI consumes them for every provider); `gcloud`/`azure` add provider-specific presentation.
+- **Use cases** — `internal/usecase/{param,secret,staging}`: business logic. `param`/`secret` are the provider-neutral service-axis core that the CLI, GUI and TUI share for every provider: they take a name plus an opaque version suffix and return opaque string versions, labels, and `Extra` fields. Provider-specific rendering (AWS ARN, integer versions, id truncation) lives in the CLI presenters under `internal/cli/commands/<cloud>`.
 - **CLI commands** — `internal/cli/commands/{aws,gcloud,azure}` for provider groups plus the provider-neutral scaffold under `internal/cli/commands/generic` (show/diff/list/log/tag); wiring in `internal/cli/commands/app.go` and `internal/cli/commands/internal`.
 - **Staging** — `internal/staging`: the reducer-based transition state machine (`transition/`) over a keychain-encrypted file store (`store/file`, the only backend).
-- **Version parsers** — `internal/version/*` (`awsparamversion`, `awssecretversion`, `gcloudversion`, `azurekvversion`, `azureappconfigversion`) resolve version/shift/label per provider.
+- **Version parsers** — `internal/version/*` (`awsparamversion`, `awssecretversion`, `gcloudversion`, `azurekvversion`, `azureappconfigversion`) parse version/shift/label per provider; each versioned grammar's `Suffix` rebuilds the suffix that callers hand to the use cases.
 - **GUI** — `internal/gui` (Wails app) + `internal/gui/frontend` (Svelte + Playwright).
 
 ## Non-obvious invariants

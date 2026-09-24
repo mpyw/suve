@@ -11,7 +11,6 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
-	"github.com/mpyw/suve/internal/version/awsparamversion"
 )
 
 // resolveBySuffix returns a ResolveFunc mapping a version-spec suffix to a ref.
@@ -45,16 +44,16 @@ func TestDiffUseCase_Execute(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := awsparamversion.Parse("/app/config#1")
-	spec2, _ := awsparamversion.Parse("/app/config#2")
+	name1, suffix1 := "/app/config", "#1"
+	name2, suffix2 := "/app/config", "#2"
 
-	output, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
+	output, err := uc.Execute(t.Context(), param.DiffInput{Name1: name1, Suffix1: suffix1, Name2: name2, Suffix2: suffix2})
 	require.NoError(t, err)
 	assert.Equal(t, "/app/config", output.OldName)
-	assert.Equal(t, int64(1), output.OldVersion)
+	assert.Equal(t, "1", output.OldVersion)
 	assert.Equal(t, "old-value", output.OldValue)
 	assert.Equal(t, "/app/config", output.NewName)
-	assert.Equal(t, int64(2), output.NewVersion)
+	assert.Equal(t, "2", output.NewVersion)
 	assert.Equal(t, "new-value", output.NewValue)
 	assert.False(t, output.Secret, "a plaintext (String) param diff is not secret")
 }
@@ -86,10 +85,10 @@ func TestDiffUseCase_Execute_SecureStringIsSecret(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := awsparamversion.Parse("/app/config#1")
-	spec2, _ := awsparamversion.Parse("/app/config#2")
+	name1, suffix1 := "/app/config", "#1"
+	name2, suffix2 := "/app/config", "#2"
 
-	output, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
+	output, err := uc.Execute(t.Context(), param.DiffInput{Name1: name1, Suffix1: suffix1, Name2: name2, Suffix2: suffix2})
 	require.NoError(t, err)
 	assert.True(t, output.Secret, "a SecureString param diff must be flagged secret")
 }
@@ -108,10 +107,10 @@ func TestDiffUseCase_Execute_Spec1Error(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := awsparamversion.Parse("/app/config#1")
-	spec2, _ := awsparamversion.Parse("/app/config#2")
+	name1, suffix1 := "/app/config", "#1"
+	name2, suffix2 := "/app/config", "#2"
 
-	_, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
+	_, err := uc.Execute(t.Context(), param.DiffInput{Name1: name1, Suffix1: suffix1, Name2: name2, Suffix2: suffix2})
 	assert.Error(t, err)
 }
 
@@ -131,10 +130,10 @@ func TestDiffUseCase_Execute_Spec2Error(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := awsparamversion.Parse("/app/config#1")
-	spec2, _ := awsparamversion.Parse("/app/config#2")
+	name1, suffix1 := "/app/config", "#1"
+	name2, suffix2 := "/app/config", "#2"
 
-	_, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
+	_, err := uc.Execute(t.Context(), param.DiffInput{Name1: name1, Suffix1: suffix1, Name2: name2, Suffix2: suffix2})
 	assert.Error(t, err)
 }
 
@@ -148,12 +147,12 @@ func TestDiffUseCase_Execute_WithLatest(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := awsparamversion.Parse("/app/config#3")
-	spec2, _ := awsparamversion.Parse("/app/config")
+	name1, suffix1 := "/app/config", "#3"
+	name2, suffix2 := "/app/config", ""
 
-	output, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
+	output, err := uc.Execute(t.Context(), param.DiffInput{Name1: name1, Suffix1: suffix1, Name2: name2, Suffix2: suffix2})
 	require.NoError(t, err)
-	assert.Equal(t, int64(3), output.OldVersion)
+	assert.Equal(t, "3", output.OldVersion)
 	// Latest ref has an empty id; version renders as 0.
 	assert.Equal(t, "latest-value", output.NewValue)
 }
@@ -168,14 +167,14 @@ func TestDiffUseCase_Execute_WithShift(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := awsparamversion.Parse("/app/config~2") // 2 versions back from latest (v3 -> v1)
-	spec2, _ := awsparamversion.Parse("/app/config~1") // 1 version back from latest (v3 -> v2)
+	name1, suffix1 := "/app/config", "~2" // 2 versions back from latest (v3 -> v1)
+	name2, suffix2 := "/app/config", "~1" // 1 version back from latest (v3 -> v2)
 
-	output, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
+	output, err := uc.Execute(t.Context(), param.DiffInput{Name1: name1, Suffix1: suffix1, Name2: name2, Suffix2: suffix2})
 	require.NoError(t, err)
-	assert.Equal(t, int64(1), output.OldVersion)
+	assert.Equal(t, "1", output.OldVersion)
 	assert.Equal(t, "v1", output.OldValue)
-	assert.Equal(t, int64(2), output.NewVersion)
+	assert.Equal(t, "2", output.NewVersion)
 	assert.Equal(t, "v2", output.NewValue)
 }
 
@@ -190,9 +189,38 @@ func TestDiffUseCase_Execute_WithShift_Error(t *testing.T) {
 
 	uc := &param.DiffUseCase{Reader: store}
 
-	spec1, _ := awsparamversion.Parse("/app/config~1")
-	spec2, _ := awsparamversion.Parse("/app/config")
+	name1, suffix1 := "/app/config", "~1"
+	name2, suffix2 := "/app/config", ""
 
-	_, err := uc.Execute(t.Context(), param.DiffInput{Spec1: spec1, Spec2: spec2})
+	_, err := uc.Execute(t.Context(), param.DiffInput{Name1: name1, Suffix1: suffix1, Name2: name2, Suffix2: suffix2})
 	assert.Error(t, err)
+}
+
+// TestDiffUseCase_Execute_DistinctNames verifies each side is resolved under its
+// own name, so an unversioned store (Azure App Configuration) can compare two
+// distinct keys.
+func TestDiffUseCase_Execute_DistinctNames(t *testing.T) {
+	t.Parallel()
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, name, spec string) (provider.VersionRef, error) {
+			assert.Empty(t, spec)
+
+			return provider.NewVersionRef(name), nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Value: "val-" + name, Type: domain.ValueTypePlaintext}, nil
+		},
+	}
+
+	uc := &param.DiffUseCase{Reader: store}
+
+	output, err := uc.Execute(t.Context(), param.DiffInput{Name1: "key-a", Name2: "key-b"})
+	require.NoError(t, err)
+	assert.Equal(t, "key-a", output.OldName)
+	assert.Equal(t, "val-key-a", output.OldValue)
+	assert.Equal(t, "key-b", output.NewName)
+	assert.Equal(t, "val-key-b", output.NewValue)
+	assert.Empty(t, output.OldVersion, "an unversioned store yields no version id")
+	assert.False(t, output.Secret)
 }

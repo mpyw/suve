@@ -123,7 +123,7 @@ func TestParamSourceVersionContentsSecret(t *testing.T) {
 	assert.False(t, plainContent.Secret, "a String param diff is not secret")
 }
 
-// TestSecretSourceStateNotInferred pins that a version's State and StagingLabels
+// TestSecretSourceStateNotInferred pins that a version's State and Labels
 // are carried as-is (never one inferred from the other), and the ARN comes from
 // Extra.
 func TestSecretSourceStateNotInferred(t *testing.T) {
@@ -147,7 +147,7 @@ func TestSecretSourceStateNotInferred(t *testing.T) {
 	d, err := src.Show(context.Background(), "api-key", "")
 	require.NoError(t, err)
 	assert.Equal(t, "enabled", d.State)
-	assert.Empty(t, d.StagingLabels, "a State-bearing version has no staging labels")
+	assert.Empty(t, d.Labels, "a State-bearing version has no staging labels")
 	assert.Equal(t, "arn:test", d.ARN)
 }
 

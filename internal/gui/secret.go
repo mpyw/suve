@@ -153,7 +153,7 @@ func (a *App) SecretList(prefix string, withValue bool, filter string, _ int, _ 
 
 // SecretShow shows a secret value.
 func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
-	spec, err := a.parseSecretSpec(specStr)
+	name, suffix, err := a.parseSecretSpec(specStr)
 	if err != nil {
 		return nil, err
 	}
@@ -165,16 +165,16 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 
 	uc := &secret.ShowUseCase{Reader: store}
 
-	result, err := uc.Execute(a.ctx, secret.ShowInput{Spec: spec})
+	result, err := uc.Execute(a.ctx, secret.ShowInput{Name: name, Suffix: suffix})
 	if err != nil {
 		return nil, err
 	}
 
 	r := &SecretShowResult{
 		Name:          result.Name,
-		ARN:           result.ARN,
-		VersionID:     result.VersionID,
-		StagingLabels: result.VersionStage,
+		ARN:           lo.FindOrElse(result.Extra, domain.Field{}, func(f domain.Field) bool { return f.Label == "ARN" }).Value,
+		VersionID:     result.Version,
+		StagingLabels: result.Labels,
 		State:         result.State,
 		Value:         result.Value,
 		Description:   result.Description,
@@ -208,8 +208,8 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 
 	entries := lo.Map(result.Entries, func(e secret.LogEntry, _ int) SecretLogEntry {
 		entry := SecretLogEntry{
-			VersionID:     e.VersionID,
-			StagingLabels: e.VersionStage,
+			VersionID:     e.Version,
+			StagingLabels: e.Labels,
 			State:         e.State,
 			Value:         e.Value,
 			IsCurrent:     e.IsCurrent,
@@ -253,7 +253,7 @@ func (a *App) SecretCreate(name, value, description string) (*SecretCreateResult
 
 	return &SecretCreateResult{
 		Name:      result.Name,
-		VersionID: result.VersionID,
+		VersionID: result.Version,
 	}, nil
 }
 
@@ -283,7 +283,7 @@ func (a *App) SecretUpdate(name, value, description string) (*SecretUpdateResult
 
 	return &SecretUpdateResult{
 		Name:      result.Name,
-		VersionID: result.VersionID,
+		VersionID: result.Version,
 	}, nil
 }
 
@@ -365,12 +365,12 @@ func (a *App) SecretRemoveTag(name, key string) error {
 
 // SecretDiff compares two secret versions.
 func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
-	spec1, err := a.parseSecretSpec(spec1Str)
+	name1, suffix1, err := a.parseSecretSpec(spec1Str)
 	if err != nil {
 		return nil, err
 	}
 
-	spec2, err := a.parseSecretSpec(spec2Str)
+	name2, suffix2, err := a.parseSecretSpec(spec2Str)
 	if err != nil {
 		return nil, err
 	}
@@ -383,8 +383,8 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 	uc := &secret.DiffUseCase{Reader: store}
 
 	result, err := uc.Execute(a.ctx, secret.DiffInput{
-		Spec1: spec1,
-		Spec2: spec2,
+		Name1: name1, Suffix1: suffix1,
+		Name2: name2, Suffix2: suffix2,
 	})
 	if err != nil {
 		return nil, err
@@ -392,10 +392,10 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 
 	return &SecretDiffResult{
 		OldName:      result.OldName,
-		OldVersionID: result.OldVersionID,
+		OldVersionID: result.OldVersion,
 		OldValue:     result.OldValue,
 		NewName:      result.NewName,
-		NewVersionID: result.NewVersionID,
+		NewVersionID: result.NewVersion,
 		NewValue:     result.NewValue,
 	}, nil
 }
