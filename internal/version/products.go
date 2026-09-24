@@ -1,6 +1,6 @@
 // products.go binds each cloud product to the grammar it uses. These values
-// are the package's API, so the file is core: ParameterStore does not have to
-// become ProductParameterStore.
+// are the package's API, so the file is core: AWSParameterStore does not have to
+// become ProductAWSParameterStore.
 //declscope:core
 
 package version
@@ -11,24 +11,24 @@ import (
 
 // Product-specific errors.
 var (
-	// ErrInvalidSecretsManagerID is returned when # is not followed by an AWS
+	// ErrInvalidAWSSecretsManagerID is returned when # is not followed by an AWS
 	// Secrets Manager version ID.
-	ErrInvalidSecretsManagerID = errors.New("# must be followed by a version ID")
-	// ErrInvalidSecretsManagerLabel is returned when : is not followed by an AWS
+	ErrInvalidAWSSecretsManagerID = errors.New("# must be followed by a version ID")
+	// ErrInvalidAWSSecretsManagerLabel is returned when : is not followed by an AWS
 	// Secrets Manager staging label.
-	ErrInvalidSecretsManagerLabel = errors.New(": must be followed by a label")
-	// ErrSecretManagerLabelUnsupported is returned when a :LABEL specifier is
+	ErrInvalidAWSSecretsManagerLabel = errors.New(": must be followed by a label")
+	// ErrGoogleCloudSecretManagerLabelUnsupported is returned when a :LABEL specifier is
 	// used for Google Cloud Secret Manager, which has no staging labels.
-	ErrSecretManagerLabelUnsupported = errors.New(
+	ErrGoogleCloudSecretManagerLabelUnsupported = errors.New(
 		": staging labels are not supported for Google Cloud Secret Manager " +
 			"(versions are integers or \"latest\")",
 	)
-	// ErrInvalidKeyVaultID is returned when # is not followed by an Azure Key
+	// ErrInvalidAzureKeyVaultID is returned when # is not followed by an Azure Key
 	// Vault version id.
-	ErrInvalidKeyVaultID = errors.New("# must be followed by a version id")
-	// ErrKeyVaultLabelUnsupported is returned when a :LABEL specifier is used
+	ErrInvalidAzureKeyVaultID = errors.New("# must be followed by a version id")
+	// ErrAzureKeyVaultLabelUnsupported is returned when a :LABEL specifier is used
 	// for Azure Key Vault, which has no staging labels.
-	ErrKeyVaultLabelUnsupported = errors.New(
+	ErrAzureKeyVaultLabelUnsupported = errors.New(
 		": staging labels are not supported for Azure Key Vault " +
 			"(versions are opaque ids or the current version)",
 	)
@@ -38,50 +38,50 @@ var (
 //
 //nolint:gochecknoglobals // stateless grammar configuration
 var (
-	// ParameterStore is the AWS Systems Manager Parameter Store grammar:
+	// AWSParameterStore is the AWS Systems Manager Parameter Store grammar:
 	// integer versions, name#VERSION~SHIFT.
-	ParameterStore = NumericGrammar{}
+	AWSParameterStore = NumericGrammar{}
 
-	// SecretsManager is the AWS Secrets Manager grammar: opaque version ids
+	// AWSSecretsManager is the AWS Secrets Manager grammar: opaque version ids
 	// plus staging labels, name#VERSION / name:LABEL, then ~SHIFT.
-	SecretsManager = OpaqueGrammar{
-		IsIDChar:       isSecretsManagerIDChar,
-		InvalidIDError: ErrInvalidSecretsManagerID,
+	AWSSecretsManager = OpaqueGrammar{
+		IsIDChar:       isAWSSecretsManagerIDChar,
+		InvalidIDError: ErrInvalidAWSSecretsManagerID,
 		Labels:         true,
-		LabelError:     ErrInvalidSecretsManagerLabel,
+		LabelError:     ErrInvalidAWSSecretsManagerLabel,
 	}
 
-	// SecretManager is the Google Cloud Secret Manager grammar: integer
+	// GoogleCloudSecretManager is the Google Cloud Secret Manager grammar: integer
 	// versions ("latest" is the zero spec) and no staging labels, so a ':'
 	// specifier is rejected before any API call.
-	SecretManager = NumericGrammar{LabelError: ErrSecretManagerLabelUnsupported}
+	GoogleCloudSecretManager = NumericGrammar{LabelError: ErrGoogleCloudSecretManagerLabelUnsupported}
 
-	// KeyVault is the Azure Key Vault grammar: opaque 32-character hex version
+	// AzureKeyVault is the Azure Key Vault grammar: opaque 32-character hex version
 	// ids and no staging labels, so a ':' specifier is rejected before any API
 	// call.
-	KeyVault = OpaqueGrammar{
-		IsIDChar:       isKeyVaultIDChar,
-		InvalidIDError: ErrInvalidKeyVaultID,
-		LabelError:     ErrKeyVaultLabelUnsupported,
+	AzureKeyVault = OpaqueGrammar{
+		IsIDChar:       isAzureKeyVaultIDChar,
+		InvalidIDError: ErrInvalidAzureKeyVaultID,
+		LabelError:     ErrAzureKeyVaultLabelUnsupported,
 	}
 
-	// AppConfiguration is the Azure App Configuration grammar. The service is
+	// AzureAppConfiguration is the Azure App Configuration grammar. The service is
 	// unversioned and a key may contain ':' (the ASP.NET hierarchy separator),
 	// '#' and '~', so the whole argument is the key.
-	AppConfiguration = BareGrammar{}
+	AzureAppConfiguration = BareGrammar{}
 )
 
-// isSecretsManagerIDChar reports whether c is valid within a Secrets Manager
+// isAWSSecretsManagerIDChar reports whether c is valid within a Secrets Manager
 // version id. Version ids are ClientRequestTokens (not just console UUIDs): a
 // token created via the API may contain '_' and '.' as well, so accept them
 // alongside letters, digits and '-'. Excludes the specifier characters '#',
 // ':', '~'.
-func isSecretsManagerIDChar(c byte) bool {
+func isAWSSecretsManagerIDChar(c byte) bool {
 	return isLetterChar(c) || isDigitChar(c) || c == '-' || c == '_' || c == '.'
 }
 
-// isKeyVaultIDChar reports whether c is valid within a Key Vault version id
+// isAzureKeyVaultIDChar reports whether c is valid within a Key Vault version id
 // (hex-like: letters, digits, and dashes).
-func isKeyVaultIDChar(c byte) bool {
+func isAzureKeyVaultIDChar(c byte) bool {
 	return isLetterChar(c) || isDigitChar(c) || c == '-'
 }

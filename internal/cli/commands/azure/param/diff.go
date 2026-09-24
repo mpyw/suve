@@ -119,7 +119,7 @@ func parseDiffArgs(args []string) (*version.BareSpec, *version.BareSpec, error) 
 		return nil, nil, errors.New(usage)
 	}
 
-	spec1, err := version.AppConfiguration.Parse(args[0])
+	spec1, err := version.AzureAppConfiguration.Parse(args[0])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -128,7 +128,7 @@ func parseDiffArgs(args []string) (*version.BareSpec, *version.BareSpec, error) 
 		return spec1, &version.BareSpec{Name: spec1.Name}, nil
 	}
 
-	spec2, err := version.AppConfiguration.Parse(args[1])
+	spec2, err := version.AzureAppConfiguration.Parse(args[1])
 	if err != nil {
 		return nil, nil, err
 	}

@@ -203,7 +203,7 @@ func TestSecretManagerParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.SecretManager.Parse(tt.input)
+			spec, err := version.GoogleCloudSecretManager.Parse(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 
@@ -221,9 +221,9 @@ func TestSecretManagerParse(t *testing.T) {
 func TestSecretManagerParse_LabelErrorMessage(t *testing.T) {
 	t.Parallel()
 
-	_, err := version.SecretManager.Parse("my-secret:latest")
+	_, err := version.GoogleCloudSecretManager.Parse("my-secret:latest")
 	require.Error(t, err)
-	require.ErrorIs(t, err, version.ErrSecretManagerLabelUnsupported)
+	require.ErrorIs(t, err, version.ErrGoogleCloudSecretManagerLabelUnsupported)
 }
 
 // TestParse_LabelAfterVersionRejected exercises the ':' reject path reached
@@ -232,9 +232,9 @@ func TestSecretManagerParse_LabelErrorMessage(t *testing.T) {
 func TestSecretManagerParse_LabelAfterVersionRejected(t *testing.T) {
 	t.Parallel()
 
-	_, err := version.SecretManager.Parse("my-secret#3:latest")
+	_, err := version.GoogleCloudSecretManager.Parse("my-secret#3:latest")
 	require.Error(t, err)
-	require.ErrorIs(t, err, version.ErrSecretManagerLabelUnsupported)
+	require.ErrorIs(t, err, version.ErrGoogleCloudSecretManagerLabelUnsupported)
 }
 
 // TestParse_VersionOverflow exercises the strconv.ParseInt failure branch when
@@ -242,7 +242,7 @@ func TestSecretManagerParse_LabelAfterVersionRejected(t *testing.T) {
 func TestSecretManagerParse_VersionOverflow(t *testing.T) {
 	t.Parallel()
 
-	_, err := version.SecretManager.Parse("my-secret#99999999999999999999999999")
+	_, err := version.GoogleCloudSecretManager.Parse("my-secret#99999999999999999999999999")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "out of range")
 }
@@ -266,11 +266,11 @@ func TestSecretManagerSuffix(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.SecretManager.Parse(tt.input)
+			spec, err := version.GoogleCloudSecretManager.Parse(tt.input)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, version.SecretManager.Suffix(spec))
+			assert.Equal(t, tt.want, version.GoogleCloudSecretManager.Suffix(spec))
 
-			reparsed, err := version.SecretManager.Parse(spec.Name + version.SecretManager.Suffix(spec))
+			reparsed, err := version.GoogleCloudSecretManager.Parse(spec.Name + version.GoogleCloudSecretManager.Suffix(spec))
 			require.NoError(t, err)
 			assert.Equal(t, spec, reparsed)
 		})

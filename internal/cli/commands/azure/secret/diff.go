@@ -43,9 +43,9 @@ func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.OpaqueSpec) 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
 	result, err := p.uc.Execute(ctx, secret.DiffInput{
 		Name1:   p.spec1.Name,
-		Suffix1: version.KeyVault.Suffix(p.spec1),
+		Suffix1: version.AzureKeyVault.Suffix(p.spec1),
 		Name2:   p.spec2.Name,
-		Suffix2: version.KeyVault.Suffix(p.spec2),
+		Suffix2: version.AzureKeyVault.Suffix(p.spec2),
 	})
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ EXAMPLES:
 func parseDiffArgs(args []string) (*version.OpaqueSpec, *version.OpaqueSpec, error) {
 	return generic.ParseDiffArgs(
 		args,
-		version.KeyVault.Parse,
+		version.AzureKeyVault.Parse,
 		version.OpaqueAbsolute.IsSet,
 		"#~",
 		"usage: suve azure secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",

@@ -24,9 +24,9 @@ options and examples, read the full docs:
 | Azure | App Configuration | `suve azure param` | Unversioned (single current value); last-write-wins | Yes | `appconfig`, `ac`, `appcfg` | `AZURE_APPCONFIG_NAME` |
 
 Each versioning model is a grammar value in `internal/version/products.go`:
-`ParameterStore` and `SecretManager` are numeric, `SecretsManager` and
-`KeyVault` are opaque (only `SecretsManager` has labels), and
-`AppConfiguration` is bare.
+`AWSParameterStore` and `GoogleCloudSecretManager` are numeric,
+`AWSSecretsManager` and `AzureKeyVault` are opaque (only `AWSSecretsManager`
+has labels), and `AzureAppConfiguration` is bare.
 
 ## Command shape
 

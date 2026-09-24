@@ -2,7 +2,7 @@
 // contracts for AWS Secrets Manager. It confines all
 // Secrets Manager SDK types to this package: version/label/shift resolution
 // lives here, so AWS staging labels (AWSCURRENT etc.) never leak past this
-// boundary. Spec PARSING stays generic via version.SecretsManager.Parse.
+// boundary. Spec PARSING stays generic via version.AWSSecretsManager.Parse.
 package secretsmanager
 
 import (
@@ -85,7 +85,7 @@ func New(client Client) *Store {
 // so no AWS label escapes this package. An empty/latest spec resolves to the
 // latest ref (empty id).
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
-	parsed, err := version.SecretsManager.Parse(name + spec)
+	parsed, err := version.AWSSecretsManager.Parse(name + spec)
 	if err != nil {
 		return provider.VersionRef{}, err
 	}

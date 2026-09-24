@@ -272,7 +272,7 @@ func TestParameterStoreParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.ParameterStore.Parse(tt.input)
+			spec, err := version.AWSParameterStore.Parse(tt.input)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -341,11 +341,11 @@ func TestParameterStoreSuffix(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.ParameterStore.Parse(tt.input)
+			spec, err := version.AWSParameterStore.Parse(tt.input)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, version.ParameterStore.Suffix(spec))
+			assert.Equal(t, tt.want, version.AWSParameterStore.Suffix(spec))
 
-			reparsed, err := version.ParameterStore.Parse(spec.Name + version.ParameterStore.Suffix(spec))
+			reparsed, err := version.AWSParameterStore.Parse(spec.Name + version.AWSParameterStore.Suffix(spec))
 			require.NoError(t, err)
 			assert.Equal(t, spec, reparsed)
 		})
@@ -355,11 +355,11 @@ func TestParameterStoreSuffix(t *testing.T) {
 func TestParameterStoreSplit(t *testing.T) {
 	t.Parallel()
 
-	name, suffix, err := version.ParameterStore.Split("/app/key#5~~")
+	name, suffix, err := version.AWSParameterStore.Split("/app/key#5~~")
 	require.NoError(t, err)
 	assert.Equal(t, "/app/key", name)
 	assert.Equal(t, "#5~2", suffix)
 
-	_, _, err = version.ParameterStore.Split("/app/key#x")
+	_, _, err = version.AWSParameterStore.Split("/app/key#x")
 	require.ErrorIs(t, err, version.ErrInvalidNumericVersion)
 }

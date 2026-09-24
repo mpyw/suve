@@ -36,7 +36,7 @@ func TestShowPresenter_RendersDescription(t *testing.T) {
 		},
 	}
 
-	spec, err := version.ParameterStore.Parse("/my/param")
+	spec, err := version.AWSParameterStore.Parse("/my/param")
 	require.NoError(t, err)
 
 	presenter := awsparam.NewShowPresenter(store, spec)
@@ -78,7 +78,7 @@ func TestShowPresenter_OmitsEmptyDescription(t *testing.T) {
 		},
 	}
 
-	spec, err := version.ParameterStore.Parse("/my/param")
+	spec, err := version.AWSParameterStore.Parse("/my/param")
 	require.NoError(t, err)
 
 	presenter := awsparam.NewShowPresenter(store, spec)

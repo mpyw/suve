@@ -119,7 +119,7 @@ EXAMPLES:
   suve azure param show --raw my-key                  Output raw value (for piping)
   suve azure param show --output=json my-key          Output as JSON`,
 		UsageError: "usage: suve azure param show <key>",
-		ParseSpec:  version.AppConfiguration.Parse,
+		ParseSpec:  version.AzureAppConfiguration.Parse,
 		NewPresenter: func(ctx context.Context, spec *version.BareSpec) (generic.ShowPresenter, error) {
 			store, err := azureinternal.AppConfigStore(ctx)
 			if err != nil {

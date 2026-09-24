@@ -1,7 +1,7 @@
 // Package parameterstore implements the provider.Store contract for AWS Systems Manager
 // Parameter Store. It confines all SSM SDK types to this package: version
 // resolution (absolute #version and ~shift against history) lives here, while
-// spec PARSING stays generic via version.ParameterStore.Parse.
+// spec PARSING stays generic via version.AWSParameterStore.Parse.
 package parameterstore
 
 import (
@@ -60,7 +60,7 @@ func New(client Client) *Store {
 // an opaque VersionRef holding the concrete version number. An empty/latest
 // spec resolves to the latest ref (empty id).
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
-	parsed, err := version.ParameterStore.Parse(name + spec)
+	parsed, err := version.AWSParameterStore.Parse(name + spec)
 	if err != nil {
 		return provider.VersionRef{}, err
 	}

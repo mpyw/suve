@@ -4,8 +4,8 @@
 // Three grammars cover the products: NumericGrammar (integer versions),
 // OpaqueGrammar (opaque version ids, optionally with staging labels), and
 // BareGrammar (unversioned; the whole argument is the name). products.go binds
-// each product to one of them (ParameterStore, SecretsManager, SecretManager,
-// KeyVault, AppConfiguration). Each versioned grammar's Suffix rebuilds the
+// each product to one of them (AWSParameterStore, AWSSecretsManager,
+// GoogleCloudSecretManager, AzureKeyVault, AzureAppConfiguration). Each versioned grammar's Suffix rebuilds the
 // suffix that callers hand to the use cases.
 //
 // Version specification grammar:

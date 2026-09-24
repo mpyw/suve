@@ -47,7 +47,7 @@ func NewShowPresenter(reader provider.Reader, spec *version.NumericSpec) generic
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, param.ShowInput{Name: p.spec.Name, Suffix: version.ParameterStore.Suffix(p.spec)})
+	result, err := p.uc.Execute(ctx, param.ShowInput{Name: p.spec.Name, Suffix: version.AWSParameterStore.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ EXAMPLES:
   suve aws param show --output=json /app/config                 Output as JSON
   DB_URL=$(suve aws param show --raw /app/config)               Use in shell variable`,
 		UsageError: "usage: suve aws param show <name>",
-		ParseSpec:  version.ParameterStore.Parse,
+		ParseSpec:  version.AWSParameterStore.Parse,
 		NewPresenter: func(ctx context.Context, spec *version.NumericSpec) (generic.ShowPresenter, error) {
 			store, err := awsinternal.ParamStore(ctx)
 			if err != nil {

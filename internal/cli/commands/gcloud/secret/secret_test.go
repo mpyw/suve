@@ -212,7 +212,7 @@ func TestShowPresenter(t *testing.T) {
 		},
 	}
 
-	spec, err := version.SecretManager.Parse("my-secret")
+	spec, err := version.GoogleCloudSecretManager.Parse("my-secret")
 	require.NoError(t, err)
 
 	presenter := secret.NewShowPresenter(store, spec)

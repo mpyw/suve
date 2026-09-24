@@ -197,7 +197,7 @@ func TestParseDiffArgsParam(t *testing.T) {
 
 			spec1, spec2, err := generic.ParseDiffArgs(
 				tt.args,
-				version.ParameterStore.Parse,
+				version.AWSParameterStore.Parse,
 				func(abs version.NumericAbsolute) bool { return abs.Version != nil },
 				"#~",
 				"usage: suve param diff <spec1> [spec2] | <name> <version1> [version2]",
@@ -356,7 +356,7 @@ func TestParseDiffArgsSecret(t *testing.T) {
 
 			spec1, spec2, err := generic.ParseDiffArgs(
 				tt.args,
-				version.SecretsManager.Parse,
+				version.AWSSecretsManager.Parse,
 				func(abs version.OpaqueAbsolute) bool { return abs.ID != nil || abs.Label != nil },
 				"#:~",
 				"usage: suve secret diff <spec1> [spec2] | <name> <version1> [version2]",
@@ -806,7 +806,7 @@ func TestSecretIdenticalWarning(t *testing.T) {
 func TestParseDiffArgs_Param(t *testing.T) {
 	t.Parallel()
 
-	parse := version.ParameterStore.Parse
+	parse := version.AWSParameterStore.Parse
 	hasAbsolute := func(abs version.NumericAbsolute) bool { return abs.Version != nil }
 	prefixes := "#~"
 	usage := "usage: suve param diff"
@@ -1013,7 +1013,7 @@ func TestParseDiffArgs_Param(t *testing.T) {
 func TestParseDiffArgs_ThreeArgRequiresSpecifier(t *testing.T) {
 	t.Parallel()
 
-	parse := version.ParameterStore.Parse
+	parse := version.AWSParameterStore.Parse
 	hasAbsolute := func(abs version.NumericAbsolute) bool { return abs.Version != nil }
 	prefixes := "#~"
 	usage := "usage: suve param diff"
@@ -1072,7 +1072,7 @@ func TestParseDiffArgs_ThreeArgRequiresSpecifier(t *testing.T) {
 func TestParseDiffArgs_Secret(t *testing.T) {
 	t.Parallel()
 
-	parse := version.SecretsManager.Parse
+	parse := version.AWSSecretsManager.Parse
 	hasAbsolute := func(abs version.OpaqueAbsolute) bool { return abs.ID != nil || abs.Label != nil }
 	prefixes := "#:~"
 	usage := "usage: suve secret diff"

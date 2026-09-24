@@ -75,7 +75,7 @@ func runShow(
 func mustParseParam(t *testing.T, s string) *version.NumericSpec {
 	t.Helper()
 
-	spec, err := version.ParameterStore.Parse(s)
+	spec, err := version.AWSParameterStore.Parse(s)
 	require.NoError(t, err)
 
 	return spec

@@ -251,7 +251,7 @@ func DiffCommand[S any](cfg DiffConfig[S]) *cli.Command {
 // # Parameters
 //
 //   - args: Command line arguments (1-3 arguments supported)
-//   - parse: Service-specific parser function (e.g., version.ParameterStore.Parse, version.SecretsManager.Parse)
+//   - parse: Service-specific parser function (e.g., version.AWSParameterStore.Parse, version.AWSSecretsManager.Parse)
 //   - hasAbsolute: Returns true if the absolute specifier is set (non-zero).
 //     Used to distinguish "mixed" pattern from "partial spec" pattern in 2-arg case.
 //     For SSM Parameter Store: func(abs) bool { return abs.Version != nil }
@@ -274,7 +274,7 @@ func DiffCommand[S any](cfg DiffConfig[S]) *cli.Command {
 //
 //	spec1, spec2, err := ParseDiffArgs(
 //	    args,
-//	    version.ParameterStore.Parse,
+//	    version.AWSParameterStore.Parse,
 //	    version.NumericAbsolute.IsSet,
 //	    "#~",
 //	    "usage: suve aws param diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
@@ -284,7 +284,7 @@ func DiffCommand[S any](cfg DiffConfig[S]) *cli.Command {
 //
 //	spec1, spec2, err := ParseDiffArgs(
 //	    args,
-//	    version.SecretsManager.Parse,
+//	    version.AWSSecretsManager.Parse,
 //	    version.OpaqueAbsolute.IsSet,
 //	    "#:~",
 //	    "usage: suve aws secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",
