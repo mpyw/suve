@@ -80,10 +80,13 @@ echo "Demo data ready:"
 echo ""
 echo "=== Recording TUI demo ==="
 # Create temp tape with correct endpoint URL (rewrites the default 4566 port).
-TEMP_TAPE=$(mktemp)
+# vhs appends ".tape" to a path without that extension, so the temp file must
+# end in .tape (BSD mktemp cannot add a suffix, hence the temp directory).
+TEMP_DIR=$(mktemp -d)
+TEMP_TAPE="$TEMP_DIR/tui-demo.tape"
 sed "s|http://localhost:4566|$AWS_ENDPOINT_URL|g" demo/tui-demo.tape > "$TEMP_TAPE"
 PATH="$PROJECT_DIR/bin:$PATH" vhs "$TEMP_TAPE"
-rm -f "$TEMP_TAPE"
+rm -rf "$TEMP_DIR"
 
 echo ""
 echo "=== Done ==="
