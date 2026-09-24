@@ -393,6 +393,9 @@ jobs:
           install_args: "go golangci-lint go:golang.org/x/tools/cmd/deadcode"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check go.mod is tidy (root and gui/)
+        run: mise run tidy-check
+
       - name: Run golangci-lint (default build)
         run: golangci-lint run --timeout=5m
 
@@ -414,8 +417,8 @@ jobs:
         run: go run github.com/mpyw/goroutinectx/cmd/goroutinectx@v0.7.5 ./...
 
   # declscope only reads the files a build configuration selects. The script
-  # runs it with no tags, with production+e2e on the host OS, and with
-  # production+e2e for windows. The Linux and macOS Wails backends use cgo, so
+  # runs it with no tags, with production+e2e on the host OS, with
+  # production+e2e for windows, and on the separate gui/ module. The Linux and macOS Wails backends use cgo, so
   # their OS files are type-checked only on their own host: one leg per OS.
   declscope:
     name: declscope (${{ matrix.os }})

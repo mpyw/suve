@@ -19,6 +19,12 @@
 # | No tags                           | gui_stub.go                          |
 # | Host GOOS, production + e2e       | GUI, e2e and the host's OS files     |
 # | GOOS=windows, production + e2e    | run_windows.go (pure Go, cross-checks from any host) |
+# | gui/, host GOOS, production + e2e | gui/main.go                          |
+#
+# gui/ is a separate Go module (the Wails entry point), so `./...` from the
+# root does not reach it. Its only file is behind `production || dev`, so a run
+# with no tags matches no packages. It uses the root .declscope.yaml, the
+# nearest one declscope finds.
 #
 # The Wails backends for Linux and macOS use cgo, so run_linux.go needs a Linux
 # host with the GTK/WebKit headers and run_darwin.go / cgo_darwin.go need a
@@ -44,11 +50,13 @@ host_tags=production,e2e
 # ubuntu-latest ships webkit2gtk-4.1, which Wails selects with webkit2_41.
 [ "$host" = linux ] && host_tags=production,webkit2_41,e2e
 
+# run GOOS TAGS [DIR]
 run() {
-  echo "declscope: GOOS=$1 tags=${2:-(none)}"
-  GOOS=$1 GOFLAGS="${2:+-tags=$2}" declscope ./...
+  echo "declscope: ${3:-.} GOOS=$1 tags=${2:-(none)}"
+  (cd "${3:-.}" && GOOS=$1 GOFLAGS="${2:+-tags=$2}" declscope ./...)
 }
 
 run "$host" ""
 run "$host" "$host_tags"
 [ "$host" = windows ] || run windows production,e2e
+run "$host" "$host_tags" gui
