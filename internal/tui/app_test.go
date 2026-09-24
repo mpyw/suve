@@ -589,7 +589,11 @@ func TestUpdate_PendingTargetResolves(t *testing.T) {
 	require.True(t, m.statusBar().Target.Pending, "the AWS target is pending until STS answers")
 	assert.Equal(t, "aws", m.applyTargetLine())
 
-	m.Update(targetMsg{target: resolved})
+	msg := m.fetchTargetCmd()()
+	require.Equal(t, targetMsg{target: resolved}, msg, "the fetch command reports the resolved target")
+	require.NotNil(t, m.Init(), "Init starts the fetch")
+
+	m.Update(msg)
 	assert.False(t, m.statusBar().Target.Pending)
 	assert.Equal(t, "aws · profile dev · account 123456789012 · region ap-northeast-1", m.applyTargetLine())
 
@@ -597,7 +601,9 @@ func TestUpdate_PendingTargetResolves(t *testing.T) {
 		scope:       provider.Scope{Provider: provider.ProviderAWS},
 		fetchTarget: func() (provider.Target, error) { return provider.Target{}, errors.New("no credentials") },
 	})
-	failed.Update(targetErrMsg{err: errors.New("no credentials")})
+	errMsg := failed.fetchTargetCmd()()
+	require.IsType(t, targetErrMsg{}, errMsg, "the fetch command reports a lookup failure")
+	failed.Update(errMsg)
 	assert.False(t, failed.statusBar().Target.Pending, "a failed lookup stops the loading placeholder")
 
 	gcloud := newApp(config{
