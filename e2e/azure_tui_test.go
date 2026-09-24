@@ -89,12 +89,14 @@ func newAzureTUIModel(t *testing.T, scope provider.Scope, service string) tea.Mo
 }
 
 // filterBrowser types a substring into the browser's filter field and commits it,
-// isolating a single target entry so it becomes the selected row. Key Vault
-// deletes are SOFT (lowkey-vault keeps a deleted secret listed until purged), so
-// across the sequential suite the browser list accumulates prior tests' secrets
-// and would otherwise auto-select the alphabetically-first one rather than the
-// seeded target. Filtering to the target's unique name makes the selection (and
-// thus the detail/history it drives) deterministic regardless of leftovers.
+// isolating a single target entry so it becomes the selected row. Emulators are
+// shared across a sequential suite, so the browser list can hold other tests'
+// entries: Key Vault deletes are SOFT (lowkey-vault keeps a deleted secret listed
+// until purged), and a t.Cleanup delete runs after t.Context() is canceled, so it
+// may never commit. The list would then auto-select the first entry rather than
+// the seeded target. Filtering to the target's unique name makes the selection
+// (and thus the detail/history it drives) deterministic regardless of leftovers.
+// The AWS TUI e2e (aws_tui_test.go) reuses this helper and settleReload.
 func filterBrowser(t *testing.T, tm *teatest.TestModel, substr string) {
 	t.Helper()
 
@@ -485,8 +487,8 @@ func TestTUIAzureAppConfig_Namespaces(t *testing.T) {
 	})
 }
 
-// TestAzureAppConfig_TUI_DetailNoHistory seeds a single setting under the "dev"
-// namespace, navigates to it, and asserts (a) its detail renders — value shown
+// TestAzureAppConfig_TUI_DetailNoHistory seeds a setting under the "dev"
+// namespace, filters the browser down to it, and asserts (a) its detail renders — value shown
 // (App Configuration values are plaintext, never masked) and the namespace
 // surfaced — and (b) the version-history controls are HIDDEN, because App
 // Configuration is unversioned and the browser gates the history section on the
@@ -512,15 +514,19 @@ func TestTUIAzureAppConfig_DetailNoHistory(t *testing.T) {
 	tm := teatest.NewTestModel(t, newAzureTUIModel(t, azureAppConfigTUIScope(), string(staging.ServiceParam)),
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 
-	// The setting is under "dev", so the launch (null) view is empty; gate on the
-	// namespace header rendering, advance one step to a view that includes the dev
-	// entries, wait for the setting to be listed (the sole seeded entry, so it is
-	// selected), then let the selection's async detail load settle so the value has
-	// landed before we capture — so the assert never races the detail read on a slow
-	// CI runner.
+	// The setting is under "dev", so gate on the namespace header rendering and
+	// advance one step to a view that includes the dev entries ("dev" or the
+	// all-namespaces "*"), then wait for the setting to be listed. That view is not
+	// guaranteed to hold only this setting: sibling tests' settings (e.g. the
+	// Namespaces test's, whose t.Cleanup deletes run after t.Context() is canceled
+	// and so may not commit) can share it and take the default selection. Filter to
+	// this setting's unique name so it becomes the selected row, then let the
+	// filter's reselection detail load settle so the value has landed before we
+	// capture — so the assert never races the detail read on a slow CI runner.
 	waitForScreen(t, tm, "ns:")
 	tm.Send(keyRune(' '))
 	waitForScreen(t, tm, name)
+	filterBrowser(t, tm, "ac/detail")
 	settleReload()
 
 	screen := finalScreen(t, tm)

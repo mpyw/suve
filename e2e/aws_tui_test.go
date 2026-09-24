@@ -139,15 +139,18 @@ func TestTUIAWS_ParamBrowse(t *testing.T) {
 	tm := teatest.NewTestModel(t, newTUIModel(t, string(staging.ServiceParam)),
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 
-	// Gate on the detail pane's async Show completing by waiting for the selected
-	// entry's value — not just the list name. The detail loads AFTER the list, so
-	// the value appearing proves both the list read and the async detail read
-	// landed before we quit, and the assertion never races the "select an entry"
-	// placeholder frame. A single gate (not list-then-value) is deliberate:
-	// waitForScreen consumes the output buffer, so when the list+detail frames
-	// batch a first wait on the name would swallow the value and a second wait
-	// would block forever.
-	waitForScreen(t, tm, alphaValue)
+	// Gate on the async list landing (alpha is listed), then filter to this test's
+	// shared "/suve-e2e-tui/" prefix: localstack may hold other params (e.g. the
+	// CLI suite's under `mise e2e-aws`, or leftovers whose t.Cleanup deletes ran
+	// after t.Context() was canceled), and one of them could otherwise take the
+	// default selection. Within the filtered list alpha sorts before bravo, so it
+	// is selected. Let the filter's reselection detail load settle so alpha's value
+	// has landed in the settled model the final screen renders (a gate on the value
+	// cannot close this window: the reload may re-render the same content, which
+	// the terminal's cell diffing emits no new bytes for).
+	waitForScreen(t, tm, alphaName)
+	filterBrowser(t, tm, "/suve-e2e-tui/")
+	settleReload()
 
 	screen := finalScreen(t, tm)
 
@@ -181,11 +184,16 @@ func TestTUIAWS_SecretBrowse(t *testing.T) {
 	tm := teatest.NewTestModel(t, newTUIModel(t, string(staging.ServiceSecret)),
 		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
 
-	// Gate on the async list landing, then explicitly reveal the value with `x`
+	// Gate on the async list landing, isolate this test's secret so it is the
+	// selected row (other secrets in localstack would otherwise take the default
+	// selection and the reveal would fetch theirs), and let the filter's
+	// reselection detail load settle. Then explicitly reveal the value with `x`
 	// and wait for the async fetch+reveal to render the value before capturing —
 	// the reveal triggers a fresh emulator read, so gating on the list alone
 	// would race the masked → revealed transition.
 	waitForScreen(t, tm, secretName)
+	filterBrowser(t, tm, "suve-e2e-tui/token")
+	settleReload()
 	tm.Send(keyRune('x'))
 	waitForScreen(t, tm, secretValue)
 
