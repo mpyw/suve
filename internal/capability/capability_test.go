@@ -219,6 +219,9 @@ func TestLookups(t *testing.T) {
 	_, ok = capability.Provider(provider.Provider("mystery"))
 	assert.False(t, ok)
 
+	_, ok = capability.Service(provider.Provider("mystery"), "secret")
+	assert.False(t, ok, "an unknown provider offers no service")
+
 	assert.Equal(t, "AWS", capability.DisplayName(provider.ProviderAWS))
 	assert.Equal(t, "mystery", capability.DisplayName(provider.Provider("mystery")), "an unknown provider keeps its key")
 }

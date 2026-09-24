@@ -245,3 +245,22 @@ func TestResolveTarget_SharesStagingIdentity(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, calls, "the target and the staging scope share one identity lookup")
 }
+
+// TestEnsureResolvable_NoServiceNamesTheProvider pins the launch error for a
+// scope that offers no service: it names the provider by its display name.
+func TestEnsureResolvable_NoServiceNamesTheProvider(t *testing.T) {
+	t.Parallel()
+
+	err := ensureResolvable(t.Context(), provider.Scope{Provider: provider.ProviderAzure})
+	require.ErrorContains(t, err, "no service is available for the Azure scope")
+}
+
+// TestStagingProbe_CapabilityGated pins that a staging probe exists only for a
+// service the provider offers with staging.
+func TestStagingProbe_CapabilityGated(t *testing.T) {
+	t.Parallel()
+
+	f := newSourceFactory(t.Context(), provider.GoogleCloudScope("proj"))
+	assert.NotNil(t, f.stagingProbe(provider.KindSecret, "secret"), "Secret Manager stages")
+	assert.Nil(t, f.stagingProbe(provider.KindParam, "param"), "Google Cloud offers no param service")
+}
