@@ -5,10 +5,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/apply"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/reset"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
@@ -196,9 +192,13 @@ func stageGlobalFlags() []cli.Flag {
 
 // stageGlobalConfig builds the provider-wide stage config for Azure. App
 // Configuration (param) and Key Vault (secret) are independent resources with
-// separate staging buckets, so each service carries its own ScopeResolver. The
-// top-level ScopeResolver keys the global export/import scope under App
-// Configuration; cross-resource scoping is tracked separately (#435).
+// separate staging buckets, so each service carries its own ScopeResolver.
+//
+// Azure wires no all-service export/import: those commands drain and restore
+// one staging scope and embed it in every snapshot, which cannot span the two
+// buckets. Export and import stay per-service ("azure stage param export",
+// "azure stage secret export"). The top-level ScopeResolver is therefore unused
+// and set to App Configuration's only to satisfy the config contract.
 func stageGlobalConfig(paramCfg, secretCfg stgcli.CommandConfig) stgcli.GlobalConfig {
 	return stgcli.GlobalConfig{
 		ProviderLabel: stageProviderLabel,
@@ -248,10 +248,10 @@ func StageCommand() *cli.Command {
 		Commands: []*cli.Command{
 			keyVaultStageGroup(),
 			appConfigStageGroup(),
-			status.Command(gcfg),
-			diff.Command(gcfg),
-			apply.Command(gcfg),
-			reset.Command(gcfg),
+			stgcli.NewGlobalStatusCommand(gcfg),
+			stgcli.NewGlobalDiffCommand(gcfg),
+			stgcli.NewGlobalApplyCommand(gcfg),
+			stgcli.NewGlobalResetCommand(gcfg),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

@@ -17,13 +17,9 @@ import (
 
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	globalstage "github.com/mpyw/suve/internal/cli/commands/aws/stage"
-	globalapply "github.com/mpyw/suve/internal/cli/commands/aws/stage/apply"
-	globaldiff "github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
+	awsstage "github.com/mpyw/suve/internal/cli/commands/aws/stage"
 	paramstage "github.com/mpyw/suve/internal/cli/commands/aws/stage/param"
-	globalreset "github.com/mpyw/suve/internal/cli/commands/aws/stage/reset"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/aws/stage/secret"
-	globalstatus "github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
@@ -32,7 +28,7 @@ import (
 // awsStageGlobalConfig builds the AWS provider config for the global stage
 // commands (param + secret), used by the e2e tests.
 func awsStageGlobalConfig() stgcli.GlobalConfig {
-	return globalstage.GlobalConfig()
+	return awsstage.GlobalConfig()
 }
 
 // =============================================================================
@@ -75,7 +71,7 @@ func TestAWSGlobal_StageWorkflow(t *testing.T) {
 
 	// 1. Global status shows both
 	t.Run("global-status", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -86,7 +82,7 @@ func TestAWSGlobal_StageWorkflow(t *testing.T) {
 
 	// 2. Global diff shows both
 	t.Run("global-diff", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globaldiff.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalDiffCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-original-param")
 		assert.Contains(t, stdout, "+staged-param")
@@ -97,7 +93,7 @@ func TestAWSGlobal_StageWorkflow(t *testing.T) {
 
 	// 3. Global apply applies both
 	t.Run("global-apply", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalapply.Command(awsStageGlobalConfig()), "--yes")
+		stdout, _, err := runCommand(t, stgcli.NewGlobalApplyCommand(awsStageGlobalConfig()), "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -117,7 +113,7 @@ func TestAWSGlobal_StageWorkflow(t *testing.T) {
 
 	// 5. Status should be empty
 	t.Run("status-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 		assert.NotContains(t, stdout, secretName)
@@ -159,7 +155,7 @@ func TestAWSGlobal_StageResetAll(t *testing.T) {
 
 	// Global reset requires --all flag
 	t.Run("reset-without-all-warns", func(t *testing.T) {
-		stdout, stderr, err := runCommand(t, globalreset.Command(awsStageGlobalConfig()))
+		stdout, stderr, err := runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		// Without --all, should show warning
 		assert.Contains(t, stderr, "no effect")
@@ -168,7 +164,7 @@ func TestAWSGlobal_StageResetAll(t *testing.T) {
 
 	// Verify still staged (not reset without --all)
 	t.Run("verify-still-staged", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
@@ -176,14 +172,14 @@ func TestAWSGlobal_StageResetAll(t *testing.T) {
 
 	// Global reset with --all
 	t.Run("reset-with-all", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
+		stdout, _, err := runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--all")
 		require.NoError(t, err)
 		t.Logf("global reset --all output: %s", stdout)
 	})
 
 	// Verify empty
 	t.Run("verify-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 		assert.NotContains(t, stdout, secretName)
@@ -197,7 +193,7 @@ func TestAWSGlobal_StageCommand(t *testing.T) {
 
 	// Test that global stage command has correct subcommands
 	t.Run("has-subcommands", func(t *testing.T) {
-		cmd := globalstage.Command()
+		cmd := awsstage.Command()
 		assert.Equal(t, "stage", cmd.Name)
 
 		subCmdNames := make([]string, len(cmd.Commands))
@@ -283,7 +279,7 @@ func TestAWSGlobal_StagingWithTags(t *testing.T) {
 
 	// Test global diff shows tag changes
 	t.Run("global-diff-shows-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globaldiff.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalDiffCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Tags:")
 		assert.Contains(t, stdout, paramName)
@@ -293,7 +289,7 @@ func TestAWSGlobal_StagingWithTags(t *testing.T) {
 
 	// Test global status shows tag changes
 	t.Run("global-status-shows-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "T")         // T = Tag change marker
 		assert.Contains(t, stdout, "+2 tag(s)") // Two tags being added
@@ -302,7 +298,7 @@ func TestAWSGlobal_StagingWithTags(t *testing.T) {
 
 	// Test global apply applies tag changes
 	t.Run("global-apply-applies-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalapply.Command(awsStageGlobalConfig()), "--yes")
+		stdout, _, err := runCommand(t, stgcli.NewGlobalApplyCommand(awsStageGlobalConfig()), "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Applying SSM Parameter Store tags")
 		assert.Contains(t, stdout, "Tagged")
@@ -409,7 +405,7 @@ func TestAWSGlobal_ResetWithTags(t *testing.T) {
 
 	// Test global reset clears both entries and tags
 	t.Run("global-reset-clears-all", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
+		stdout, _, err := runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--all")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Unstaged all changes")
 		assert.Contains(t, stdout, "2 SSM Parameter Store") // 1 entry + 1 tag
@@ -434,9 +430,9 @@ func TestAWSGlobal_ExportImport(t *testing.T) {
 
 	paramName := "/suve-e2e-export-import/param"
 
-	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+	_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+		_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage a parameter in the working staging area.
@@ -447,7 +443,7 @@ func TestAWSGlobal_ExportImport(t *testing.T) {
 
 	// Export writes <dir>/param.json and clears the working area.
 	t.Run("export", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, globalstage.Command(), "export", dir)
+		stdout, _, err := runSubCommand(t, awsstage.Command(), "export", dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "exported")
 
@@ -457,20 +453,20 @@ func TestAWSGlobal_ExportImport(t *testing.T) {
 
 	// Working area is now empty.
 	t.Run("working-cleared", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 	})
 
 	// Import restores the working area.
 	t.Run("import", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, globalstage.Command(), "import", dir)
+		stdout, _, err := runSubCommand(t, awsstage.Command(), "import", dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "imported")
 	})
 
 	t.Run("working-restored", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -483,9 +479,9 @@ func TestAWSGlobal_ExportKeep(t *testing.T) {
 
 	paramName := "/suve-e2e-export-keep/param"
 
-	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+	_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+		_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	})
 
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "keep-value")
@@ -493,12 +489,12 @@ func TestAWSGlobal_ExportKeep(t *testing.T) {
 
 	dir := filepath.Join(t.TempDir(), "backup")
 
-	stdout, _, err := runSubCommand(t, globalstage.Command(), "export", dir, "--keep")
+	stdout, _, err := runSubCommand(t, awsstage.Command(), "export", dir, "--keep")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "kept in the working staging area")
 
 	// Still staged.
-	stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+	stdout, _, err = runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 	require.NoError(t, err)
 	assert.Contains(t, stdout, paramName)
 }
@@ -511,9 +507,9 @@ func TestAWSGlobal_ImportMerge(t *testing.T) {
 	paramName1 := "/suve-e2e-import-merge/param1"
 	paramName2 := "/suve-e2e-import-merge/param2"
 
-	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+	_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+		_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	})
 
 	// Stage param1 and export it (clears the working area).
@@ -521,7 +517,7 @@ func TestAWSGlobal_ImportMerge(t *testing.T) {
 	require.NoError(t, err)
 
 	dir := filepath.Join(t.TempDir(), "backup")
-	_, _, err = runSubCommand(t, globalstage.Command(), "export", dir)
+	_, _, err = runSubCommand(t, awsstage.Command(), "export", dir)
 	require.NoError(t, err)
 
 	// Stage param2 in the working area.
@@ -529,11 +525,11 @@ func TestAWSGlobal_ImportMerge(t *testing.T) {
 	require.NoError(t, err)
 
 	// Import merges param1 back in.
-	stdout, _, err := runSubCommand(t, globalstage.Command(), "import", dir, "--merge")
+	stdout, _, err := runSubCommand(t, awsstage.Command(), "import", dir, "--merge")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "merged")
 
-	stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+	stdout, _, err = runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 	require.NoError(t, err)
 	assert.Contains(t, stdout, paramName1)
 	assert.Contains(t, stdout, paramName2)
@@ -547,16 +543,16 @@ func TestAWSGlobal_ImportScopeMismatch(t *testing.T) {
 
 	paramName := "/suve-e2e-import-scope/param"
 
-	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+	_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+		_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	})
 
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "value")
 	require.NoError(t, err)
 
 	dir := filepath.Join(t.TempDir(), "backup")
-	_, _, err = runSubCommand(t, globalstage.Command(), "export", dir)
+	_, _, err = runSubCommand(t, awsstage.Command(), "export", dir)
 	require.NoError(t, err)
 
 	// Tamper the exported envelope's scope so it no longer matches.
@@ -575,17 +571,17 @@ func TestAWSGlobal_ImportScopeMismatch(t *testing.T) {
 
 	// Import is refused by default.
 	t.Run("refused", func(t *testing.T) {
-		_, _, err := runSubCommand(t, globalstage.Command(), "import", dir)
+		_, _, err := runSubCommand(t, awsstage.Command(), "import", dir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "scope")
 	})
 
 	// --allow-scope-mismatch overrides.
 	t.Run("forced", func(t *testing.T) {
-		_, _, err := runSubCommand(t, globalstage.Command(), "import", dir, "--allow-scope-mismatch")
+		_, _, err := runSubCommand(t, awsstage.Command(), "import", dir, "--allow-scope-mismatch")
 		require.NoError(t, err)
 
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -596,11 +592,11 @@ func TestAWSGlobal_ExportEmpty(t *testing.T) {
 	setupEnv(t)
 	setupTempHome(t)
 
-	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+	_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 
 	dir := filepath.Join(t.TempDir(), "backup")
 
-	stdout, _, err := runSubCommand(t, globalstage.Command(), "export", dir)
+	stdout, _, err := runSubCommand(t, awsstage.Command(), "export", dir)
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "No staged changes to export.")
 
@@ -616,9 +612,9 @@ func TestAWSGlobal_ExportImportEncrypted(t *testing.T) {
 
 	paramName := "/suve-e2e-export-encrypted/param"
 
-	_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+	_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--yes")
+		_, _, _ = runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--yes")
 	})
 
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "secret-value")
@@ -628,19 +624,19 @@ func TestAWSGlobal_ExportImportEncrypted(t *testing.T) {
 
 	// Export encrypted.
 	stdout, stderr, err := runSubCommandWithStdin(
-		t, globalstage.Command(), strings.NewReader("testpass\n"), "export", dir, "--passphrase-stdin",
+		t, awsstage.Command(), strings.NewReader("testpass\n"), "export", dir, "--passphrase-stdin",
 	)
 	require.NoError(t, err, "export failed: stdout=%s stderr=%s", stdout, stderr)
 	assert.Contains(t, stdout, "encrypted")
 
 	// Import back with the same passphrase.
 	stdout, stderr, err = runSubCommandWithStdin(
-		t, globalstage.Command(), strings.NewReader("testpass\n"), "import", dir, "--passphrase-stdin",
+		t, awsstage.Command(), strings.NewReader("testpass\n"), "import", dir, "--passphrase-stdin",
 	)
 	require.NoError(t, err, "import failed: stdout=%s stderr=%s", stdout, stderr)
 	assert.Contains(t, stdout, "imported")
 
-	stdout, _, err = runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+	stdout, _, err = runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 	require.NoError(t, err)
 	assert.Contains(t, stdout, paramName)
 }
@@ -1102,7 +1098,7 @@ func TestAWSAgentLifecycle_StatusDoesNotStartAgent(t *testing.T) {
 
 	// Global status should return "No changes staged" without error
 	t.Run("global-status-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No changes staged")
 	})
@@ -1134,7 +1130,7 @@ func TestAWSAgentLifecycle_DiffDoesNotStartAgent(t *testing.T) {
 
 	// Global diff should show warning without error
 	t.Run("global-diff-empty", func(t *testing.T) {
-		_, stderr, err := runCommand(t, globaldiff.Command(awsStageGlobalConfig()))
+		_, stderr, err := runCommand(t, stgcli.NewGlobalDiffCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "nothing staged")
 	})
@@ -1162,7 +1158,7 @@ func TestAWSAgentLifecycle_ApplyDoesNotStartAgent(t *testing.T) {
 
 	// Global apply should return info message without error
 	t.Run("global-apply-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalapply.Command(awsStageGlobalConfig()), "--yes")
+		stdout, _, err := runCommand(t, stgcli.NewGlobalApplyCommand(awsStageGlobalConfig()), "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No changes staged")
 	})
@@ -1188,7 +1184,7 @@ func TestAWSAgentLifecycle_ResetDoesNotStartAgent(t *testing.T) {
 
 	// Global reset --all should return info message without error
 	t.Run("global-reset-all-empty", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalreset.Command(awsStageGlobalConfig()), "--all")
+		stdout, _, err := runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--all")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No changes staged")
 	})

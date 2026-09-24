@@ -156,27 +156,36 @@ func (c CommandConfig) namespaceFor(ctx context.Context) string {
 	return c.Namespace(ctx)
 }
 
-// diffStrategyFor adapts StrategyForNamespace to the DiffUseCase resolver, or nil
-// when the provider has no namespace axis (the single strategy handles all).
-func (c CommandConfig) diffStrategyFor(ctx context.Context) func(string) (staging.DiffStrategy, error) {
-	if c.StrategyForNamespace == nil {
+// diffStrategyFor adapts a StrategyForNamespace builder to the DiffUseCase
+// resolver, or nil when the service has no namespace axis (the single strategy
+// handles all).
+//
+//declscope:package // shared with the all-service diff (global_diff.go)
+func diffStrategyFor(
+	ctx context.Context, forNamespace func(context.Context, string) (staging.FullStrategy, error),
+) func(string) (staging.DiffStrategy, error) {
+	if forNamespace == nil {
 		return nil
 	}
 
 	return func(ns string) (staging.DiffStrategy, error) {
-		return c.StrategyForNamespace(ctx, ns)
+		return forNamespace(ctx, ns)
 	}
 }
 
-// applyStrategyFor adapts StrategyForNamespace to the ApplyUseCase resolver, or
-// nil when the provider has no namespace axis.
-func (c CommandConfig) applyStrategyFor(ctx context.Context) func(string) (staging.ApplyStrategy, error) {
-	if c.StrategyForNamespace == nil {
+// applyStrategyFor adapts a StrategyForNamespace builder to the ApplyUseCase
+// resolver, or nil when the service has no namespace axis.
+//
+//declscope:package // shared with the all-service apply (global_apply.go)
+func applyStrategyFor(
+	ctx context.Context, forNamespace func(context.Context, string) (staging.FullStrategy, error),
+) func(string) (staging.ApplyStrategy, error) {
+	if forNamespace == nil {
 		return nil
 	}
 
 	return func(ns string) (staging.ApplyStrategy, error) {
-		return c.StrategyForNamespace(ctx, ns)
+		return forNamespace(ctx, ns)
 	}
 }
 
@@ -278,7 +287,7 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 					UseCase: &stagingusecase.DiffUseCase{
 						Strategy:    strategy,
 						Store:       store,
-						StrategyFor: cfg.diffStrategyFor(ctx),
+						StrategyFor: diffStrategyFor(ctx, cfg.StrategyForNamespace),
 					},
 					Stdout: w,
 					Stderr: cmd.Root().ErrWriter,
@@ -454,7 +463,7 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 				UseCase: &stagingusecase.ApplyUseCase{
 					Strategy:    strategy,
 					Store:       store,
-					StrategyFor: cfg.applyStrategyFor(ctx),
+					StrategyFor: applyStrategyFor(ctx, cfg.StrategyForNamespace),
 				},
 				Store:         store,
 				Parser:        cfg.ParserFactory(),

@@ -15,10 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
-	globaldiff "github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
 	paramstage "github.com/mpyw/suve/internal/cli/commands/aws/stage/param"
-	globalstatus "github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
 	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
 // =============================================================================
@@ -846,7 +845,7 @@ func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 
 	// Verify global status shows tag changes
 	t.Run("global-status-shows-tags", func(t *testing.T) {
-		stdout, _, err := runCommand(t, globalstatus.Command(awsStageGlobalConfig()))
+		stdout, _, err := runCommand(t, stgcli.NewGlobalStatusCommand(awsStageGlobalConfig()))
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "T")         // T = Tag change marker
 		assert.Contains(t, stdout, "+2 tag(s)") // Two tags being added
@@ -991,7 +990,7 @@ func TestAWSParam_GlobalDiffWithJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check diff with -j flag (--parse-json)
-	stdout, _, err := runCommand(t, globaldiff.Command(awsStageGlobalConfig()), "-j")
+	stdout, _, err := runCommand(t, stgcli.NewGlobalDiffCommand(awsStageGlobalConfig()), "-j")
 	require.NoError(t, err)
 	t.Logf("global diff -j output: %s", stdout)
 	// Should have formatted JSON

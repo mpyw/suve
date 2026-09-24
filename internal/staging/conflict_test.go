@@ -58,7 +58,7 @@ func resolverFor(s staging.ApplyStrategy) staging.ApplyStrategyResolver {
 	}
 }
 
-func TestCheckConflicts(t *testing.T) {
+func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 	t.Parallel()
 
 	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -68,7 +68,7 @@ func TestCheckConflicts(t *testing.T) {
 		t.Parallel()
 
 		strategy := &mockApplyStrategy{}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), map[staging.EntryKey]staging.Entry{})
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), map[staging.EntryKey]staging.Entry{}, nil)
 		assert.Empty(t, conflicts)
 	})
 
@@ -80,7 +80,7 @@ func TestCheckConflicts(t *testing.T) {
 			{Name: "item1"}: {Operation: staging.OperationUpdate},
 			{Name: "item2"}: {Operation: staging.OperationDelete},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Empty(t, conflicts)
 	})
 
@@ -95,7 +95,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "new-item"})
 	})
 
@@ -111,7 +111,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Empty(t, conflicts)
 	})
 
@@ -126,7 +126,7 @@ func TestCheckConflicts(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Empty(t, conflicts)
 	})
 
@@ -145,7 +145,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "existing-item"})
 	})
 
@@ -164,7 +164,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Empty(t, conflicts)
 	})
 
@@ -183,7 +183,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Empty(t, conflicts)
 	})
 
@@ -201,7 +201,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "delete-item"})
 	})
 
@@ -219,7 +219,7 @@ func TestCheckConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Empty(t, conflicts)
 	})
 
@@ -248,14 +248,14 @@ func TestCheckConflicts(t *testing.T) {
 			{Name: "delete-item"}:        {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
 			{Name: "update-no-conflict"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
 		}
-		conflicts := staging.CheckConflicts(t.Context(), resolverFor(strategy), entries)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		assert.Len(t, conflicts, 2)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "create-item"})
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "update-item"})
 	})
 }
 
-func TestCheckTagConflicts(t *testing.T) {
+func TestCheckEntryAndTagConflicts_Tags(t *testing.T) {
 	t.Parallel()
 
 	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -265,7 +265,7 @@ func TestCheckTagConflicts(t *testing.T) {
 		t.Parallel()
 
 		strategy := &mockApplyStrategy{}
-		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), map[staging.EntryKey]staging.TagEntry{})
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, map[staging.EntryKey]staging.TagEntry{})
 		assert.Empty(t, conflicts)
 	})
 
@@ -280,7 +280,7 @@ func TestCheckTagConflicts(t *testing.T) {
 		tags := map[staging.EntryKey]staging.TagEntry{
 			{Name: "item1"}: {Add: map[string]string{"env": "prod"}},
 		}
-		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
 		assert.Empty(t, conflicts)
 	})
 
@@ -298,7 +298,7 @@ func TestCheckTagConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "existing-item"})
 	})
 
@@ -316,7 +316,7 @@ func TestCheckTagConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
 		assert.Empty(t, conflicts)
 	})
 
@@ -334,7 +334,7 @@ func TestCheckTagConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
 		assert.Empty(t, conflicts)
 	})
 
@@ -352,7 +352,7 @@ func TestCheckTagConflicts(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckTagConflicts(t.Context(), resolverFor(strategy), tags)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
 		assert.Empty(t, conflicts)
 	})
 
@@ -377,7 +377,7 @@ func TestCheckTagConflicts(t *testing.T) {
 			{Name: "k", Namespace: "dev"}: {Add: map[string]string{"a": "1"}, BaseModifiedAt: &baseTime},
 		}
 
-		conflicts := staging.CheckTagConflicts(t.Context(), resolve, tags)
+		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolve, nil, tags)
 		assert.Len(t, conflicts, 1)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "k", Namespace: "dev"})
 		assert.NotContains(t, conflicts, staging.EntryKey{Name: "k", Namespace: ""})
@@ -432,7 +432,7 @@ func TestCheckEntryAndTagConflicts_SingleFetch(t *testing.T) {
 // TestCheckConflicts_ResolverError verifies that a per-namespace resolver which
 // fails to resolve a strategy is treated like a fetch error: the entry is
 // skipped (no conflict) and the failure surfaces later on the apply attempt.
-func TestCheckConflicts_ResolverError(t *testing.T) {
+func TestCheckEntryAndTagConflicts_ResolverError(t *testing.T) {
 	t.Parallel()
 
 	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -449,7 +449,7 @@ func TestCheckConflicts_ResolverError(t *testing.T) {
 		},
 	}
 
-	conflicts := staging.CheckConflicts(t.Context(), resolve, entries)
+	conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolve, entries, nil)
 	assert.Empty(t, conflicts)
 }
 
@@ -458,7 +458,7 @@ func TestCheckConflicts_ResolverError(t *testing.T) {
 // namespace's remote state, and the reported conflict must carry the namespace.
 // With the namespace dropped, a single bare-name probe would compare both
 // entries against one namespace's time and falsely flag or clear the other.
-func TestCheckConflicts_PerNamespace(t *testing.T) {
+func TestCheckEntryAndTagConflicts_PerNamespace(t *testing.T) {
 	t.Parallel()
 
 	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -500,7 +500,7 @@ func TestCheckConflicts_PerNamespace(t *testing.T) {
 		},
 	}
 
-	conflicts := staging.CheckConflicts(t.Context(), resolve, entries)
+	conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolve, entries, nil)
 
 	// Only the "dev" entry conflicts, and the report carries its namespace.
 	assert.Len(t, conflicts, 1)

@@ -76,6 +76,18 @@ type DiffUseCase struct {
 	// namespace (Azure App Configuration). When nil, Strategy handles every
 	// entry (namespace-agnostic providers).
 	StrategyFor func(namespace string) (staging.DiffStrategy, error)
+	// RemoteLabel names the remote in auto-unstage warnings (e.g. "already
+	// deleted in AWS"). Empty uses the strategy's ServiceName.
+	RemoteLabel string
+}
+
+// remoteLabel returns RemoteLabel, or the strategy's ServiceName when unset.
+func (u *DiffUseCase) remoteLabel() string {
+	if u.RemoteLabel != "" {
+		return u.RemoteLabel
+	}
+
+	return u.Strategy.ServiceName()
 }
 
 // strategyForNamespace returns the diff strategy scoped to the given namespace,
@@ -245,7 +257,7 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 			Name:      key.Name,
 			Namespace: key.Namespace,
 			Type:      DiffEntryAutoUnstaged,
-			Warning:   "identical to " + u.Strategy.ServiceName() + " current",
+			Warning:   "identical to " + u.remoteLabel() + " current",
 		}, nil
 	}
 
@@ -282,7 +294,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
-				Warning:   "already deleted in " + u.Strategy.ServiceName(),
+				Warning:   "already deleted in " + u.remoteLabel(),
 			}, nil
 		}
 
@@ -310,7 +322,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
-				Warning:   "item no longer exists in " + u.Strategy.ServiceName(),
+				Warning:   "item no longer exists in " + u.remoteLabel(),
 			}, nil
 		}
 	}

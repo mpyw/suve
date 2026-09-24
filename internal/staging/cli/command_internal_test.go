@@ -70,31 +70,39 @@ func TestCommandConfig_NamespaceFor(t *testing.T) {
 	assert.Equal(t, "dev", withNS.namespaceFor(t.Context()))
 }
 
-func TestCommandConfig_StrategyForAdapters(t *testing.T) {
+func TestStrategyForAdapters(t *testing.T) {
 	t.Parallel()
 
 	// Nil StrategyForNamespace => nil resolvers, so the use cases fall back to
 	// their single Strategy (the namespace-agnostic providers).
-	var none CommandConfig
-	assert.Nil(t, none.diffStrategyFor(t.Context()))
-	assert.Nil(t, none.applyStrategyFor(t.Context()))
+	assert.Nil(t, diffStrategyFor(t.Context(), nil))
+	assert.Nil(t, applyStrategyFor(t.Context(), nil))
 
 	sentinel := errors.New("resolved")
-	cfg := CommandConfig{
-		StrategyForNamespace: func(_ context.Context, namespace string) (staging.FullStrategy, error) {
-			assert.Equal(t, "dev", namespace)
+	forNamespace := func(_ context.Context, namespace string) (staging.FullStrategy, error) {
+		assert.Equal(t, "dev", namespace)
 
-			return nil, sentinel
-		},
+		return nil, sentinel
 	}
 
-	diff := cfg.diffStrategyFor(t.Context())
+	diff := diffStrategyFor(t.Context(), forNamespace)
 	require.NotNil(t, diff)
 	_, err := diff("dev")
 	require.ErrorIs(t, err, sentinel)
 
-	apply := cfg.applyStrategyFor(t.Context())
+	apply := applyStrategyFor(t.Context(), forNamespace)
 	require.NotNil(t, apply)
 	_, err = apply("dev")
 	require.ErrorIs(t, err, sentinel)
+}
+
+func TestWorkingStore_NilResolverFails(t *testing.T) {
+	t.Parallel()
+
+	// There is no default provider: a config without a ScopeResolver is a wiring
+	// bug and must fail instead of silently keying state under some provider.
+	store, _, err := workingStore(t.Context(), nil)
+	require.Error(t, err)
+	assert.Nil(t, store)
+	assert.Contains(t, err.Error(), "staging scope resolver is not configured")
 }

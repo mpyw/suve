@@ -550,7 +550,7 @@ func TestResetUseCase_Execute_UnstageAll_WithTags(t *testing.T) {
 }
 
 // stubApplyStrategy is a minimal ApplyStrategy that reports a fixed
-// last-modified time, used to drive CheckConflicts in the restore regression.
+// last-modified time, used to drive CheckEntryAndTagConflicts in the restore regression.
 type stubApplyStrategy struct {
 	lastModified time.Time
 }
@@ -609,10 +609,11 @@ func TestResetUseCase_Execute_Restore_AnchorsConflictBase(t *testing.T) {
 
 	// A far-future remote modification must now be flagged as a conflict.
 	strategy := &stubApplyStrategy{lastModified: base.Add(24 * time.Hour)}
-	conflicts := staging.CheckConflicts(
+	conflicts := staging.CheckEntryAndTagConflicts(
 		t.Context(),
 		func(string) (staging.ApplyStrategy, error) { return strategy, nil },
 		map[staging.EntryKey]staging.Entry{key: *entry},
+		nil,
 	)
 	assert.Contains(t, conflicts, key)
 }
