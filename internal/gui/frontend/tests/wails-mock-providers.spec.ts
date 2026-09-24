@@ -109,7 +109,7 @@ test.describe('wails-mock provider bindings', () => {
       const app = (window as any).go.gui.App;
       // Export only the secret service; the param bucket is untouched.
       const exp = await app.StagingExport('/mock/secret.json', 'secret', '', false);
-      const info = await app.InspectImportFile('/mock/secret.json');
+      const info = await app.StagingInspectImportFile('/mock/secret.json');
       const afterExport = await app.StagingStatus();
       // Re-import the secret file back into the secret service.
       const imp = await app.StagingImport('/mock/secret.json', 'secret', '', 'merge');

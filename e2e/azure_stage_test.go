@@ -1,5 +1,8 @@
 //go:build e2e
 
+// One Azure suite split by service; the files share one namespace.
+//declscope:namespace azure
+
 //nolint:paralleltest // E2E subtests share state and run sequentially, not in parallel
 package e2e_test
 

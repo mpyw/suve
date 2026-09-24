@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are detect.go's in-package tests.
+//declscope:namespace detect
+
 package gui
 
 import (
@@ -29,7 +32,7 @@ func clearDetectEnv(t *testing.T) {
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", filepath.Join(t.TempDir(), "no-such-credentials"))
 }
 
-// TestDetectProviders covers the DetectProviders binding (and providerStrings):
+// TestDetectProviders covers the DetectProviders binding (and detectedProviderStrings):
 // it projects detect.Resolve over the ambient env into the frontend DTO — the
 // uniquely-active provider per service (empty when 0 or 2+ are active) plus the
 // full active sets, in the resolver's stable order.
@@ -95,10 +98,10 @@ func TestDetectProviders(t *testing.T) {
 	}
 }
 
-// TestInitialProviderFromEnv covers the standalone env-derived initial provider:
+// TestDetectInitialProvider covers the standalone env-derived initial provider:
 // the sole provider active across services, or "" when zero or two-plus are
 // active (the frontend then shows the selector).
-func TestInitialProviderFromEnv(t *testing.T) {
+func TestDetectInitialProvider(t *testing.T) {
 	tests := []struct {
 		name string
 		env  map[string]string
@@ -134,18 +137,18 @@ func TestInitialProviderFromEnv(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			assert.Equal(t, tt.want, InitialProviderFromEnv())
+			assert.Equal(t, tt.want, DetectInitialProvider())
 		})
 	}
 }
 
-func TestProviderStrings(t *testing.T) {
+func TestDetectedProviderStrings(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t,
 		[]string{"aws", "azure"},
-		providerStrings([]provider.Provider{provider.ProviderAWS, provider.ProviderAzure}))
-	assert.Empty(t, providerStrings(nil))
+		detectedProviderStrings([]provider.Provider{provider.ProviderAWS, provider.ProviderAzure}))
+	assert.Empty(t, detectedProviderStrings(nil))
 }
 
 // TestApp_InitialProvider covers the launch-provider accessor: the provider the

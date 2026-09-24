@@ -30,10 +30,6 @@ export function InitialService() {
   return window['go']['gui']['App']['InitialService']();
 }
 
-export function InspectImportFile(arg1) {
-  return window['go']['gui']['App']['InspectImportFile'](arg1);
-}
-
 export function ParamAddTag(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['ParamAddTag'](arg1, arg2, arg3, arg4);
 }
@@ -68,14 +64,6 @@ export function ParamShow(arg1, arg2) {
 
 export function ParamTypeOptions() {
   return window['go']['gui']['App']['ParamTypeOptions']();
-}
-
-export function PickExportPath(arg1) {
-  return window['go']['gui']['App']['PickExportPath'](arg1);
-}
-
-export function PickImportPath() {
-  return window['go']['gui']['App']['PickImportPath']();
 }
 
 export function SecretAddTag(arg1, arg2, arg3) {
@@ -164,6 +152,18 @@ export function StagingExport(arg1, arg2, arg3, arg4) {
 
 export function StagingImport(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['gui']['App']['StagingImport'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function StagingInspectImportFile(arg1) {
+  return window['go']['gui']['App']['StagingInspectImportFile'](arg1);
+}
+
+export function StagingPickExportPath(arg1) {
+  return window['go']['gui']['App']['StagingPickExportPath'](arg1);
+}
+
+export function StagingPickImportPath() {
+  return window['go']['gui']['App']['StagingPickImportPath']();
 }
 
 export function StagingRemoveTag(arg1, arg2, arg3, arg4) {

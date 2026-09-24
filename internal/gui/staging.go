@@ -188,14 +188,14 @@ type StagingDiffTagEntry struct {
 //
 //nolint:gochecknoglobals // immutable enum→string lookup tables
 var (
-	applyStatusNames = map[stagingusecase.ApplyResultStatus]string{
+	stagingApplyStatusNames = map[stagingusecase.ApplyResultStatus]string{
 		stagingusecase.ApplyResultCreated: "created",
 		stagingusecase.ApplyResultUpdated: "updated",
 		stagingusecase.ApplyResultDeleted: "deleted",
 		stagingusecase.ApplyResultFailed:  "failed",
 	}
 
-	resetTypeNames = map[stagingusecase.ResetResultType]string{
+	stagingResetTypeNames = map[stagingusecase.ResetResultType]string{
 		stagingusecase.ResetResultUnstaged:      "unstaged",
 		stagingusecase.ResetResultUnstagedAll:   "unstagedAll",
 		stagingusecase.ResetResultRestored:      "restored",
@@ -205,7 +205,7 @@ var (
 		stagingusecase.ResetResultUnstagedTag:   "unstagedTag",
 	}
 
-	diffEntryTypeNames = map[stagingusecase.DiffEntryType]string{
+	stagingDiffEntryTypeNames = map[stagingusecase.DiffEntryType]string{
 		stagingusecase.DiffEntryNormal:       "normal",
 		stagingusecase.DiffEntryCreate:       "create",
 		stagingusecase.DiffEntryAutoUnstaged: "autoUnstaged",
@@ -257,16 +257,16 @@ func (a *App) StagingStatus() (*StagingStatusResult, error) {
 	}
 
 	return &StagingStatusResult{
-		Param:      toStagingEntries(statusEntries(paramResult)),
-		Secret:     toStagingEntries(statusEntries(secretResult)),
-		ParamTags:  toStagingTagEntries(statusTagEntries(paramResult)),
-		SecretTags: toStagingTagEntries(statusTagEntries(secretResult)),
+		Param:      toStagingEntries(stagingStatusEntries(paramResult)),
+		Secret:     toStagingEntries(stagingStatusEntries(secretResult)),
+		ParamTags:  toStagingTagEntries(stagingStatusTagEntries(paramResult)),
+		SecretTags: toStagingTagEntries(stagingStatusTagEntries(secretResult)),
 	}, nil
 }
 
-// statusEntries / statusTagEntries safely read a (possibly nil, when the
+// stagingStatusEntries / stagingStatusTagEntries safely read a (possibly nil, when the
 // service is unsupported by the active scope) StatusOutput.
-func statusEntries(o *stagingusecase.StatusOutput) []stagingusecase.StatusEntry {
+func stagingStatusEntries(o *stagingusecase.StatusOutput) []stagingusecase.StatusEntry {
 	if o == nil {
 		return nil
 	}
@@ -274,7 +274,7 @@ func statusEntries(o *stagingusecase.StatusOutput) []stagingusecase.StatusEntry 
 	return o.Entries
 }
 
-func statusTagEntries(o *stagingusecase.StatusOutput) []stagingusecase.StatusTagEntry {
+func stagingStatusTagEntries(o *stagingusecase.StatusOutput) []stagingusecase.StatusTagEntry {
 	if o == nil {
 		return nil
 	}
@@ -376,7 +376,7 @@ func newStagingApplyResult(result *stagingusecase.ApplyOutput) *StagingApplyResu
 		entry := StagingApplyEntryResult{
 			Name:      r.Name,
 			Namespace: r.Namespace,
-			Status:    applyStatusNames[r.Status],
+			Status:    stagingApplyStatusNames[r.Status],
 		}
 		if r.Status == stagingusecase.ApplyResultFailed && r.Error != nil {
 			entry.Error = r.Error.Error()
@@ -438,7 +438,7 @@ func (a *App) StagingReset(service string) (*StagingResetResult, error) {
 		ServiceName: result.ServiceName,
 		Name:        result.Name,
 		Count:       result.Count,
-		Type:        resetTypeNames[result.Type],
+		Type:        stagingResetTypeNames[result.Type],
 	}, nil
 }
 
@@ -461,7 +461,7 @@ func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddRes
 	// For App Configuration the existence check must run under the target
 	// namespace, and the staged entry records that namespace as part of its
 	// identity; other providers ignore it.
-	strategy, namespace, err := a.editStrategyForNamespace(sc, service, namespace)
+	strategy, namespace, err := a.stagingEditStrategyForNamespace(sc, service, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -482,11 +482,11 @@ func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddRes
 	return &StagingAddResult{Name: result.Name}, nil
 }
 
-// editStrategyForNamespace returns the edit strategy for a staged entry and the
+// stagingEditStrategyForNamespace returns the edit strategy for a staged entry and the
 // validated namespace. For the App Configuration param service the strategy is
 // scoped to the target namespace (rejecting a `*`/`,` filter value); for every
 // other service the base strategy is returned and the namespace is empty.
-func (a *App) editStrategyForNamespace(sc provider.Scope, service, namespace string) (staging.EditStrategy, string, error) {
+func (a *App) stagingEditStrategyForNamespace(sc provider.Scope, service, namespace string) (staging.EditStrategy, string, error) {
 	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
 		literal, err := a.validateParamNamespaceScoped(sc, namespace)
 		if err != nil {
@@ -520,7 +520,7 @@ func (a *App) StagingEdit(service, name, value, namespace string) (*StagingEditR
 		return nil, err
 	}
 
-	strategy, namespace, err := a.editStrategyForNamespace(sc, service, namespace)
+	strategy, namespace, err := a.stagingEditStrategyForNamespace(sc, service, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -628,7 +628,7 @@ func (a *App) StagingAddTag(service, name, key, value, namespace string) (*Stagi
 		return nil, err
 	}
 
-	strategy, ns, err := a.editStrategyForNamespace(sc, service, namespace)
+	strategy, ns, err := a.stagingEditStrategyForNamespace(sc, service, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -660,7 +660,7 @@ func (a *App) StagingRemoveTag(service, name, key, namespace string) (*StagingRe
 		return nil, err
 	}
 
-	strategy, ns, err := a.editStrategyForNamespace(sc, service, namespace)
+	strategy, ns, err := a.stagingEditStrategyForNamespace(sc, service, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -826,7 +826,7 @@ func (a *App) StagingDiff(service string, name string) (*StagingDiffResult, erro
 		return StagingDiffEntry{
 			Name:             e.Name,
 			Namespace:        e.Namespace,
-			Type:             diffEntryTypeNames[e.Type],
+			Type:             stagingDiffEntryTypeNames[e.Type],
 			Operation:        string(e.Operation),
 			RemoteValue:      e.RemoteValue,
 			RemoteIdentifier: e.RemoteIdentifier,
@@ -872,10 +872,10 @@ type StagingImportResult struct {
 	TagCount   int  `json:"tagCount"`
 }
 
-// EnvelopeInfoResult describes an export file's plaintext header so the frontend
+// StagingEnvelopeInfoResult describes an export file's plaintext header so the frontend
 // can decide whether to prompt for a passphrase (Encrypted) and warn on a
 // scope/service mismatch (ScopeMatches) BEFORE any passphrase is supplied.
-type EnvelopeInfoResult struct {
+type StagingEnvelopeInfoResult struct {
 	// Encrypted reports whether the payload is passphrase-encrypted.
 	Encrypted bool `json:"encrypted"`
 	// Provider is the scope provider string embedded in the envelope.
@@ -900,18 +900,18 @@ type EnvelopeInfoResult struct {
 // Export / Import helpers
 // =============================================================================
 
-// errStoreNotFileStore is returned when the resolved staging store cannot serve
+// errStagingStoreNotFileStore is returned when the resolved staging store cannot serve
 // the working-area drain/unstage/update operations (should never happen for the
 // file/mock stores).
-var errStoreNotFileStore = stringError("staging store does not support import/export")
+var errStagingStoreNotFileStore = stringError("staging store does not support import/export")
 
-// getWorkingFileStoreScoped resolves the per-service working store as a
+// getStagingWorkingFileStoreScoped resolves the per-service working store as a
 // WorkingStore (bulk Drain plus the per-key unstage and atomic Update the
 // export/import use cases need) from an already-snapshotted scope (#560). It
 // goes through getStagingStoreScoped so the test seam and the per-service scope
 // resolution (the #445 fix: param → App Configuration bucket, secret → Key
 // Vault bucket) are shared with every other staging op.
-func (a *App) getWorkingFileStoreScoped(sc provider.Scope, kind provider.Kind) (store.WorkingStore, error) {
+func (a *App) getStagingWorkingFileStoreScoped(sc provider.Scope, kind provider.Kind) (store.WorkingStore, error) {
 	s, err := a.getStagingStoreScoped(sc, kind)
 	if err != nil {
 		return nil, err
@@ -919,37 +919,37 @@ func (a *App) getWorkingFileStoreScoped(sc provider.Scope, kind provider.Kind) (
 
 	fs, ok := s.(store.WorkingStore)
 	if !ok {
-		return nil, errStoreNotFileStore
+		return nil, errStagingStoreNotFileStore
 	}
 
 	return fs, nil
 }
 
-// envelopeWriteTarget adapts file.WriteEnvelopeFile to the export use case's
+// stagingEnvelopeWriteTarget adapts file.WriteEnvelopeFile to the export use case's
 // EnvelopeWriter port. It binds the destination path (chosen via the native save
 // dialog), the per-service scope (kept in the plaintext header), and the
 // passphrase, so the use case only supplies the service and its state.
-type envelopeWriteTarget struct {
+type stagingEnvelopeWriteTarget struct {
 	path       string
 	scope      provider.Scope
 	passphrase string
 }
 
 // WriteEnvelope writes svc's state to the bound destination path.
-func (t *envelopeWriteTarget) WriteEnvelope(_ context.Context, svc staging.Service, state *staging.State) error {
+func (t *stagingEnvelopeWriteTarget) WriteEnvelope(_ context.Context, svc staging.Service, state *staging.State) error {
 	return file.WriteEnvelopeFile(t.path, t.scope, svc, state, t.passphrase)
 }
 
-// envelopeReadSource adapts a validated file.Envelope to the import use case's
+// stagingEnvelopeReadSource adapts a validated file.Envelope to the import use case's
 // EnvelopeReader port. Only the service the header declares yields data; any
 // other service is an empty state (skipped).
-type envelopeReadSource struct {
+type stagingEnvelopeReadSource struct {
 	env        *file.Envelope
 	passphrase string
 }
 
 // ReadState decodes (and decrypts when encrypted) the envelope for svc.
-func (s *envelopeReadSource) ReadState(_ context.Context, svc staging.Service) (*staging.State, error) {
+func (s *stagingEnvelopeReadSource) ReadState(_ context.Context, svc staging.Service) (*staging.State, error) {
 	if string(svc) != s.env.Service {
 		return staging.NewEmptyState(), nil
 	}
@@ -961,10 +961,10 @@ func (s *envelopeReadSource) ReadState(_ context.Context, svc staging.Service) (
 // Export / Import dialogs
 // =============================================================================
 
-// PickExportPath opens the native Save dialog for choosing an export
+// StagingPickExportPath opens the native Save dialog for choosing an export
 // destination file, prefilled with defaultName. It returns an empty path (no
 // error) when the user cancels, which the frontend treats as an aborted flow.
-func (a *App) PickExportPath(defaultName string) (string, error) {
+func (a *App) StagingPickExportPath(defaultName string) (string, error) {
 	return wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
 		Title:           "Export staged changes",
 		DefaultFilename: defaultName,
@@ -974,9 +974,9 @@ func (a *App) PickExportPath(defaultName string) (string, error) {
 	})
 }
 
-// PickImportPath opens the native Open dialog for choosing an export file to
+// StagingPickImportPath opens the native Open dialog for choosing an export file to
 // import. It returns an empty path (no error) when the user cancels.
-func (a *App) PickImportPath() (string, error) {
+func (a *App) StagingPickImportPath() (string, error) {
 	return wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
 		Title: "Import staged changes",
 		Filters: []wailsruntime.FileFilter{
@@ -1013,14 +1013,14 @@ func (a *App) StagingExport(path, service, passphrase string, keep bool) (*Stagi
 		return nil, err
 	}
 
-	working, err := a.getWorkingFileStoreScoped(sc, kindForService(service))
+	working, err := a.getStagingWorkingFileStoreScoped(sc, kindForService(service))
 	if err != nil {
 		return nil, err
 	}
 
 	uc := &stagingusecase.ExportUseCase{
 		Working: working,
-		Target: &envelopeWriteTarget{
+		Target: &stagingEnvelopeWriteTarget{
 			path:       path,
 			scope:      scope,
 			passphrase: passphrase,
@@ -1043,12 +1043,12 @@ func (a *App) StagingExport(path, service, passphrase string, keep bool) (*Stagi
 	}, nil
 }
 
-// InspectImportFile reads and validates the plaintext envelope header at path
+// StagingInspectImportFile reads and validates the plaintext envelope header at path
 // WITHOUT decoding the (possibly encrypted) payload, so the frontend can prompt
 // for a passphrase only when needed and warn on a scope/service mismatch. The
 // envelope's scope is compared against the scope its declared service resolves
 // to under the active provider (the #445 per-service resolution).
-func (a *App) InspectImportFile(path string) (*EnvelopeInfoResult, error) {
+func (a *App) StagingInspectImportFile(path string) (*StagingEnvelopeInfoResult, error) {
 	env, err := file.ReadEnvelopeFile(path)
 	if err != nil {
 		return nil, err
@@ -1064,12 +1064,12 @@ func (a *App) InspectImportFile(path string) (*EnvelopeInfoResult, error) {
 		return nil, err
 	}
 
-	workingHasChanges, err := a.workingHasChangesForService(env.Service)
+	workingHasChanges, err := a.stagingWorkingHasChangesForService(env.Service)
 	if err != nil {
 		return nil, err
 	}
 
-	return &EnvelopeInfoResult{
+	return &StagingEnvelopeInfoResult{
 		Encrypted:         encrypted,
 		Provider:          env.Provider,
 		Scope:             env.Scope,
@@ -1079,13 +1079,13 @@ func (a *App) InspectImportFile(path string) (*EnvelopeInfoResult, error) {
 	}, nil
 }
 
-// workingHasChangesForService reports whether the per-service working staging
+// stagingWorkingHasChangesForService reports whether the per-service working staging
 // area holds any staged entries or tag changes for the given service. The GUI
-// uses it (via InspectImportFile) to prompt for merge/overwrite only when the
+// uses it (via StagingInspectImportFile) to prompt for merge/overwrite only when the
 // working area is non-empty, mirroring the CLI's import behavior. The working
 // store is file-based, so this makes no network calls. An unrecognized service
 // (a malformed envelope) reports no changes rather than erroring.
-func (a *App) workingHasChangesForService(service string) (bool, error) {
+func (a *App) stagingWorkingHasChangesForService(service string) (bool, error) {
 	// A malformed envelope may name an unknown service; treat that as no working
 	// changes rather than resolving a store for it.
 	if service != string(staging.ServiceParam) && service != string(staging.ServiceSecret) {
@@ -1121,7 +1121,7 @@ func (a *App) workingHasChangesForService(service string) (bool, error) {
 // (the file holds another service's data) is a hard error, as is a provider
 // mismatch (never overridable — a provider change is qualitatively different
 // from an account/region/vault change). A scope mismatch is refused unless force
-// is true; the frontend passes force after the user confirms the InspectImportFile
+// is true; the frontend passes force after the user confirms the StagingInspectImportFile
 // scope warning (the equivalent of the CLI's --force). This backend guard restores
 // defense-in-depth parity with the CLI so a frontend regression cannot import
 // cross-scope changes unchecked.
@@ -1166,7 +1166,7 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 			env.Scope, scope.Key())
 	}
 
-	working, err := a.getWorkingFileStoreScoped(sc, kindForService(service))
+	working, err := a.getStagingWorkingFileStoreScoped(sc, kindForService(service))
 	if err != nil {
 		return nil, err
 	}
@@ -1177,7 +1177,7 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 	}
 
 	uc := &stagingusecase.ImportUseCase{
-		Source: &envelopeReadSource{
+		Source: &stagingEnvelopeReadSource{
 			env:        env,
 			passphrase: passphrase,
 		},
@@ -1189,7 +1189,7 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 	// against the target scope's current LastModified (mirrors the CLI).
 	reAnchor := force && env.Scope != scope.Key()
 	if reAnchor {
-		uc.ReAnchor, err = a.importReAnchorResolverScoped(sc, service)
+		uc.ReAnchor, err = a.stagingImportReAnchorResolverScoped(sc, service)
 		if err != nil {
 			return nil, err
 		}
@@ -1207,12 +1207,12 @@ func (a *App) StagingImport(path, service, passphrase, mode string, force bool) 
 	}, nil
 }
 
-// importReAnchorResolverScoped builds the resolver a cross-scope import uses to
+// stagingImportReAnchorResolverScoped builds the resolver a cross-scope import uses to
 // fetch the target scope's current LastModified, from an already-snapshotted
 // scope (#560). App Configuration (param) keeps all namespaces in one staging
 // store, so it resolves a strategy per namespace like the apply path; every
 // other service resolves a single strategy built once.
-func (a *App) importReAnchorResolverScoped(sc provider.Scope, service string) (stagingusecase.ReAnchorResolver, error) {
+func (a *App) stagingImportReAnchorResolverScoped(sc provider.Scope, service string) (stagingusecase.ReAnchorResolver, error) {
 	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
 		return func(_ staging.Service, namespace string) (staging.ApplyStrategy, error) {
 			return a.paramStrategyForNamespaceScoped(sc, namespace)

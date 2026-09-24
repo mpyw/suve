@@ -18,7 +18,7 @@ landed across #273–#282.
 ## Capability-driven UI
 
 - Drive control visibility from the per-provider capability descriptor
-  (`ProviderCapability` / `ServiceCapability` in `internal/gui/providers.go`,
+  (`ProviderCapability` / `ServiceCapability` in `internal/gui/capability.go`,
   #264/#274). Hide unsupported controls via the descriptor; never hardcode
   provider conditionals in Svelte.
 - Security-relevant guards live **server-side in the Go bindings**, not only in

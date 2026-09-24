@@ -1,5 +1,8 @@
 //go:build e2e
 
+// One TUI suite split by provider; the files share the TUI driving helpers.
+//declscope:namespace tui
+
 //nolint:paralleltest // E2E tests run sequentially, not in parallel
 package e2e_test
 

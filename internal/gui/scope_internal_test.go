@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// In-package tests of app.go's launch-scope handling.
+//declscope:core
+
 package gui
 
 import (

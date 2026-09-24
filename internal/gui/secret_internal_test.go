@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are secret.go's in-package tests.
+//declscope:namespace secret
+
 package gui
 
 import (

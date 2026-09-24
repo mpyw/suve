@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are spec.go's in-package tests.
+//declscope:namespace spec
+
 package gui
 
 import (
@@ -11,10 +14,6 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/version/gcloudversion"
 )
-
-func appWithProvider(p provider.Provider) *App {
-	return &App{scope: provider.Scope{Provider: p}}
-}
 
 func TestApp_parseParamSpec(t *testing.T) {
 	t.Parallel()

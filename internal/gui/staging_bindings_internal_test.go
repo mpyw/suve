@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are staging.go's in-package binding tests.
+//declscope:namespace staging
+
 package gui
 
 import (
@@ -22,12 +25,12 @@ import (
 // stage) AND a registry override (so serviceStrategyScoped can resolve a
 // providermock.Store-backed strategy through the package-global registry).
 //
-// setupWriteBindingApp combines them: it builds an App on scope, runs Startup,
+// setupStagingWriteBindingApp combines them: it builds an App on scope, runs Startup,
 // injects the mock staging store, and swaps the package-global registry for one
 // whose only factory returns store for every (scope, kind). The registry is a
 // package global, so tests that call this must NOT run in parallel (matching
 // secret_internal_test.go / param_internal_test.go). The cleanup restores it.
-func setupWriteBindingApp(t *testing.T, scope provider.Scope, store provider.Store) *App {
+func setupStagingWriteBindingApp(t *testing.T, scope provider.Scope, store provider.Store) *App {
 	t.Helper()
 
 	app := newTestApp(t, scope, "")
@@ -42,11 +45,11 @@ func setupWriteBindingApp(t *testing.T, scope provider.Scope, store provider.Sto
 	return app
 }
 
-// existingParamStore is a providermock whose Get reports every name as an
+// stagingExistingParamStore is a providermock whose Get reports every name as an
 // existing plaintext entry EXCEPT the reserved "not-found" names, which report
 // provider.ErrNotFound. A create (StagingAdd) targets a not-found name so the
 // resource "does not exist"; an edit/delete/tag targets an existing name.
-func existingParamStore() *providermock.Store {
+func stagingExistingParamStore() *providermock.Store {
 	return &providermock.Store{
 		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
 			if name == "/app/new" || name == "app/flag" {
@@ -63,8 +66,8 @@ func existingParamStore() *providermock.Store {
 	}
 }
 
-// existingSecretStore mirrors existingParamStore for the secret service.
-func existingSecretStore() *providermock.Store {
+// stagingExistingSecretStore mirrors stagingExistingParamStore for the secret service.
+func stagingExistingSecretStore() *providermock.Store {
 	return &providermock.Store{
 		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
 			if name == "new-secret" {
@@ -89,7 +92,7 @@ func existingSecretStore() *providermock.Store {
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingAdd(t *testing.T) {
 	t.Run("param create", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		res, err := app.StagingAdd("param", "/app/new", "fresh", "")
 		require.NoError(t, err)
@@ -105,7 +108,7 @@ func TestApp_StagingAdd(t *testing.T) {
 	})
 
 	t.Run("secret create", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingSecretStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingSecretStore())
 
 		res, err := app.StagingAdd("secret", "new-secret", "s3cr3t", "")
 		require.NoError(t, err)
@@ -119,7 +122,7 @@ func TestApp_StagingAdd(t *testing.T) {
 	})
 
 	t.Run("invalid service", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		_, err := app.StagingAdd("bogus", "/x", "v", "")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -133,7 +136,7 @@ func TestApp_StagingAdd(t *testing.T) {
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingEdit(t *testing.T) {
 	t.Run("param update", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		res, err := app.StagingEdit("param", "/app/config", "changed", "")
 		require.NoError(t, err)
@@ -148,7 +151,7 @@ func TestApp_StagingEdit(t *testing.T) {
 	})
 
 	t.Run("secret update", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingSecretStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingSecretStore())
 
 		res, err := app.StagingEdit("secret", "my-secret", "rotated", "")
 		require.NoError(t, err)
@@ -161,7 +164,7 @@ func TestApp_StagingEdit(t *testing.T) {
 	})
 
 	t.Run("invalid service", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		_, err := app.StagingEdit("bogus", "/x", "v", "")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -174,7 +177,7 @@ func TestApp_StagingEdit(t *testing.T) {
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingDelete(t *testing.T) {
 	t.Run("param delete", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		res, err := app.StagingDelete("param", "/app/config", false, 0, "")
 		require.NoError(t, err)
@@ -188,7 +191,7 @@ func TestApp_StagingDelete(t *testing.T) {
 	})
 
 	t.Run("secret delete", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingSecretStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingSecretStore())
 
 		// Secret delete has recovery-window options; force=true skips validation.
 		res, err := app.StagingDelete("secret", "my-secret", true, 0, "")
@@ -202,7 +205,7 @@ func TestApp_StagingDelete(t *testing.T) {
 	})
 
 	t.Run("invalid service", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		_, err := app.StagingDelete("bogus", "/x", false, 0, "")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -215,7 +218,7 @@ func TestApp_StagingDelete(t *testing.T) {
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingAddRemoveTag(t *testing.T) {
 	t.Run("add tag", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		res, err := app.StagingAddTag("param", "/app/config", "env", "prod", "")
 		require.NoError(t, err)
@@ -229,7 +232,7 @@ func TestApp_StagingAddRemoveTag(t *testing.T) {
 	})
 
 	t.Run("remove tag", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		res, err := app.StagingRemoveTag("param", "/app/config", "deprecated", "")
 		require.NoError(t, err)
@@ -242,14 +245,14 @@ func TestApp_StagingAddRemoveTag(t *testing.T) {
 	})
 
 	t.Run("add tag invalid service", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		_, err := app.StagingAddTag("bogus", "/x", "k", "v", "")
 		assert.ErrorIs(t, err, errInvalidService)
 	})
 
 	t.Run("remove tag invalid service", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		_, err := app.StagingRemoveTag("bogus", "/x", "k", "")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -263,7 +266,7 @@ func TestApp_StagingAddRemoveTag(t *testing.T) {
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingDiff(t *testing.T) {
 	t.Run("param diff of a staged update", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		_, err := app.StagingEdit("param", "/app/config", "changed", "")
 		require.NoError(t, err)
@@ -278,7 +281,7 @@ func TestApp_StagingDiff(t *testing.T) {
 	})
 
 	t.Run("secret diff of a staged update", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingSecretStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingSecretStore())
 
 		_, err := app.StagingEdit("secret", "my-secret", "rotated", "")
 		require.NoError(t, err)
@@ -291,7 +294,7 @@ func TestApp_StagingDiff(t *testing.T) {
 	})
 
 	t.Run("diff of an unstaged item warns", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		diff, err := app.StagingDiff("param", "/app/config")
 		require.NoError(t, err)
@@ -300,7 +303,7 @@ func TestApp_StagingDiff(t *testing.T) {
 	})
 
 	t.Run("invalid service", func(t *testing.T) {
-		app := setupWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, existingParamStore())
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingExistingParamStore())
 
 		_, err := app.StagingDiff("bogus", "/x")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -308,7 +311,7 @@ func TestApp_StagingDiff(t *testing.T) {
 }
 
 // TestApp_StagingWriteBindings_AzureAppConfig covers the Azure App Configuration
-// namespace-guard branches: editStrategyForNamespace validates+scopes the target
+// namespace-guard branches: stagingEditStrategyForNamespace validates+scopes the target
 // namespace for the param service (staging.go:491-503), StagingDelete's own App
 // Config branch (staging.go:558-568), and StagingDiff's serviceStrategyScoped
 // Azure-param branch. A filter-shaped namespace (`*` / `,`-list) is rejected so
@@ -319,7 +322,7 @@ func TestApp_StagingWriteBindings_AzureAppConfig(t *testing.T) {
 	azureScope := provider.Scope{Provider: provider.ProviderAzure, StoreName: "my-store"}
 
 	t.Run("add stages under the concrete namespace", func(t *testing.T) {
-		app := setupWriteBindingApp(t, azureScope, existingParamStore())
+		app := setupStagingWriteBindingApp(t, azureScope, stagingExistingParamStore())
 
 		res, err := app.StagingAdd("param", "app/flag", "on", "dev")
 		require.NoError(t, err)
@@ -334,7 +337,7 @@ func TestApp_StagingWriteBindings_AzureAppConfig(t *testing.T) {
 	})
 
 	t.Run("delete stages under the concrete namespace", func(t *testing.T) {
-		app := setupWriteBindingApp(t, azureScope, existingParamStore())
+		app := setupStagingWriteBindingApp(t, azureScope, stagingExistingParamStore())
 
 		res, err := app.StagingDelete("param", "app/existing", false, 0, "dev")
 		require.NoError(t, err)
@@ -348,21 +351,21 @@ func TestApp_StagingWriteBindings_AzureAppConfig(t *testing.T) {
 	})
 
 	t.Run("add rejects a filter-shaped namespace", func(t *testing.T) {
-		app := setupWriteBindingApp(t, azureScope, existingParamStore())
+		app := setupStagingWriteBindingApp(t, azureScope, stagingExistingParamStore())
 
 		_, err := app.StagingAdd("param", "app/flag", "on", "*")
 		require.Error(t, err, "a `*` namespace names all namespaces and must be rejected")
 	})
 
 	t.Run("delete rejects a filter-shaped namespace", func(t *testing.T) {
-		app := setupWriteBindingApp(t, azureScope, existingParamStore())
+		app := setupStagingWriteBindingApp(t, azureScope, stagingExistingParamStore())
 
 		_, err := app.StagingDelete("param", "app/existing", false, 0, "dev,prd")
 		require.Error(t, err, "a `,`-list namespace names multiple namespaces and must be rejected")
 	})
 
 	t.Run("diff resolves the App Config param strategy", func(t *testing.T) {
-		app := setupWriteBindingApp(t, azureScope, existingParamStore())
+		app := setupStagingWriteBindingApp(t, azureScope, stagingExistingParamStore())
 
 		_, err := app.StagingEdit("param", "app/existing", "changed", "dev")
 		require.NoError(t, err)
@@ -382,7 +385,7 @@ func TestApp_StagingWriteBindings_AzureAppConfig(t *testing.T) {
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingWriteBindings_AzureKeyVault(t *testing.T) {
 	azureScope := provider.Scope{Provider: provider.ProviderAzure, VaultName: "my-vault"}
-	app := setupWriteBindingApp(t, azureScope, existingSecretStore())
+	app := setupStagingWriteBindingApp(t, azureScope, stagingExistingSecretStore())
 
 	res, err := app.StagingAdd("secret", "new-secret", "s3cr3t", "")
 	require.NoError(t, err)
@@ -401,7 +404,7 @@ func TestApp_StagingWriteBindings_AzureKeyVault(t *testing.T) {
 //nolint:paralleltest // overrides the package-global registry.
 func TestApp_StagingWriteBindings_GoogleCloud(t *testing.T) {
 	gcloudScope := provider.Scope{Provider: provider.ProviderGoogleCloud}
-	app := setupWriteBindingApp(t, gcloudScope, existingSecretStore())
+	app := setupStagingWriteBindingApp(t, gcloudScope, stagingExistingSecretStore())
 
 	res, err := app.StagingAdd("secret", "new-secret", "s3cr3t", "")
 	require.NoError(t, err)
