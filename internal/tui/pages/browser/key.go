@@ -21,7 +21,6 @@ var (
 	filterKey    = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
 	valuesKey    = key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "values"))
 	recursiveKey = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "recursive/refresh"))
-	loadMoreKey  = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "load more"))
 	revealKey    = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reveal"))
 	compareKey   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "compare"))
 	// spaceKey is only for key matching; its help is built per-service by spaceHelp

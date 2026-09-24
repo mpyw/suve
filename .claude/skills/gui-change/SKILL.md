@@ -38,6 +38,14 @@ landed across #273–#282.
   while it is pending, `ResolveScopeTarget` (AWS: STS). Both wrap
   `provider.Target` (`internal/gui/target.go`); render its segments, never a
   per-provider block. "Change scope" shows when the provider has `scopeFields`.
+- Binding DTOs use neutral names. A secret carries `version` and `labels`
+  (a version's movable labels, such as `AWSCURRENT`; not suve's staging), and
+  provider-specific display metadata arrives as `extra` (`{label, value}[]`
+  from `domain.Entry.Extra`). Render `extra` verbatim; never add a
+  cloud-specific DTO field such as an ARN. The TUI renders the same fields as
+  detail meta rows.
+- Lists are not paginated: every provider lists all names in one call, so
+  `ParamList`/`SecretList` take no page size or cursor and return no token.
 - Security-relevant guards live **server-side in the Go bindings**, not only in
   frontend hiding (#276) — e.g. staging guards and scope validation/readback.
 

@@ -113,7 +113,7 @@ test.describe('Provider selection', () => {
       await clickItemByName(page, 'gcloud-secret-1');
       await expect(page.locator('.detail-panel')).toBeVisible();
       // No ARN section (empty arn) — presence-gated (#268).
-      await expect(page.locator('.arn-display')).toHaveCount(0);
+      await expect(page.locator('.extra-value')).toHaveCount(0);
     });
   });
 

@@ -33,8 +33,7 @@ type paramNamespaceLister interface {
 
 // ParamListResult represents the result of listing parameters.
 type ParamListResult struct {
-	Entries   []ParamListEntry `json:"entries"`
-	NextToken string           `json:"nextToken,omitempty"`
+	Entries []ParamListEntry `json:"entries"`
 }
 
 // ParamListEntry represents a single parameter in the list.
@@ -123,7 +122,7 @@ type ParamDeleteResult struct {
 // across ALL namespaces (each carrying its namespace) so the GUI can filter by
 // namespace client-side (#425); every other provider uses the neutral
 // param.ListUseCase path and leaves Namespace empty.
-func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string, _ int, _ string) (*ParamListResult, error) {
+func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter string) (*ParamListResult, error) {
 	store, err := a.paramStore()
 	if err != nil {
 		return nil, err

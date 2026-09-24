@@ -30,8 +30,7 @@ type ListEntry struct {
 
 // ListOutput holds the result of the list use case.
 type ListOutput struct {
-	Entries   []ListEntry
-	NextToken string // Retained for API compatibility; always empty (provider lists all names)
+	Entries []ListEntry
 }
 
 // ListUseCase executes list operations.

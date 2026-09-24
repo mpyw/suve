@@ -68,13 +68,10 @@ type Item struct {
 	Namespace string
 }
 
-// ListResult is a page of list items plus the paging cursor.
+// ListResult is the full list of items. Every provider lists all names in one
+// call, so there is no paging.
 type ListResult struct {
 	Items []Item
-	// NextToken is the secret-service paging cursor; empty when there are no more
-	// pages (every provider today lists all names, so it is always empty, but the
-	// field keeps the load-more wiring honest).
-	NextToken string
 }
 
 // MetaRow is one capability-gated label/value line in the detail pane.
@@ -112,9 +109,6 @@ type Detail struct {
 	// edit dialog can preserve the type on an update. Empty for services with no
 	// value type (secret, App Configuration).
 	TypeLabel string
-	// ARN is the Secrets Manager ARN surfaced from the entry's Extra metadata,
-	// empty for providers that expose none.
-	ARN string
 }
 
 // HistoryRow is one version row in the detail history.
@@ -446,7 +440,7 @@ func (s *secretSource) List(ctx context.Context, params ListParams) (ListResult,
 		return Item{Name: e.Name, Value: e.Value, Secret: true}
 	})
 
-	return ListResult{Items: items, NextToken: out.NextToken}, nil
+	return ListResult{Items: items}, nil
 }
 
 func (s *secretSource) Show(ctx context.Context, name, _ string) (Detail, error) {
@@ -464,7 +458,6 @@ func (s *secretSource) Show(ctx context.Context, name, _ string) (Detail, error)
 		State:       out.State,
 		Labels:      out.Labels,
 		Description: out.Description,
-		ARN:         lo.FindOrElse(out.Extra, domain.Field{}, func(f domain.Field) bool { return f.Label == "ARN" }).Value,
 		Tags: lo.Map(out.Tags, func(t secret.ShowTag, _ int) Tag {
 			return Tag{Key: t.Key, Value: t.Value}
 		}),
@@ -476,9 +469,11 @@ func (s *secretSource) Show(ctx context.Context, name, _ string) (Detail, error)
 		d.Meta = append(d.Meta, MetaRow{Label: "Created", Value: timeutil.FormatDateTime(*out.CreatedDate)})
 	}
 
-	if d.ARN != "" {
-		d.Meta = append(d.Meta, MetaRow{Label: "ARN", Value: d.ARN})
-	}
+	// Provider-specific, display-only metadata (e.g. the Secrets Manager ARN),
+	// rendered verbatim.
+	d.Meta = append(d.Meta, lo.Map(out.Extra, func(f domain.Field, _ int) MetaRow {
+		return MetaRow{Label: f.Label, Value: f.Value}
+	})...)
 
 	return d, nil
 }

@@ -19,11 +19,10 @@ import (
 // (#746).
 type (
 	listLoadedMsg struct {
-		token  int
-		seq    int
-		append bool
-		res    data.ListResult
-		err    error
+		token int
+		seq   int
+		res   data.ListResult
+		err   error
 	}
 	detailLoadedMsg struct {
 		token int
@@ -65,9 +64,8 @@ func (m *Model) listParams() data.ListParams {
 	}
 }
 
-// loadListCmd issues a list fetch guarded by a fresh listSeq. appendPage is
-// reserved for secret NextToken paging (append rather than replace).
-func (m *Model) loadListCmd(appendPage bool) tea.Cmd {
+// loadListCmd issues a list fetch guarded by a fresh listSeq.
+func (m *Model) loadListCmd() tea.Cmd {
 	m.listSeq++
 	m.loading = true
 	token := m.token
@@ -79,7 +77,7 @@ func (m *Model) loadListCmd(appendPage bool) tea.Cmd {
 	return func() tea.Msg {
 		res, err := source.List(ctx, params)
 
-		return listLoadedMsg{token: token, seq: seq, append: appendPage, res: res, err: err}
+		return listLoadedMsg{token: token, seq: seq, res: res, err: err}
 	}
 }
 

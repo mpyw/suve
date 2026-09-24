@@ -11,7 +11,7 @@ function kvWithVersionTags() {
     secretVersions: {
       'kv-secret': [
         {
-          versionId: 'vLatest',
+          version: 'vLatest',
           state: 'enabled',
           value: 'v2',
           isCurrent: true,
@@ -19,7 +19,7 @@ function kvWithVersionTags() {
           tags: [{ key: 'env', value: 'prod' }],
         },
         {
-          versionId: 'vOld',
+          version: 'vOld',
           state: 'enabled',
           value: 'v1',
           isCurrent: false,

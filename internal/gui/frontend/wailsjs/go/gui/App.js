@@ -42,8 +42,8 @@ export function ParamDiff(arg1, arg2, arg3) {
   return window['go']['gui']['App']['ParamDiff'](arg1, arg2, arg3);
 }
 
-export function ParamList(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['gui']['App']['ParamList'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function ParamList(arg1, arg2, arg3, arg4) {
+  return window['go']['gui']['App']['ParamList'](arg1, arg2, arg3, arg4);
 }
 
 export function ParamLog(arg1, arg2, arg3) {
@@ -86,8 +86,8 @@ export function SecretDiff(arg1, arg2) {
   return window['go']['gui']['App']['SecretDiff'](arg1, arg2);
 }
 
-export function SecretList(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['gui']['App']['SecretList'](arg1, arg2, arg3, arg4, arg5);
+export function SecretList(arg1, arg2, arg3) {
+  return window['go']['gui']['App']['SecretList'](arg1, arg2, arg3);
 }
 
 export function SecretLog(arg1, arg2) {

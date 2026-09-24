@@ -63,10 +63,9 @@ func TestSecretList(t *testing.T) {
 
 	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
 
-	res, err := app.SecretList("", true, "", 0, "")
+	res, err := app.SecretList("", true, "")
 	require.NoError(t, err)
 	require.Len(t, res.Entries, 2)
-	assert.Empty(t, res.NextToken, "the secret list use case never paginates")
 
 	// The use case sorts alphabetically (#480).
 	assert.Equal(t, "alpha", res.Entries[0].Name)
@@ -78,33 +77,33 @@ func TestSecretList(t *testing.T) {
 	assert.Equal(t, "val-beta", *res.Entries[1].Value)
 }
 
-// TestSecretShow_StateVsStagingLabels asserts the SecretShow binding copies a
+// TestSecretShow_StateVsLabels asserts the SecretShow binding copies a
 // version's two independent, provider-specific axes into the RIGHT fields
-// (#419): AWS staging labels land in StagingLabels (State empty), while a
-// lifecycle state lands in State (StagingLabels empty) — a version never has
+// (#419): AWS staging labels land in Labels (State empty), while a
+// lifecycle state lands in State (Labels empty) — a version never has
 // both. It also checks the ARN/description/tags/created mapping.
 //
 //nolint:paralleltest // overrides the package-global registry.
-func TestSecretShow_StateVsStagingLabels(t *testing.T) {
+func TestSecretShow_StateVsLabels(t *testing.T) {
 	created := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 
 	tests := []struct {
-		name        string
-		version     domain.Version
-		wantStaging []string
-		wantState   string
+		name       string
+		version    domain.Version
+		wantLabels []string
+		wantState  string
 	}{
 		{
-			name:        "aws staging labels populate StagingLabels not State",
-			version:     domain.Version{ID: "v1", Labels: []string{"AWSPREVIOUS", "AWSCURRENT"}},
-			wantStaging: []string{"AWSCURRENT", "AWSPREVIOUS"}, // stages() sorts.
-			wantState:   "",
+			name:       "aws staging labels populate Labels not State",
+			version:    domain.Version{ID: "v1", Labels: []string{"AWSPREVIOUS", "AWSCURRENT"}},
+			wantLabels: []string{"AWSCURRENT", "AWSPREVIOUS"}, // stages() sorts.
+			wantState:  "",
 		},
 		{
-			name:        "lifecycle state populates State not StagingLabels",
-			version:     domain.Version{ID: "v1", State: "enabled"},
-			wantStaging: nil,
-			wantState:   "enabled",
+			name:       "lifecycle state populates State not Labels",
+			version:    domain.Version{ID: "v1", State: "enabled"},
+			wantLabels: nil,
+			wantState:  "enabled",
 		},
 	}
 
@@ -137,11 +136,11 @@ func TestSecretShow_StateVsStagingLabels(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, "my-secret", res.Name)
-			assert.Equal(t, "arn:aws:secretsmanager:x", res.ARN)
-			assert.Equal(t, "v1", res.VersionID)
+			assert.Equal(t, []SecretExtraField{{Label: "ARN", Value: "arn:aws:secretsmanager:x"}}, res.Extra)
+			assert.Equal(t, "v1", res.Version)
 			assert.Equal(t, "secret-value", res.Value)
 			assert.Equal(t, "the description", res.Description)
-			assert.Equal(t, tt.wantStaging, res.StagingLabels)
+			assert.Equal(t, tt.wantLabels, res.Labels)
 			assert.Equal(t, tt.wantState, res.State)
 			assert.NotEmpty(t, res.CreatedDate)
 
@@ -152,38 +151,38 @@ func TestSecretShow_StateVsStagingLabels(t *testing.T) {
 	}
 }
 
-// TestSecretLog_StateVsStagingLabels asserts the SecretLog binding maps each
+// TestSecretLog_StateVsLabels asserts the SecretLog binding maps each
 // version's independent axes into the right fields (#419), computes IsCurrent,
 // and threads each version's value. As in SecretShow, AWS carries staging
 // labels (no State) while Google Cloud / Key Vault carry a lifecycle state (no
 // staging labels).
 //
 //nolint:paralleltest // overrides the package-global registry.
-func TestSecretLog_StateVsStagingLabels(t *testing.T) {
+func TestSecretLog_StateVsLabels(t *testing.T) {
 	tests := []struct {
 		name     string
 		versions []domain.Version
 		// asserted against the first (current) entry.
-		wantStaging []string
-		wantState   string
+		wantLabels []string
+		wantState  string
 	}{
 		{
-			name: "aws staging labels populate StagingLabels not State",
+			name: "aws staging labels populate Labels not State",
 			versions: []domain.Version{
 				{ID: "v2", Labels: []string{"AWSCURRENT"}, Current: true},
 				{ID: "v1", Labels: []string{"AWSPREVIOUS"}},
 			},
-			wantStaging: []string{"AWSCURRENT"},
-			wantState:   "",
+			wantLabels: []string{"AWSCURRENT"},
+			wantState:  "",
 		},
 		{
-			name: "lifecycle state populates State not StagingLabels",
+			name: "lifecycle state populates State not Labels",
 			versions: []domain.Version{
 				{ID: "v2", State: "enabled", Current: true},
 				{ID: "v1", State: "disabled"},
 			},
-			wantStaging: nil,
-			wantState:   "enabled",
+			wantLabels: nil,
+			wantState:  "enabled",
 		},
 	}
 
@@ -211,13 +210,13 @@ func TestSecretLog_StateVsStagingLabels(t *testing.T) {
 			require.Len(t, res.Entries, 2)
 
 			// History is newest first; v2 is current.
-			assert.Equal(t, "v2", res.Entries[0].VersionID)
-			assert.Equal(t, tt.wantStaging, res.Entries[0].StagingLabels)
+			assert.Equal(t, "v2", res.Entries[0].Version)
+			assert.Equal(t, tt.wantLabels, res.Entries[0].Labels)
 			assert.Equal(t, tt.wantState, res.Entries[0].State)
 			assert.True(t, res.Entries[0].IsCurrent, "the newest version is current")
 			assert.Equal(t, "value-v2", res.Entries[0].Value)
 
-			assert.Equal(t, "v1", res.Entries[1].VersionID)
+			assert.Equal(t, "v1", res.Entries[1].Version)
 			assert.False(t, res.Entries[1].IsCurrent)
 			assert.Equal(t, "value-v1", res.Entries[1].Value)
 		})
@@ -381,11 +380,11 @@ func TestSecretDiff(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "my-secret", res.OldName)
-	assert.Equal(t, "v1", res.OldVersionID)
+	assert.Equal(t, "v1", res.OldVersion)
 	assert.Equal(t, "value-v1", res.OldValue)
 
 	assert.Equal(t, "my-secret", res.NewName)
-	assert.Equal(t, "v2", res.NewVersionID)
+	assert.Equal(t, "v2", res.NewVersion)
 	assert.Equal(t, "value-v2", res.NewValue)
 }
 

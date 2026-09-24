@@ -113,11 +113,6 @@ func (m *Model) viewColumn() []key.Binding {
 		col = append(col, narrowKey, widenKey)
 	}
 
-	// Load-more only applies while a next page is pending (secret pagination).
-	if m.nextToken != "" {
-		col = append(col, loadMoreKey)
-	}
-
 	return col
 }
 

@@ -124,7 +124,6 @@ type Model struct {
 	// List state.
 	list       components.EntryList
 	items      []data.Item
-	nextToken  string
 	stagedKeys map[data.StagedKey]struct{}
 	// deleteStagedKeys is the subset of stagedKeys staged for deletion; the
 	// edit/delete/tag affordances are dead-end transitions on such an entry (the
@@ -248,7 +247,7 @@ func New(
 // Init dispatches the initial loads: list, staged flags, and (App Config)
 // discovered namespaces.
 func (m *Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadListCmd(false), m.spinner.Tick}
+	cmds := []tea.Cmd{m.loadListCmd(), m.spinner.Tick}
 	if m.staging != nil {
 		cmds = append(cmds, m.loadStagedCmd())
 	}
