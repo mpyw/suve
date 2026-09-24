@@ -479,3 +479,15 @@ func TestSecretsManagerSuffix(t *testing.T) {
 		})
 	}
 }
+
+func TestSecretsManagerSplit(t *testing.T) {
+	t.Parallel()
+
+	name, suffix, err := version.SecretsManager.Split("my-secret:AWSCURRENT~1")
+	require.NoError(t, err)
+	assert.Equal(t, "my-secret", name)
+	assert.Equal(t, ":AWSCURRENT~1", suffix)
+
+	_, _, err = version.SecretsManager.Split("")
+	require.ErrorIs(t, err, version.ErrEmptySpec)
+}

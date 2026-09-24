@@ -91,3 +91,14 @@ func (NumericGrammar) Suffix(spec *NumericSpec) string {
 
 	return abs + spec.ShiftSuffix()
 }
+
+// Split parses input and returns its name plus the rebuilt suffix (Suffix), the
+// pair the use cases take.
+func (g NumericGrammar) Split(input string) (name, suffix string, err error) {
+	spec, err := g.Parse(input)
+	if err != nil {
+		return "", "", err
+	}
+
+	return spec.Name, g.Suffix(spec), nil
+}

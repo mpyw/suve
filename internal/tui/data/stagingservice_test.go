@@ -185,6 +185,41 @@ func TestStagingService_Review_StrategyForNamespace(t *testing.T) {
 	assert.Equal(t, "prod", review.Entries[1].Namespace)
 }
 
+// TestStagingService_Apply_KeepsEachNamespace pins that one name applied under
+// two namespaces yields one result per namespace, each carrying its own
+// namespace, instead of collapsing into one result per name.
+//
+//nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv (newStagingService)
+func TestStagingService_Apply_KeepsEachNamespace(t *testing.T) {
+	ctx := context.Background()
+
+	provStore := &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Value: "remote", Type: domain.ValueTypePlaintext, Version: domain.Version{ID: "1"}}, nil
+		},
+		PutFunc: func(context.Context, string, string, domain.ValueType, string, ...provider.WriteOption) (domain.Version, error) {
+			return domain.Version{ID: "2"}, nil
+		},
+	}
+
+	svc, st := newStagingService(t, azureParamCap(t), provStore, true)
+
+	update := func(v string) staging.Entry {
+		return staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr(v)}
+	}
+	stageEntry(ctx, t, st, staging.EntryKey{Name: "/cfg/X", Namespace: "prod"}, update("staged-p"))
+	stageEntry(ctx, t, st, staging.EntryKey{Name: "/cfg/X"}, update("staged-null"))
+
+	out, err := svc.Apply(ctx, false)
+	require.NoError(t, err)
+
+	require.Len(t, out.Entries, 2)
+	assert.Equal(t, "/cfg/X", out.Entries[0].Name)
+	assert.Empty(t, out.Entries[0].Namespace, "the null namespace sorts first")
+	assert.Equal(t, "/cfg/X", out.Entries[1].Name)
+	assert.Equal(t, "prod", out.Entries[1].Namespace)
+}
+
 // TestStagingService_Reset covers Reset over both a populated and an empty store,
 // pinning stagingResetType's UnstagedAll and NothingStaged mappings and the count.
 //

@@ -28,3 +28,14 @@ func (BareGrammar) Parse(input string) (*BareSpec, error) {
 
 	return &BareSpec{Name: name}, nil
 }
+
+// Split parses input and returns the whole argument as the name. The suffix is
+// always empty: an unversioned service has no version to select.
+func (g BareGrammar) Split(input string) (name, suffix string, err error) {
+	spec, err := g.Parse(input)
+	if err != nil {
+		return "", "", err
+	}
+
+	return spec.Name, "", nil
+}

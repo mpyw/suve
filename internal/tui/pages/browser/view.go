@@ -89,7 +89,7 @@ func (m *Model) renderHeader(width int) (string, []headerSeg) {
 		piece{toggle(m.styles, "values", m.valuesOn), regionValues},
 	)
 
-	if m.svcCap.Service == "param" && !m.svcCap.HasNamespaces {
+	if m.svcCap.HasRecursiveList {
 		pieces = append(pieces,
 			piece{"  ", ""},
 			piece{toggle(m.styles, "recursive", m.recursive), regionRecursive},

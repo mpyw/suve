@@ -46,10 +46,5 @@ func (azureKeyVaultSecretHooks) traits() versionedTraits {
 }
 
 func (azureKeyVaultSecretHooks) parse(input string) (name, suffix string, err error) {
-	spec, err := version.KeyVault.Parse(input)
-	if err != nil {
-		return "", "", err
-	}
-
-	return spec.Name, version.KeyVault.Suffix(spec), nil
+	return version.KeyVault.Split(input)
 }

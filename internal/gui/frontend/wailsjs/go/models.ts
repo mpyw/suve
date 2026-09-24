@@ -14,6 +14,7 @@ export namespace capability {
 	    hasRecoveryWindow: boolean;
 	    hasDescription: boolean;
 	    hasValueType: boolean;
+	    hasRecursiveList: boolean;
 	    scopeField: string;
 	    nativeTagName: string;
 	
@@ -36,6 +37,7 @@ export namespace capability {
 	        this.hasRecoveryWindow = source["hasRecoveryWindow"];
 	        this.hasDescription = source["hasDescription"];
 	        this.hasValueType = source["hasValueType"];
+	        this.hasRecursiveList = source["hasRecursiveList"];
 	        this.scopeField = source["scopeField"];
 	        this.nativeTagName = source["nativeTagName"];
 	    }

@@ -72,4 +72,27 @@ test.describe('App Configuration staging view namespace (#431)', () => {
     await expect(rows).toHaveCount(2);
     await expect(rows.locator('.namespace-badge')).toHaveText(['dev', 'prd']);
   });
+
+  test('applying one key staged under two namespaces reports each namespace', async ({ page }) => {
+    await setupWailsMocks(page, createAzureNamespaceState());
+    await page.goto('/');
+    await waitForItemList(page);
+
+    // The same key under the null namespace and under dev.
+    await stageCreate(page, 'app/multi', 'null-val');
+    await nsSelect(page).selectOption('dev');
+    await stageCreate(page, 'app/multi', 'dev-val');
+
+    await navigateTo(page, 'Staging');
+    await page.getByRole('button', { name: /Apply/i }).first().click();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
+    await page.locator('.form-actions').getByRole('button', { name: /Apply|Confirm/i }).first().click();
+    await expect(page.getByRole('button', { name: 'Close' })).toBeVisible({ timeout: 10000 });
+
+    // One result row per namespace: grouping by name would show only one.
+    const rows = page.locator('.result-item').filter({ hasText: 'app/multi' });
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0).locator('.result-namespace')).toHaveCount(0);
+    await expect(rows.nth(1).locator('.result-namespace')).toHaveText('dev');
+  });
 });

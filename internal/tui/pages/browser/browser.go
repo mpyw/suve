@@ -232,7 +232,7 @@ func New(
 		tagStagedKeys:    map[data.StagedKey]struct{}{},
 		// Recursive listing defaults on (GUI parity): a param browser shows the whole
 		// subtree under a prefix by default. The toggle is only shown/effective for a
-		// non-namespaced param service; elsewhere the field is inert.
+		// HasRecursiveList service; elsewhere the field is inert.
 		recursive: true,
 	}
 	if m.svcCap.HasNamespaces {

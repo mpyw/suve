@@ -214,7 +214,7 @@ func (a *App) paramListWithNamespaces(
 // entry's own namespace so a namespaced setting is read under its own label
 // rather than the shared read scope's (which the footer filter never changes).
 func (a *App) ParamShow(specStr, namespace string) (*ParamShowResult, error) {
-	name, suffix, err := a.parseParamSpec(specStr)
+	name, suffix, err := a.parseSpec(provider.KindParam, specStr)
 	if err != nil {
 		return nil, err
 	}
@@ -290,12 +290,12 @@ func (a *App) ParamLog(name string, maxResults int32, namespace string) (*ParamL
 // App Configuration namespace (empty for the null/default namespace and every
 // other provider).
 func (a *App) ParamDiff(spec1Str, spec2Str, namespace string) (*ParamDiffResult, error) {
-	name1, suffix1, err := a.parseParamSpec(spec1Str)
+	name1, suffix1, err := a.parseSpec(provider.KindParam, spec1Str)
 	if err != nil {
 		return nil, err
 	}
 
-	name2, suffix2, err := a.parseParamSpec(spec2Str)
+	name2, suffix2, err := a.parseSpec(provider.KindParam, spec2Str)
 	if err != nil {
 		return nil, err
 	}

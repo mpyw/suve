@@ -153,7 +153,7 @@ func (a *App) SecretList(prefix string, withValue bool, filter string) (*SecretL
 
 // SecretShow shows a secret value.
 func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
-	name, suffix, err := a.parseSecretSpec(specStr)
+	name, suffix, err := a.parseSpec(provider.KindSecret, specStr)
 	if err != nil {
 		return nil, err
 	}
@@ -366,12 +366,12 @@ func (a *App) SecretRemoveTag(name, key string) error {
 
 // SecretDiff compares two secret versions.
 func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
-	name1, suffix1, err := a.parseSecretSpec(spec1Str)
+	name1, suffix1, err := a.parseSpec(provider.KindSecret, spec1Str)
 	if err != nil {
 		return nil, err
 	}
 
-	name2, suffix2, err := a.parseSecretSpec(spec2Str)
+	name2, suffix2, err := a.parseSpec(provider.KindSecret, spec2Str)
 	if err != nil {
 		return nil, err
 	}

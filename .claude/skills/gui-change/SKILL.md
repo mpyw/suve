@@ -27,9 +27,16 @@ landed across #273–#282.
   `wailsjs/go/models.ts`). Hide unsupported controls via the descriptor; never hardcode
   provider conditionals in Svelte. The descriptor also carries the data a
   provider switch used to hold: `hasValueType` (the param Type dropdown),
-  `hasNamespaces` (the namespace axis), `scopeField` (the scope field a service
+  `hasNamespaces` (the namespace axis), `hasRecursiveList` (the Recursive
+  toggle, Parameter Store only), `scopeField` (the scope field a service
   needs, so Azure shows a tab only for the vault or store that is set), and
   `nativeTagName` (the "(= Google Cloud: labels)" hint).
+- The sidebar scope form is built from the provider's `scopeFields`, and a
+  scope is complete once at least one service's `scopeField` is set. The
+  helpers live in `internal/gui/frontend/src/lib/scopeFields.ts`: its
+  `SCOPE_FIELDS` table maps each field name to the `ScopeSelection` property,
+  input id, label and hint. Add a scope field there, not a provider branch in
+  `App.svelte` or `Sidebar.svelte`.
 - Go code looks capabilities up with `capability.Service(p, service)`,
   `capability.Provider(p)` and `capability.DisplayName(p)`. The bindings gate
   on `a.serviceCapability(kind)` (`internal/gui/capability.go`) rather than on
@@ -51,11 +58,12 @@ landed across #273–#282.
 
 ## Provider-specific staging rules
 
-- Do not switch on the provider in `internal/gui` for staging parsers,
-  strategies, staging scopes, or the App Configuration namespace. Look them up
-  in `internal/staging/binding` (the GUI's `stagingBinding`,
-  `stagingScopeForKindScoped`, `effectiveParamScopeScoped`), which the CLI and
-  TUI share.
+- Do not switch on the provider in `internal/gui` for version grammars,
+  staging parsers, strategies, staging scopes, or the App Configuration
+  namespace. Look them up in `internal/staging/binding`, which the CLI and
+  TUI share (the GUI's `stagingBinding`, `stagingScopeForKindScoped`,
+  `effectiveParamScopeScoped`, and `parseSpec` in `internal/gui/spec.go`,
+  which uses `Binding.SplitSpec`).
 - The launch scope and the bare-launch provider come from the shared helpers:
   `RegisterLaunchMode` (`internal/cli/commands/launch.go`),
   `detect.HydrateScope`, and `detect.Result.UniqueProvider`.

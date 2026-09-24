@@ -52,6 +52,8 @@ export interface StagedEntry {
   name: string;
   operation: StagedOperation;
   value?: string;
+  // App Configuration namespace the entry is staged under ('' = null).
+  namespace?: string;
   // Optional service classifier. Export/import stamp this onto each entry so a
   // per-service envelope round-trips back into the same service regardless of
   // the name shape (Google Cloud/Azure names carry no leading '/').
@@ -134,6 +136,7 @@ export interface ServiceCapability {
   hasNamespaces: boolean;
   hasDescription: boolean;
   hasValueType: boolean;
+  hasRecursiveList: boolean;
   scopeField: string;
   nativeTagName: string;
 }
@@ -298,8 +301,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'AWS',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'Parameter Store', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: true, scopeField: '', nativeTagName: '' },
-      { service: 'secret', displayName: 'Secrets Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true, hasValueType: false, scopeField: '', nativeTagName: '' },
+      { service: 'param', displayName: 'Parameter Store', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: true, hasRecursiveList: true, scopeField: '', nativeTagName: '' },
+      { service: 'secret', displayName: 'Secrets Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true, hasValueType: false, hasRecursiveList: false, scopeField: '', nativeTagName: '' },
     ],
   },
   {
@@ -307,7 +310,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: false, scopeField: '', nativeTagName: 'labels' },
+      { service: 'secret', displayName: 'Secret Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: false, hasRecursiveList: false, scopeField: 'project', nativeTagName: 'labels' },
     ],
   },
   {
@@ -315,8 +318,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: ['vault', 'store', 'namespace'],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true, hasDescription: false, hasValueType: false, scopeField: 'store', nativeTagName: '' },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: false, hasValueType: false, scopeField: 'vault', nativeTagName: '' },
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true, hasDescription: false, hasValueType: false, hasRecursiveList: false, scopeField: 'store', nativeTagName: '' },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: false, hasValueType: false, hasRecursiveList: false, scopeField: 'vault', nativeTagName: '' },
     ],
   },
 ];
@@ -1279,8 +1282,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         if (state.stagingApplyUnstageErrorService === service) {
           return {
             serviceName: service,
-            entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated', unstageError: 'keychain locked' })) : null,
-            tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, status: 'updated', unstageError: 'keychain locked' })) : null,
+            entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, namespace: s.namespace ?? '', status: s.operation === 'delete' ? 'deleted' : 'updated', unstageError: 'keychain locked' })) : null,
+            tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, namespace: t.namespace ?? '', status: 'updated', unstageError: 'keychain locked' })) : null,
             conflicts: null,
             entrySucceeded: entryCount,
             entryFailed: 0,
@@ -1301,8 +1304,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         // slipped past the mock once).
         return {
           serviceName: service,
-          entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, status: s.operation === 'delete' ? 'deleted' : 'updated' })) : null,
-          tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, status: 'updated' })) : null,
+          entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, namespace: s.namespace ?? '', status: s.operation === 'delete' ? 'deleted' : 'updated' })) : null,
+          tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, namespace: t.namespace ?? '', status: 'updated' })) : null,
           conflicts: null,
           entrySucceeded: entryCount,
           entryFailed: 0,

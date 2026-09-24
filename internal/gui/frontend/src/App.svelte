@@ -18,17 +18,10 @@
   import SecretView from './lib/SecretView.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import StagingView from './lib/StagingView.svelte';
+  import { hasRequiredScope, scopeFieldValue, selectionFor, servicesInScope } from './lib/scopeFields';
   import { NS_ALL, NS_NULL, parseError } from './lib/viewUtils';
 
   type ViewKey = 'param' | 'secret' | 'staging';
-
-  // Capability scope-field names → the ScopeSelection field that holds each.
-  const SCOPE_FIELD_KEYS: Record<string, keyof gui.ScopeSelection> = {
-    project: 'projectId',
-    vault: 'vaultName',
-    store: 'storeName',
-    namespace: 'namespace',
-  };
 
   // ---- Provider / scope: single source of truth for the whole app ----------
   let capabilities = $state<capability.ProviderCapability[]>([]);
@@ -72,17 +65,10 @@
 
   // ---- Derived capability lookups -------------------------------------------
   const activeProvider = $derived(capabilities.find((c) => c.provider === provider) ?? null);
-  const allServices = $derived(activeProvider?.services ?? []);
   // A service with a scopeField is enabled only when that scope field is set
   // (Azure: vault → Key Vault, store → App Configuration), so a vault-only user
   // sees no param tab and vice versa. Other services are always offered.
-  const services = $derived(
-    allServices.filter((s) => {
-      if (!s.scopeField) return true;
-      const key = SCOPE_FIELD_KEYS[s.scopeField];
-      return !!(key && scope?.[key]);
-    }),
-  );
+  const services = $derived(servicesInScope(activeProvider, scope));
   const hasAnyStaging = $derived(services.some((s) => s.hasStaging));
 
   // Which provider the sidebar scope form is for, and its prefill values
@@ -176,15 +162,13 @@
     const cached = readCachedScope(p);
     const launch = scope?.provider === p ? scope : null;
     const env = await withRetry(() => EnvScope(p)).catch(() => null);
-    const pick = (field: keyof gui.ScopeSelection): string =>
-      (launch?.[field] || env?.[field] || cached?.[field] || '') as string;
-    return {
-      provider: p,
-      projectId: p === 'googlecloud' ? pick('projectId') : '',
-      vaultName: p === 'azure' ? pick('vaultName') : '',
-      storeName: p === 'azure' ? pick('storeName') : '',
-      namespace: p === 'azure' ? pick('namespace') : '',
-    } as gui.ScopeSelection;
+    const pick = (field: string): string =>
+      scopeFieldValue(launch, field) || scopeFieldValue(env, field) || scopeFieldValue(cached, field);
+    return selectionFor(capabilityOf(p), p, pick);
+  }
+
+  function capabilityOf(p: string): capability.ProviderCapability | null {
+    return capabilities.find((c) => c.provider === p) ?? null;
   }
 
   // ---- localStorage persistence of the last-applied scope per provider ------
@@ -220,19 +204,6 @@
     }
   }
 
-  function hasRequiredScope(sel: gui.ScopeSelection): boolean {
-    switch (sel.provider) {
-      case 'aws':
-        return true;
-      case 'googlecloud':
-        return !!sel.projectId;
-      case 'azure':
-        return !!sel.vaultName || !!sel.storeName;
-      default:
-        return false;
-    }
-  }
-
   // handleSelectProvider is invoked from the provider dropdown (and at startup).
   // If the prefilled scope already satisfies the provider it applies at once;
   // otherwise it parks the choice in pendingProvider so the sidebar shows the
@@ -241,7 +212,7 @@
     scopeError = '';
 
     const sel = await buildSelection(p);
-    if (hasRequiredScope(sel)) {
+    if (hasRequiredScope(capabilityOf(sel.provider), sel)) {
       await applyScope(sel);
     } else {
       pendingProvider = p;
@@ -253,7 +224,7 @@
   // forgets the provider's cached scope and returns to the provider prompt,
   // rather than erroring. A non-empty submission applies normally.
   async function handleSelectScope(sel: gui.ScopeSelection) {
-    if (!hasRequiredScope(sel)) {
+    if (!hasRequiredScope(capabilityOf(sel.provider), sel)) {
       clearScope(sel.provider);
       return;
     }
