@@ -22,12 +22,12 @@ the CLI and staging layers talk to a provider-neutral `provider.Store`, and a
 Two ways to reach a provider coexist:
 
 1. **Explicit groups — always present.** `suve aws`, `suve gcloud`, and
-   `suve azure` are registered unconditionally (`internal/cli/commands/app.go:50-54`).
+   `suve azure` are registered unconditionally (`MakeAppWithDetect` in `internal/cli/commands/app.go`).
 
 2. **Flat aliases — env-detected.** The bare `param`, `secret`, and `stage`
    commands are aliases added only when exactly one provider is active for that
    service. Detection runs at process start
-   (`detect.Resolve(detect.OSEnvironment())`, invoked at `app.go:42`) and is
+   (`detect.Resolve(detect.OSEnvironment())`, invoked by `MakeApp`) and is
    implemented in `internal/provider/detect/detect.go`. It reads only env vars
    (no network, no credential-chain resolution):
 
@@ -72,7 +72,7 @@ Each command group resolves its store through this shared registry via
 `provider.KindSecret`). A `Factory` returns `provider.ErrUnsupportedKind` when a
 provider does not offer a requested kind, and the registry returns
 `provider.ErrNoFactory` for an unregistered provider
-(`internal/provider/registry.go:17-25`).
+(`Registry.Store` in `internal/provider/registry.go`).
 
 ## Scope construction per provider
 

@@ -578,8 +578,11 @@ suve azure param list [options] [filter-prefix]
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--filter` | - | - | Filter by regex pattern (client-side) |
-| `--show` | - | `false` | Show setting values (format: `<key><TAB><value>`) |
+| `--show` | - | `false` | Show setting values (format: `<namespace><TAB><key><TAB><value>`) |
 | `--output` | - | `text` | Output format: `text` (default) or `json` |
+| `--hide-namespace` | `--hide-ns` | `false` | Drop the NAMESPACE column and list keys only |
+
+Each text row starts with the setting's namespace; `(NULL)` is the null (default) namespace. The listing follows the group's `--namespace` filter: with no flag it shows the null namespace only, `*` shows every namespace, and `dev,prod` / `dev*` filter by OR / prefix. JSON output carries a `namespace` field.
 
 **Examples:**
 
@@ -592,6 +595,12 @@ suve azure param list app/ --store-name my-store
 
 # List with values
 suve azure param list --show app/ --store-name my-store
+
+# List across all namespaces
+suve azure param list --namespace '*' --store-name my-store
+
+# List keys only, without the namespace column
+suve azure param list --hide-ns app/ --store-name my-store
 
 # Output as JSON
 suve azure param list --output=json app/ --store-name my-store

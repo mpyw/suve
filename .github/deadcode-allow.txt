@@ -66,14 +66,3 @@ internal/staging/store/file/store.go: unreachable func: NewStoreWithPassphrase
 # timeutil.ResetLocationCache: test seam that clears the cached time.Location so
 # tests can re-exercise the lazy-load path.
 internal/timeutil/timeutil.go: unreachable func: ResetLocationCache
-
-# --- Not test helpers: GUI-only production callers ---------------------------
-# The two entries below are NOT test seams. They are live production code whose
-# only non-test caller is internal/gui (param.go / secret.go, both guarded by
-# `//go:build production || dev`). This gate runs deadcode with the default
-# build tags, which exclude the GUI, so the real callers are invisible and the
-# funcs look dead. Deleting them would break the GUI (`suve --gui`) build. Their
-# reachability from the GUI is already covered by the production golangci-lint
-# step, so they are waived here rather than deleted.
-internal/usecase/param/tag.go: unreachable func: TagUseCase.Execute
-internal/usecase/secret/tag.go: unreachable func: TagUseCase.Execute
