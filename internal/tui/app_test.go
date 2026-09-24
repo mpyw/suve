@@ -587,7 +587,7 @@ func TestUpdate_PendingTargetResolves(t *testing.T) {
 		fetchTarget: func() (provider.Target, error) { return resolved, nil },
 	})
 	require.True(t, m.statusBar().Target.Pending, "the AWS target is pending until STS answers")
-	assert.Equal(t, "aws", m.applyTargetLine())
+	assert.Equal(t, "AWS", m.applyTargetLine())
 
 	msg := m.fetchTargetCmd()()
 	require.Equal(t, targetMsg{target: resolved}, msg, "the fetch command reports the resolved target")
@@ -595,7 +595,7 @@ func TestUpdate_PendingTargetResolves(t *testing.T) {
 
 	m.Update(msg)
 	assert.False(t, m.statusBar().Target.Pending)
-	assert.Equal(t, "aws · profile dev · account 123456789012 · region ap-northeast-1", m.applyTargetLine())
+	assert.Equal(t, "AWS · profile dev · account 123456789012 · region ap-northeast-1", m.applyTargetLine())
 
 	failed := newApp(config{
 		scope:       provider.Scope{Provider: provider.ProviderAWS},
@@ -615,5 +615,5 @@ func TestUpdate_PendingTargetResolves(t *testing.T) {
 		},
 	})
 	assert.False(t, gcloud.statusBar().Target.Pending)
-	assert.Equal(t, "googlecloud · project proj", gcloud.applyTargetLine())
+	assert.Equal(t, "Google Cloud · project proj", gcloud.applyTargetLine())
 }

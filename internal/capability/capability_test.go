@@ -188,3 +188,64 @@ func TestAll_ProviderShape(t *testing.T) {
 
 	assert.Equal(t, want, got)
 }
+
+// TestAll_HasValueType pins the value-type selector to AWS Parameter Store, the
+// only service whose values carry a type.
+func TestAll_HasValueType(t *testing.T) {
+	t.Parallel()
+
+	for _, pc := range capability.All() {
+		for _, sc := range pc.Services {
+			want := pc.Provider == string(provider.ProviderAWS) && sc.Service == "param"
+			assert.Equal(t, want, sc.HasValueType, "%s %s", pc.Provider, sc.Service)
+		}
+	}
+}
+
+func TestLookups(t *testing.T) {
+	t.Parallel()
+
+	pc, ok := capability.Provider(provider.ProviderGoogleCloud)
+	assert.True(t, ok)
+	assert.Equal(t, "Google Cloud", pc.DisplayName)
+
+	sc, ok := capability.Service(provider.ProviderAzure, "param")
+	assert.True(t, ok)
+	assert.Equal(t, "App Configuration", sc.DisplayName)
+
+	_, ok = capability.Service(provider.ProviderGoogleCloud, "param")
+	assert.False(t, ok, "Google Cloud offers no param service")
+
+	_, ok = capability.Provider(provider.Provider("mystery"))
+	assert.False(t, ok)
+
+	_, ok = capability.Service(provider.Provider("mystery"), "secret")
+	assert.False(t, ok, "an unknown provider offers no service")
+
+	assert.Equal(t, "AWS", capability.DisplayName(provider.ProviderAWS))
+	assert.Equal(t, "mystery", capability.DisplayName(provider.Provider("mystery")), "an unknown provider keeps its key")
+}
+
+// TestAll_ScopeFieldMatchesScope pins each service's ScopeField to the scope
+// field provider.Scope.SupportsService checks, so the GUI's service tabs agree
+// with the backend.
+func TestAll_ScopeFieldMatchesScope(t *testing.T) {
+	t.Parallel()
+
+	for _, pc := range capability.All() {
+		for _, sc := range pc.Services {
+			if sc.ScopeField != "" {
+				assert.Contains(t, pc.ScopeFields, sc.ScopeField, "%s %s", pc.Provider, sc.Service)
+			}
+
+			kind := provider.Kind(sc.Service)
+			empty := provider.Scope{Provider: provider.Provider(pc.Provider), ProjectID: "p"}
+			assert.Equal(t, sc.ScopeField == "", empty.SupportsService(kind),
+				"%s %s: a service without a ScopeField is offered by the bare scope", pc.Provider, sc.Service)
+		}
+	}
+
+	azure := provider.Scope{Provider: provider.ProviderAzure, StoreName: "s"}
+	assert.True(t, azure.SupportsService(provider.KindParam))
+	assert.False(t, azure.SupportsService(provider.KindSecret))
+}

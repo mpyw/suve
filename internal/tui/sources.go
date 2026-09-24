@@ -62,7 +62,7 @@ func newSourceFactory(ctx context.Context, scope provider.Scope) *sourceFactory 
 // sourceFor returns the read source and (best-effort) staging probe for a
 // service tab, or (nil, nil) when the service is unavailable for the scope.
 func (f *sourceFactory) sourceFor(service string) (data.Source, data.StagingProbe) {
-	svcCap, ok := capabilityFor(f.scope.Provider, service)
+	svcCap, ok := capability.Service(f.scope.Provider, service)
 	if !ok {
 		return nil, nil
 	}
@@ -89,7 +89,7 @@ func (f *sourceFactory) sourceFor(service string) (data.Source, data.StagingProb
 // cases with the staged-write strategy (from the shared staging binding) and the
 // per-scope-cached staging store.
 func (f *sourceFactory) mutatorFor(service string) data.Mutator {
-	svcCap, ok := capabilityFor(f.scope.Provider, service)
+	svcCap, ok := capability.Service(f.scope.Provider, service)
 	if !ok {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (f *sourceFactory) mutatorFor(service string) data.Mutator {
 // never touches the keychain/registry on the update loop; a key-loss surfaces as
 // the review's error.
 func (f *sourceFactory) stagingService(service string) data.StagingService {
-	svcCap, ok := capabilityFor(f.scope.Provider, service)
+	svcCap, ok := capability.Service(f.scope.Provider, service)
 	if !ok || !svcCap.HasStaging {
 		return nil
 	}
@@ -240,7 +240,7 @@ func (f *sourceFactory) paramResolver() data.StoreResolver {
 // the service has no staging workflow. Building the on-disk store (which may
 // touch the keychain) is deferred to the first probe, off the update loop.
 func (f *sourceFactory) stagingProbe(kind provider.Kind, service string) data.StagingProbe {
-	svcCap, ok := capabilityFor(f.scope.Provider, service)
+	svcCap, ok := capability.Service(f.scope.Provider, service)
 	if !ok || !svcCap.HasStaging {
 		return nil
 	}
@@ -345,24 +345,6 @@ func (p *lazyStagingProbe) Staged(ctx context.Context) (data.StagingSnapshot, er
 	}
 
 	return probe.Staged(ctx)
-}
-
-// capabilityFor looks up the ServiceCapability for a provider+service in the
-// neutral matrix, so every gate reads one source of truth.
-func capabilityFor(prov provider.Provider, service string) (capability.ServiceCapability, bool) {
-	for _, pc := range capability.All() {
-		if pc.Provider != string(prov) {
-			continue
-		}
-
-		for _, sc := range pc.Services {
-			if sc.Service == service {
-				return sc, true
-			}
-		}
-	}
-
-	return capability.ServiceCapability{}, false
 }
 
 // parserFor returns the store-less staging parser for a provider+service

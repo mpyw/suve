@@ -14,13 +14,15 @@
   import './common.css';
 
   interface Props {
-    capability?: capabilityModel.ServiceCapability;
-    provider?: string;
+    // App mounts a view only for a service the provider offers.
+    capability: capabilityModel.ServiceCapability;
+    // The provider's display name, for the tags hint.
+    providerName?: string;
     onnavigatetostaging?: () => void;
     onstagingchange?: () => void;
   }
 
-  let { capability, provider = '', onnavigatetostaging, onstagingchange }: Props = $props();
+  let { capability, providerName = '', onnavigatetostaging, onstagingchange }: Props = $props();
 
   // Capability-driven visibility. Absent capability defaults to AWS-like (true).
   const stagingEnabled = $derived(capability?.hasStaging ?? true);
@@ -623,7 +625,7 @@
             {/if}
 
             {#if tagsEnabled && !tagsPerVersion}
-              <TagList tags={secretDetail.tags} serviceClass="secret" {provider} onadd={openTagModal} onremove={openRemoveTagModal} />
+              <TagList tags={secretDetail.tags} serviceClass="secret" nativeTagName={capability.nativeTagName} {providerName} onadd={openTagModal} onremove={openRemoveTagModal} />
             {/if}
 
             {#if historyEnabled && secretLog.length > 0}

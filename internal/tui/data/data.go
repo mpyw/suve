@@ -311,9 +311,9 @@ func (s *paramSource) Show(ctx context.Context, name, namespace string) (Detail,
 		d.Meta = append(d.Meta, MetaRow{Label: "Version", Value: currentVersionLabel(out.Version)})
 	}
 
-	// App Configuration values are untyped, so only a typed param service (AWS
-	// SSM) shows a Type row — matching the GUI hiding it for App Config.
-	if !s.svcCap.HasNamespaces {
+	// Only a service with typed values (HasValueType) shows a Type row —
+	// matching the GUI hiding it elsewhere.
+	if s.svcCap.HasValueType {
 		d.Meta = append(d.Meta, MetaRow{Label: "Type", Value: typeLabel(out.Type, true)})
 	}
 

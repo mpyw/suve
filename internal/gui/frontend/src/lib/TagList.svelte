@@ -4,17 +4,20 @@
   interface Props {
     tags: Array<{ key: string; value: string }> | undefined;
     serviceClass: 'param' | 'secret';
-    provider?: string;
+    // The cloud's own term for tags (the capability's nativeTagName, e.g.
+    // "labels"), or '' when it also says tags; providerName names the cloud.
+    nativeTagName?: string;
+    providerName?: string;
     onadd: () => void;
     onremove: (key: string) => void;
   }
 
-  let { tags, serviceClass, provider = '', onadd, onremove }: Props = $props();
+  // suve uses one metadata vocabulary ("Tags") across every provider. A cloud
+  // with its own term for the same key=value metadata (the capability's
+  // nativeTagName) gets a secondary, non-primary hint without renaming the field.
+  let { tags, serviceClass, nativeTagName = '', providerName = '', onadd, onremove }: Props = $props();
 
-  // suve uses one metadata vocabulary ("Tags") across every provider. Google
-  // Cloud natively calls this same key=value metadata "labels", so surface a
-  // secondary, non-primary hint for GCloud users without renaming the field.
-  const nativeHint = $derived(provider === 'googlecloud' ? '(= Google Cloud: labels)' : '');
+  const nativeHint = $derived(nativeTagName ? `(= ${providerName}: ${nativeTagName})` : '');
 </script>
 
 <div class="detail-section">

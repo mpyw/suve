@@ -344,10 +344,10 @@ func (a *App) ParamSet(name, value, paramType, namespace, description string) (*
 		return nil, err
 	}
 
-	// Defense in depth: only honor a description where the provider persists it.
-	// The frontend hides the input for Azure, but drop it here too so a stale or
-	// forged call cannot smuggle one past the capability gate.
-	if !a.hasDescriptionCapability() {
+	// Defense in depth: only honor a description where the service persists it.
+	// The frontend hides the input without HasDescription, but drop it here too
+	// so a stale or forged call cannot smuggle one past the capability gate.
+	if !a.serviceCapability(provider.KindParam).HasDescription {
 		description = ""
 	}
 
@@ -455,10 +455,10 @@ func (a *App) ParamRemoveTag(name, key, namespace string) error {
 // ParamTypeOptions returns the selectable parameter type display names for the
 // current provider (AWS: "String", "SecureString", "StringList"). The frontend
 // renders its type dropdown from this list instead of hardcoding SSM strings.
-// Only AWS SSM has a value type; Azure App Configuration values are untyped, so
-// the list is empty there and the frontend hides the Type dropdown.
+// Only a service with HasValueType has one (AWS SSM); elsewhere values are
+// untyped, so the list is empty and the frontend hides the Type dropdown.
 func (a *App) ParamTypeOptions() []string {
-	if a.currentScope().Provider != provider.ProviderAWS {
+	if !a.serviceCapability(provider.KindParam).HasValueType {
 		return []string{}
 	}
 

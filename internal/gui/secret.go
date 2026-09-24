@@ -237,7 +237,7 @@ func (a *App) SecretCreate(name, value, description string) (*SecretCreateResult
 		return nil, err
 	}
 
-	if !a.hasDescriptionCapability() {
+	if !a.serviceCapability(provider.KindSecret).HasDescription {
 		description = ""
 	}
 
@@ -267,7 +267,7 @@ func (a *App) SecretUpdate(name, value, description string) (*SecretUpdateResult
 		return nil, err
 	}
 
-	if !a.hasDescriptionCapability() {
+	if !a.serviceCapability(provider.KindSecret).HasDescription {
 		description = ""
 	}
 
@@ -321,11 +321,10 @@ func (a *App) SecretDelete(name string, force bool) (*SecretDeleteResult, error)
 	}
 	// The provider Delete returns only an error; when not forcing, compute the
 	// scheduled deletion date client-side (now + AWS default recovery window).
-	// Only AWS Secrets Manager has a recovery window: Google Cloud deletes
-	// immediately and Key Vault retention is governed by vault policy, so a
-	// synthetic "recoverable until" date there would be false. Gate on the
-	// active provider (mirrors ServiceCapability.HasRecoveryWindow).
-	if !force && a.currentScope().Provider == provider.ProviderAWS {
+	// Only a service with HasRecoveryWindow (AWS Secrets Manager) has one:
+	// Google Cloud deletes immediately and Key Vault retention is governed by
+	// vault policy, so a synthetic "recoverable until" date there would be false.
+	if !force && a.serviceCapability(provider.KindSecret).HasRecoveryWindow {
 		const defaultRecoveryWindowDays = 30
 
 		r.DeletionDate = timeutil.FormatRFC3339(time.Now().AddDate(0, 0, defaultRecoveryWindowDays))

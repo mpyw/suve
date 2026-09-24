@@ -13,6 +13,9 @@ export namespace capability {
 	    hasForceDelete: boolean;
 	    hasRecoveryWindow: boolean;
 	    hasDescription: boolean;
+	    hasValueType: boolean;
+	    scopeField: string;
+	    nativeTagName: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ServiceCapability(source);
@@ -32,6 +35,9 @@ export namespace capability {
 	        this.hasForceDelete = source["hasForceDelete"];
 	        this.hasRecoveryWindow = source["hasRecoveryWindow"];
 	        this.hasDescription = source["hasDescription"];
+	        this.hasValueType = source["hasValueType"];
+	        this.scopeField = source["scopeField"];
+	        this.nativeTagName = source["nativeTagName"];
 	    }
 	}
 	export class ProviderCapability {

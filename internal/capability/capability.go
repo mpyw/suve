@@ -6,6 +6,8 @@
 package capability
 
 import (
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/provider"
 )
 
@@ -61,6 +63,19 @@ type ServiceCapability struct {
 	// frontend hides the description field for them and the staged CLI does not
 	// register a --description flag.
 	HasDescription bool `json:"hasDescription"`
+	// HasValueType is true when a value carries a selectable type (AWS
+	// Parameter Store's String/SecureString/StringList). The frontends show the
+	// type selector only when true, and the GUI returns no type options otherwise.
+	HasValueType bool `json:"hasValueType"`
+	// ScopeField names the provider scope field (one of the provider's
+	// ScopeFields) that must be set for this service to be available, or ""
+	// when the provider scope always offers it. Azure's two services are
+	// separate resources: App Configuration needs "store", Key Vault "vault".
+	ScopeField string `json:"scopeField"`
+	// NativeTagName is what the cloud itself calls suve's tags, shown as a
+	// secondary hint next to "Tags" (Google Cloud Secret Manager: "labels").
+	// Empty when the cloud also says tags.
+	NativeTagName string `json:"nativeTagName"`
 }
 
 // ProviderCapability describes a provider and the services it offers.
@@ -94,6 +109,7 @@ func All() []ProviderCapability {
 					Service: serviceParam, DisplayName: "Parameter Store",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
+					HasValueType: true,
 				},
 				{
 					Service: serviceSecret, DisplayName: "Secrets Manager",
@@ -111,6 +127,7 @@ func All() []ProviderCapability {
 					Service: serviceSecret, DisplayName: "Secret Manager",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
+					NativeTagName: "labels",
 				},
 			},
 		},
@@ -125,6 +142,7 @@ func All() []ProviderCapability {
 					Service: serviceParam, DisplayName: "App Configuration",
 					HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasNamespaces: true,
+					ScopeField: "store",
 				},
 				{
 					Service: serviceSecret, DisplayName: "Key Vault",
@@ -134,8 +152,35 @@ func All() []ProviderCapability {
 					// staged deletes can't carry it — so deletes are always soft (Restore
 					// recovers them). HasForceDelete/HasRecoveryWindow both stay false.
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false,
+					ScopeField: "vault",
 				},
 			},
 		},
 	}
+}
+
+// Provider returns the capability descriptor of provider p.
+func Provider(p provider.Provider) (ProviderCapability, bool) {
+	return lo.Find(All(), func(pc ProviderCapability) bool { return pc.Provider == string(p) })
+}
+
+// Service returns the capability of one service ("param" or "secret") of
+// provider p.
+func Service(p provider.Provider, service string) (ServiceCapability, bool) {
+	pc, ok := Provider(p)
+	if !ok {
+		return ServiceCapability{}, false
+	}
+
+	return lo.Find(pc.Services, func(sc ServiceCapability) bool { return sc.Service == service })
+}
+
+// DisplayName returns the provider's display name ("AWS", "Google Cloud",
+// "Azure"), or the bare key for an unknown provider.
+func DisplayName(p provider.Provider) string {
+	if pc, ok := Provider(p); ok {
+		return pc.DisplayName
+	}
+
+	return string(p)
 }

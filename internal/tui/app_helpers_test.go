@@ -84,22 +84,22 @@ func TestApplyTargetLine(t *testing.T) {
 	t.Parallel()
 
 	awsWith := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
-	assert.Equal(t, "aws · profile dev · account 123456789012 · region ap-northeast-1", awsWith.applyTargetLine(),
+	assert.Equal(t, "AWS · profile dev · account 123456789012 · region ap-northeast-1", awsWith.applyTargetLine(),
 		"AWS voices profile, account and region from the resolved target")
 
 	awsNo := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}})
-	assert.Equal(t, "aws", awsNo.applyTargetLine(), "AWS with no identity is just the provider name")
+	assert.Equal(t, "AWS", awsNo.applyTargetLine(), "AWS with no identity is just the provider name")
 
 	gcloud := newApp(config{scope: provider.GoogleCloudScope("proj")})
-	assert.Equal(t, "googlecloud · project proj", gcloud.applyTargetLine(), "Google Cloud voices the project")
+	assert.Equal(t, "Google Cloud · project proj", gcloud.applyTargetLine(), "Google Cloud voices the project")
 
 	azure := newApp(config{scope: provider.Scope{Provider: provider.ProviderAzure, VaultName: "v", StoreName: "s"}})
-	assert.Equal(t, "azure · vault v · store s", azure.applyTargetLine(), "Azure voices the vault and store")
+	assert.Equal(t, "Azure · vault v · store s", azure.applyTargetLine(), "Azure voices the vault and store")
 
 	azureNS := newApp(config{scope: provider.Scope{
 		Provider: provider.ProviderAzure, StoreName: "s", AppConfigNamespace: "dev",
 	}})
-	assert.Equal(t, "azure · store s · namespace dev", azureNS.applyTargetLine(), "Azure voices a selected namespace")
+	assert.Equal(t, "Azure · store s · namespace dev", azureNS.applyTargetLine(), "Azure voices a selected namespace")
 
 	unknown := newApp(config{scope: provider.Scope{Provider: provider.Provider("mystery")}})
 	assert.Equal(t, "mystery", unknown.applyTargetLine(), "an unknown provider falls back to its bare name")

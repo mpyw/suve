@@ -22,6 +22,14 @@
 
   type ViewKey = 'param' | 'secret' | 'staging';
 
+  // Capability scope-field names → the ScopeSelection field that holds each.
+  const SCOPE_FIELD_KEYS: Record<string, keyof gui.ScopeSelection> = {
+    project: 'projectId',
+    vault: 'vaultName',
+    store: 'storeName',
+    namespace: 'namespace',
+  };
+
   // ---- Provider / scope: single source of truth for the whole app ----------
   let capabilities = $state<capability.ProviderCapability[]>([]);
   let provider = $state(''); // '' until resolved/selected → selector prompt
@@ -65,13 +73,15 @@
   // ---- Derived capability lookups -------------------------------------------
   const activeProvider = $derived(capabilities.find((c) => c.provider === provider) ?? null);
   const allServices = $derived(activeProvider?.services ?? []);
-  // Azure enables a service tab only when its scope name is set (vaultName → Key
-  // Vault secret; storeName → App Configuration param), so a vault-only user
-  // sees no param tab and vice versa. Other providers expose all their services.
+  // A service with a scopeField is enabled only when that scope field is set
+  // (Azure: vault → Key Vault, store → App Configuration), so a vault-only user
+  // sees no param tab and vice versa. Other services are always offered.
   const services = $derived(
-    provider === 'azure'
-      ? allServices.filter((s) => (s.service === 'secret' ? !!scope?.vaultName : !!scope?.storeName))
-      : allServices,
+    allServices.filter((s) => {
+      if (!s.scopeField) return true;
+      const key = SCOPE_FIELD_KEYS[s.scopeField];
+      return !!(key && scope?.[key]);
+    }),
   );
   const hasAnyStaging = $derived(services.some((s) => s.hasStaging));
 
@@ -415,7 +425,7 @@
         {#if effectiveView === 'param' && paramCap}
           <ParamView
             capability={paramCap}
-            {provider}
+            providerName={activeProvider?.displayName ?? ''}
             {selectedNamespace}
             onnamespaces={handleNamespaces}
             onnavigatetostaging={() => handleNavigate('staging')}
@@ -424,7 +434,7 @@
         {:else if effectiveView === 'secret' && secretCap}
           <SecretView
             capability={secretCap}
-            {provider}
+            providerName={activeProvider?.displayName ?? ''}
             onnavigatetostaging={() => handleNavigate('staging')}
             onstagingchange={handleStagingChange}
           />

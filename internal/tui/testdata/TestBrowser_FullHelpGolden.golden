@@ -1,4 +1,4 @@
-suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
+suve  AWS · profile:dev · account:123456789012 · region:ap-northeast-1
  Parameter Store Secrets Manager Staging
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 prefix: —   filter: —   values:off  ⟳

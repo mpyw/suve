@@ -34,7 +34,7 @@ var (
 
 // capFor looks up a service capability for the fixtures.
 func capFor(prov, service string) capability.ServiceCapability {
-	sc, _ := capabilityFor(provider.Provider(prov), service)
+	sc, _ := capability.Service(provider.Provider(prov), service)
 
 	return sc
 }

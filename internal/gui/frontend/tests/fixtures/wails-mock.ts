@@ -131,6 +131,9 @@ export interface ServiceCapability {
   hasRecoveryWindow: boolean;
   hasNamespaces: boolean;
   hasDescription: boolean;
+  hasValueType: boolean;
+  scopeField: string;
+  nativeTagName: string;
 }
 
 export interface ProviderCapability {
@@ -296,8 +299,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'AWS',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'Parameter Store', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true },
-      { service: 'secret', displayName: 'Secrets Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true },
+      { service: 'param', displayName: 'Parameter Store', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: true, scopeField: '', nativeTagName: '' },
+      { service: 'secret', displayName: 'Secrets Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true, hasValueType: false, scopeField: '', nativeTagName: '' },
     ],
   },
   {
@@ -305,7 +308,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true },
+      { service: 'secret', displayName: 'Secret Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: false, scopeField: '', nativeTagName: 'labels' },
     ],
   },
   {
@@ -313,8 +316,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: ['vault', 'store', 'namespace'],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true, hasDescription: false },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: false },
+      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true, hasDescription: false, hasValueType: false, scopeField: 'store', nativeTagName: '' },
+      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: false, hasValueType: false, scopeField: 'vault', nativeTagName: '' },
     ],
   },
 ];
@@ -1024,8 +1027,13 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
       // Only AWS SSM has value types; Azure App Configuration is untyped
       // (empty list hides the frontend Type dropdown).
-      ParamTypeOptions: async () =>
-        state.currentScope.provider === 'aws' ? ['String', 'SecureString', 'StringList'] : [],
+      // Mirrors the backend: options only for a param service with hasValueType.
+      ParamTypeOptions: async () => {
+        const param = (state.capabilities as ProviderCapability[])
+          .find((c) => c.provider === state.currentScope.provider)
+          ?.services.find((sv) => sv.service === 'param');
+        return param?.hasValueType ? ['String', 'SecureString', 'StringList'] : [];
+      },
       ParamLog: async (name: string, _limit?: number) => {
         // Azure App Configuration is unversioned — mirror the backend, which
         // returns ErrVersioningUnsupported from History (the value must still

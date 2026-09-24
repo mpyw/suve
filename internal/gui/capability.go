@@ -9,16 +9,18 @@ import (
 
 // Capabilities.
 
-// hasDescriptionCapability reports whether the current provider persists a
-// create/update description. It is the server-side backstop for the capability-
-// gated Description input: AWS (Param + Secret) and Google Cloud (Secret) honor
-// it; Azure App Configuration and Key Vault writers ignore it, so the binding
-// drops any description a stale/forged frontend might send (defense in depth,
-// #767). Mirrors ServiceCapability.HasDescription.
+// serviceCapability returns the capability of one service kind of the current
+// provider. The bindings gate provider-specific
+// behavior on it, as server-side backstops for the capability-gated controls
+// (defense in depth, #767): a stale or forged frontend call cannot reach a
+// feature the service does not have. An unknown service or provider has no
+// capabilities.
 //
-//declscope:package // the param and secret write bindings drop an unsupported description
-func (a *App) hasDescriptionCapability() bool {
-	return a.currentScope().Provider != provider.ProviderAzure
+//declscope:package // the param and secret bindings gate description, value type and recovery window on it
+func (a *App) serviceCapability(kind provider.Kind) capability.ServiceCapability {
+	sc, _ := capability.Service(a.currentScope().Provider, string(kind))
+
+	return sc
 }
 
 // Capabilities returns the static capability descriptor for every provider,

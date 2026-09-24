@@ -187,13 +187,13 @@ func NewEntryForm(in EntryFormInput) (Model, tea.Cmd) {
 // than taking a new one, and the dialog cannot seed the entry's current type — so
 // a Type control there could neither be honored nor shown accurately.
 func (d *entryForm) offersType() bool {
-	return d.svcCap.Service == serviceParam && !d.svcCap.HasNamespaces && !d.stagedOnly
+	return d.svcCap.HasValueType && !d.stagedOnly
 }
 
 // defaultEntryTypeLabel picks the Type select's initial value: the seeded label when
 // valid, else the canonical default ("String").
 func defaultEntryTypeLabel(svcCap capability.ServiceCapability, seed string) string {
-	if svcCap.Service != serviceParam || svcCap.HasNamespaces {
+	if !svcCap.HasValueType {
 		return ""
 	}
 
