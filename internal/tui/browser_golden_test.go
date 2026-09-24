@@ -92,7 +92,7 @@ func TestBrowser_AWSParamGolden(t *testing.T) { //nolint:paralleltest // goldenE
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), probe),
 	})
 
@@ -112,7 +112,7 @@ func TestBrowser_AWSParamValuesOnGolden(t *testing.T) { //nolint:paralleltest //
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), probe),
 	})
 
@@ -136,7 +136,7 @@ func TestBrowser_AWSParamHistoryFocusGolden(t *testing.T) { //nolint:paralleltes
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), probe),
 	})
 
@@ -154,7 +154,7 @@ func TestBrowser_AWSParamHistoryValueRevealGolden(t *testing.T) { //nolint:paral
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 
@@ -183,7 +183,7 @@ func TestBrowser_DeleteStagedGateStatusGolden(t *testing.T) { //nolint:parallelt
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
 		service:   "secret",
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("secret", awsSecretSource(), probe),
 	})
 
@@ -216,7 +216,7 @@ func awsParamStagedBannerApp(entry, tags bool) *App {
 
 	return newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), probe),
 	})
 }
@@ -265,7 +265,7 @@ func TestBrowser_CopyKeepsMaskGolden(t *testing.T) { //nolint:paralleltest // go
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 
@@ -284,7 +284,7 @@ func TestBrowser_JSONFormattedGolden(t *testing.T) { //nolint:paralleltest // go
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamJSONSource(), nil),
 	})
 
@@ -302,7 +302,7 @@ func TestBrowser_AWSSecretGolden(t *testing.T) { //nolint:paralleltest // golden
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
 		service:   "secret",
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("secret", awsSecretSource(), nil),
 	})
 

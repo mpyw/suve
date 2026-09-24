@@ -122,7 +122,7 @@ func gatherGlobalServices(
 		services = append(services, globalService{
 			spec:   spec,
 			store:  st,
-			target: resolved.Target,
+			target: resolved.Target.String(),
 			staged: len(entries[spec.Service]) + len(tags[spec.Service]),
 		})
 	}

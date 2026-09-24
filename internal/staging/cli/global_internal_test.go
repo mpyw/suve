@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
@@ -27,11 +28,11 @@ func globalNotConfigured(_ context.Context) (staging.ResolvedScope, error) {
 	return staging.ResolvedScope{}, fmt.Errorf("%w: no resource", staging.ErrServiceNotConfigured)
 }
 
-// globalTarget returns a scope whose Target is the given string, so the
+// globalTarget returns a scope whose Target renders as the given string, so the
 // injected store resolver can map it back to a specific mock store.
 func globalTarget(target string) staging.ScopeResolver {
 	return func(_ context.Context) (staging.ResolvedScope, error) {
-		return staging.ResolvedScope{Target: target}, nil
+		return staging.ResolvedScope{Target: provider.Target{Segments: []provider.TargetSegment{{Label: "at", Value: target}}}}, nil
 	}
 }
 
@@ -45,7 +46,7 @@ func globalResolveFrom(stores map[string]store.ReadWriteOperator) globalStoreRes
 			return nil, staging.ResolvedScope{}, err
 		}
 
-		return stores[rs.Target], rs, nil
+		return stores[rs.Target.Segments[0].Value], rs, nil
 	}
 }
 
@@ -149,7 +150,7 @@ func TestGlobalApplyUseCase_PerServiceStores(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, useCase.Services, 2)
 	assert.Equal(t, 2, total)
-	assert.Equal(t, []string{"store", "vault"}, targets)
+	assert.Equal(t, []string{"at store", "at vault"}, targets)
 	assert.Same(t, paramStore, useCase.Services[0].Store)
 	assert.Same(t, secretStore, useCase.Services[1].Store)
 }

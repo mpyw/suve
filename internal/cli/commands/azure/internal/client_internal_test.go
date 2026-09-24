@@ -20,7 +20,7 @@ func TestKeyVaultStagingScopeResolver(t *testing.T) {
 	ctx := WithStoreName(WithVaultName(t.Context(), "my-vault"), "my-store")
 	got, err := KeyVaultStagingScopeResolver(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, staging.ResolvedScope{Scope: provider.AzureKeyVaultScope("my-vault"), Target: "vault my-vault"}, got)
+	assert.Equal(t, staging.ResolvedScope{Scope: provider.AzureKeyVaultScope("my-vault"), Target: provider.AzureKeyVaultScope("my-vault").Target()}, got)
 }
 
 func TestAppConfigStagingScopeResolver(t *testing.T) {
@@ -35,6 +35,6 @@ func TestAppConfigStagingScopeResolver(t *testing.T) {
 
 	want := provider.AzureAppConfigScope("my-store")
 	want.AppConfigNamespace = "dev"
-	assert.Equal(t, staging.ResolvedScope{Scope: want, Target: "store my-store (namespace dev)"}, got)
+	assert.Equal(t, staging.ResolvedScope{Scope: want, Target: want.Target()}, got)
 	assert.Equal(t, "dev", AppConfigNamespace(ctx))
 }

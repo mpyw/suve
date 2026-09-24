@@ -44,7 +44,7 @@ func setupExportImportEnv(t *testing.T) provider.Scope {
 // fixedResolver returns a ScopeResolver that always resolves to scope.
 func fixedResolver(scope provider.Scope) staging.ScopeResolver {
 	return func(context.Context) (staging.ResolvedScope, error) {
-		return staging.ResolvedScope{Scope: scope, Target: scope.Key()}, nil
+		return staging.ResolvedScope{Scope: scope, Target: scope.Target()}, nil
 	}
 }
 

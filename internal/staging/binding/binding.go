@@ -113,7 +113,7 @@ var descriptors = map[provider.Provider]descriptor{
 				return staging.ResolvedScope{}, false
 			}
 
-			return staging.ResolvedScope{Scope: sc, Target: awsTarget("", sc.AccountID, sc.Region)}, true
+			return staging.ResolvedScope{Scope: sc, Target: sc.Target()}, true
 		},
 		identity: awsIdentity,
 	},
@@ -125,7 +125,7 @@ var descriptors = map[provider.Provider]descriptor{
 			},
 		},
 		stagingScope: func(sc provider.Scope, _ provider.Kind) (staging.ResolvedScope, bool) {
-			return staging.ResolvedScope{Scope: sc, Target: "project " + sc.ProjectID}, true
+			return staging.ResolvedScope{Scope: sc, Target: sc.Target()}, true
 		},
 	},
 	provider.ProviderAzure: {
@@ -148,15 +148,12 @@ var descriptors = map[provider.Provider]descriptor{
 				scope := provider.AzureAppConfigScope(sc.StoreName)
 				scope.AppConfigNamespace = sc.AppConfigNamespace
 
-				target := "store " + sc.StoreName
-				if sc.AppConfigNamespace != "" {
-					target += " (namespace " + sc.AppConfigNamespace + ")"
-				}
-
-				return staging.ResolvedScope{Scope: scope, Target: target}, true
+				return staging.ResolvedScope{Scope: scope, Target: scope.Target()}, true
 			}
 
-			return staging.ResolvedScope{Scope: provider.AzureKeyVaultScope(sc.VaultName), Target: "vault " + sc.VaultName}, true
+			scope := provider.AzureKeyVaultScope(sc.VaultName)
+
+			return staging.ResolvedScope{Scope: scope, Target: scope.Target()}, true
 		},
 	},
 }
@@ -177,7 +174,7 @@ func Lookup(p provider.Provider, kind provider.Kind) (Binding, error) {
 }
 
 // StagingScope resolves the scope that keys kind's staging state for the
-// selected scope sc, plus the confirmation target line. It fails only for an
+// selected scope sc, plus the confirmation target. It fails only for an
 // unknown provider: a known provider keys a kind it does not offer under the
 // selected scope, and the parser or strategy lookup rejects that kind instead.
 //
@@ -215,6 +212,29 @@ func DefaultIdentity(p provider.Provider) IdentityLookup {
 	return d.identity
 }
 
+// ResolveTarget describes what the selected scope sc points at, running the
+// provider's identity lookup when sc cannot describe itself (AWS: the STS
+// caller identity fills the profile, account and region). lookup replaces the
+// default lookup, as in StagingScope, so a caller can share one memoized lookup
+// between staging and display.
+func ResolveTarget(ctx context.Context, sc provider.Scope, lookup IdentityLookup) (provider.Target, error) {
+	target := sc.Target()
+	if !target.Pending {
+		return target, nil
+	}
+
+	if lookup == nil {
+		lookup = DefaultIdentity(sc.Provider)
+	}
+
+	resolved, err := lookup(ctx)
+	if err != nil {
+		return provider.Target{}, err
+	}
+
+	return resolved.Target, nil
+}
+
 // awsIdentity resolves the AWS staging scope (account and region) from the STS
 // caller identity.
 func awsIdentity(ctx context.Context) (staging.ResolvedScope, error) {
@@ -225,20 +245,6 @@ func awsIdentity(ctx context.Context) (staging.ResolvedScope, error) {
 
 	return staging.ResolvedScope{
 		Scope:  provider.AWSScope(identity.AccountID, identity.Region),
-		Target: awsTarget(identity.Profile, identity.AccountID, identity.Region),
+		Target: provider.AWSTarget(identity.Profile, identity.AccountID, identity.Region),
 	}, nil
-}
-
-// awsTarget formats the AWS confirmation target line:
-// "profile (account / region)" or "account / region".
-func awsTarget(profile, accountID, region string) string {
-	if accountID == "" || region == "" {
-		return ""
-	}
-
-	if profile != "" {
-		return fmt.Sprintf("%s (%s / %s)", profile, accountID, region)
-	}
-
-	return fmt.Sprintf("%s / %s", accountID, region)
 }

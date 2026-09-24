@@ -113,7 +113,7 @@ func TestStagingScope_NoLookupNeeded(t *testing.T) {
 			wantScope: provider.Scope{
 				Provider: provider.ProviderAzure, StoreName: "mystore", AppConfigNamespace: "dev",
 			},
-			wantTarget: "store mystore (namespace dev)",
+			wantTarget: "store mystore · namespace dev",
 		},
 		{
 			name:       "azure param without namespace",
@@ -134,7 +134,7 @@ func TestStagingScope_NoLookupNeeded(t *testing.T) {
 			scope:      provider.AWSScope("123456789012", "us-east-1"),
 			kind:       provider.KindSecret,
 			wantScope:  provider.AWSScope("123456789012", "us-east-1"),
-			wantTarget: "123456789012 / us-east-1",
+			wantTarget: "account 123456789012 · region us-east-1",
 		},
 	}
 
@@ -149,7 +149,7 @@ func TestStagingScope_NoLookupNeeded(t *testing.T) {
 			got, err := binding.StagingScope(t.Context(), tt.scope, tt.kind, failLookup)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantScope, got.Scope)
-			assert.Equal(t, tt.wantTarget, got.Target)
+			assert.Equal(t, tt.wantTarget, got.Target.String())
 		})
 	}
 }
@@ -157,7 +157,7 @@ func TestStagingScope_NoLookupNeeded(t *testing.T) {
 func TestStagingScope_AWSUsesLookup(t *testing.T) {
 	t.Parallel()
 
-	want := staging.ResolvedScope{Scope: provider.AWSScope("123456789012", "us-east-1"), Target: "dev (123456789012 / us-east-1)"}
+	want := staging.ResolvedScope{Scope: provider.AWSScope("123456789012", "us-east-1"), Target: provider.AWSTarget("dev", "123456789012", "us-east-1")}
 
 	var calls int
 
@@ -190,4 +190,44 @@ func TestStagingScope_UnknownProvider(t *testing.T) {
 	// Google Cloud keys staging from its project and has no identity lookup.
 	_, err := binding.DefaultIdentity(provider.ProviderGoogleCloud)(t.Context())
 	require.Error(t, err)
+}
+
+func TestResolveTarget(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a scope that describes itself skips the lookup", func(t *testing.T) {
+		t.Parallel()
+
+		lookup := func(context.Context) (staging.ResolvedScope, error) {
+			return staging.ResolvedScope{}, errors.New("lookup must not run")
+		}
+
+		got, err := binding.ResolveTarget(t.Context(), provider.GoogleCloudScope("proj"), lookup)
+		require.NoError(t, err)
+		assert.Equal(t, "project proj", got.String())
+	})
+
+	t.Run("a pending AWS target runs the lookup", func(t *testing.T) {
+		t.Parallel()
+
+		want := provider.AWSTarget("dev", "123456789012", "us-east-1")
+		lookup := func(context.Context) (staging.ResolvedScope, error) {
+			return staging.ResolvedScope{Scope: provider.AWSScope("123456789012", "us-east-1"), Target: want}, nil
+		}
+
+		got, err := binding.ResolveTarget(t.Context(), provider.Scope{Provider: provider.ProviderAWS}, lookup)
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("a lookup failure is returned", func(t *testing.T) {
+		t.Parallel()
+
+		lookup := func(context.Context) (staging.ResolvedScope, error) {
+			return staging.ResolvedScope{}, errors.New("no credentials")
+		}
+
+		_, err := binding.ResolveTarget(t.Context(), provider.Scope{Provider: provider.ProviderAWS}, lookup)
+		require.ErrorContains(t, err, "no credentials")
+	})
 }

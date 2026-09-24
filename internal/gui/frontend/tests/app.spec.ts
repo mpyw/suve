@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/coverage';
-import { setupWailsMocks, type MockState, createAWSIdentityState, createNoAWSIdentityState } from './fixtures/wails-mock';
+import { setupWailsMocks, type MockState, createAWSIdentityState, createAzureState, createNoAWSIdentityState } from './fixtures/wails-mock';
 
 test.describe('App Navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -117,7 +117,7 @@ test.describe('Empty State Handling', () => {
   });
 });
 
-test.describe('AWS Identity Display', () => {
+test.describe('Scope target display (AWS)', () => {
   test('should display AWS identity with profile in sidebar', async ({ page }) => {
     await setupWailsMocks(page, createAWSIdentityState('123456789012', 'ap-northeast-1', 'production'));
     await page.goto('/');
@@ -126,73 +126,100 @@ test.describe('AWS Identity Display', () => {
     await expect(page.locator('.sidebar')).toBeVisible();
 
     // Check AWS info section is displayed
-    const awsInfo = page.locator('.aws-info');
-    await expect(awsInfo).toBeVisible();
+    const info = page.locator('.scope-info');
+    await expect(info).toBeVisible();
 
     // Check profile is displayed
-    await expect(awsInfo.locator('.aws-info-profile')).toContainText('production');
+    await expect(info.locator('.scope-info-primary')).toContainText('production');
+
+    // Labels come from the backend's target segments, in display order
+    await expect(info.locator('.scope-info-label')).toHaveText(['profile', 'account', 'region']);
 
     // Check account is displayed
-    await expect(awsInfo).toContainText('123456789012');
+    await expect(info).toContainText('123456789012');
 
     // Check region is displayed
-    await expect(awsInfo).toContainText('ap-northeast-1');
+    await expect(info).toContainText('ap-northeast-1');
   });
 
   test('renders "?" for the profile when none is set', async ({ page }) => {
     await setupWailsMocks(page, createAWSIdentityState('987654321098', 'us-east-1', ''));
     await page.goto('/');
 
-    const awsInfo = page.locator('.aws-info');
-    await expect(awsInfo).toBeVisible();
+    const info = page.locator('.scope-info');
+    await expect(info).toBeVisible();
 
     // Profile is optional; it renders as "?" instead of being hidden.
-    await expect(awsInfo.locator('.aws-info-profile')).toHaveText('?');
+    await expect(info.locator('.scope-info-primary')).toHaveText('?');
     // Account and region still show their values.
-    await expect(awsInfo).toContainText('987654321098');
-    await expect(awsInfo).toContainText('us-east-1');
+    await expect(info).toContainText('987654321098');
+    await expect(info).toContainText('us-east-1');
   });
 
   test('renders the AWS panel with "?" everywhere when identity is unavailable', async ({ page }) => {
     await setupWailsMocks(page, createNoAWSIdentityState());
     await page.goto('/');
 
-    const awsInfo = page.locator('.aws-info');
+    const info = page.locator('.scope-info');
     // Symmetric with Google Cloud / Azure: the panel always renders, with "?"
     // for every unresolved value rather than being hidden.
-    await expect(awsInfo).toBeVisible();
-    await expect(awsInfo.getByText('?', { exact: true })).toHaveCount(3);
+    await expect(info).toBeVisible();
+    await expect(info.getByText('?', { exact: true })).toHaveCount(3);
   });
 
-  test('renders the AWS panel with "?" when GetAWSIdentity fails', async ({ page }) => {
+  test('renders the AWS panel with "?" when ResolveScopeTarget fails', async ({ page }) => {
     await setupWailsMocks(page, {
-      simulateError: { operation: 'GetAWSIdentity', message: 'No credentials found' },
+      simulateError: { operation: 'ResolveScopeTarget', message: 'No credentials found' },
     });
     await page.goto('/');
 
-    const awsInfo = page.locator('.aws-info');
-    await expect(awsInfo).toBeVisible();
-    await expect(awsInfo.getByText('?', { exact: true })).toHaveCount(3);
+    const info = page.locator('.scope-info');
+    await expect(info).toBeVisible();
+    await expect(info.getByText('?', { exact: true })).toHaveCount(3);
   });
 
   test('renders "?" for region when only the account id is available', async ({ page }) => {
     await setupWailsMocks(page, createAWSIdentityState('123456789012', '', ''));
     await page.goto('/');
 
-    const awsInfo = page.locator('.aws-info');
-    await expect(awsInfo).toBeVisible();
-    await expect(awsInfo).toContainText('123456789012'); // account shown
-    await expect(awsInfo.getByText('?', { exact: true })).toHaveCount(2); // region + profile
+    const info = page.locator('.scope-info');
+    await expect(info).toBeVisible();
+    await expect(info).toContainText('123456789012'); // account shown
+    await expect(info.getByText('?', { exact: true })).toHaveCount(2); // region + profile
   });
 
   test('renders "?" for the account id when only the region is available', async ({ page }) => {
     await setupWailsMocks(page, createAWSIdentityState('', 'ap-northeast-1', ''));
     await page.goto('/');
 
-    const awsInfo = page.locator('.aws-info');
-    await expect(awsInfo).toBeVisible();
-    await expect(awsInfo).toContainText('ap-northeast-1'); // region shown
-    await expect(awsInfo.getByText('?', { exact: true })).toHaveCount(2); // account + profile
+    const info = page.locator('.scope-info');
+    await expect(info).toBeVisible();
+    await expect(info).toContainText('ap-northeast-1'); // region shown
+    await expect(info.getByText('?', { exact: true })).toHaveCount(2); // account + profile
+  });
+});
+
+test.describe('Scope target display (every provider)', () => {
+  test('AWS reads its scope from the ambient config, so there is no Change scope', async ({ page }) => {
+    await setupWailsMocks(page);
+    await page.goto('/');
+
+    await expect(page.locator('.scope-info')).toContainText('123456789012');
+    await expect(page.getByRole('button', { name: 'Change scope' })).toHaveCount(0);
+  });
+
+  test('Azure lists the vault and store segments and offers Change scope', async ({ page }) => {
+    await setupWailsMocks(page, createAzureState());
+    await page.goto('/');
+
+    const info = page.locator('.scope-info');
+    await expect(info.locator('.scope-info-label').first()).toHaveText('vault');
+    await expect(info.locator('.scope-info-label').nth(1)).toHaveText('store');
+    await expect(page.getByRole('button', { name: 'Change scope' })).toBeVisible();
+
+    // A self-describing target never runs the network lookup.
+    const calls = await page.evaluate(() => (window as any).__wailsCalls as string[]);
+    expect(calls).not.toContain('ResolveScopeTarget');
   });
 });
 

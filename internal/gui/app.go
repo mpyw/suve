@@ -15,7 +15,6 @@ import (
 	"sync"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/provider/detect"
@@ -588,29 +587,4 @@ func (a *App) strategyAsScoped[T any](sc provider.Scope, service string) (T, err
 	}
 
 	return narrowed, nil
-}
-
-// =============================================================================
-// AWS Identity
-// =============================================================================
-
-// AWSIdentityResult contains AWS account ID, region, and profile for frontend display.
-type AWSIdentityResult struct {
-	AccountID string `json:"accountId"`
-	Region    string `json:"region"`
-	Profile   string `json:"profile"`
-}
-
-// GetAWSIdentity returns the current AWS account ID, region, and profile.
-func (a *App) GetAWSIdentity() (*AWSIdentityResult, error) {
-	identity, err := aws.LoadIdentity(a.ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return &AWSIdentityResult{
-		AccountID: identity.AccountID,
-		Region:    identity.Region,
-		Profile:   identity.Profile,
-	}, nil
 }

@@ -220,3 +220,28 @@ func TestParamResolver_NamespaceOnlyForAppConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, aws, got)
 }
+
+// TestResolveTarget_SharesStagingIdentity proves the status-bar target and the
+// staging scope share one memoized identity lookup, so an AWS launch makes one
+// STS call for both.
+func TestResolveTarget_SharesStagingIdentity(t *testing.T) {
+	t.Parallel()
+
+	var calls int
+
+	want := provider.AWSTarget("dev", "123456789012", "us-east-1")
+	f := newSourceFactory(t.Context(), provider.Scope{Provider: provider.ProviderAWS})
+	f.resolveIdentity = func(context.Context) (staging.ResolvedScope, error) {
+		calls++
+
+		return staging.ResolvedScope{Scope: provider.AWSScope("123456789012", "us-east-1"), Target: want}, nil
+	}
+
+	got, err := f.resolveTarget()
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+
+	_, err = f.stagingScope(provider.KindParam)
+	require.NoError(t, err)
+	assert.Equal(t, 1, calls, "the target and the staging scope share one identity lookup")
+}

@@ -133,7 +133,7 @@ func stagingApp() *App {
 	return newApp(config{
 		scope:      provider.Scope{Provider: provider.ProviderAWS},
 		service:    "staging",
-		identity:   awsIdentityFixture(),
+		target:     awsTargetFixture(),
 		stagingFor: stagingFixture(),
 	})
 }
@@ -174,7 +174,7 @@ func secureStringStagingApp() *App {
 	return newApp(config{
 		scope:      provider.Scope{Provider: provider.ProviderAWS},
 		service:    "staging",
-		identity:   awsIdentityFixture(),
+		target:     awsTargetFixture(),
 		stagingFor: secureStringStagingFixture(),
 	})
 }
@@ -216,7 +216,7 @@ func secureStringCreateStagingApp() *App {
 	return newApp(config{
 		scope:      provider.Scope{Provider: provider.ProviderAWS},
 		service:    "staging",
-		identity:   awsIdentityFixture(),
+		target:     awsTargetFixture(),
 		stagingFor: secureStringCreateStagingFixture(),
 	})
 }

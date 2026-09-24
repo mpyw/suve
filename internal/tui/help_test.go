@@ -65,7 +65,7 @@ func TestHelp_BrowserShowsEditKey(t *testing.T) {
 
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 	m.width, m.height = browserTermWidth, browserTermHeight
@@ -86,7 +86,7 @@ func TestHelp_DiffersByPage(t *testing.T) {
 
 	browserApp := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 	stagingApp := stagingApp()
@@ -123,7 +123,7 @@ func TestHelp_FullHelpGatesOnCapability(t *testing.T) {
 	awsSecret := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
 		service:   "secret",
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("secret", awsSecretSource(), nil),
 	})
 
@@ -147,7 +147,7 @@ func TestBrowser_FullHelpGolden(t *testing.T) { //nolint:paralleltest // goldenE
 	m := newApp(config{
 		scope:     provider.Scope{Provider: provider.ProviderAWS},
 		service:   "secret",
-		identity:  awsIdentityFixture(),
+		target:    awsTargetFixture(),
 		sourceFor: sourceForShape("secret", awsSecretSource(), nil),
 	})
 

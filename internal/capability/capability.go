@@ -69,10 +69,10 @@ type ProviderCapability struct {
 	Provider string `json:"provider"`
 	// DisplayName is the provider label (e.g. "Google Cloud").
 	DisplayName string `json:"displayName"`
-	// ScopeFields lists the provider-level scope inputs the frontend must collect
-	// (e.g. ["project"] for Google Cloud). Empty for AWS (ambient config) and for
-	// Azure, whose per-service vault/store names are collected by the service's
-	// own view.
+	// ScopeFields lists the scope inputs the frontend collects in its scope form
+	// (["project"] for Google Cloud; the vault, store and namespace for Azure).
+	// Empty for AWS, which reads its scope from the ambient config, so there is
+	// no scope to change.
 	ScopeFields []string `json:"scopeFields"`
 	// Services are the param/secret services this provider offers, in stable
 	// display order.
@@ -117,7 +117,7 @@ func All() []ProviderCapability {
 		{
 			Provider:    string(provider.ProviderAzure),
 			DisplayName: "Azure",
-			ScopeFields: []string{},
+			ScopeFields: []string{"vault", "store", "namespace"},
 			Services: []ServiceCapability{
 				// App Configuration is unversioned; tags are writable via
 				// GET-merge-PUT (azappconfig/v2).

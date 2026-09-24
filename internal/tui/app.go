@@ -73,10 +73,11 @@ const (
 	minHeight = 16
 )
 
-// identityFetcher resolves the AWS caller identity for the status bar. It takes
-// no context: the launch layer builds it as a closure over the Run context, so
-// the model stays free of both a stored context and the AWS provider package.
-type identityFetcher func() (components.AWSIdentity, error)
+// targetFetcher resolves a pending scope target (see provider.Target) for the
+// status bar and the apply confirmation. It takes no context: the launch layer
+// builds it as a closure over the Run context, so the model stays free of both a
+// stored context and any provider package.
+type targetFetcher func() (provider.Target, error)
 
 // config is the constructor input for the root model.
 type config struct {
@@ -84,12 +85,12 @@ type config struct {
 	scope provider.Scope
 	// service preselects the initial tab ("param"/"secret", or "").
 	service string
-	// fetchIdentity, when non-nil and the scope is AWS, is run asynchronously on
-	// Init to fill the status bar's account/region/profile.
-	fetchIdentity identityFetcher
-	// identity, when non-nil, seeds the AWS identity directly (used by tests and
+	// fetchTarget, when non-nil, is run asynchronously on Init when the scope's
+	// target is pending (AWS: the STS caller identity).
+	fetchTarget targetFetcher
+	// target, when non-nil, seeds the resolved target directly (used by tests and
 	// any already-resolved launch), bypassing the async fetch.
-	identity *components.AWSIdentity
+	target *provider.Target
 	// sourceFor builds the read source and staging probe for a service tab. It is
 	// the data seam: production wires it to the registry-backed sourceFactory,
 	// tests to a providermock-backed one. When nil (an uninitialized shell and
@@ -135,12 +136,12 @@ type escInterceptor interface {
 	interceptEsc() bool
 }
 
-// awsIdentityMsg carries a resolved AWS identity back to the model.
-type awsIdentityMsg struct{ id components.AWSIdentity }
+// targetMsg carries a resolved scope target back to the model.
+type targetMsg struct{ target provider.Target }
 
-// awsIdentityErrMsg reports that the AWS identity lookup failed; the status bar
-// simply stops showing the loading placeholder.
-type awsIdentityErrMsg struct{ err error }
+// targetErrMsg reports that the target lookup failed; the status bar simply
+// stops showing the loading placeholder.
+type targetErrMsg struct{ err error }
 
 // App is the root Bubble Tea model — the app shell.
 type App struct {
@@ -174,9 +175,9 @@ type App struct {
 	styles styles.Styles
 	help   help.Model
 
-	fetchIdentity   identityFetcher
-	identity        *components.AWSIdentity
-	identityLoading bool
+	// fetchTarget resolves target while target.Pending is set.
+	fetchTarget targetFetcher
+	target      provider.Target
 
 	// sourceFor is the injected data seam (see config); runCtx is the Run context
 	// threaded into pages.
@@ -208,24 +209,28 @@ func newApp(cfg config) *App {
 	active := initialTabIndex(tabs, cfg.service)
 
 	m := &App{
-		scope:         cfg.scope,
-		service:       cfg.service,
-		tabs:          tabs,
-		activeTab:     active,
-		keys:          keys.Default(),
-		styles:        st,
-		help:          help.New(),
-		fetchIdentity: cfg.fetchIdentity,
-		identity:      cfg.identity,
-		sourceFor:     cfg.sourceFor,
-		mutatorFor:    cfg.mutatorFor,
-		stagingFor:    cfg.stagingFor,
-		runCtx:        cmp.Or(cfg.runCtx, context.Background()),
-		stagedCounts:  map[string]int{},
+		scope:        cfg.scope,
+		service:      cfg.service,
+		tabs:         tabs,
+		activeTab:    active,
+		keys:         keys.Default(),
+		styles:       st,
+		help:         help.New(),
+		fetchTarget:  cfg.fetchTarget,
+		target:       cfg.scope.Target(),
+		sourceFor:    cfg.sourceFor,
+		mutatorFor:   cfg.mutatorFor,
+		stagingFor:   cfg.stagingFor,
+		runCtx:       cmp.Or(cfg.runCtx, context.Background()),
+		stagedCounts: map[string]int{},
 	}
 
-	m.identityLoading = cfg.scope.Provider == provider.ProviderAWS &&
-		cfg.identity == nil && cfg.fetchIdentity != nil
+	if cfg.target != nil {
+		m.target = *cfg.target
+	}
+
+	// Without a fetcher a pending target never resolves, so it is shown as is.
+	m.target.Pending = m.target.Pending && m.fetchTarget != nil
 
 	if len(tabs) > 0 {
 		p, _ := m.pageForTab(active)
@@ -247,13 +252,13 @@ func (m *App) initialPageCmd() tea.Cmd {
 	return initPage(m.pages[len(m.pages)-1])
 }
 
-// Init kicks off the async AWS identity fetch (AWS scope only) and the initial
-// page's own loads.
+// Init kicks off the async target fetch (when the target is pending) and the
+// initial page's own loads.
 func (m *App) Init() tea.Cmd {
 	var cmds []tea.Cmd
 
-	if m.identityLoading {
-		cmds = append(cmds, m.fetchIdentityCmd())
+	if m.target.Pending {
+		cmds = append(cmds, m.fetchTargetCmd())
 	}
 
 	if cmd := m.initialPageCmd(); cmd != nil {
@@ -267,23 +272,23 @@ func (m *App) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// fetchIdentityCmd runs the injected identity fetcher off the update loop.
-func (m *App) fetchIdentityCmd() tea.Cmd {
-	fetch := m.fetchIdentity
+// fetchTargetCmd runs the injected target fetcher off the update loop.
+func (m *App) fetchTargetCmd() tea.Cmd {
+	fetch := m.fetchTarget
 
 	return func() tea.Msg {
-		id, err := fetch()
+		target, err := fetch()
 		if err != nil {
-			return awsIdentityErrMsg{err: err}
+			return targetErrMsg{err: err}
 		}
 
-		return awsIdentityMsg{id: id}
+		return targetMsg{target: target}
 	}
 }
 
 // Update dispatches messages. Input (keys, mouse) is routed dialogs-first, then
 // through the global key map, then to the active page. Window resizes fan out
-// to the active page and every dialog; async identity results update the status
+// to the active page and every dialog; async target results update the status
 // bar.
 func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -300,14 +305,13 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help.SetWidth(msg.Width)
 
 		return m, m.forwardResize(msg)
-	case awsIdentityMsg:
-		id := msg.id
-		m.identity = &id
-		m.identityLoading = false
+	case targetMsg:
+		m.target = msg.target
+		m.target.Pending = false
 
 		return m, nil
-	case awsIdentityErrMsg:
-		m.identityLoading = false
+	case targetErrMsg:
+		m.target.Pending = false
 
 		return m, nil
 	case cursor.BlinkMsg:
@@ -960,38 +964,16 @@ func (m *App) pushStagingDetail(req nav.OpenStagingDetail) tea.Cmd {
 	return p.Init()
 }
 
-// applyTargetLine renders the apply target identity (account/region, project, or
-// vault/store) shown on the apply confirmation — parity with the CLI's prompt.
+// applyTargetLine renders the apply target (the provider plus its resolved
+// target segments) shown on the apply confirmation — parity with the CLI's
+// prompt.
 func (m *App) applyTargetLine() string {
-	switch m.scope.Provider {
-	case provider.ProviderAWS:
-		parts := []string{string(provider.ProviderAWS)}
-		if m.identity != nil {
-			parts = appendKV(parts, "account", m.identity.Account)
-			parts = appendKV(parts, "region", m.identity.Region)
-		}
-
-		return strings.Join(parts, " · ")
-	case provider.ProviderGoogleCloud:
-		return strings.Join(appendKV([]string{string(provider.ProviderGoogleCloud)}, "project", m.scope.ProjectID), " · ")
-	case provider.ProviderAzure:
-		parts := []string{string(provider.ProviderAzure)}
-		parts = appendKV(parts, "vault", m.scope.VaultName)
-		parts = appendKV(parts, "store", m.scope.StoreName)
-
-		return strings.Join(parts, " · ")
-	default:
-		return string(m.scope.Provider)
-	}
-}
-
-// appendKV appends a "key value" segment when value is non-empty.
-func appendKV(parts []string, key, value string) []string {
-	if value == "" {
-		return parts
+	parts := []string{string(m.scope.Provider)}
+	if target := m.target.String(); target != "" {
+		parts = append(parts, target)
 	}
 
-	return append(parts, key+" "+value)
+	return strings.Join(parts, " · ")
 }
 
 // applyTitle names the apply confirmation: "— all" for the fan-out, else the
@@ -1067,10 +1049,9 @@ func (m *App) tabBarRow() int {
 // statusBar builds the status-bar component for the current state.
 func (m *App) statusBar() components.StatusBar {
 	return components.StatusBar{
-		Scope:    m.scope,
-		Styles:   m.styles,
-		Identity: m.identity,
-		Loading:  m.identityLoading,
+		Scope:  m.scope,
+		Styles: m.styles,
+		Target: m.target,
 	}
 }
 

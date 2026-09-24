@@ -29,7 +29,7 @@ func TestApp_Capabilities_DelegatesToCapabilityPackage(t *testing.T) {
 // capability descriptor, failing the test when absent. (The capability matrix
 // now lives in internal/capability; this small lookup helper is kept local to
 // the HasDescription gating test below.)
-func findServiceCapability(t *testing.T, caps []ProviderCapability, prov, service string) ServiceCapability {
+func findServiceCapability(t *testing.T, caps []capability.ProviderCapability, prov, service string) capability.ServiceCapability {
 	t.Helper()
 
 	for _, p := range caps {
@@ -46,7 +46,7 @@ func findServiceCapability(t *testing.T, caps []ProviderCapability, prov, servic
 
 	t.Fatalf("no capability for provider %q service %q", prov, service)
 
-	return ServiceCapability{}
+	return capability.ServiceCapability{}
 }
 
 // TestApp_Capabilities_HasDescription pins the HasDescription capability that

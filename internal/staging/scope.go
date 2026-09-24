@@ -7,14 +7,14 @@ import (
 )
 
 // ResolvedScope is the outcome of resolving the active provider's staging scope:
-// the provider.Scope used to key on-disk staging state, plus a human-readable
-// Target line shown in apply/pop confirmation prompts (e.g. an AWS
-// profile/account/region, or a Google Cloud project).
+// the provider.Scope used to key on-disk staging state, plus the Target shown in
+// apply/import confirmation prompts (e.g. an AWS profile/account/region, or a
+// Google Cloud project).
 type ResolvedScope struct {
 	// Scope keys the on-disk staging state (see provider.Scope.Key).
 	Scope provider.Scope
-	// Target is a human-readable description of where changes will be applied.
-	Target string
+	// Target describes where changes will be applied.
+	Target provider.Target
 }
 
 // ScopeResolver resolves the active provider's staging scope. AWS resolves it

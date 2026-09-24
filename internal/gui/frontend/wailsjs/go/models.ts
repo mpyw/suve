@@ -1,21 +1,80 @@
-export namespace gui {
+export namespace capability {
 	
-	export class AWSIdentityResult {
-	    accountId: string;
-	    region: string;
-	    profile: string;
+	export class ServiceCapability {
+	    service: string;
+	    displayName: string;
+	    hasVersionHistory: boolean;
+	    hasVersionSpecifiers: boolean;
+	    hasTags: boolean;
+	    tagsPerVersion: boolean;
+	    hasRestore: boolean;
+	    hasStaging: boolean;
+	    hasNamespaces: boolean;
+	    hasForceDelete: boolean;
+	    hasRecoveryWindow: boolean;
+	    hasDescription: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new AWSIdentityResult(source);
+	        return new ServiceCapability(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.accountId = source["accountId"];
-	        this.region = source["region"];
-	        this.profile = source["profile"];
+	        this.service = source["service"];
+	        this.displayName = source["displayName"];
+	        this.hasVersionHistory = source["hasVersionHistory"];
+	        this.hasVersionSpecifiers = source["hasVersionSpecifiers"];
+	        this.hasTags = source["hasTags"];
+	        this.tagsPerVersion = source["tagsPerVersion"];
+	        this.hasRestore = source["hasRestore"];
+	        this.hasStaging = source["hasStaging"];
+	        this.hasNamespaces = source["hasNamespaces"];
+	        this.hasForceDelete = source["hasForceDelete"];
+	        this.hasRecoveryWindow = source["hasRecoveryWindow"];
+	        this.hasDescription = source["hasDescription"];
 	    }
 	}
+	export class ProviderCapability {
+	    provider: string;
+	    displayName: string;
+	    scopeFields: string[];
+	    services: ServiceCapability[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ProviderCapability(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.displayName = source["displayName"];
+	        this.scopeFields = source["scopeFields"];
+	        this.services = this.convertValues(source["services"], ServiceCapability);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace gui {
+	
 	export class DetectResult {
 	    param: string;
 	    secret: string;
@@ -38,28 +97,6 @@ export namespace gui {
 	        this.stageActive = source["stageActive"];
 	    }
 	}
-	export class StagingEnvelopeInfoResult {
-	    encrypted: boolean;
-	    provider: string;
-	    scope: string;
-	    service: string;
-	    scopeMatches: boolean;
-	    workingHasChanges: boolean;
-
-	    static createFrom(source: any = {}) {
-	        return new StagingEnvelopeInfoResult(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.encrypted = source["encrypted"];
-	        this.provider = source["provider"];
-	        this.scope = source["scope"];
-	        this.service = source["service"];
-	        this.scopeMatches = source["scopeMatches"];
-	        this.workingHasChanges = source["workingHasChanges"];
-	    }
-	}
 	export class ParamDeleteResult {
 	    name: string;
 	
@@ -78,11 +115,11 @@ export namespace gui {
 	    oldValue: string;
 	    newValue: string;
 	    secret: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ParamDiffResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.oldName = source["oldName"];
@@ -273,76 +310,6 @@ export namespace gui {
 		}
 	}
 	
-	export class ServiceCapability {
-	    service: string;
-	    displayName: string;
-	    hasVersionHistory: boolean;
-	    hasVersionSpecifiers: boolean;
-	    hasTags: boolean;
-	    tagsPerVersion: boolean;
-	    hasRestore: boolean;
-	    hasStaging: boolean;
-	    hasNamespaces: boolean;
-	    hasForceDelete: boolean;
-	    hasRecoveryWindow: boolean;
-	    hasDescription: boolean;
-
-	    static createFrom(source: any = {}) {
-	        return new ServiceCapability(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.service = source["service"];
-	        this.displayName = source["displayName"];
-	        this.hasVersionHistory = source["hasVersionHistory"];
-	        this.hasVersionSpecifiers = source["hasVersionSpecifiers"];
-	        this.hasTags = source["hasTags"];
-	        this.tagsPerVersion = source["tagsPerVersion"];
-	        this.hasRestore = source["hasRestore"];
-	        this.hasStaging = source["hasStaging"];
-	        this.hasNamespaces = source["hasNamespaces"];
-	        this.hasForceDelete = source["hasForceDelete"];
-	        this.hasRecoveryWindow = source["hasRecoveryWindow"];
-	        this.hasDescription = source["hasDescription"];
-	    }
-	}
-	export class ProviderCapability {
-	    provider: string;
-	    displayName: string;
-	    scopeFields: string[];
-	    services: ServiceCapability[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ProviderCapability(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.provider = source["provider"];
-	        this.displayName = source["displayName"];
-	        this.scopeFields = source["scopeFields"];
-	        this.services = this.convertValues(source["services"], ServiceCapability);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class ScopeSelection {
 	    provider: string;
 	    projectId: string;
@@ -363,6 +330,53 @@ export namespace gui {
 	        this.namespace = source["namespace"];
 	    }
 	}
+	export class ScopeTargetSegment {
+	    label: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScopeTargetSegment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.value = source["value"];
+	    }
+	}
+	export class ScopeTarget {
+	    segments: ScopeTargetSegment[];
+	    pending: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScopeTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.segments = this.convertValues(source["segments"], ScopeTargetSegment);
+	        this.pending = source["pending"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class SecretCreateResult {
 	    name: string;
 	    versionId: string;
@@ -628,7 +642,6 @@ export namespace gui {
 	        this.arn = source["arn"];
 	    }
 	}
-	
 	export class StagingAddResult {
 	    name: string;
 	
@@ -801,11 +814,11 @@ export namespace gui {
 	    description?: string;
 	    warning?: string;
 	    secret: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new StagingDiffEntry(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -903,6 +916,28 @@ export namespace gui {
 	        this.operation = source["operation"];
 	        this.value = source["value"];
 	        this.stagedAt = source["stagedAt"];
+	    }
+	}
+	export class StagingEnvelopeInfoResult {
+	    encrypted: boolean;
+	    provider: string;
+	    scope: string;
+	    service: string;
+	    scopeMatches: boolean;
+	    workingHasChanges: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new StagingEnvelopeInfoResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.encrypted = source["encrypted"];
+	        this.provider = source["provider"];
+	        this.scope = source["scope"];
+	        this.service = source["service"];
+	        this.scopeMatches = source["scopeMatches"];
+	        this.workingHasChanges = source["workingHasChanges"];
 	    }
 	}
 	export class StagingExportResult {
