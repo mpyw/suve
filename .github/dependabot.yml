@@ -1,7 +1,9 @@
 version: 2
 updates:
+  # gui/ is a separate module (Wails entry point) that replaces the root with
+  # ../; it must be bumped too or its go.mod falls behind and is no longer tidy.
   - package-ecosystem: gomod
-    directory: /
+    directories: ["/", "/gui"]
     schedule:
       interval: weekly
     cooldown:

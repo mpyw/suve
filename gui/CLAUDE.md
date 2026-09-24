@@ -58,4 +58,5 @@ gui/main.go ──calls──> internal/gui.Run()
 
 - Do NOT delete this directory - Wails toolchain requires it
 - The `go.mod` here is separate from the root module to isolate Wails dependencies
+- It replaces `github.com/mpyw/suve` with `../`, so re-run `go mod tidy` here after a root dependency change. `mise tidy-check` (part of `mise lint` and CI) fails when it is not tidy
 - Build tags `production` or `dev` are required (see `//go:build` in main.go)
