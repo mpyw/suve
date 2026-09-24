@@ -292,7 +292,7 @@ func (d *deleteConfirm) activate() (Model, tea.Cmd) {
 		// When the service supports staging, the Delete button opens the Stage/Apply
 		// popup; otherwise the delete is always immediate and runs directly.
 		if d.svcCap.HasStaging {
-			d.confirm = newModeConfirm("Delete "+entryNoun(d.svcCap), d.staged)
+			d.confirm = newModeConfirm("Delete "+d.svcCap.ItemNoun, d.staged)
 			d.confirming = true
 
 			return d, tea.ClearScreen
@@ -362,7 +362,7 @@ func (d *deleteConfirm) View() string {
 	// unwrapped long name (or sibling paths differing only in suffix) from clipping
 	// at the screen edge, which would leave an ambiguous delete target — a safety
 	// concern.
-	header := d.fit(d.styles.PaneTitle.Render("Delete " + entryNoun(d.svcCap)))
+	header := d.fit(d.styles.PaneTitle.Render("Delete " + d.svcCap.ItemNoun))
 	name := d.fit(clipName(d.name, d.namespace))
 
 	b.WriteString(header)

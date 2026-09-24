@@ -3,6 +3,7 @@ export namespace capability {
 	export class ServiceCapability {
 	    service: string;
 	    displayName: string;
+	    itemNoun: string;
 	    hasVersionHistory: boolean;
 	    hasVersionSpecifiers: boolean;
 	    hasTags: boolean;
@@ -26,6 +27,7 @@ export namespace capability {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.service = source["service"];
 	        this.displayName = source["displayName"];
+	        this.itemNoun = source["itemNoun"];
 	        this.hasVersionHistory = source["hasVersionHistory"];
 	        this.hasVersionSpecifiers = source["hasVersionSpecifiers"];
 	        this.hasTags = source["hasTags"];

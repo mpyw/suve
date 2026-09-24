@@ -96,26 +96,28 @@ func (m *fakeMutator) Restore(context.Context, string) (data.WriteOutcome, error
 
 // Capability fixtures.
 func awsParamCap() capability.ServiceCapability {
-	return capability.ServiceCapability{Service: "param", HasTags: true, HasStaging: true, HasDescription: true, HasValueType: true}
+	return capability.ServiceCapability{
+		Service: "param", ItemNoun: "parameter", HasTags: true, HasStaging: true, HasDescription: true, HasValueType: true,
+	}
 }
 
 func appConfigCap() capability.ServiceCapability {
-	return capability.ServiceCapability{Service: "param", HasTags: true, HasStaging: true, HasNamespaces: true}
+	return capability.ServiceCapability{Service: "param", ItemNoun: "setting", HasTags: true, HasStaging: true, HasNamespaces: true}
 }
 
 func awsSecretCap() capability.ServiceCapability {
 	return capability.ServiceCapability{
-		Service: "secret", HasTags: true, HasStaging: true, HasRestore: true,
+		Service: "secret", ItemNoun: "secret", HasTags: true, HasStaging: true, HasRestore: true,
 		HasForceDelete: true, HasRecoveryWindow: true, HasDescription: true,
 	}
 }
 
 func gcloudSecretCap() capability.ServiceCapability {
-	return capability.ServiceCapability{Service: "secret", HasTags: true, HasStaging: true, HasDescription: true}
+	return capability.ServiceCapability{Service: "secret", ItemNoun: "secret", HasTags: true, HasStaging: true, HasDescription: true}
 }
 
 func noStagingParamCap() capability.ServiceCapability {
-	return capability.ServiceCapability{Service: "param", HasTags: true, HasStaging: false}
+	return capability.ServiceCapability{Service: "param", ItemNoun: "parameter", HasTags: true, HasStaging: false}
 }
 
 // execCmd runs a command for its side effect on the recording mutator.

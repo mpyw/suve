@@ -62,7 +62,7 @@ test.describe('wails-mock provider bindings', () => {
     });
 
     expect(result.errors).toHaveLength(2);
-    expect(result.errors[0]).toContain('Google Cloud project ID is required');
+    expect(result.errors[0]).toContain('Google Cloud requires the project ID');
     expect(result.errors[1]).toContain('Azure requires');
     expect(result.scope.provider).toBe('googlecloud');
     expect(result.scope.projectId).toBe('p1');

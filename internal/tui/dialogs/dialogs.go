@@ -26,12 +26,6 @@ import (
 	"github.com/mpyw/suve/internal/tui/data"
 )
 
-// Service keys shared across the dialogs (the service axis).
-const (
-	serviceParam  = "param"
-	serviceSecret = "secret"
-)
-
 // discardNotice is the inline warning a free-text form shows after the first Esc
 // on a dirty form (#790); a second consecutive Esc then discards.
 const discardNotice = "unsaved changes — press esc again to discard"

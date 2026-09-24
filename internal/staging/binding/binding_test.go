@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/binding"
@@ -40,6 +41,21 @@ func TestLookup_PerProvider(t *testing.T) {
 			assert.IsType(t, tt.want, b.Parser())
 			assert.IsType(t, tt.want, b.ParserFactory()())
 		})
+	}
+}
+
+// TestLookup_ItemNameMatchesCapability pins that every capability service's
+// ItemNoun (the TUI and GUI wording) equals its staging strategy's ItemName (the
+// CLI wording), so a noun changed in one place cannot drift from the other.
+func TestLookup_ItemNameMatchesCapability(t *testing.T) {
+	t.Parallel()
+
+	for _, pc := range capability.All() {
+		for _, sc := range pc.Services {
+			b, err := binding.Lookup(provider.Provider(pc.Provider), provider.Kind(sc.Service))
+			require.NoError(t, err, "%s %s", pc.Provider, sc.Service)
+			assert.Equal(t, sc.ItemNoun, b.Parser().ItemName(), "%s %s", pc.Provider, sc.Service)
+		}
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
 )
 
@@ -21,6 +22,7 @@ func TestApp_SelectScope(t *testing.T) {
 		name      string
 		sel       ScopeSelection
 		wantErr   error
+		wantMsg   string
 		wantScope provider.Scope
 	}{
 		{
@@ -36,7 +38,8 @@ func TestApp_SelectScope(t *testing.T) {
 		{
 			name:    "googlecloud missing project",
 			sel:     ScopeSelection{Provider: "googlecloud"},
-			wantErr: errGoogleCloudProjectRequired,
+			wantErr: errScopeIncomplete,
+			wantMsg: "scope is incomplete: Google Cloud requires the project ID",
 		},
 		{
 			name: "azure with vault only",
@@ -68,8 +71,26 @@ func TestApp_SelectScope(t *testing.T) {
 		},
 		{
 			name:    "azure missing both vault and store",
-			sel:     ScopeSelection{Provider: "azure"},
-			wantErr: errAzureScopeRequired,
+			sel:     ScopeSelection{Provider: "azure", Namespace: "dev"},
+			wantErr: errScopeIncomplete,
+			wantMsg: "scope is incomplete: Azure requires the App Configuration store name or the Key Vault name",
+		},
+		{
+			name:      "aws drops fields it does not collect",
+			sel:       ScopeSelection{Provider: "aws", ProjectID: "p", VaultName: "v", StoreName: "s", Namespace: "n"},
+			wantScope: provider.Scope{Provider: provider.ProviderAWS},
+		},
+		{
+			name:      "googlecloud drops the azure fields",
+			sel:       ScopeSelection{Provider: "googlecloud", ProjectID: "p", VaultName: "v", Namespace: "n"},
+			wantScope: provider.GoogleCloudScope("p"),
+		},
+		{
+			name: "azure drops the project",
+			sel:  ScopeSelection{Provider: "azure", ProjectID: "p", VaultName: "v"},
+			wantScope: provider.Scope{
+				Provider: provider.ProviderAzure, VaultName: "v",
+			},
 		},
 		{
 			name:    "unknown provider",
@@ -87,6 +108,11 @@ func TestApp_SelectScope(t *testing.T) {
 			err := app.SelectScope(tt.sel)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
+
+				if tt.wantMsg != "" {
+					require.EqualError(t, err, tt.wantMsg)
+				}
+
 				// A rejected selection must not mutate the active scope.
 				assert.Equal(t, provider.Scope{Provider: provider.ProviderAWS}, app.currentScope())
 
@@ -293,4 +319,16 @@ func TestApp_EnvScope(t *testing.T) {
 	got, err := app.EnvScope("oracle")
 	require.ErrorIs(t, err, errInvalidProvider)
 	assert.Nil(t, got)
+}
+
+// TestScopeFields_CoverCapabilities pins that every scope field a provider
+// capability names has a binding, so scopeFromSelection never drops one.
+func TestScopeFields_CoverCapabilities(t *testing.T) {
+	t.Parallel()
+
+	for _, pc := range capability.All() {
+		for _, name := range pc.ScopeFields {
+			assert.Contains(t, scopeFields, name, "%s scope field %q", pc.Provider, name)
+		}
+	}
 }
