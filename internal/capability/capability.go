@@ -9,11 +9,10 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 )
 
-// Service keys and display labels reused across the capability descriptors.
+// Service keys reused across the capability descriptors.
 const (
-	serviceParam      = "param"
-	serviceSecret     = "secret"
-	displayNameSecret = "Secret"
+	serviceParam  = "param"
+	serviceSecret = "secret"
 )
 
 // ServiceCapability describes one provider service (param or secret) so a
@@ -81,9 +80,9 @@ type ProviderCapability struct {
 }
 
 // All returns the static capability descriptor for every provider, driving
-// provider-selection and control-visibility in the frontends. Display names:
-// AWS {Param, Secret}, Google Cloud {Secret}, Azure {App Configuration,
-// Key Vault}.
+// provider-selection and control-visibility in the frontends. Each service's
+// display name is the cloud product name: AWS {Parameter Store, Secrets
+// Manager}, Google Cloud {Secret Manager}, Azure {App Configuration, Key Vault}.
 func All() []ProviderCapability {
 	return []ProviderCapability{
 		{
@@ -92,12 +91,12 @@ func All() []ProviderCapability {
 			ScopeFields: []string{},
 			Services: []ServiceCapability{
 				{
-					Service: serviceParam, DisplayName: "Param",
+					Service: serviceParam, DisplayName: "Parameter Store",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
 				},
 				{
-					Service: serviceSecret, DisplayName: displayNameSecret,
+					Service: serviceSecret, DisplayName: "Secrets Manager",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: true,
 					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: true, HasDescription: true,
 				},
@@ -109,7 +108,7 @@ func All() []ProviderCapability {
 			ScopeFields: []string{"project"},
 			Services: []ServiceCapability{
 				{
-					Service: serviceSecret, DisplayName: displayNameSecret,
+					Service: serviceSecret, DisplayName: "Secret Manager",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
 				},

@@ -48,7 +48,7 @@ test.describe('AWS description display (#753)', () => {
       });
       await page.goto('/');
       await waitForItemList(page);
-      await navigateTo(page, 'Secret');
+      await navigateTo(page, 'Secrets Manager');
     });
 
     test('renders the description in the detail pane', async ({ page }) => {

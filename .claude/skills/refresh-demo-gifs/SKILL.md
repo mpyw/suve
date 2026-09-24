@@ -20,8 +20,8 @@ After a UI change the GUI recording breaks on selectors:
 - Prefer role/label selectors over positional ones — use
   `page.getByRole('checkbox', { name: 'Show Values' })`, not `.first()`.
 - Re-check navigation labels against the provider display names in
-  `internal/gui/providers.go` (AWS {Param, Secret}, Google Cloud {Secret},
-  Azure {App Configuration, Key Vault}).
+  `internal/capability/capability.go` (AWS {Parameter Store, Secrets Manager},
+  Google Cloud {Secret Manager}, Azure {App Configuration, Key Vault}).
 
 ## CLI output drift also invalidates the GIF
 

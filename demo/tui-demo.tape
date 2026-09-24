@@ -22,7 +22,7 @@ Env AWS_SECRET_ACCESS_KEY "test"
 Env AWS_DEFAULT_REGION "us-east-1"
 
 # Launch the TUI. With only LocalStack AWS env active, AWS is the sole active
-# provider, so `suve --tui` opens straight on the AWS Param tab.
+# provider, so `suve --tui` opens straight on the AWS Parameter Store tab.
 Type "suve --tui"
 Enter
 Sleep 4s
@@ -165,7 +165,7 @@ Enter
 Sleep 2s
 
 # ===========================================================================
-# 10. Back on the Param tab, verify the applied state with values revealed.
+# 10. Back on the Parameter Store tab, verify the applied state with values revealed.
 #     (1 rebuilds/reloads the tab; /demo/api/url is auto-selected, now v2 with
 #      the Env=Dev tag and no Version tag; /demo/cache/ttl exists; legacy gone.)
 # ===========================================================================

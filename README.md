@@ -655,7 +655,7 @@ suve --gui                 # auto-detects the active provider (see Bare Aliases)
 ```
 
 - **Provider / scope:** the GUI resolves the active provider from the environment just like the bare CLI aliases; when nothing is set or the choice is ambiguous it opens a **provider picker** instead of failing, and provider/scope stay re-selectable from within the running app.
-- **Tabs:** Param, Secret, and Staging, each gated by what the selected provider/scope supports — the same capability rules as the CLI (an unversioned backend hides version history, a secret-only provider hides Param, and so on).
+- **Tabs:** one tab per service, labeled with the product name (Parameter Store / Secrets Manager on AWS, Secret Manager on Google Cloud, App Configuration / Key Vault on Azure), plus Staging. Each is gated by what the selected provider/scope supports — the same capability rules as the CLI (an unversioned backend hides version history, a secret-only provider has no param tab, and so on).
 - **Same operations:** browse/filter, show with metadata, version history and diff, create/update/delete, and tag/untag are all available where the backend supports them; secret values are masked in passive views and revealed only on an explicit reveal or compare.
 - **Shared staging area:** edits staged in the GUI use the same per-scope staging store as the CLI/TUI, so `suve stage status` sees them and `stage apply` from either side applies the same working set.
 
@@ -674,13 +674,13 @@ suve --tui                 # only when exactly one provider is active (see Bare 
 suve aws --tui             # explicit provider group (always available)
 suve gcloud --tui
 suve azure --tui
-suve aws param --tui       # a service subgroup preselects that tab (Param / Secret)
+suve aws param --tui       # a service subgroup preselects that tab (Parameter Store)
 suve azure secret --tui    # opens on the Key Vault tab
 ```
 
 - **Unique-provider rule:** bare `suve --tui` follows the same detection as the bare aliases — it launches only when exactly one provider is active across the union of the param/secret/stage axes (AWS is also accepted via `~/.aws/credentials`, or an ambient-credential variable in a cloud shell — see [Cloud Shell Support](#cloud-shell-support)). With two or more active, it lists the explicit `suve <group> --tui` forms instead; there is no silent priority.
 - **Scope / env:** the TUI consumes the same scope inputs as the CLI — `GOOGLE_CLOUD_PROJECT` for Google Cloud, `--vault-name` / `AZURE_KEYVAULT_NAME` and `--store-name` / `AZURE_APPCONFIG_NAME` (plus `--namespace` / `AZURE_APPCONFIG_NAMESPACE`) for Azure. AWS uses the ambient shared config.
-- **Azure tab gating:** the Param (App Configuration) and Secret (Key Vault) tabs appear only for the services the launch scope resolves — set `--vault-name` for the Key Vault tab, `--store-name` for the App Configuration tab, either or both as needed. The Staging tab is always present.
+- **Azure tab gating:** the App Configuration (param) and Key Vault (secret) tabs appear only for the services the launch scope resolves — set `--vault-name` for the Key Vault tab, `--store-name` for the App Configuration tab, either or both as needed. The Staging tab is always present.
 - **Shared staging area:** staged edits made in the TUI use the same per-scope staging store as the CLI/GUI, so `suve stage status` sees them and `stage apply` from either side applies the same working set.
 - The TUI adds **no new commands** and does not cover export/import (use the CLI/GUI for those). It requires an interactive terminal (a TTY on stdin and stdout).
 

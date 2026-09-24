@@ -296,8 +296,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'AWS',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'Param', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true },
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true },
+      { service: 'param', displayName: 'Parameter Store', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true },
+      { service: 'secret', displayName: 'Secrets Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true },
     ],
   },
   {
@@ -305,7 +305,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true },
+      { service: 'secret', displayName: 'Secret Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true },
     ],
   },
   {
@@ -1547,22 +1547,20 @@ export async function waitForViewLoaded(page: Page) {
 /**
  * Navigate to a specific view.
  *
- * Accepts the legacy AWS labels ('Parameters'/'Secrets') as well as the
- * capability display names surfaced by the provider-aware sidebar ('Param',
- * 'Secret', 'Key Vault', 'App Configuration'), so provider-switching specs can
+ * Accepts the capability display names surfaced by the provider-aware sidebar
+ * (the cloud product names) plus 'Staging', so provider-switching specs can
  * target the right service button regardless of provider.
  */
 export type NavLabel =
-  | 'Parameters'
-  | 'Secrets'
   | 'Staging'
-  | 'Param'
-  | 'Secret'
+  | 'Parameter Store'
+  | 'Secrets Manager'
+  | 'Secret Manager'
   | 'Key Vault'
   | 'App Configuration';
 
 export async function navigateTo(page: Page, view: NavLabel) {
-  // Scope to the sidebar nav so a short capability label (e.g. "Secret") does
+  // Scope to the sidebar nav so a capability label (e.g. "Secrets Manager") does
   // not collide with item names that contain the same word (e.g. "my-secret").
   await page.locator('.nav').getByRole('button', { name: new RegExp(view, 'i') }).click();
 }

@@ -94,7 +94,7 @@ test.describe('GUI Demo Recording', () => {
     // 4. Stage an update to existing parameter (/demo/api/url)
     // =========================================================================
     console.log('Step 4: Staging update to existing parameter');
-    await navigateTo(page, 'Param');
+    await navigateTo(page, 'Parameter Store');
     await waitForItemList(page);
     await pause(PAUSE_MEDIUM); // Wait for view transition to complete
 
@@ -212,7 +212,7 @@ test.describe('GUI Demo Recording', () => {
     // 11. Verify changes
     // =========================================================================
     console.log('Step 11: Verifying changes');
-    await navigateTo(page, 'Param');
+    await navigateTo(page, 'Parameter Store');
     await waitForItemList(page);
     await pause(PAUSE_MEDIUM);
 
