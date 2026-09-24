@@ -1,3 +1,7 @@
+// secretmanager.go is this package's subject: the adapter Store and the Client port it
+// drives. Core, so that secretmanager.Store does not have to become secretmanager.SecretmanagerStore.
+//declscope:core
+
 // Package secretmanager implements the provider.Store contract (Reader/Writer/Tagger)
 // for Google Cloud Secret Manager. It confines all Secret Manager SDK types to
 // this package: resource-path construction and integer-version resolution live
@@ -46,7 +50,7 @@ import (
 
 // Client is the narrow Secret Manager surface this adapter needs. The list
 // methods return drained slices rather than the SDK's iterators so tests can
-// mock the interface trivially; the production adapter (see Wrap) confines the
+// mock the interface trivially; the production adapter (see WrapClient) confines the
 // iterator draining and the concrete *secretmanager.Client to this package.
 type Client interface {
 	AccessSecretVersion(

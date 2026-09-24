@@ -1,5 +1,5 @@
 // In-package tests of the setting-selector internals in client.go.
-//declscope:namespace appconfig
+//declscope:namespace client
 
 package appconfig
 
@@ -20,7 +20,7 @@ func TestListSettingSelector_ForwardsFilter(t *testing.T) {
 	t.Parallel()
 
 	for _, filter := range []string{"\x00", "dev", "dev,prod", "dev*", "*"} {
-		sel := listSettingSelector(filter)
+		sel := clientSettingSelector(filter)
 
 		require.NotNil(t, sel.LabelFilter, "List must set a label filter, not enumerate all labels")
 		assert.Equal(t, filter, *sel.LabelFilter)
@@ -37,7 +37,7 @@ func TestListSettingSelector_ForwardsFilter(t *testing.T) {
 func TestListSettingSelector_NullLabelDefault(t *testing.T) {
 	t.Parallel()
 
-	sel := listSettingSelector(namespaces.Filter(""))
+	sel := clientSettingSelector(namespaces.Filter(""))
 
 	require.NotNil(t, sel.LabelFilter)
 	assert.Equal(t, "\x00", *sel.LabelFilter)

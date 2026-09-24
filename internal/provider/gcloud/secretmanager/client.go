@@ -1,7 +1,3 @@
-// Adapts the concrete SDK client to the Client port that secretmanager.go
-// declares: one unit with secretmanager.go, split out for readability.
-//declscope:namespace secretmanager
-
 package secretmanager
 
 import (
@@ -20,8 +16,8 @@ type apiClient struct {
 	c *secretmanagersdk.Client
 }
 
-// Wrap adapts a concrete Secret Manager client to the narrow Client interface.
-func Wrap(c *secretmanagersdk.Client) Client {
+// WrapClient adapts a concrete Secret Manager client to the narrow Client interface.
+func WrapClient(c *secretmanagersdk.Client) Client {
 	return &apiClient{c: c}
 }
 

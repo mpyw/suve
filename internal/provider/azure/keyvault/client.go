@@ -1,7 +1,3 @@
-// Adapts the concrete SDK client to the Client port that keyvault.go
-// declares: one unit with keyvault.go, split out for readability.
-//declscope:namespace keyvault
-
 package keyvault
 
 import (
@@ -17,8 +13,8 @@ type apiClient struct {
 	c *azsecrets.Client
 }
 
-// Wrap adapts a concrete Key Vault secrets client to the narrow Client interface.
-func Wrap(c *azsecrets.Client) Client {
+// WrapClient adapts a concrete Key Vault secrets client to the narrow Client interface.
+func WrapClient(c *azsecrets.Client) Client {
 	return &apiClient{c: c}
 }
 

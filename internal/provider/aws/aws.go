@@ -1,8 +1,14 @@
+// aws.go is this package's subject: the AWS provider.Factory and its
+// registration. Core, so that aws.Factory does not have to become aws.AwsFactory.
+//declscope:core
+
 // Package aws wires the AWS Parameter Store and Secrets Manager adapters into a
-// provider.Factory / provider.Registry. It loads the AWS config (config.go),
-// resolves the caller identity (identity.go), builds SSM and Secrets Manager
-// clients from that config (honoring the scope's region), and hands them to the
-// per-product adapters in the parameterstore and secretsmanager subpackages.
+// provider.Factory / provider.Registry. It loads the AWS config (config.go, with
+// the SDK debug logger in debug.go), resolves the caller identity (identity.go,
+// with the ~/.aws/config profile lookup in profile.go), builds SSM and Secrets
+// Manager clients from that config (honoring the scope's region), and hands them
+// to the per-product adapters in the parameterstore and secretsmanager
+// subpackages.
 package aws
 
 import (
