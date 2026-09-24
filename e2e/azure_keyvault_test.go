@@ -96,7 +96,7 @@ func runAzureStageCapture(t *testing.T, args ...string) (stdout, stderr string, 
 // base; an out-of-band write then makes the remote newer, so apply must reject
 // the write and report the conflict under the bare name (empty namespace -> no
 // [namespace] badge, via EntryKey.Label()). This is the end-to-end guard for the
-// resolver-based CheckConflicts path from #441 on a namespaced-capable provider.
+// resolver-based conflict-check path from #441 on a namespaced-capable provider.
 func TestAzureKeyVaultStage_ConflictDetected(t *testing.T) {
 	setupAzureKeyVault(t)
 	setAzureKeyVaultStagingKey(t)

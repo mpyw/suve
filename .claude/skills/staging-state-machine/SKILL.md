@@ -37,6 +37,10 @@ The state machine lives in `internal/staging/transition/`:
 - `reducer.go` — pure reducer functions (`ReduceEntry`, `ReduceTag`)
 - `executor.go` — persists reducer results to the store
 
+Conflict detection is `CheckEntryAndTagConflicts` in `internal/staging/conflict.go`,
+called from `usecase/staging.ApplyUseCase` and, for the all-service apply,
+`GlobalApplyUseCase` (every service is checked before any is applied).
+
 Reducers are pure and deterministic; keep new behavior in the reducer and let
 the executor stay a thin persistence step. When you change a transition, update
 `docs/staging-state-transitions.md` to match.

@@ -1,9 +1,14 @@
-package apply_test
+// The all-service command tests share one namespace with their fixtures in
+// global_test.go.
+//declscope:namespace global
+
+package cli_test
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,16 +16,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/apply"
-	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// mockStrategy implements staging.ApplyStrategy for testing.
-type mockStrategy struct {
+// globalApplyStrategy implements staging.ApplyStrategy for testing.
+type globalApplyStrategy struct {
 	service              staging.Service
 	serviceName          string
 	itemName             string
@@ -30,12 +35,12 @@ type mockStrategy struct {
 	fetchLastModifiedVal time.Time
 }
 
-func (m *mockStrategy) Service() staging.Service { return m.service }
-func (m *mockStrategy) ServiceName() string      { return m.serviceName }
-func (m *mockStrategy) ItemName() string         { return m.itemName }
-func (m *mockStrategy) HasDeleteOptions() bool   { return m.hasDeleteOptions }
+func (m *globalApplyStrategy) Service() staging.Service { return m.service }
+func (m *globalApplyStrategy) ServiceName() string      { return m.serviceName }
+func (m *globalApplyStrategy) ItemName() string         { return m.itemName }
+func (m *globalApplyStrategy) HasDeleteOptions() bool   { return m.hasDeleteOptions }
 
-func (m *mockStrategy) Apply(ctx context.Context, name string, entry staging.Entry) error {
+func (m *globalApplyStrategy) Apply(ctx context.Context, name string, entry staging.Entry) error {
 	if m.applyFunc != nil {
 		return m.applyFunc(ctx, name, entry)
 	}
@@ -43,11 +48,11 @@ func (m *mockStrategy) Apply(ctx context.Context, name string, entry staging.Ent
 	return nil
 }
 
-func (m *mockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
+func (m *globalApplyStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
 	return m.fetchLastModifiedVal, nil
 }
 
-func (m *mockStrategy) ApplyTags(ctx context.Context, name string, tagEntry staging.TagEntry) error {
+func (m *globalApplyStrategy) ApplyTags(ctx context.Context, name string, tagEntry staging.TagEntry) error {
 	if m.applyTagsFunc != nil {
 		return m.applyTagsFunc(ctx, name, tagEntry)
 	}
@@ -55,8 +60,8 @@ func (m *mockStrategy) ApplyTags(ctx context.Context, name string, tagEntry stag
 	return nil
 }
 
-func newParamStrategy() *mockStrategy {
-	return &mockStrategy{
+func newGlobalApplyParamStrategy() *globalApplyStrategy {
+	return &globalApplyStrategy{
 		service:          staging.ServiceParam,
 		serviceName:      "SSM Parameter Store",
 		itemName:         "parameter",
@@ -64,8 +69,8 @@ func newParamStrategy() *mockStrategy {
 	}
 }
 
-func newSecretStrategy() *mockStrategy {
-	return &mockStrategy{
+func newGlobalApplySecretStrategy() *globalApplyStrategy {
+	return &globalApplyStrategy{
 		service:          staging.ServiceSecret,
 		serviceName:      "Secrets Manager",
 		itemName:         "secret",
@@ -73,32 +78,25 @@ func newSecretStrategy() *mockStrategy {
 	}
 }
 
-func TestCommand_Validation(t *testing.T) {
+func TestGlobalApplyCommand_Help(t *testing.T) {
 	t.Parallel()
 
-	t.Run("help", func(t *testing.T) {
-		t.Parallel()
-
-		app := apptest.AWSApp()
-
-		var buf bytes.Buffer
-
-		app.Writer = &buf
-		err := app.Run(t.Context(), []string{"suve", "stage", "push", "--help"})
-		require.NoError(t, err)
-		assert.Contains(t, buf.String(), "Apply all staged changes")
-	})
+	stdout, _, err := runLeafCmd(t, stgcli.NewGlobalApplyCommand(globalAWSConfig()), nil, "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Apply all staged changes")
 }
 
-func TestRun_NoChanges(t *testing.T) {
+func TestGlobalApply_NoChanges(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(newParamStrategy(), store), secretApply(newSecretStrategy(), store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase: globalApplyServices(
+			globalApplyParam(newGlobalApplyParamStrategy(), store), globalApplySecret(newGlobalApplySecretStrategy(), store),
+		),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -111,7 +109,7 @@ func TestRun_NoChanges(t *testing.T) {
 	assert.Empty(t, buf.String())
 }
 
-func TestRun_ApplyBothServices(t *testing.T) {
+func TestGlobalApply_ApplyBothServices(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -133,7 +131,7 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	paramPutCalled := false
 	secretPutCalled := false
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		paramPutCalled = true
 
@@ -142,7 +140,7 @@ func TestRun_ApplyBothServices(t *testing.T) {
 		return nil
 	}
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, name string, _ staging.Entry) error {
 		secretPutCalled = true
 
@@ -153,8 +151,8 @@ func TestRun_ApplyBothServices(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store), secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store), globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -176,7 +174,7 @@ func TestRun_ApplyBothServices(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_ApplyParamOnly(t *testing.T) {
+func TestGlobalApply_ApplyParamOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -189,7 +187,7 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	})
 
 	paramPutCalled := false
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		paramPutCalled = true
 
@@ -198,8 +196,8 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -212,7 +210,7 @@ func TestRun_ApplyParamOnly(t *testing.T) {
 	assert.NotContains(t, buf.String(), "Applying Secrets Manager...")
 }
 
-func TestRun_ApplySecretOnly(t *testing.T) {
+func TestGlobalApply_ApplySecretOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -225,7 +223,7 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	})
 
 	secretPutCalled := false
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		secretPutCalled = true
 
@@ -234,8 +232,8 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -248,7 +246,7 @@ func TestRun_ApplySecretOnly(t *testing.T) {
 	assert.Contains(t, buf.String(), "Applying Secrets Manager...")
 }
 
-func TestRun_ApplyDelete(t *testing.T) {
+func TestGlobalApply_ApplyDelete(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -267,14 +265,14 @@ func TestRun_ApplyDelete(t *testing.T) {
 	paramDeleteCalled := false
 	secretDeleteCalled := false
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		paramDeleteCalled = true
 
 		return nil
 	}
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		secretDeleteCalled = true
 
@@ -283,8 +281,8 @@ func TestRun_ApplyDelete(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store), secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store), globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -298,7 +296,7 @@ func TestRun_ApplyDelete(t *testing.T) {
 	assert.Contains(t, buf.String(), "Secrets Manager: Deleted old-secret")
 }
 
-func TestRun_PartialFailure(t *testing.T) {
+func TestGlobalApply_PartialFailure(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -316,20 +314,20 @@ func TestRun_PartialFailure(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("SSM Parameter Store error")
 	}
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return nil
 	}
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store), secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store), globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &errBuf,
@@ -349,7 +347,7 @@ func TestRun_PartialFailure(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_SecretDeleteWithForce(t *testing.T) {
+func TestGlobalApply_SecretDeleteWithForce(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -365,7 +363,7 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 
 	var capturedEntry staging.Entry
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
 
@@ -374,8 +372,8 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -387,7 +385,7 @@ func TestRun_SecretDeleteWithForce(t *testing.T) {
 	assert.True(t, capturedEntry.DeleteOptions.Force)
 }
 
-func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
+func TestGlobalApply_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -403,7 +401,7 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 
 	var capturedEntry staging.Entry
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
 		capturedEntry = entry
 
@@ -412,8 +410,8 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -425,7 +423,7 @@ func TestRun_SecretDeleteWithRecoveryWindow(t *testing.T) {
 	assert.Equal(t, 7, capturedEntry.DeleteOptions.RecoveryWindow)
 }
 
-func TestRun_ParamDeleteError(t *testing.T) {
+func TestGlobalApply_ParamDeleteError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -435,15 +433,15 @@ func TestRun_ParamDeleteError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("delete failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &errBuf,
@@ -454,7 +452,7 @@ func TestRun_ParamDeleteError(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "Failed")
 }
 
-func TestRun_SecretSetError(t *testing.T) {
+func TestGlobalApply_SecretSetError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -465,15 +463,15 @@ func TestRun_SecretSetError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("put secret failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &errBuf,
@@ -484,7 +482,7 @@ func TestRun_SecretSetError(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "Failed")
 }
 
-func TestRun_SecretDeleteError(t *testing.T) {
+func TestGlobalApply_SecretDeleteError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -494,15 +492,15 @@ func TestRun_SecretDeleteError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("delete secret failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &errBuf,
@@ -513,7 +511,7 @@ func TestRun_SecretDeleteError(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "Failed")
 }
 
-func TestRun_ParamSetError(t *testing.T) {
+func TestGlobalApply_ParamSetError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -524,15 +522,15 @@ func TestRun_ParamSetError(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return fmt.Errorf("put parameter failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &errBuf,
@@ -543,7 +541,7 @@ func TestRun_ParamSetError(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "Failed")
 }
 
-func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
+func TestGlobalApply_ConflictDetection_CreateConflict(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -555,14 +553,14 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	// Resource now exists (someone else created it)
 	paramMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel:   "AWS",
 		Stdout:          &buf,
 		Stderr:          &errBuf,
@@ -575,7 +573,7 @@ func TestRun_ConflictDetection_CreateConflict(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "conflict detected for /app/new-param")
 }
 
-func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
+func TestGlobalApply_ConflictDetection_UpdateConflict(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -588,14 +586,14 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 		BaseModifiedAt: &baseTime,
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	// AWS was modified after BaseModifiedAt
 	paramMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel:   "AWS",
 		Stdout:          &buf,
 		Stderr:          &errBuf,
@@ -608,7 +606,7 @@ func TestRun_ConflictDetection_UpdateConflict(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "conflict detected for /app/config")
 }
 
-func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
+func TestGlobalApply_ConflictDetection_DeleteConflict(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -620,14 +618,14 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 		BaseModifiedAt: &baseTime,
 	})
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	// AWS was modified after BaseModifiedAt
 	secretMock.fetchLastModifiedVal = time.Now()
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:        []apply.ServiceApply{secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(globalApplySecret(secretMock, store)),
 		ProviderLabel:   "AWS",
 		Stdout:          &buf,
 		Stderr:          &errBuf,
@@ -640,7 +638,7 @@ func TestRun_ConflictDetection_DeleteConflict(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "conflict detected for my-secret")
 }
 
-func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
+func TestGlobalApply_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -654,7 +652,7 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	})
 
 	applyCalled := false
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	// AWS was modified after BaseModifiedAt (conflict)
 	paramMock.fetchLastModifiedVal = time.Now()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
@@ -665,8 +663,8 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel:   "AWS",
 		Stdout:          &buf,
 		Stderr:          &errBuf,
@@ -678,7 +676,7 @@ func TestRun_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	assert.True(t, applyCalled, "Apply should be called when IgnoreConflicts is true")
 }
 
-func TestRun_ConflictDetection_NoConflict(t *testing.T) {
+func TestGlobalApply_ConflictDetection_NoConflict(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -692,7 +690,7 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	})
 
 	applyCalled := false
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	// AWS was modified BEFORE BaseModifiedAt (no conflict)
 	paramMock.fetchLastModifiedVal = baseTime.Add(-1 * time.Hour)
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
@@ -703,8 +701,8 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel:   "AWS",
 		Stdout:          &buf,
 		Stderr:          &bytes.Buffer{},
@@ -716,7 +714,7 @@ func TestRun_ConflictDetection_NoConflict(t *testing.T) {
 	assert.True(t, applyCalled, "Apply should be called when there's no conflict")
 }
 
-func TestRun_ConflictDetection_BothServices(t *testing.T) {
+func TestGlobalApply_ConflictDetection_BothServices(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -739,16 +737,16 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 		BaseModifiedAt: &baseTime,
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.fetchLastModifiedVal = time.Now() // conflict
 
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.fetchLastModifiedVal = time.Now() // conflict
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock, store), secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(globalApplyParam(paramMock, store), globalApplySecret(secretMock, store)),
 		ProviderLabel:   "AWS",
 		Stdout:          &buf,
 		Stderr:          &errBuf,
@@ -762,7 +760,7 @@ func TestRun_ConflictDetection_BothServices(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "conflict detected for my-secret")
 }
 
-func TestRun_ConflictDetection_TagConflict(t *testing.T) {
+func TestGlobalApply_ConflictDetection_TagConflict(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -777,7 +775,7 @@ func TestRun_ConflictDetection_TagConflict(t *testing.T) {
 	})
 
 	applyTagsCalled := false
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	// Remote was modified after BaseModifiedAt (conflict).
 	paramMock.fetchLastModifiedVal = time.Now()
 	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
@@ -788,8 +786,8 @@ func TestRun_ConflictDetection_TagConflict(t *testing.T) {
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:        []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel:   "AWS",
 		Stdout:          &buf,
 		Stderr:          &errBuf,
@@ -807,7 +805,7 @@ func TestRun_ConflictDetection_TagConflict(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRun_ApplyCreate(t *testing.T) {
+func TestGlobalApply_ApplyCreate(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -819,15 +817,15 @@ func TestRun_ApplyCreate(t *testing.T) {
 		StagedAt:  time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		return nil
 	}
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -838,7 +836,7 @@ func TestRun_ApplyCreate(t *testing.T) {
 	assert.Contains(t, buf.String(), "SSM Parameter Store: Created /app/new-param")
 }
 
-func TestRun_ApplyTagsSuccess(t *testing.T) {
+func TestGlobalApply_ApplyTagsSuccess(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -851,7 +849,7 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 	})
 
 	applyTagsCalled := false
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyTagsFunc = func(_ context.Context, name string, tagEntry staging.TagEntry) error {
 		applyTagsCalled = true
 
@@ -864,8 +862,8 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -884,7 +882,7 @@ func TestRun_ApplyTagsSuccess(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_ApplyTagsError(t *testing.T) {
+func TestGlobalApply_ApplyTagsError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -895,15 +893,15 @@ func TestRun_ApplyTagsError(t *testing.T) {
 		StagedAt: time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
 		return fmt.Errorf("tag operation failed")
 	}
 
 	var buf, errBuf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &errBuf,
@@ -920,7 +918,7 @@ func TestRun_ApplyTagsError(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRun_ApplyTagsSecretService(t *testing.T) {
+func TestGlobalApply_ApplyTagsSecretService(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -932,7 +930,7 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 	})
 
 	applyTagsCalled := false
-	secretMock := newSecretStrategy()
+	secretMock := newGlobalApplySecretStrategy()
 	secretMock.applyTagsFunc = func(_ context.Context, name string, _ staging.TagEntry) error {
 		applyTagsCalled = true
 
@@ -943,8 +941,8 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{secretApply(secretMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplySecret(secretMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -957,7 +955,7 @@ func TestRun_ApplyTagsSecretService(t *testing.T) {
 	assert.Contains(t, buf.String(), "Secrets Manager: Tagged my-secret")
 }
 
-func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
+func TestGlobalApply_ApplyBothEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -978,7 +976,7 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 	entryCalled := false
 	tagCalled := false
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
 		entryCalled = true
 
@@ -992,8 +990,8 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -1007,7 +1005,7 @@ func TestRun_ApplyBothEntriesAndTags(t *testing.T) {
 	assert.Contains(t, buf.String(), "Applying SSM Parameter Store tags")
 }
 
-func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
+func TestGlobalApply_ApplyTagsOnlyAdditions(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -1018,15 +1016,15 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 		StagedAt: time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
 		return nil
 	}
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -1038,7 +1036,7 @@ func TestRun_ApplyTagsOnlyAdditions(t *testing.T) {
 	assert.NotContains(t, buf.String(), "-")
 }
 
-func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
+func TestGlobalApply_ApplyTagsOnlyRemovals(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -1049,15 +1047,15 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 		StagedAt: time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyTagsFunc = func(_ context.Context, _ string, _ staging.TagEntry) error {
 		return nil
 	}
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -1069,7 +1067,7 @@ func TestRun_ApplyTagsOnlyRemovals(t *testing.T) {
 	assert.NotContains(t, buf.String(), "+")
 }
 
-func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
+func TestGlobalApply_FormatTagApplySummaryEmpty(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -1079,12 +1077,12 @@ func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
 		StagedAt: time.Now(),
 	})
 
-	paramMock := newParamStrategy()
+	paramMock := newGlobalApplyParamStrategy()
 
 	var buf bytes.Buffer
 
-	r := &apply.Runner{
-		Services:      []apply.ServiceApply{paramApply(paramMock, store)},
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplyParam(paramMock, store)),
 		ProviderLabel: "AWS",
 		Stdout:        &buf,
 		Stderr:        &bytes.Buffer{},
@@ -1098,26 +1096,78 @@ func TestRun_FormatTagApplySummaryEmpty(t *testing.T) {
 	assert.NotContains(t, buf.String(), "[-")
 }
 
-func paramApply(s staging.ApplyStrategy, st store.ReadWriteOperator) apply.ServiceApply {
-	return serviceApply(staging.ServiceParam, s, st)
+func globalApplyParam(s staging.ApplyStrategy, st store.ReadWriteOperator) *stagingusecase.ApplyUseCase {
+	return &stagingusecase.ApplyUseCase{Strategy: s, Store: st}
 }
 
-func secretApply(s staging.ApplyStrategy, st store.ReadWriteOperator) apply.ServiceApply {
-	return serviceApply(staging.ServiceSecret, s, st)
+func globalApplySecret(s staging.ApplyStrategy, st store.ReadWriteOperator) *stagingusecase.ApplyUseCase {
+	return &stagingusecase.ApplyUseCase{Strategy: s, Store: st}
 }
 
-// serviceApply builds a ServiceApply with this service's staged changes
-// pre-listed from the store (mirroring what the command layer does; the Runner
-// consumes the pre-listed entries).
-func serviceApply(svc staging.Service, s staging.ApplyStrategy, st store.ReadWriteOperator) apply.ServiceApply {
-	entries, _ := st.ListEntries(context.Background(), svc)
-	tags, _ := st.ListTags(context.Background(), svc)
+// globalApplyServices bundles per-service apply use cases into the all-service
+// apply use case, in apply order.
+func globalApplyServices(services ...*stagingusecase.ApplyUseCase) *stagingusecase.GlobalApplyUseCase {
+	return &stagingusecase.GlobalApplyUseCase{Services: services}
+}
 
-	return apply.ServiceApply{
-		Service:  svc,
-		Store:    st,
-		Strategy: s,
-		Entries:  entries[svc],
-		Tags:     tags[svc],
+// TestGlobalApply_AppliesEntriesUnderTheirNamespace is the core guard for the
+// per-namespace path: the SAME key staged under two namespaces must apply through
+// the strategy scoped to EACH entry's own namespace (App Configuration keeps all
+// namespaces in one staging store). Without correct threading, both entries would
+// go through one namespace's strategy.
+func TestGlobalApply_AppliesEntriesUnderTheirNamespace(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	st := testutil.NewMockStore()
+	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "k"}, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("va"), StagedAt: time.Now(),
+	}))
+	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "k", Namespace: "dev"}, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("vb"), StagedAt: time.Now(),
+	}))
+
+	var mu sync.Mutex
+
+	appliedByNS := map[string]string{}
+
+	// StrategyFor returns a strategy bound to the requested namespace; its Apply
+	// records which value it received, so we can prove each entry was routed to
+	// its own namespace's strategy.
+	strategyFor := func(ns string) (staging.ApplyStrategy, error) {
+		s := newGlobalApplyParamStrategy()
+		s.applyFunc = func(_ context.Context, _ string, entry staging.Entry) error {
+			mu.Lock()
+			defer mu.Unlock()
+
+			appliedByNS[ns] = lo.FromPtr(entry.Value)
+
+			return nil
+		}
+
+		return s, nil
 	}
+
+	svc := &stagingusecase.ApplyUseCase{
+		Store:       st,
+		Strategy:    newGlobalApplyParamStrategy(),
+		StrategyFor: strategyFor,
+	}
+
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(svc),
+		ProviderLabel:   "Azure",
+		Stdout:          &bytes.Buffer{},
+		Stderr:          &bytes.Buffer{},
+		IgnoreConflicts: true, // this test is about namespace routing, not conflicts
+	}
+
+	require.NoError(t, r.Run(ctx))
+
+	// Each entry reached the strategy scoped to ITS namespace.
+	assert.Equal(t, map[string]string{"": "va", "dev": "vb"}, appliedByNS)
+
+	// Both entries were unstaged under their own (name, namespace) key.
+	remaining, _ := st.ListEntries(ctx, staging.ServiceParam)
+	assert.Empty(t, remaining[staging.ServiceParam])
 }

@@ -1,10 +1,13 @@
-package status_test
+// The all-service command tests share one namespace with their fixtures in
+// global_test.go.
+//declscope:namespace global
+
+package cli_test
 
 import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -12,34 +15,32 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
-	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
-func TestCommand_NoStagedChanges(t *testing.T) {
+func TestGlobalStatus_NoStagedChanges(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes staged")
 }
 
-func TestCommand_ShowParamChangesOnly(t *testing.T) {
+func TestGlobalStatus_ShowParamChangesOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -53,14 +54,14 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -69,7 +70,7 @@ func TestCommand_ShowParamChangesOnly(t *testing.T) {
 	assert.NotContains(t, output, "Staged Secrets Manager changes")
 }
 
-func TestCommand_ShowSecretChangesOnly(t *testing.T) {
+func TestGlobalStatus_ShowSecretChangesOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -83,14 +84,14 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -99,7 +100,7 @@ func TestCommand_ShowSecretChangesOnly(t *testing.T) {
 	assert.NotContains(t, output, "Staged SSM Parameter Store changes")
 }
 
-func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
+func TestGlobalStatus_ShowBothParamAndSecretChanges(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -118,14 +119,14 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -137,7 +138,7 @@ func TestCommand_ShowBothParamAndSecretChanges(t *testing.T) {
 	assert.Contains(t, output, "D")
 }
 
-func TestCommand_VerboseOutput(t *testing.T) {
+func TestGlobalStatus_VerboseOutput(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -157,14 +158,14 @@ func TestCommand_VerboseOutput(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -174,7 +175,7 @@ func TestCommand_VerboseOutput(t *testing.T) {
 	assert.Contains(t, output, "secret-value")
 }
 
-func TestCommand_VerboseWithDelete(t *testing.T) {
+func TestGlobalStatus_VerboseWithDelete(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -187,14 +188,14 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -203,7 +204,7 @@ func TestCommand_VerboseWithDelete(t *testing.T) {
 	assert.NotContains(t, output, "Value:")
 }
 
-func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
+func TestGlobalStatus_VerboseTruncatesLongValue(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -218,14 +219,14 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -233,23 +234,15 @@ func TestCommand_VerboseTruncatesLongValue(t *testing.T) {
 	assert.NotContains(t, output, "display")
 }
 
-func TestCommand_Validation(t *testing.T) {
+func TestGlobalStatusCommand_Help(t *testing.T) {
 	t.Parallel()
 
-	app := apptest.AWSApp()
-
-	var buf bytes.Buffer
-
-	app.Writer = &buf
-
-	// Test that the command exists and works. `status` is a subcommand of
-	// `stage`, not a top-level command, so it must be invoked as `stage status`.
-	err := app.Run(t.Context(), []string{"suve", "stage", "status", "--help"})
+	stdout, _, err := runLeafCmd(t, stgcli.NewGlobalStatusCommand(globalAWSConfig()), nil, "--help")
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "staged changes")
+	assert.Contains(t, stdout, "staged changes")
 }
 
-func TestCommand_StoreError(t *testing.T) {
+func TestGlobalStatus_StoreError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -257,19 +250,19 @@ func TestCommand_StoreError(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mock store error")
 }
 
-func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
+func TestGlobalStatus_ShowParamTagChangesOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -282,14 +275,14 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -300,7 +293,7 @@ func TestCommand_ShowParamTagChangesOnly(t *testing.T) {
 	assert.NotContains(t, output, "Staged Secrets Manager changes")
 }
 
-func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
+func TestGlobalStatus_ShowSecretTagChangesOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -314,14 +307,14 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -333,7 +326,7 @@ func TestCommand_ShowSecretTagChangesOnly(t *testing.T) {
 	assert.NotContains(t, output, "Staged SSM Parameter Store changes")
 }
 
-func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
+func TestGlobalStatus_ShowMixedEntryAndTagChanges(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -354,14 +347,14 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -372,7 +365,7 @@ func TestCommand_ShowMixedEntryAndTagChanges(t *testing.T) {
 	assert.Contains(t, output, "T")
 }
 
-func TestCommand_TagChangesVerbose(t *testing.T) {
+func TestGlobalStatus_TagChangesVerbose(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -386,14 +379,14 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{Verbose: true})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{Verbose: true})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -406,7 +399,7 @@ func TestCommand_TagChangesVerbose(t *testing.T) {
 	assert.Contains(t, output, "- old")
 }
 
-func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
+func TestGlobalStatus_TagOnlyChangesNoEntries(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -425,14 +418,14 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -443,54 +436,39 @@ func TestCommand_TagOnlyChangesNoEntries(t *testing.T) {
 	assert.NotContains(t, output, "No changes staged")
 }
 
-// awsServices returns the AWS service specs (param + secret) used by the
-// provider-wide status command.
-func awsServices() []stgcli.GlobalServiceSpec {
-	return []stgcli.GlobalServiceSpec{
-		{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory},
-		{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory},
-	}
-}
-
-// notConfiguredResolver mimics an Azure scope resolver whose resource is not
-// named (e.g. no --vault-name), signalling the service should be skipped.
-func notConfiguredResolver(_ context.Context) (staging.ResolvedScope, error) {
-	return staging.ResolvedScope{}, fmt.Errorf("%w: no resource", staging.ErrServiceNotConfigured)
-}
-
-// TestRun_SkipUnconfiguredService verifies that a service whose scope is not
+// TestGlobalStatus_SkipUnconfiguredService verifies that a service whose scope is not
 // configured is skipped (an unconfigured service can hold no staged state), so a
 // provider like Azure with only one of Key Vault / App Configuration connected
 // reports no error. Store is nil so each spec resolves via its ScopeResolver.
-func TestRun_SkipUnconfiguredService(t *testing.T) {
+func TestGlobalStatus_SkipUnconfiguredService(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: notConfiguredResolver},
-			{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: notConfiguredResolver},
+			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: globalNotConfiguredResolver},
+			{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: globalNotConfiguredResolver},
 		},
 		Stdout: &buf,
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No changes staged")
 }
 
-// TestRun_ResolverErrorPropagates verifies a non-sentinel resolver error is not
+// TestGlobalStatus_ResolverErrorPropagates verifies a non-sentinel resolver error is not
 // swallowed by the skip path.
-func TestRun_ResolverErrorPropagates(t *testing.T) {
+func TestGlobalStatus_ResolverErrorPropagates(t *testing.T) {
 	t.Parallel()
 
 	wantErr := errors.New("boom")
 
 	var buf bytes.Buffer
 
-	r := &status.Runner{
+	r := &stgcli.GlobalStatusRunner{
 		Services: []stgcli.GlobalServiceSpec{
 			{
 				Service:       staging.ServiceParam,
@@ -504,6 +482,6 @@ func TestRun_ResolverErrorPropagates(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 	}
 
-	err := r.Run(t.Context(), status.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalStatusOptions{})
 	require.ErrorIs(t, err, wantErr)
 }

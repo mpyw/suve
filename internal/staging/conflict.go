@@ -11,47 +11,23 @@ import (
 // time (or the fetch error).
 type conflictLastModifiedResults = map[EntryKey]*parallel.Result[time.Time]
 
-// CheckConflicts checks if remote resources were modified after staging.
-// Returns the set of EntryKeys that have conflicts.
+// CheckEntryAndTagConflicts checks staged value changes and staged tag changes
+// for conflicts and returns the merged set of conflicting EntryKeys.
 //
-// Each entry is probed through the strategy resolved for its own namespace, so
-// the probe carries the full EntryKey (name + namespace) and never collapses
-// two same-named entries across namespaces onto one namespace's remote state.
-// For namespace-agnostic providers the resolver returns the single strategy and
-// the empty namespace, so behavior is unchanged.
+//   - Create: conflicts if the resource now exists (someone else created it).
+//   - Update/Delete with BaseModifiedAt: conflicts if the remote was modified
+//     after the base time.
+//   - Tag change with BaseModifiedAt: conflicts if the remote was modified after
+//     the tags were fetched. A tag change without a base time cannot be checked,
+//     and a remote that no longer exists is skipped (the tag apply fails on its
+//     own).
 //
-// For Create operations: conflicts if resource now exists (someone else created it).
-// For Update/Delete operations with BaseModifiedAt: conflicts if the remote was modified after base.
-func CheckConflicts(ctx context.Context, resolve ApplyStrategyResolver, entries map[EntryKey]Entry) map[EntryKey]struct{} {
-	return CheckEntryAndTagConflicts(ctx, resolve, entries, nil)
-}
-
-// CheckTagConflicts checks if the remote resource behind each staged tag change
-// was modified after the tags were fetched. Returns the set of EntryKeys that
-// have conflicts.
-//
-// It mirrors the Update/Delete path of CheckConflicts using the tag's own
-// TagEntry.BaseModifiedAt: if the remote's last-modified time is after that base
-// time, someone changed the resource since the tags were staged and the apply is
-// a conflict rather than a silent overwrite. Each tag change is probed through
-// the strategy resolved for its own namespace (App Configuration); other
-// providers resolve the single strategy under the empty namespace.
-//
-// A tag change with no BaseModifiedAt cannot be checked and is never a conflict.
-// A remote that no longer exists (zero time) is skipped too — the tag apply will
-// fail on its own.
-func CheckTagConflicts(ctx context.Context, resolve ApplyStrategyResolver, tags map[EntryKey]TagEntry) map[EntryKey]struct{} {
-	return CheckEntryAndTagConflicts(ctx, resolve, nil, tags)
-}
-
-// CheckEntryAndTagConflicts checks both staged value changes and staged tag
-// changes for conflicts and returns the merged set of conflicting EntryKeys.
-//
-// It fetches each remote's last-modified time at most once, even when the same
-// key carries both a value change and a tag change: the two probes previously
-// double-fetched the same remote, wasting I/O and widening the window in which
-// the two timestamps could disagree on second-granular providers. The value and
-// tag comparisons now share that single fetch.
+// Each key is probed through the strategy resolved for its own namespace, so
+// two same-named entries in different App Configuration namespaces never
+// collapse onto one namespace's remote state; namespace-agnostic providers
+// resolve the single strategy under the empty namespace. Each remote's
+// last-modified time is fetched at most once, even when a key carries both a
+// value change and a tag change.
 func CheckEntryAndTagConflicts(
 	ctx context.Context,
 	resolve ApplyStrategyResolver,

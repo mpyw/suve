@@ -6,12 +6,8 @@ package stage
 import (
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/apply"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
 	"github.com/mpyw/suve/internal/cli/commands/aws/stage/param"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/reset"
 	"github.com/mpyw/suve/internal/cli/commands/aws/stage/secret"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
@@ -74,10 +70,10 @@ EXAMPLES:
 		Commands: []*cli.Command{
 			param.Command(),
 			secret.Command(),
-			status.Command(gcfg),
-			diff.Command(gcfg),
-			apply.Command(gcfg),
-			reset.Command(gcfg),
+			stgcli.NewGlobalStatusCommand(gcfg),
+			stgcli.NewGlobalDiffCommand(gcfg),
+			stgcli.NewGlobalApplyCommand(gcfg),
+			stgcli.NewGlobalResetCommand(gcfg),
 			stgcli.NewGlobalExportCommand(gcfg),
 			stgcli.NewGlobalImportCommand(gcfg),
 		},

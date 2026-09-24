@@ -58,8 +58,19 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 		return nil
 	}
 
-	// For all items, show header and entries
-	output.Printf(r.Stdout, "%s (%d):\n", colors.For(r.Stdout).Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)), totalCount)
+	r.printService(result, opts.Verbose)
+
+	return nil
+}
+
+// printService prints one service's staged changes under a
+// "Staged <service> changes (N):" header.
+//
+//declscope:package // the all-service status (global_status.go) renders through it
+func (r *StatusRunner) printService(result *stagingusecase.StatusOutput, verbose bool) {
+	output.Printf(r.Stdout, "%s (%d):\n",
+		colors.For(r.Stdout).Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)),
+		len(result.Entries)+len(result.TagEntries))
 
 	printer := &staging.EntryPrinter{Writer: r.Stdout}
 
@@ -77,7 +88,7 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 
 	for _, entry := range entries {
 		key := staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}
-		printer.PrintEntry(key, stagingEntryFromStatus(entry), opts.Verbose, entry.ShowDeleteOptions)
+		printer.PrintEntry(key, stagingEntryFromStatus(entry), verbose, entry.ShowDeleteOptions)
 	}
 
 	// Print tag entries, sorted by (name, namespace). Like entries, the same App
@@ -93,10 +104,8 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 	})
 
 	for _, tagEntry := range tagEntries {
-		r.printTagEntry(tagEntry, opts.Verbose)
+		r.printTagEntry(tagEntry, verbose)
 	}
-
-	return nil
 }
 
 func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bool) {

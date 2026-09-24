@@ -32,6 +32,12 @@ options and examples, read the full docs:
 - Staging shares one workflow across providers:
   `add` / `edit` / `delete` / `status` / `diff` / `apply` / `reset` /
   `tag` / `untag` / `export` / `import`. The `stage` alias is `stg`.
+- Multi-service providers (AWS, Azure) also get all-service
+  `suve <provider> stage status|diff|apply|reset` that span both services,
+  each service in its own staging scope (an unconfigured Azure resource is
+  skipped). All-service `stage export|import <dir>` is AWS-only: it snapshots
+  one scope, and Azure's two services keep separate scopes, so Azure exports
+  per service.
 
 ## Group aliases
 

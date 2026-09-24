@@ -1,4 +1,8 @@
-package diff_test
+// The all-service command tests share one namespace with their fixtures in
+// global_test.go.
+//declscope:namespace global
+
+package cli_test
 
 import (
 	"bytes"
@@ -12,21 +16,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	stagediff "github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
-	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/staging"
+	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// storeReturning builds a provider.Store mock whose Get returns an entry with
+// globalDiffStoreReturning builds a provider.Store mock whose Get returns an entry with
 // the given value and version id. The staging diff path only calls Get (via
 // FetchCurrent / FetchCurrentTags), so that is all the mock needs to implement.
-func storeReturning(value, versionID string) *providermock.Store {
+func globalDiffStoreReturning(value, versionID string) *providermock.Store {
 	return &providermock.Store{
 		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 			return &domain.Entry{Value: value, Version: domain.Version{ID: versionID}}, nil
@@ -34,9 +38,9 @@ func storeReturning(value, versionID string) *providermock.Store {
 	}
 }
 
-// storeGetError builds a provider.Store mock whose Get fails with a genuine
+// globalDiffStoreGetError builds a provider.Store mock whose Get fails with a genuine
 // provider.ErrNotFound, simulating a resource that no longer exists.
-func storeGetError(msg string) *providermock.Store {
+func globalDiffStoreGetError(msg string) *providermock.Store {
 	return &providermock.Store{
 		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, msg)
@@ -44,10 +48,10 @@ func storeGetError(msg string) *providermock.Store {
 	}
 }
 
-// storeGetTransientError builds a provider.Store mock whose Get fails with a
+// globalDiffStoreGetTransientError builds a provider.Store mock whose Get fails with a
 // non-not-found error (e.g. throttling, expired credentials, a network blip),
 // which must NOT trigger auto-unstaging of staged work.
-func storeGetTransientError(msg string) *providermock.Store {
+func globalDiffStoreGetTransientError(msg string) *providermock.Store {
 	return &providermock.Store{
 		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 			return nil, errors.New(msg)
@@ -55,9 +59,9 @@ func storeGetTransientError(msg string) *providermock.Store {
 	}
 }
 
-// storeWithTags builds a provider.Store mock whose Get returns an entry
+// globalDiffStoreWithTags builds a provider.Store mock whose Get returns an entry
 // carrying the given tags (used to drive FetchCurrentTags for tag diffs).
-func storeWithTags(tags ...domain.Tag) *providermock.Store {
+func globalDiffStoreWithTags(tags ...domain.Tag) *providermock.Store {
 	return &providermock.Store{
 		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
 			return &domain.Entry{Tags: tags}, nil
@@ -65,33 +69,27 @@ func storeWithTags(tags ...domain.Tag) *providermock.Store {
 	}
 }
 
-func TestCommand_Validation(t *testing.T) {
+func TestGlobalDiffCommand_Validation(t *testing.T) {
 	t.Parallel()
 
 	t.Run("help", func(t *testing.T) {
 		t.Parallel()
 
-		app := apptest.AWSApp()
-
-		var buf bytes.Buffer
-
-		app.Writer = &buf
-		err := app.Run(t.Context(), []string{"suve", "stage", "diff", "--help"})
+		stdout, _, err := runLeafCmd(t, stgcli.NewGlobalDiffCommand(globalAWSConfig()), nil, "--help")
 		require.NoError(t, err)
-		assert.Contains(t, buf.String(), "Show diff of all staged changes")
+		assert.Contains(t, stdout, "Show diff of all staged changes")
 	})
 
 	t.Run("no arguments allowed", func(t *testing.T) {
 		t.Parallel()
 
-		app := apptest.AWSApp()
-		err := app.Run(t.Context(), []string{"suve", "stage", "diff", "extra-arg"})
+		_, _, err := runLeafCmd(t, stgcli.NewGlobalDiffCommand(globalAWSConfig()), nil, "extra-arg")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage:")
 	})
 }
 
-func TestRun_NothingStaged(t *testing.T) {
+func TestGlobalDiff_NothingStaged(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -99,9 +97,12 @@ func TestRun_NothingStaged(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	// Empty per-service stores produce no output (the command action prints the
-	// warning). The Runner consumes pre-listed entries/tags.
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{serviceDiff(staging.ServiceParam, nil, store), serviceDiff(staging.ServiceSecret, nil, store)},
+	// warning).
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("", "1")), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreReturning("", "1")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -109,12 +110,12 @@ func TestRun_NothingStaged(t *testing.T) {
 
 	// When called with empty store, Run should return without error
 	// and produce no output (action handles the warning)
-	err := r.Run(t.Context(), stagediff.Options{})
+	err := r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, stdout.String())
 }
 
-func TestRun_ParamOnly(t *testing.T) {
+func TestGlobalDiff_ParamOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -129,14 +130,14 @@ func TestRun_ParamOnly(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeReturning("old-value", "1")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("old-value", "1")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -146,7 +147,7 @@ func TestRun_ParamOnly(t *testing.T) {
 	assert.Contains(t, output, "(staged)")
 }
 
-func TestRun_SecretOnly(t *testing.T) {
+func TestGlobalDiff_SecretOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -161,14 +162,16 @@ func TestRun_SecretOnly(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeReturning("old-secret", "abc123def456")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreReturning("old-secret", "abc123def456")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -176,7 +179,7 @@ func TestRun_SecretOnly(t *testing.T) {
 	assert.Contains(t, output, "+new-secret")
 }
 
-func TestRun_BothServices(t *testing.T) {
+func TestGlobalDiff_BothServices(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -199,17 +202,17 @@ func TestRun_BothServices(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services: []stagediff.ServiceStrategy{
-			paramDiff(staging.NewAWSParamStrategy(storeReturning("param-old", "1")), store),
-			secretDiff(staging.NewAWSSecretStrategy(storeReturning("secret-old", "abc123def456")), store),
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("param-old", "1")), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreReturning("secret-old", "abc123def456")), store),
 		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -221,7 +224,7 @@ func TestRun_BothServices(t *testing.T) {
 	assert.Contains(t, output, "+secret-new")
 }
 
-func TestRun_DeleteOperations(t *testing.T) {
+func TestGlobalDiff_DeleteOperations(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -242,17 +245,17 @@ func TestRun_DeleteOperations(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services: []stagediff.ServiceStrategy{
-			paramDiff(staging.NewAWSParamStrategy(storeReturning("existing-value", "1")), store),
-			secretDiff(staging.NewAWSSecretStrategy(storeReturning("existing-secret", "abc123def456")), store),
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("existing-value", "1")), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreReturning("existing-secret", "abc123def456")), store),
 		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -261,7 +264,7 @@ func TestRun_DeleteOperations(t *testing.T) {
 	assert.Contains(t, output, "-existing-secret")
 }
 
-func TestRun_IdenticalValues(t *testing.T) {
+func TestGlobalDiff_IdenticalValues(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -276,14 +279,16 @@ func TestRun_IdenticalValues(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeReturning("same-value", "1")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("same-value", "1")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
@@ -294,7 +299,7 @@ func TestRun_IdenticalValues(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_ParseJSON(t *testing.T) {
+func TestGlobalDiff_ParseJSON(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -309,14 +314,16 @@ func TestRun_ParseJSON(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeReturning(`{"key":"old"}`, "1")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning(`{"key":"old"}`, "1")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -324,7 +331,7 @@ func TestRun_ParseJSON(t *testing.T) {
 	assert.Contains(t, output, "+")
 }
 
-func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
+func TestGlobalDiff_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -339,14 +346,16 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeGetError("parameter not found")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("parameter not found")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "no longer exists")
@@ -356,7 +365,7 @@ func TestRun_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
+func TestGlobalDiff_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -371,14 +380,16 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeGetError("secret not found")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("secret not found")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "no longer exists")
@@ -388,7 +399,7 @@ func TestRun_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-func TestRun_SecretIdenticalValues(t *testing.T) {
+func TestGlobalDiff_SecretIdenticalValues(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -403,14 +414,16 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeReturning("same-value", "abc123def456")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreReturning("same-value", "abc123def456")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	assert.Empty(t, stdout.String())
@@ -421,7 +434,7 @@ func TestRun_SecretIdenticalValues(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_SecretParseJSON(t *testing.T) {
+func TestGlobalDiff_SecretParseJSON(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -436,14 +449,16 @@ func TestRun_SecretParseJSON(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeReturning(`{"key":"old"}`, "abc123def456")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreReturning(`{"key":"old"}`, "abc123def456")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -451,7 +466,7 @@ func TestRun_SecretParseJSON(t *testing.T) {
 	assert.Contains(t, output, "+")
 }
 
-func TestRun_SecretParseJSONMixed(t *testing.T) {
+func TestGlobalDiff_SecretParseJSONMixed(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -466,20 +481,22 @@ func TestRun_SecretParseJSONMixed(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeReturning(`{"key":"old"}`, "abc123def456")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreReturning(`{"key":"old"}`, "abc123def456")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{ParseJSON: true})
 	require.NoError(t, err)
 
 	assert.Contains(t, stderr.String(), "--parse-json has no effect")
 }
 
-func TestRun_ParamCreateOperation(t *testing.T) {
+func TestGlobalDiff_ParamCreateOperation(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -501,14 +518,16 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeGetError("parameter not found")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("parameter not found")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -520,7 +539,7 @@ func TestRun_ParamCreateOperation(t *testing.T) {
 	// Tags are now staged separately and displayed in tag diff section
 }
 
-func TestRun_SecretCreateOperation(t *testing.T) {
+func TestGlobalDiff_SecretCreateOperation(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -542,14 +561,16 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeGetError("secret not found")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("secret not found")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -561,7 +582,7 @@ func TestRun_SecretCreateOperation(t *testing.T) {
 	// Tags are now staged separately and displayed in tag diff section
 }
 
-func TestRun_CreateWithParseJSON(t *testing.T) {
+func TestGlobalDiff_CreateWithParseJSON(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -576,14 +597,16 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeGetError("parameter not found")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("parameter not found")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -592,7 +615,7 @@ func TestRun_CreateWithParseJSON(t *testing.T) {
 	assert.Contains(t, output, "\"key\":")
 }
 
-func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
+func TestGlobalDiff_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -606,14 +629,16 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeGetError("parameter not found")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("parameter not found")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "already deleted")
@@ -623,10 +648,10 @@ func TestRun_DeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-// TestRun_KeptStagedOnTransientFetchError verifies that a non-not-found fetch
+// TestGlobalDiff_KeptStagedOnTransientFetchError verifies that a non-not-found fetch
 // error (throttling, expired credentials, a network blip) on a read-only
 // `stage diff` does NOT discard staged deletes/updates (#321).
-func TestRun_KeptStagedOnTransientFetchError(t *testing.T) {
+func TestGlobalDiff_KeptStagedOnTransientFetchError(t *testing.T) {
 	t.Parallel()
 
 	for _, op := range []staging.Operation{staging.OperationDelete, staging.OperationUpdate} {
@@ -644,14 +669,16 @@ func TestRun_KeptStagedOnTransientFetchError(t *testing.T) {
 
 			var stdout, stderr bytes.Buffer
 
-			r := &stagediff.Runner{
-				Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeGetTransientError("throttled")), store)},
+			r := &stgcli.GlobalDiffRunner{
+				Services: []*stagingusecase.DiffUseCase{
+					globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetTransientError("throttled")), store),
+				},
 				ProviderLabel: "AWS",
 				Stdout:        &stdout,
 				Stderr:        &stderr,
 			}
 
-			require.NoError(t, r.Run(t.Context(), stagediff.Options{}))
+			require.NoError(t, r.Run(t.Context(), stgcli.GlobalDiffOptions{}))
 
 			// Surfaced as a warning, but NOT unstaged.
 			assert.Contains(t, stderr.String(), "throttled")
@@ -663,10 +690,10 @@ func TestRun_KeptStagedOnTransientFetchError(t *testing.T) {
 	}
 }
 
-// TestRun_DeleteEmptyRemoteNotUnstaged verifies a staged delete of a resource
+// TestGlobalDiff_DeleteEmptyRemoteNotUnstaged verifies a staged delete of a resource
 // whose remote value is the empty string is not cancelled by the
 // identical-value shortcut (#323).
-func TestRun_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
+func TestGlobalDiff_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -677,14 +704,14 @@ func TestRun_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeReturning("", "1")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("", "1")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	require.NoError(t, r.Run(t.Context(), stagediff.Options{}))
+	require.NoError(t, r.Run(t.Context(), stgcli.GlobalDiffOptions{}))
 	assert.NotContains(t, stderr.String(), "unstaged")
 
 	// The staged deletion must survive `stage diff`.
@@ -692,11 +719,11 @@ func TestRun_DeleteEmptyRemoteNotUnstaged(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestRun_ParseJSONReformatOnlyUpdateKeptStaged verifies that a staged update
+// TestGlobalDiff_ParseJSONReformatOnlyUpdateKeptStaged verifies that a staged update
 // which only reformats JSON (same content, different key order) is NOT unstaged
 // by `stage diff -j`: the auto-unstage decision is made on raw values, so
 // staged work does not depend on a display flag (#324).
-func TestRun_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
+func TestGlobalDiff_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -708,14 +735,16 @@ func TestRun_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeReturning(`{"a":1,"b":2}`, "1")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning(`{"a":1,"b":2}`, "1")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	require.NoError(t, r.Run(t.Context(), stagediff.Options{ParseJSON: true}))
+	require.NoError(t, r.Run(t.Context(), stgcli.GlobalDiffOptions{ParseJSON: true}))
 	assert.NotContains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "only in JSON formatting")
 
@@ -724,7 +753,7 @@ func TestRun_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
+func TestGlobalDiff_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -738,14 +767,16 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeGetError("secret not found")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("secret not found")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, stderr.String(), "unstaged")
 	assert.Contains(t, stderr.String(), "already deleted")
@@ -755,7 +786,7 @@ func TestRun_SecretDeleteAutoUnstageWhenAlreadyDeleted(t *testing.T) {
 	assert.ErrorIs(t, err, staging.ErrNotStaged)
 }
 
-func TestRun_MetadataWithDescription(t *testing.T) {
+func TestGlobalDiff_MetadataWithDescription(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -771,14 +802,14 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeReturning("old-value", "1")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("old-value", "1")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -786,7 +817,7 @@ func TestRun_MetadataWithDescription(t *testing.T) {
 	assert.Contains(t, output, "Updated config")
 }
 
-func TestRun_MetadataWithTags(t *testing.T) {
+func TestGlobalDiff_MetadataWithTags(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -807,14 +838,14 @@ func TestRun_MetadataWithTags(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeReturning("old-value", "1")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("old-value", "1")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -824,7 +855,7 @@ func TestRun_MetadataWithTags(t *testing.T) {
 	// Tags are now staged separately and would be displayed in tag diff section
 }
 
-func TestRun_TagOnlyDiff(t *testing.T) {
+func TestGlobalDiff_TagOnlyDiff(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -839,14 +870,17 @@ func TestRun_TagOnlyDiff(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{serviceDiff(staging.ServiceParam, nil, store), serviceDiff(staging.ServiceSecret, nil, store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("no remote")), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("no remote")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -858,7 +892,7 @@ func TestRun_TagOnlyDiff(t *testing.T) {
 	assert.Contains(t, output, "team=api")
 }
 
-func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
+func TestGlobalDiff_TagOnlyRemovalsDiff(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -873,14 +907,17 @@ func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{serviceDiff(staging.ServiceParam, nil, store), serviceDiff(staging.ServiceSecret, nil, store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("no remote")), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("no remote")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -891,7 +928,7 @@ func TestRun_TagOnlyRemovalsDiff(t *testing.T) {
 	assert.Contains(t, output, "old-tag")
 }
 
-func TestRun_SecretTagDiff(t *testing.T) {
+func TestGlobalDiff_SecretTagDiff(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -907,14 +944,17 @@ func TestRun_SecretTagDiff(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{serviceDiff(staging.ServiceParam, nil, store), serviceDiff(staging.ServiceSecret, nil, store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("no remote")), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("no remote")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -926,7 +966,7 @@ func TestRun_SecretTagDiff(t *testing.T) {
 	assert.Contains(t, output, "deprecated")
 }
 
-func TestRun_SecretCreateWithParseJSON(t *testing.T) {
+func TestGlobalDiff_SecretCreateWithParseJSON(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -941,14 +981,16 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeGetError("secret not found")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services: []*stagingusecase.DiffUseCase{
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("secret not found")), store),
+		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{ParseJSON: true})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{ParseJSON: true})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -957,7 +999,7 @@ func TestRun_SecretCreateWithParseJSON(t *testing.T) {
 	assert.Contains(t, output, "\"key\":")
 }
 
-func TestRun_BothEntriesAndTags(t *testing.T) {
+func TestGlobalDiff_BothEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -981,14 +1023,14 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeReturning("old-value", "1")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreReturning("old-value", "1")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -1001,7 +1043,7 @@ func TestRun_BothEntriesAndTags(t *testing.T) {
 	assert.Contains(t, output, "/app/other")
 }
 
-func TestRun_ParamTagDiffWithValues(t *testing.T) {
+func TestGlobalDiff_ParamTagDiffWithValues(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -1015,7 +1057,7 @@ func TestRun_ParamTagDiffWithValues(t *testing.T) {
 	require.NoError(t, err)
 
 	// Provider returns current tag values for the removal preview.
-	paramStore := storeWithTags(
+	paramStore := globalDiffStoreWithTags(
 		domain.Tag{Key: "deprecated", Value: "true"},
 		domain.Tag{Key: "old-tag", Value: "legacy-value"},
 		domain.Tag{Key: "other", Value: "not-staged"},
@@ -1023,14 +1065,14 @@ func TestRun_ParamTagDiffWithValues(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(paramStore), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(paramStore), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -1040,7 +1082,7 @@ func TestRun_ParamTagDiffWithValues(t *testing.T) {
 	assert.Contains(t, output, "old-tag=legacy-value")
 }
 
-func TestRun_SecretTagDiffWithValues(t *testing.T) {
+func TestGlobalDiff_SecretTagDiffWithValues(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -1054,18 +1096,18 @@ func TestRun_SecretTagDiffWithValues(t *testing.T) {
 	require.NoError(t, err)
 
 	// Provider returns current tag values for the removal preview.
-	secretStore := storeWithTags(domain.Tag{Key: "deprecated", Value: "yes"})
+	secretStore := globalDiffStoreWithTags(domain.Tag{Key: "deprecated", Value: "yes"})
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(secretStore), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffSecret(staging.NewAWSSecretStrategy(secretStore), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -1074,7 +1116,7 @@ func TestRun_SecretTagDiffWithValues(t *testing.T) {
 	assert.Contains(t, output, "deprecated=yes")
 }
 
-func TestRun_ParamTagDiffAPIError(t *testing.T) {
+func TestGlobalDiff_ParamTagDiffAPIError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -1089,14 +1131,14 @@ func TestRun_ParamTagDiffAPIError(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(storeGetError("API error")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("API error")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -1105,7 +1147,7 @@ func TestRun_ParamTagDiffAPIError(t *testing.T) {
 	assert.Contains(t, output, "deprecated")
 }
 
-func TestRun_SecretTagDiffAPIError(t *testing.T) {
+func TestGlobalDiff_SecretTagDiffAPIError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -1120,14 +1162,14 @@ func TestRun_SecretTagDiffAPIError(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{secretDiff(staging.NewAWSSecretStrategy(storeGetError("API error")), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("API error")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -1136,7 +1178,7 @@ func TestRun_SecretTagDiffAPIError(t *testing.T) {
 	assert.Contains(t, output, "old-tag")
 }
 
-func TestRun_TagDiffWithMissingValue(t *testing.T) {
+func TestGlobalDiff_TagDiffWithMissingValue(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -1150,18 +1192,18 @@ func TestRun_TagDiffWithMissingValue(t *testing.T) {
 	require.NoError(t, err)
 
 	// Provider returns only some of the staged tags (no-value not present).
-	paramStore := storeWithTags(domain.Tag{Key: "has-value", Value: "found"})
+	paramStore := globalDiffStoreWithTags(domain.Tag{Key: "has-value", Value: "found"})
 
 	var stdout, stderr bytes.Buffer
 
-	r := &stagediff.Runner{
-		Services:      []stagediff.ServiceStrategy{paramDiff(staging.NewAWSParamStrategy(paramStore), store)},
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(paramStore), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
 	}
 
-	err = r.Run(t.Context(), stagediff.Options{})
+	err = r.Run(t.Context(), stgcli.GlobalDiffOptions{})
 	require.NoError(t, err)
 
 	output := stdout.String()
@@ -1171,26 +1213,65 @@ func TestRun_TagDiffWithMissingValue(t *testing.T) {
 	assert.NotContains(t, output, "no-value=")
 }
 
-func paramDiff(s staging.DiffStrategy, st store.ReadWriteOperator) stagediff.ServiceStrategy {
-	return serviceDiff(staging.ServiceParam, s, st)
+func globalDiffParam(s staging.DiffStrategy, st store.ReadWriteOperator) *stagingusecase.DiffUseCase {
+	return globalDiffUseCase(s, st)
 }
 
-func secretDiff(s staging.DiffStrategy, st store.ReadWriteOperator) stagediff.ServiceStrategy {
-	return serviceDiff(staging.ServiceSecret, s, st)
+func globalDiffSecret(s staging.DiffStrategy, st store.ReadWriteOperator) *stagingusecase.DiffUseCase {
+	return globalDiffUseCase(s, st)
 }
 
-// serviceDiff builds a ServiceStrategy with this service's staged changes
-// pre-listed from the store (mirroring the command layer; the Runner consumes
-// the pre-listed entries).
-func serviceDiff(svc staging.Service, s staging.DiffStrategy, st store.ReadWriteOperator) stagediff.ServiceStrategy {
-	entries, _ := st.ListEntries(context.Background(), svc)
-	tags, _ := st.ListTags(context.Background(), svc)
+// globalDiffUseCase builds one service's DiffUseCase labelled with the AWS
+// provider, as the command layer does.
+func globalDiffUseCase(s staging.DiffStrategy, st store.ReadWriteOperator) *stagingusecase.DiffUseCase {
+	return &stagingusecase.DiffUseCase{Strategy: s, Store: st, RemoteLabel: "AWS"}
+}
 
-	return stagediff.ServiceStrategy{
-		Service:  svc,
-		Store:    st,
-		Strategy: s,
-		Entries:  entries[svc],
-		Tags:     tags[svc],
+// TestGlobalDiff_DiffsEntriesUnderTheirNamespace guards the per-namespace diff path: the
+// SAME key staged under two namespaces must be diffed against the CURRENT value
+// fetched under EACH entry's own namespace. The dev entry's strategy reports a
+// different current value ("cur-b"), so if namespace threading were broken the
+// dev entry would diff against the null-namespace current ("cur-a") and "cur-b"
+// would never appear.
+func TestGlobalDiff_DiffsEntriesUnderTheirNamespace(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	st := testutil.NewMockStore()
+	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "k"}, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("new-a"), StagedAt: time.Now(),
+	}))
+	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "k", Namespace: "dev"}, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("new-b"), StagedAt: time.Now(),
+	}))
+
+	// Current value differs per namespace, so a mis-routed fetch is observable.
+	nsCurrent := map[string]string{"": "cur-a", "dev": "cur-b"}
+
+	svc := &stagingusecase.DiffUseCase{
+		Store:       st,
+		RemoteLabel: "Azure",
+		Strategy:    staging.NewAWSParamStrategy(globalDiffStoreReturning("cur-a", "1")),
+		StrategyFor: func(ns string) (staging.DiffStrategy, error) {
+			return staging.NewAWSParamStrategy(globalDiffStoreReturning(nsCurrent[ns], "1")), nil
+		},
 	}
+
+	var buf bytes.Buffer
+
+	r := &stgcli.GlobalDiffRunner{
+		Services:      []*stagingusecase.DiffUseCase{svc},
+		ProviderLabel: "Azure",
+		Stdout:        &buf,
+		Stderr:        &bytes.Buffer{},
+	}
+
+	require.NoError(t, r.Run(ctx, stgcli.GlobalDiffOptions{}))
+
+	out := buf.String()
+	assert.Contains(t, out, "cur-a")
+	assert.Contains(t, out, "new-a")
+	assert.Contains(t, out, "cur-b", "the dev entry must be diffed against the value fetched under the dev namespace")
+	assert.Contains(t, out, "new-b")
+	assert.Contains(t, out, "[dev]", "the dev-namespaced entry must be labelled with its namespace")
 }

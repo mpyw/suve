@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/parallel"
 	"github.com/mpyw/suve/internal/staging"
@@ -108,62 +110,23 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 		ItemName:    itemName,
 	}
 
-	// Get staged entries and tags
-	stagedEntries, err := u.Store.ListEntries(ctx, service)
+	entries, tags, err := u.staged(ctx, input.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	stagedTags, err := u.Store.ListTags(ctx, service)
-	if err != nil {
-		return nil, err
-	}
-
-	entries := stagedEntries[service]
-	tags := stagedTags[service]
-
-	// Filter by name if specified. Items are keyed by EntryKey (name, namespace),
-	// so match on the key's name — for App Configuration this applies the named
-	// setting across every namespace it is staged under.
-	if input.Name != "" {
-		filteredEntries := make(map[staging.EntryKey]staging.Entry)
-		filteredTags := make(map[staging.EntryKey]staging.TagEntry)
-
-		for key, entry := range entries {
-			if key.Name == input.Name {
-				filteredEntries[key] = entry
-			}
-		}
-
-		for key, tagEntry := range tags {
-			if key.Name == input.Name {
-				filteredTags[key] = tagEntry
-			}
-		}
-
-		if len(filteredEntries) == 0 && len(filteredTags) == 0 {
-			return nil, fmt.Errorf("%s %s is not staged", itemName, input.Name)
-		}
-
-		entries = filteredEntries
-		tags = filteredTags
+	if input.Name != "" && len(entries) == 0 && len(tags) == 0 {
+		return nil, fmt.Errorf("%s %s is not staged", itemName, input.Name)
 	}
 
 	if len(entries) == 0 && len(tags) == 0 {
 		return output, nil
 	}
 
-	// Check for conflicts. Both value entries and tag changes carry a
-	// BaseModifiedAt; a remote modified after that base time is a conflict for
-	// either kind. The merged check fetches each remote once — even when a key
-	// has both a value and a tag change — and reports that key once.
+	// Check for conflicts (see conflicts).
 	if !input.IgnoreConflicts {
-		conflicts := staging.CheckEntryAndTagConflicts(ctx, u.strategyForNamespace, entries, tags)
-
-		if len(conflicts) > 0 {
-			// Report the full EntryKey (sorted for determinism) so callers can
-			// render the namespace badge.
-			output.Conflicts = append(output.Conflicts, staging.SortedEntryKeys(conflicts)...)
+		if conflicts := u.conflicts(ctx, entries, tags); len(conflicts) > 0 {
+			output.Conflicts = conflicts
 
 			return output, fmt.Errorf("apply rejected: %d conflict(s) detected", len(conflicts))
 		}
@@ -187,6 +150,49 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 	}
 
 	return output, nil
+}
+
+// staged lists this service's staged entries and tags. When name is set, both
+// are narrowed to that name: items are keyed by EntryKey (name, namespace), so
+// for App Configuration this keeps the named setting under every namespace it
+// is staged under.
+func (u *ApplyUseCase) staged(
+	ctx context.Context, name string,
+) (map[staging.EntryKey]staging.Entry, map[staging.EntryKey]staging.TagEntry, error) {
+	service := u.Strategy.Service()
+
+	stagedEntries, err := u.Store.ListEntries(ctx, service)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	stagedTags, err := u.Store.ListTags(ctx, service)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	entries := stagedEntries[service]
+	tags := stagedTags[service]
+
+	if name == "" {
+		return entries, tags, nil
+	}
+
+	return lo.PickBy(entries, func(key staging.EntryKey, _ staging.Entry) bool { return key.Name == name }),
+		lo.PickBy(tags, func(key staging.EntryKey, _ staging.TagEntry) bool { return key.Name == name }),
+		nil
+}
+
+// conflicts returns the keys whose remote changed after staging, sorted by
+// (name, namespace). Both value entries and tag changes carry a BaseModifiedAt;
+// a remote modified after that base time is a conflict for either kind. The
+// merged check fetches each remote once — even when a key has both a value and
+// a tag change — and reports that key once. The full EntryKey is kept so
+// callers can render the namespace badge.
+func (u *ApplyUseCase) conflicts(
+	ctx context.Context, entries map[staging.EntryKey]staging.Entry, tags map[staging.EntryKey]staging.TagEntry,
+) []staging.EntryKey {
+	return staging.SortedEntryKeys(staging.CheckEntryAndTagConflicts(ctx, u.strategyForNamespace, entries, tags))
 }
 
 func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service, entries map[staging.EntryKey]staging.Entry, output *ApplyOutput) {

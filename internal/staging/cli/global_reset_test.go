@@ -1,10 +1,13 @@
-package reset_test
+// The all-service command tests share one namespace with their fixtures in
+// global_test.go.
+//declscope:namespace global
+
+package cli_test
 
 import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -12,41 +15,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/reset"
-	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
-func TestCommand_Validation(t *testing.T) {
+func TestGlobalResetCommand_Help(t *testing.T) {
 	t.Parallel()
 
-	t.Run("help", func(t *testing.T) {
-		t.Parallel()
-
-		app := apptest.AWSApp()
-
-		var buf bytes.Buffer
-
-		app.Writer = &buf
-		err := app.Run(t.Context(), []string{"suve", "stage", "reset", "--help"})
-		require.NoError(t, err)
-		assert.Contains(t, buf.String(), "Unstage all changes")
-	})
+	stdout, _, err := runLeafCmd(t, stgcli.NewGlobalResetCommand(globalAWSConfig()), nil, "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Unstage all changes")
 }
 
-func TestRun_NoChanges(t *testing.T) {
+func TestGlobalReset_NoChanges(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -56,7 +48,7 @@ func TestRun_NoChanges(t *testing.T) {
 	assert.Contains(t, buf.String(), "No changes staged")
 }
 
-func TestRun_UnstageAll(t *testing.T) {
+func TestGlobalReset_UnstageAll(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -83,9 +75,9 @@ func TestRun_UnstageAll(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -103,7 +95,7 @@ func TestRun_UnstageAll(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_UnstageParamOnly(t *testing.T) {
+func TestGlobalReset_UnstageParamOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -117,9 +109,9 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -129,7 +121,7 @@ func TestRun_UnstageParamOnly(t *testing.T) {
 	assert.Contains(t, buf.String(), "Unstaged all changes (1 SSM Parameter Store, 0 Secrets Manager)")
 }
 
-func TestRun_UnstageSecretOnly(t *testing.T) {
+func TestGlobalReset_UnstageSecretOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -143,9 +135,9 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -155,7 +147,7 @@ func TestRun_UnstageSecretOnly(t *testing.T) {
 	assert.Contains(t, buf.String(), "Unstaged all changes (0 SSM Parameter Store, 1 Secrets Manager)")
 }
 
-func TestRun_StoreError(t *testing.T) {
+func TestGlobalReset_StoreError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -163,9 +155,9 @@ func TestRun_StoreError(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -175,7 +167,7 @@ func TestRun_StoreError(t *testing.T) {
 	assert.Contains(t, err.Error(), "mock store error")
 }
 
-func TestRun_UnstageTagsOnly(t *testing.T) {
+func TestGlobalReset_UnstageTagsOnly(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -193,9 +185,9 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -211,7 +203,7 @@ func TestRun_UnstageTagsOnly(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_UnstageEntriesAndTags(t *testing.T) {
+func TestGlobalReset_UnstageEntriesAndTags(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -244,9 +236,9 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -267,7 +259,7 @@ func TestRun_UnstageEntriesAndTags(t *testing.T) {
 	assert.Equal(t, staging.ErrNotStaged, err)
 }
 
-func TestRun_ListTagsError(t *testing.T) {
+func TestGlobalReset_ListTagsError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -282,9 +274,9 @@ func TestRun_ListTagsError(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -294,7 +286,7 @@ func TestRun_ListTagsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "mock list tags error")
 }
 
-func TestRun_UnstageAllError(t *testing.T) {
+func TestGlobalReset_UnstageAllError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
@@ -309,9 +301,9 @@ func TestRun_UnstageAllError(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Store:    store,
-		Services: awsServices(),
+		Services: globalAWSServices(),
 		Stdout:   &buf,
 		Stderr:   &bytes.Buffer{},
 	}
@@ -321,33 +313,18 @@ func TestRun_UnstageAllError(t *testing.T) {
 	assert.Contains(t, err.Error(), "mock unstage all error")
 }
 
-// awsServices returns the AWS service specs (param + secret) used by the
-// provider-wide reset command.
-func awsServices() []stgcli.GlobalServiceSpec {
-	return []stgcli.GlobalServiceSpec{
-		{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory},
-		{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory},
-	}
-}
-
-// notConfiguredResolver mimics an Azure scope resolver whose resource is not
-// named (e.g. no --store-name), signalling the service should be skipped.
-func notConfiguredResolver(_ context.Context) (staging.ResolvedScope, error) {
-	return staging.ResolvedScope{}, fmt.Errorf("%w: no resource", staging.ErrServiceNotConfigured)
-}
-
-// TestRun_SkipUnconfiguredService verifies reset skips services whose scope is
+// TestGlobalReset_SkipUnconfiguredService verifies reset skips services whose scope is
 // not configured (an unconfigured service can hold no staged state), so a
 // provider with only one service connected reports no error rather than failing.
-func TestRun_SkipUnconfiguredService(t *testing.T) {
+func TestGlobalReset_SkipUnconfiguredService(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Services: []stgcli.GlobalServiceSpec{
-			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: notConfiguredResolver},
-			{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: notConfiguredResolver},
+			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: globalNotConfiguredResolver},
+			{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: globalNotConfiguredResolver},
 		},
 		Stdout: &buf,
 		Stderr: &bytes.Buffer{},
@@ -358,16 +335,16 @@ func TestRun_SkipUnconfiguredService(t *testing.T) {
 	assert.Contains(t, buf.String(), "No changes staged")
 }
 
-// TestRun_ResolverErrorPropagates verifies a non-sentinel resolver error is not
+// TestGlobalReset_ResolverErrorPropagates verifies a non-sentinel resolver error is not
 // swallowed by the skip path.
-func TestRun_ResolverErrorPropagates(t *testing.T) {
+func TestGlobalReset_ResolverErrorPropagates(t *testing.T) {
 	t.Parallel()
 
 	wantErr := errors.New("boom")
 
 	var buf bytes.Buffer
 
-	r := &reset.Runner{
+	r := &stgcli.GlobalResetRunner{
 		Services: []stgcli.GlobalServiceSpec{
 			{
 				Service:       staging.ServiceParam,
