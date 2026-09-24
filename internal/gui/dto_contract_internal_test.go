@@ -1,8 +1,9 @@
 //go:build production || dev
 
 // The DTO contract test checks every Wails-bound result type of the package
-// against the generated models, so it belongs to the package as a whole.
-//declscope:core
+// against the generated models. It tests no one binding file, so it is its own
+// namespace; the directive drops the _internal suffix testpackage asks for.
+//declscope:namespace dtoContract
 
 package gui
 
@@ -17,9 +18,9 @@ import (
 	"github.com/mpyw/suve/internal/capability"
 )
 
-// modelsPath is the Wails-generated (hand-maintained) TypeScript mirror of the
+// dtoContractModelsPath is the Wails-generated (hand-maintained) TypeScript mirror of the
 // Go binding DTOs that the frontend consumes.
-const modelsPath = "frontend/wailsjs/go/models.ts"
+const dtoContractModelsPath = "frontend/wailsjs/go/models.ts"
 
 // dtoContract lists every exported binding DTO whose JSON shape the frontend
 // depends on. Adding a new binding DTO (or a field to one) requires updating
@@ -54,10 +55,10 @@ func dtoContract() []any {
 	}
 }
 
-// jsonFieldNames returns the JSON object keys a struct type marshals to,
+// dtoContractGoFields returns the JSON object keys a struct type marshals to,
 // honoring `json:"name"` tags (including ",omitempty"), skipping `json:"-"`,
 // and defaulting to the Go field name when no tag is present.
-func jsonFieldNames(t reflect.Type) []string {
+func dtoContractGoFields(t reflect.Type) []string {
 	var names []string
 
 	for field := range t.Fields() {
@@ -83,14 +84,14 @@ func jsonFieldNames(t reflect.Type) []string {
 	return names
 }
 
-// tsClassFields parses models.ts and returns, for each exported class, the set
+// dtoContractTSFields parses models.ts and returns, for each exported class, the set
 // of JSON keys its constructor reads via source["key"].
-func tsClassFields(t *testing.T) map[string][]string {
+func dtoContractTSFields(t *testing.T) map[string][]string {
 	t.Helper()
 
-	data, err := os.ReadFile(modelsPath)
+	data, err := os.ReadFile(dtoContractModelsPath)
 	if err != nil {
-		t.Fatalf("read %s: %v", modelsPath, err)
+		t.Fatalf("read %s: %v", dtoContractModelsPath, err)
 	}
 
 	classRe := regexp.MustCompile(`export class (\w+) \{`)
@@ -140,20 +141,20 @@ func tsClassFields(t *testing.T) map[string][]string {
 func TestDTOContract(t *testing.T) {
 	t.Parallel()
 
-	tsFields := tsClassFields(t)
+	tsFields := dtoContractTSFields(t)
 
 	goFields := make(map[string][]string)
 
 	for _, dto := range dtoContract() {
 		typ := reflect.TypeOf(dto)
-		goFields[typ.Name()] = jsonFieldNames(typ)
+		goFields[typ.Name()] = dtoContractGoFields(typ)
 	}
 
 	// Every Go DTO has a TS class with identical JSON field names.
 	for name, want := range goFields {
 		got, ok := tsFields[name]
 		if !ok {
-			t.Errorf("Go DTO %q has no matching class in %s", name, modelsPath)
+			t.Errorf("Go DTO %q has no matching class in %s", name, dtoContractModelsPath)
 
 			continue
 		}

@@ -4,6 +4,7 @@ package tui
 import (
 	"errors"
 	"io"
+	"reflect"
 	"testing"
 	"time"
 
@@ -616,4 +617,129 @@ func TestUpdate_PendingTargetResolves(t *testing.T) {
 	})
 	assert.False(t, gcloud.statusBar().Target.Pending)
 	assert.Equal(t, "Google Cloud · project proj", gcloud.applyTargetLine())
+}
+
+// fakeCopyPage is a page that supplies a copy value (and records that CopyText
+// was consulted), so the app-level `y` wiring can be asserted without a real
+// browser page or an async load.
+type fakeCopyPage struct {
+	text       string
+	copyCalled bool
+}
+
+func (p *fakeCopyPage) Update(tea.Msg) (page, tea.Cmd) { return p, nil }
+func (p *fakeCopyPage) View(int, int) string           { return "" }
+func (p *fakeCopyPage) capturesInput() bool            { return false }
+
+func (p *fakeCopyPage) CopyText() (string, bool) {
+	p.copyCalled = true
+	if p.text == "" {
+		return "", false
+	}
+
+	return p.text, true
+}
+
+// TestApp_CopyWritesActivePageValue pins that `y` copies the active page's
+// revealed value through the OSC52 seam (asserted via a stub, never real escape
+// bytes), and that an empty value is a guarded no-op so it never clears the
+// clipboard.
+//
+//nolint:paralleltest // swaps the package-level setClipboard seam; must not race other tests
+func TestApp_CopyWritesActivePageValue(t *testing.T) {
+	copied := ""
+	called := false
+	orig := setClipboard
+	setClipboard = func(s string) tea.Cmd {
+		called = true
+		copied = s
+
+		return nil
+	}
+
+	t.Cleanup(func() { setClipboard = orig })
+
+	app := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
+	fp := &fakeCopyPage{text: "s3cr3t"}
+	app.pages = []page{fp}
+
+	_ = updateApp(t, app, keyPress('y'))
+
+	assert.True(t, called, "y copies the active page's value")
+	assert.Equal(t, "s3cr3t", copied)
+	assert.True(t, fp.copyCalled, "the app consults the active page's CopyText for the `y` copy")
+
+	// An empty value must not reach the clipboard (an OSC52 with "" clears it).
+	called = false
+	empty := &fakeCopyPage{text: ""}
+	app.pages = []page{empty}
+
+	_ = updateApp(t, app, keyPress('y'))
+	assert.False(t, called, "an empty copy is a guarded no-op")
+}
+
+// drainBatch runs cmd (recursing into batches) and returns every leaf message.
+// It blocks on timer commands (e.g. tea.Tick), so callers accept that latency.
+func drainBatch(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+
+	msg := cmd()
+	if msg == nil {
+		return nil
+	}
+
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var out []tea.Msg
+		for _, c := range batch {
+			out = append(out, drainBatch(c)...)
+		}
+
+		return out
+	}
+
+	return []tea.Msg{msg}
+}
+
+// clearScreenType is the reflected type of tea's (unexported) clear-screen msg.
+//
+//nolint:gochecknoglobals // test-only type sentinel
+var clearScreenType = reflect.TypeOf(tea.ClearScreen())
+
+// TestCloudShellRepaintCmd_ProducesRepaintMsg pins that the repaint ticker fires
+// a cloudShellRepaintMsg (so the loop keeps rescheduling itself).
+func TestCloudShellRepaintCmd_ProducesRepaintMsg(t *testing.T) {
+	t.Parallel()
+
+	msg := cloudShellRepaintCmd()()
+	assert.IsType(t, cloudShellRepaintMsg{}, msg)
+}
+
+// TestUpdate_CloudShellRepaint_ClearsAndReschedules pins that handling a repaint
+// tick both forces a full repaint (tea.ClearScreen) and arms the next tick.
+func TestUpdate_CloudShellRepaint_ClearsAndReschedules(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}})
+
+	_, cmd := m.Update(cloudShellRepaintMsg{})
+	require.NotNil(t, cmd)
+
+	msgs := drainBatch(cmd)
+
+	var sawClear, sawReschedule bool
+
+	for _, msg := range msgs {
+		if reflect.TypeOf(msg) == clearScreenType {
+			sawClear = true
+		}
+
+		if _, ok := msg.(cloudShellRepaintMsg); ok {
+			sawReschedule = true
+		}
+	}
+
+	assert.True(t, sawClear, "a repaint tick must force a full ClearScreen")
+	assert.True(t, sawReschedule, "a repaint tick must arm the next tick")
 }
