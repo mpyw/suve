@@ -36,7 +36,7 @@ func (m *mockServiceStrategy) HasDeleteOptions() bool   { return m.hasDeleteOpti
 func newParamStrategy() *mockServiceStrategy {
 	return &mockServiceStrategy{
 		service:          staging.ServiceParam,
-		serviceName:      "SSM Parameter Store",
+		serviceName:      "Parameter Store",
 		itemName:         "parameter",
 		hasDeleteOptions: false,
 	}

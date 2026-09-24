@@ -32,7 +32,7 @@ type EditOptions struct {
 	// null/default namespace and every other provider).
 	Namespace string
 	// ValueType is the provider-neutral value type to record on the staged entry
-	// (AWS SSM Parameter Store axis). Empty preserves the existing type.
+	// (AWS Parameter Store axis). Empty preserves the existing type.
 	ValueType domain.ValueType
 }
 

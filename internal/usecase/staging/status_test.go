@@ -26,7 +26,7 @@ func TestStatusUseCase_Execute_Empty(t *testing.T) {
 	output, err := uc.Execute(t.Context(), usecasestaging.StatusInput{})
 	require.NoError(t, err)
 	assert.Equal(t, staging.ServiceParam, output.Service)
-	assert.Equal(t, "SSM Parameter Store", output.ServiceName)
+	assert.Equal(t, "Parameter Store", output.ServiceName)
 	assert.Equal(t, "parameter", output.ItemName)
 	assert.Empty(t, output.Entries)
 }

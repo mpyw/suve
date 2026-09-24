@@ -12,7 +12,7 @@ import (
 type Service string
 
 const (
-	// ServiceParam is the parameter service (e.g. AWS SSM Parameter Store,
+	// ServiceParam is the parameter service (e.g. AWS Parameter Store,
 	// Azure App Configuration).
 	ServiceParam Service = "param"
 	// ServiceSecret is the secret service (e.g. AWS Secrets Manager, Google
@@ -34,7 +34,7 @@ type ServiceStrategy interface {
 	// Service returns the service type (ServiceParam or ServiceSecret).
 	Service() Service
 
-	// ServiceName returns the user-friendly service name (e.g., "SSM Parameter Store", "Key Vault").
+	// ServiceName returns the user-friendly service name (e.g., "Parameter Store", "Key Vault").
 	ServiceName() string
 
 	// ItemName returns the item name for messages (e.g., "parameter", "secret").

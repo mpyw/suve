@@ -76,7 +76,7 @@ func TestAWSGlobal_StageWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, secretName)
-		assert.Contains(t, stdout, "SSM Parameter Store")
+		assert.Contains(t, stdout, "Parameter Store")
 		assert.Contains(t, stdout, "Secrets Manager")
 		t.Logf("global status output: %s", stdout)
 	})
@@ -218,7 +218,7 @@ func TestAWSStaging_ErrorCases(t *testing.T) {
 	t.Run("apply-nothing-staged", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
-		// Message might say "No SSM Parameter Store changes staged" or similar
+		// Message might say "No Parameter Store changes staged" or similar
 		assert.Contains(t, stdout, "No")
 		t.Logf("apply nothing staged output: %s", stdout)
 	})
@@ -238,7 +238,7 @@ func TestAWSStaging_ErrorCases(t *testing.T) {
 	t.Run("reset-all-nothing-staged", func(t *testing.T) {
 		stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "reset", "--all")
 		require.NoError(t, err)
-		// Message might say "No SSM Parameter Store parameters staged" or similar
+		// Message might say "No Parameter Store parameters staged" or similar
 		assert.Contains(t, stdout, "No")
 		t.Logf("reset all nothing staged output: %s", stdout)
 	})
@@ -301,7 +301,7 @@ func TestAWSGlobal_StagingWithTags(t *testing.T) {
 	t.Run("global-apply-applies-tags", func(t *testing.T) {
 		stdout, _, err := runCommand(t, stgcli.NewGlobalApplyCommand(awsStageGlobalConfig()), "--yes")
 		require.NoError(t, err)
-		assert.Contains(t, stdout, "Applying SSM Parameter Store tags")
+		assert.Contains(t, stdout, "Applying Parameter Store tags")
 		assert.Contains(t, stdout, "Tagged")
 		t.Logf("global apply with tags output: %s", stdout)
 
@@ -409,7 +409,7 @@ func TestAWSGlobal_ResetWithTags(t *testing.T) {
 		stdout, _, err := runCommand(t, stgcli.NewGlobalResetCommand(awsStageGlobalConfig()), "--all")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Unstaged all changes")
-		assert.Contains(t, stdout, "2 SSM Parameter Store") // 1 entry + 1 tag
+		assert.Contains(t, stdout, "2 Parameter Store") // 1 entry + 1 tag
 		t.Logf("global reset output: %s", stdout)
 
 		// Verify staging is empty

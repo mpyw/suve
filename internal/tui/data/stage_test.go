@@ -57,7 +57,7 @@ func newStagingService(
 		return res, nil
 	}
 
-	return data.NewStagingService(svcCap, "SSM Parameter Store", resolve), st
+	return data.NewStagingService(svcCap, "Parameter Store", resolve), st
 }
 
 // stageEntry pre-stages one entry under the param service.
@@ -75,7 +75,7 @@ func TestStagingService_Accessors(t *testing.T) {
 	svc, _ := newStagingService(t, svcCap, &providermock.Store{}, false)
 
 	assert.Equal(t, "param", svc.Service())
-	assert.Equal(t, "SSM Parameter Store", svc.Label())
+	assert.Equal(t, "Parameter Store", svc.Label())
 	assert.Equal(t, svcCap, svc.Capability())
 }
 
@@ -240,7 +240,7 @@ func TestStagingService_Reset(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, data.StagingResetUnstagedAll, out.Type)
 		assert.Equal(t, 3, out.Count, "two entries plus one tag change")
-		assert.Equal(t, "SSM Parameter Store", out.ServiceLabel)
+		assert.Equal(t, "Parameter Store", out.ServiceLabel)
 
 		_, err = st.GetEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/A"})
 		require.ErrorIs(t, err, staging.ErrNotStaged)

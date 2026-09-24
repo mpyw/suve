@@ -212,7 +212,7 @@ func collectImportEnvelopes(
 
 		// A provider change is qualitatively different from an account/region/vault
 		// change: e.g. an Azure App Config envelope carries namespace-bearing entries
-		// that an AWS SSM working area would silently push to a provider that ignores
+		// that an AWS Parameter Store working area would silently push to a provider that ignores
 		// namespaces. Refuse it outright, even under --allow-scope-mismatch.
 		if env.Provider != wantProvider {
 			return nil, fmt.Errorf(

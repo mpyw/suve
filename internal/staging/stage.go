@@ -91,7 +91,7 @@ type Entry struct {
 	Value       *string   `json:"value,omitempty"` // nil for delete, pointer to distinguish from empty string
 	Description *string   `json:"description,omitempty"`
 	// ValueType classifies the staged value in the provider-neutral domain model.
-	// It only matters on the AWS SSM Parameter Store axis (String / SecureString /
+	// It only matters on the AWS Parameter Store axis (String / SecureString /
 	// StringList); every other provider's staging path ignores it. An empty value
 	// means "unset": the apply path treats it as ValueTypePlaintext for create, and
 	// as "preserve the existing type" for update. Older on-disk entries written

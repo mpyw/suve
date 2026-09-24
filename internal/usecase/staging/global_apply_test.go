@@ -83,7 +83,7 @@ func TestGlobalApplyUseCase_SkipsEmptyServicesAndCounts(t *testing.T) {
 	output, err := uc.Execute(t.Context(), usecasestaging.GlobalApplyInput{})
 	require.EqualError(t, err, "applied 1, failed 1")
 	require.Len(t, output.Services, 1, "the secret service had nothing staged")
-	assert.Equal(t, "SSM Parameter Store", output.Services[0].ServiceName)
+	assert.Equal(t, "Parameter Store", output.Services[0].ServiceName)
 	assert.Equal(t, 1, output.Succeeded)
 	assert.Equal(t, 1, output.Failed)
 }

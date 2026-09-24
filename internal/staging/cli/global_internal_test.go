@@ -181,5 +181,5 @@ func TestGlobalDiffUseCases_FactoryError(t *testing.T) {
 
 	_, err := globalDiffUseCases(t.Context(), GlobalConfig{Services: specs}, resolve)
 	require.ErrorIs(t, err, wantErr)
-	assert.Contains(t, err.Error(), "failed to initialize SSM Parameter Store client")
+	assert.Contains(t, err.Error(), "failed to initialize Parameter Store client")
 }

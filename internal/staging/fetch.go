@@ -8,7 +8,7 @@ import (
 type FetchResult struct {
 	// Value is the current remote value.
 	Value string
-	// Identifier is a display string for the version (e.g., "#3" for SSM Parameter Store, "#abc123" for Secrets Manager).
+	// Identifier is a display string for the version (e.g., "#3" for AWS Parameter Store, "#abc123" for Secrets Manager).
 	Identifier string
 	// Secret reports whether the fetched value is secret material (a Secrets
 	// Manager/Key Vault/Secret Manager value, or a SecureString param), so a

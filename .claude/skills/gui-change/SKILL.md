@@ -32,7 +32,8 @@ landed across #273–#282.
   needs, so Azure shows a tab only for the vault or store that is set),
   `nativeTagName` (the "(= Google Cloud: labels)" hint), and `itemNoun`
   (the "parameter"/"setting"/"secret" word in titles and prompts; it equals the
-  staging strategy's `ItemName`, pinned by a test in `internal/staging/binding`).
+  staging strategy's `ItemName`, and `displayName` equals its `ServiceName`,
+  both pinned by tests in `internal/staging/binding`).
 - The sidebar scope form is built from the provider's `scopeFields`, and a
   scope is complete once at least one service's `scopeField` is set. The
   helpers live in `internal/gui/frontend/src/lib/scopeFields.ts`: its

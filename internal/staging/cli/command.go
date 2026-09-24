@@ -87,7 +87,7 @@ type CommandConfig struct {
 	StrategyForNamespace func(ctx context.Context, namespace string) (staging.FullStrategy, error)
 
 	// ValueTypeFlags are provider-specific flags appended to the add and edit
-	// commands so the staged entry can carry a value type (the AWS SSM Parameter
+	// commands so the staged entry can carry a value type (the AWS Parameter
 	// Store --type/--secure axis). Nil for providers without a value-type axis.
 	ValueTypeFlags []cli.Flag
 
@@ -308,7 +308,7 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 		Description: addHelp(cfg),
 		// The --description flag is gated on HasDescription (#666: unsupported
 		// providers reject it rather than silently drop it); value-type flags are
-		// appended for providers with a value-type axis (AWS SSM param, #664).
+		// appended for providers with a value-type axis (AWS Parameter Store, #664).
 		Flags: append(cfg.descriptionFlags(), cfg.ValueTypeFlags...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
@@ -366,7 +366,7 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 		Description: editHelp(cfg),
 		// The --description flag is gated on HasDescription (#666: unsupported
 		// providers reject it rather than silently drop it); value-type flags are
-		// appended for providers with a value-type axis (AWS SSM param, #664).
+		// appended for providers with a value-type axis (AWS Parameter Store, #664).
 		Flags: append(cfg.descriptionFlags(), cfg.ValueTypeFlags...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {

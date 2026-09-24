@@ -64,7 +64,7 @@ func (m *globalApplyStrategy) ApplyTags(ctx context.Context, name string, tagEnt
 func newGlobalApplyParamStrategy() *globalApplyStrategy {
 	return &globalApplyStrategy{
 		service:          staging.ServiceParam,
-		serviceName:      "SSM Parameter Store",
+		serviceName:      "Parameter Store",
 		itemName:         "parameter",
 		hasDeleteOptions: false,
 	}
@@ -115,7 +115,7 @@ func TestGlobalApply_ApplyBothServices(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	// Stage SSM Parameter Store parameter
+	// Stage Parameter Store parameter
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
@@ -163,9 +163,9 @@ func TestGlobalApply_ApplyBothServices(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, paramPutCalled)
 	assert.True(t, secretPutCalled)
-	assert.Contains(t, buf.String(), "Applying SSM Parameter Store...")
+	assert.Contains(t, buf.String(), "Applying Parameter Store...")
 	assert.Contains(t, buf.String(), "Applying Secrets Manager...")
-	assert.Contains(t, buf.String(), "SSM Parameter Store: Updated /app/config")
+	assert.Contains(t, buf.String(), "Parameter Store: Updated /app/config")
 	assert.Contains(t, buf.String(), "Secrets Manager: Updated my-secret")
 
 	// Verify both unstaged
@@ -180,7 +180,7 @@ func TestGlobalApply_ApplyParamOnly(t *testing.T) {
 
 	store := testutil.NewMockStore()
 
-	// Stage only SSM Parameter Store parameter
+	// Stage only Parameter Store parameter
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("param-value"),
@@ -207,7 +207,7 @@ func TestGlobalApply_ApplyParamOnly(t *testing.T) {
 	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, paramPutCalled)
-	assert.Contains(t, buf.String(), "Applying SSM Parameter Store...")
+	assert.Contains(t, buf.String(), "Applying Parameter Store...")
 	assert.NotContains(t, buf.String(), "Applying Secrets Manager...")
 }
 
@@ -243,7 +243,7 @@ func TestGlobalApply_ApplySecretOnly(t *testing.T) {
 	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, secretPutCalled)
-	assert.NotContains(t, buf.String(), "Applying SSM Parameter Store...")
+	assert.NotContains(t, buf.String(), "Applying Parameter Store...")
 	assert.Contains(t, buf.String(), "Applying Secrets Manager...")
 }
 
@@ -293,7 +293,7 @@ func TestGlobalApply_ApplyDelete(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, paramDeleteCalled)
 	assert.True(t, secretDeleteCalled)
-	assert.Contains(t, buf.String(), "SSM Parameter Store: Deleted /app/old")
+	assert.Contains(t, buf.String(), "Parameter Store: Deleted /app/old")
 	assert.Contains(t, buf.String(), "Secrets Manager: Deleted old-secret")
 }
 
@@ -317,7 +317,7 @@ func TestGlobalApply_PartialFailure(t *testing.T) {
 
 	paramMock := newGlobalApplyParamStrategy()
 	paramMock.applyFunc = func(_ context.Context, _ string, _ staging.Entry) error {
-		return fmt.Errorf("SSM Parameter Store error")
+		return fmt.Errorf("Parameter Store error")
 	}
 
 	secretMock := newGlobalApplySecretStrategy()
@@ -338,7 +338,7 @@ func TestGlobalApply_PartialFailure(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "applied 1, failed 1")
 
-	// SSM Parameter Store should still be staged (failed)
+	// Parameter Store should still be staged (failed)
 	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, "param-value", lo.FromPtr(entry.Value))
@@ -834,7 +834,7 @@ func TestGlobalApply_ApplyCreate(t *testing.T) {
 
 	err := r.Run(t.Context())
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "SSM Parameter Store: Created /app/new-param")
+	assert.Contains(t, buf.String(), "Parameter Store: Created /app/new-param")
 }
 
 func TestGlobalApply_ApplyTagsSuccess(t *testing.T) {
@@ -873,8 +873,8 @@ func TestGlobalApply_ApplyTagsSuccess(t *testing.T) {
 	err := r.Run(t.Context())
 	require.NoError(t, err)
 	assert.True(t, applyTagsCalled)
-	assert.Contains(t, buf.String(), "Applying SSM Parameter Store tags")
-	assert.Contains(t, buf.String(), "SSM Parameter Store: Tagged /app/config")
+	assert.Contains(t, buf.String(), "Applying Parameter Store tags")
+	assert.Contains(t, buf.String(), "Parameter Store: Tagged /app/config")
 	assert.Contains(t, buf.String(), "+2")
 	assert.Contains(t, buf.String(), "-1")
 
@@ -1002,8 +1002,8 @@ func TestGlobalApply_ApplyBothEntriesAndTags(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, entryCalled)
 	assert.True(t, tagCalled)
-	assert.Contains(t, buf.String(), "Applying SSM Parameter Store...")
-	assert.Contains(t, buf.String(), "Applying SSM Parameter Store tags")
+	assert.Contains(t, buf.String(), "Applying Parameter Store...")
+	assert.Contains(t, buf.String(), "Applying Parameter Store tags")
 }
 
 func TestGlobalApply_ApplyTagsOnlyAdditions(t *testing.T) {
@@ -1092,7 +1092,7 @@ func TestGlobalApply_FormatTagApplySummaryEmpty(t *testing.T) {
 	err := r.Run(t.Context())
 	require.NoError(t, err)
 	// Should not have [+N] or [-N] suffix when no changes
-	assert.Contains(t, buf.String(), "SSM Parameter Store: Tagged /app/config")
+	assert.Contains(t, buf.String(), "Parameter Store: Tagged /app/config")
 	assert.NotContains(t, buf.String(), "[+")
 	assert.NotContains(t, buf.String(), "[-")
 }
@@ -1171,8 +1171,8 @@ func TestGlobalApply_AppliesEntriesUnderTheirNamespace(t *testing.T) {
 	assert.Equal(t, map[string]string{"": "va", "dev": "vb"}, appliedByNS)
 
 	// Each entry is reported on its own line, labeled with its namespace badge.
-	assert.Contains(t, stdout.String(), "SSM Parameter Store: Created k\n")
-	assert.Contains(t, stdout.String(), "SSM Parameter Store: Created k [dev]\n")
+	assert.Contains(t, stdout.String(), "Parameter Store: Created k\n")
+	assert.Contains(t, stdout.String(), "Parameter Store: Created k [dev]\n")
 
 	// Both entries were unstaged under their own (name, namespace) key.
 	remaining, _ := st.ListEntries(ctx, staging.ServiceParam)
@@ -1220,9 +1220,9 @@ func TestGlobalApply_NamespacedFailureAndUnstageWarnings(t *testing.T) {
 	}
 
 	require.Error(t, r.Run(ctx))
-	assert.Contains(t, stdout.String(), "SSM Parameter Store: Created k [dev]")
-	assert.Contains(t, stdout.String(), "SSM Parameter Store: Tagged k [dev] [+1]")
+	assert.Contains(t, stdout.String(), "Parameter Store: Created k [dev]")
+	assert.Contains(t, stdout.String(), "Parameter Store: Tagged k [dev] [+1]")
 	assert.Contains(t, stderr.String(), "failed to clear staging for k [dev]: disk full")
 	assert.Contains(t, stderr.String(), "failed to clear staging for k [dev] tags: disk full")
-	assert.Contains(t, stderr.String(), "SSM Parameter Store: k [prd] (tags): tag boom")
+	assert.Contains(t, stderr.String(), "Parameter Store: k [prd] (tags): tag boom")
 }
