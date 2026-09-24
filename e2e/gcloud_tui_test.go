@@ -64,9 +64,9 @@ const (
 
 // resetGoogleCloudTUISecrets deletes every secret the gcloud TUI suite may seed,
 // giving each test a clean, single-secret-set list regardless of a sibling test's
-// leftovers. Called at the START of each test (under the running test's live
-// context, so the deletes actually commit) — a t.Cleanup delete can race the
-// test-context cancellation, so the next test's list must not depend on it.
+// leftovers. Called at the START of each test as well as from t.Cleanup, so the
+// next test's list does not depend on a previous run having cleaned up (e.g. one
+// that was interrupted before its cleanup ran).
 func resetGoogleCloudTUISecrets(t *testing.T) {
 	t.Helper()
 

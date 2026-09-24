@@ -141,9 +141,9 @@ func TestTUIAWS_ParamBrowse(t *testing.T) {
 
 	// Gate on the async list landing (alpha is listed), then filter to this test's
 	// shared "/suve-e2e-tui/" prefix: localstack may hold other params (e.g. the
-	// CLI suite's under `mise e2e-aws`, or leftovers whose t.Cleanup deletes ran
-	// after t.Context() was canceled), and one of them could otherwise take the
-	// default selection. Within the filtered list alpha sorts before bravo, so it
+	// CLI suite's under `mise e2e-aws`, or leftovers of a run that skipped its
+	// t.Cleanup deletes), and one of them could otherwise take the default
+	// selection. Within the filtered list alpha sorts before bravo, so it
 	// is selected. Let the filter's reselection detail load settle so alpha's value
 	// has landed in the settled model the final screen renders (a gate on the value
 	// cannot close this window: the reload may re-render the same content, which
