@@ -40,7 +40,7 @@ func (googleCloudSecretHooks) traits() versionedTraits {
 	return versionedTraits{
 		service:        ServiceSecret,
 		serviceName:    "Secret Manager",
-		itemName:       itemNameSecret,
+		itemName:       secretServiceItemName,
 		tagsFetchError: "failed to get secret",
 	}
 }

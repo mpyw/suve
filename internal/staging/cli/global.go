@@ -64,7 +64,7 @@ type globalStoreResolver func(
 func globalWorkingStore(
 	ctx context.Context, resolver staging.ScopeResolver,
 ) (store.ReadWriteOperator, staging.ResolvedScope, error) {
-	return workingStore(ctx, resolver)
+	return openScopedWorkingStore(ctx, resolver)
 }
 
 // globalStoreFor returns a resolver that hands out override for every service

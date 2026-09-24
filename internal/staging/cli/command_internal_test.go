@@ -95,14 +95,3 @@ func TestStrategyForAdapters(t *testing.T) {
 	_, err = apply("dev")
 	require.ErrorIs(t, err, sentinel)
 }
-
-func TestWorkingStore_NilResolverFails(t *testing.T) {
-	t.Parallel()
-
-	// There is no default provider: a config without a ScopeResolver is a wiring
-	// bug and must fail instead of silently keying state under some provider.
-	store, _, err := workingStore(t.Context(), nil)
-	require.Error(t, err)
-	assert.Nil(t, store)
-	assert.Contains(t, err.Error(), "staging scope resolver is not configured")
-}

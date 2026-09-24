@@ -29,7 +29,7 @@ func TestExportPassphrase(t *testing.T) {
 
 		var err error
 
-		runWithCmd(t, exportFlags(), bytes.NewBufferString("pw123\n"), &bytes.Buffer{}, &bytes.Buffer{},
+		runFakeLeafCommand(t, exportFlags(), bytes.NewBufferString("pw123\n"), &bytes.Buffer{}, &bytes.Buffer{},
 			[]string{"--passphrase-stdin"}, func(cmd *cli.Command) {
 				pass, cancelled, err = exportPassphrase(cmd, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -42,7 +42,7 @@ func TestExportPassphrase(t *testing.T) {
 	t.Run("--passphrase-stdin surfaces a read error", func(t *testing.T) {
 		var err error
 
-		runWithCmd(t, exportFlags(), errReader{}, &bytes.Buffer{}, &bytes.Buffer{},
+		runFakeLeafCommand(t, exportFlags(), fakeFailingReader{}, &bytes.Buffer{}, &bytes.Buffer{},
 			[]string{"--passphrase-stdin"}, func(cmd *cli.Command) {
 				_, _, err = exportPassphrase(cmd, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -60,7 +60,7 @@ func TestExportPassphrase(t *testing.T) {
 
 		errBuf := &bytes.Buffer{}
 
-		runWithCmd(t, exportFlags(), &bytes.Buffer{}, &bytes.Buffer{}, errBuf,
+		runFakeLeafCommand(t, exportFlags(), &bytes.Buffer{}, &bytes.Buffer{}, errBuf,
 			nil, func(cmd *cli.Command) {
 				pass, cancelled, err = exportPassphrase(cmd, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -72,11 +72,11 @@ func TestExportPassphrase(t *testing.T) {
 	})
 
 	t.Run("TTY prompt error is wrapped", func(t *testing.T) {
-		mockTTY(t)
+		fakeIsTTY(t)
 
 		var err error
 
-		runWithCmd(t, exportFlags(), &fakeTTY{}, &fakeTTY{}, &fakeTTY{},
+		runFakeLeafCommand(t, exportFlags(), &fakeTTY{}, &fakeTTY{}, &fakeTTY{},
 			nil, func(cmd *cli.Command) {
 				_, _, err = exportPassphrase(cmd, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -101,7 +101,7 @@ func TestConfirmExportOverwrite(t *testing.T) {
 		existing := filepath.Join(t.TempDir(), "param.json")
 		require.NoError(t, os.WriteFile(existing, []byte("{}"), 0o600))
 
-		runWithCmd(t, exportFlags(), &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{},
+		runFakeLeafCommand(t, exportFlags(), &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{},
 			[]string{"--yes"}, func(cmd *cli.Command) {
 				proceed, err = confirmExportOverwrite(cmd, []string{existing}, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -117,7 +117,7 @@ func TestConfirmExportOverwrite(t *testing.T) {
 
 		missing := filepath.Join(t.TempDir(), "param.json")
 
-		runWithCmd(t, exportFlags(), &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{},
+		runFakeLeafCommand(t, exportFlags(), &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{},
 			nil, func(cmd *cli.Command) {
 				proceed, err = confirmExportOverwrite(cmd, []string{missing}, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -132,7 +132,7 @@ func TestConfirmExportOverwrite(t *testing.T) {
 		existing := filepath.Join(t.TempDir(), "param.json")
 		require.NoError(t, os.WriteFile(existing, []byte("{}"), 0o600))
 
-		runWithCmd(t, exportFlags(), &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{},
+		runFakeLeafCommand(t, exportFlags(), &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{},
 			nil, func(cmd *cli.Command) {
 				_, err = confirmExportOverwrite(cmd, []string{existing}, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -143,7 +143,7 @@ func TestConfirmExportOverwrite(t *testing.T) {
 	})
 
 	t.Run("TTY prompt accepts 'y'", func(t *testing.T) {
-		mockTTY(t)
+		fakeIsTTY(t)
 
 		var proceed bool
 
@@ -155,7 +155,7 @@ func TestConfirmExportOverwrite(t *testing.T) {
 		reader := &fakeTTY{}
 		_, _ = reader.WriteString("y\n")
 
-		runWithCmd(t, exportFlags(), reader, &fakeTTY{}, &fakeTTY{},
+		runFakeLeafCommand(t, exportFlags(), reader, &fakeTTY{}, &fakeTTY{},
 			nil, func(cmd *cli.Command) {
 				proceed, err = confirmExportOverwrite(cmd, []string{existing}, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -165,7 +165,7 @@ func TestConfirmExportOverwrite(t *testing.T) {
 	})
 
 	t.Run("TTY prompt declines on 'n'", func(t *testing.T) {
-		mockTTY(t)
+		fakeIsTTY(t)
 
 		var proceed bool
 
@@ -177,7 +177,7 @@ func TestConfirmExportOverwrite(t *testing.T) {
 		reader := &fakeTTY{}
 		_, _ = reader.WriteString("n\n")
 
-		runWithCmd(t, exportFlags(), reader, &fakeTTY{}, &fakeTTY{},
+		runFakeLeafCommand(t, exportFlags(), reader, &fakeTTY{}, &fakeTTY{},
 			nil, func(cmd *cli.Command) {
 				proceed, err = confirmExportOverwrite(cmd, []string{existing}, bufio.NewReader(cmd.Root().Reader))
 			})

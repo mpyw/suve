@@ -197,7 +197,7 @@ func (u *ResetUseCase) restore(ctx context.Context, spec, name, namespace string
 		baseModifiedAt = &lastModified
 	}
 
-	opts := &transition.EntryExecuteOptions{
+	opts := &transition.EntryExecutorOptions{
 		BaseModifiedAt: baseModifiedAt,
 	}
 

@@ -92,7 +92,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
 
-	opts := &transition.EntryExecuteOptions{ValueType: valueType}
+	opts := &transition.EntryExecutorOptions{ValueType: valueType}
 	if input.Description != "" {
 		opts.Description = &input.Description
 	}

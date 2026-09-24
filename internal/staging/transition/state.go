@@ -1,15 +1,4 @@
-// The entry/tag state definitions are part of the machine this package is
-// named for (transition.EntryState, transition.StagedTags read naturally, and
-// StagedTags is spelled from outside the package, so a file prefix cannot fit).
-//declscope:core
-
 package transition
-
-import (
-	"maps"
-
-	"github.com/mpyw/suve/internal/maputil"
-)
 
 // EntryState represents the current state of a staged entry.
 type EntryState struct {
@@ -46,34 +35,3 @@ func (EntryStagedStateUpdate) isEntryStagedState() {}
 type EntryStagedStateDelete struct{}
 
 func (EntryStagedStateDelete) isEntryStagedState() {}
-
-// StagedTags represents the staged tag changes.
-// Tags are stored as diff operations rather than final state.
-// Current remote values are checked at staging time for auto-skip.
-type StagedTags struct {
-	ToSet   map[string]string   // Tags to add or update
-	ToUnset maputil.Set[string] // Tag keys to remove
-}
-
-// IsEmpty returns true if there are no staged tag changes.
-func (t StagedTags) IsEmpty() bool {
-	return len(t.ToSet) == 0 && t.ToUnset.Len() == 0
-}
-
-// Clone returns a deep copy of the staged tags with initialized maps.
-func (t StagedTags) Clone() StagedTags {
-	toSet := maps.Clone(t.ToSet)
-	if toSet == nil {
-		toSet = make(map[string]string)
-	}
-
-	toUnset := maps.Clone(t.ToUnset)
-	if toUnset == nil {
-		toUnset = maputil.NewSet[string]()
-	}
-
-	return StagedTags{
-		ToSet:   toSet,
-		ToUnset: toUnset,
-	}
-}

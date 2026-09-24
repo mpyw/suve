@@ -1,5 +1,5 @@
-// In-package tests of the core executor; shares fixtures with the reducer tests.
-//declscope:core
+// These are executor.go's tests.
+//declscope:namespace executor
 
 package transition
 
@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	testCurrentValue  = "current"
-	testExistingValue = "existing-value"
+	executorTestCurrentValue  = "current"
+	executorTestExistingValue = "existing-value"
 )
 
 func TestNewExecutor(t *testing.T) {
@@ -71,7 +71,7 @@ func TestExecuteEntry_AddWithDescription(t *testing.T) {
 	}
 
 	description := "test description"
-	opts := &EntryExecuteOptions{Description: &description}
+	opts := &EntryExecutorOptions{Description: &description}
 	result, err := executor.ExecuteEntry(
 		t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"},
 		state, EntryActionAdd{Value: "new-value"}, opts,
@@ -94,7 +94,7 @@ func TestExecuteEntry_Edit(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
-	currentValue := testCurrentValue
+	currentValue := executorTestCurrentValue
 	state := EntryState{
 		CurrentValue: &currentValue,
 		StagedState:  EntryStagedStateNotStaged{},
@@ -122,7 +122,7 @@ func TestExecuteEntry_EditWithMetadata(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
-	currentValue := testCurrentValue
+	currentValue := executorTestCurrentValue
 	state := EntryState{
 		CurrentValue: &currentValue,
 		StagedState:  EntryStagedStateNotStaged{},
@@ -130,7 +130,7 @@ func TestExecuteEntry_EditWithMetadata(t *testing.T) {
 
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	description := "edit description"
-	opts := &EntryExecuteOptions{
+	opts := &EntryExecutorOptions{
 		BaseModifiedAt: &baseTime,
 		Description:    &description,
 	}
@@ -158,7 +158,7 @@ func TestExecuteEntry_Delete(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
-	currentValue := testCurrentValue
+	currentValue := executorTestCurrentValue
 	state := EntryState{
 		CurrentValue: &currentValue,
 		StagedState:  EntryStagedStateNotStaged{},
@@ -183,14 +183,14 @@ func TestExecuteEntry_DeleteWithMetadata(t *testing.T) {
 	store := testutil.NewMockStore()
 	executor := NewExecutor(store)
 
-	currentValue := testCurrentValue
+	currentValue := executorTestCurrentValue
 	state := EntryState{
 		CurrentValue: &currentValue,
 		StagedState:  EntryStagedStateNotStaged{},
 	}
 
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	opts := &EntryExecuteOptions{
+	opts := &EntryExecutorOptions{
 		BaseModifiedAt: &baseTime,
 	}
 
@@ -291,7 +291,7 @@ func TestExecuteEntry_Reset(t *testing.T) {
 	executor := NewExecutor(store)
 
 	state := EntryState{
-		CurrentValue: lo.ToPtr(testCurrentValue),
+		CurrentValue: lo.ToPtr(executorTestCurrentValue),
 		StagedState:  EntryStagedStateUpdate{DraftValue: "updated"},
 	}
 
@@ -314,7 +314,7 @@ func TestExecuteEntry_Error(t *testing.T) {
 	executor := NewExecutor(store)
 
 	state := EntryState{
-		CurrentValue: lo.ToPtr(testCurrentValue),
+		CurrentValue: lo.ToPtr(executorTestCurrentValue),
 		StagedState:  EntryStagedStateDelete{},
 	}
 
@@ -357,7 +357,7 @@ func TestExecuteTag_Add(t *testing.T) {
 		Tags:              map[string]string{"env": "prod"},
 		CurrentRemoteTags: nil, // nil disables auto-skip
 	}
-	existingValue := testExistingValue
+	existingValue := executorTestExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(
@@ -385,7 +385,7 @@ func TestExecuteTag_Remove(t *testing.T) {
 		Keys:                 maputil.NewSet("deprecated"),
 		CurrentRemoteTagKeys: nil, // nil disables auto-skip
 	}
-	existingValue := testExistingValue
+	existingValue := executorTestExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entryState, StagedTags{}, action, nil)
@@ -408,7 +408,7 @@ func TestExecuteTag_Error(t *testing.T) {
 	action := TagActionTag{
 		Tags: map[string]string{"env": "prod"},
 	}
-	existingValue := testExistingValue
+	existingValue := executorTestExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}}
 
 	// Tag on DELETE should error
@@ -438,7 +438,7 @@ func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 		Keys:                 maputil.NewSet("env"),
 		CurrentRemoteTagKeys: maputil.NewSet("env"),
 	}
-	existingValue := testExistingValue
+	existingValue := executorTestExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entryState, existingTags, action, nil)
@@ -476,7 +476,7 @@ func TestExecuteTag_UnstageWhenCompletelyEmpty(t *testing.T) {
 		Tags:              map[string]string{"env": "prod"},
 		CurrentRemoteTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
 	}
-	existingValue := testExistingValue
+	existingValue := executorTestExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entryState, existingTags, action, nil)
@@ -504,7 +504,7 @@ func TestExecuteTag_UnstageWhenAlreadyNotStaged(t *testing.T) {
 		Tags:              map[string]string{"env": "prod"},
 		CurrentRemoteTags: map[string]string{"env": "prod"}, // Same value on AWS - auto-skip
 	}
-	existingValue := testExistingValue
+	existingValue := executorTestExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entryState, existingTags, action, nil)
@@ -514,122 +514,15 @@ func TestExecuteTag_UnstageWhenAlreadyNotStaged(t *testing.T) {
 	assert.True(t, result.NewStagedTags.IsEmpty())
 }
 
-func TestLoadEntryState(t *testing.T) {
-	t.Parallel()
-
-	t.Run("not staged", func(t *testing.T) {
-		t.Parallel()
-
-		store := testutil.NewMockStore()
-
-		currentValue := "aws-value"
-		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, &currentValue)
-		require.NoError(t, err)
-
-		assert.Equal(t, &currentValue, state.CurrentValue)
-		_, isNotStaged := state.StagedState.(EntryStagedStateNotStaged)
-		assert.True(t, isNotStaged)
-	})
-
-	t.Run("staged create", func(t *testing.T) {
-		t.Parallel()
-
-		store := testutil.NewMockStore()
-		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
-			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("draft"),
-			StagedAt:  time.Now(),
-		}))
-
-		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, nil)
-		require.NoError(t, err)
-
-		create, isCreate := state.StagedState.(EntryStagedStateCreate)
-		assert.True(t, isCreate)
-		assert.Equal(t, "draft", create.DraftValue)
-	})
-
-	t.Run("staged update", func(t *testing.T) {
-		t.Parallel()
-
-		store := testutil.NewMockStore()
-		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
-			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("updated"),
-			StagedAt:  time.Now(),
-		}))
-
-		currentValue := testCurrentValue
-		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, &currentValue)
-		require.NoError(t, err)
-
-		update, isUpdate := state.StagedState.(EntryStagedStateUpdate)
-		assert.True(t, isUpdate)
-		assert.Equal(t, "updated", update.DraftValue)
-	})
-
-	t.Run("staged delete", func(t *testing.T) {
-		t.Parallel()
-
-		store := testutil.NewMockStore()
-		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
-			Operation: staging.OperationDelete,
-			StagedAt:  time.Now(),
-		}))
-
-		state, err := LoadEntryState(t.Context(), store, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, nil)
-		require.NoError(t, err)
-
-		_, isDelete := state.StagedState.(EntryStagedStateDelete)
-		assert.True(t, isDelete)
-	})
-}
-
-func TestLoadStagedTags(t *testing.T) {
-	t.Parallel()
-
-	t.Run("not staged", func(t *testing.T) {
-		t.Parallel()
-
-		store := testutil.NewMockStore()
-
-		tags, baseModifiedAt, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
-		require.NoError(t, err)
-
-		assert.True(t, tags.IsEmpty())
-		assert.Nil(t, baseModifiedAt)
-	})
-
-	t.Run("staged", func(t *testing.T) {
-		t.Parallel()
-
-		store := testutil.NewMockStore()
-		baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
-			Add:            map[string]string{"env": "prod"},
-			Remove:         maputil.NewSet("deprecated"),
-			StagedAt:       time.Now(),
-			BaseModifiedAt: &baseTime,
-		}))
-
-		tags, baseModifiedAt, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
-		require.NoError(t, err)
-
-		assert.Equal(t, "prod", tags.ToSet["env"])
-		assert.True(t, tags.ToUnset.Contains("deprecated"))
-		assert.Equal(t, baseTime, *baseModifiedAt)
-	})
-}
-
 // Error path tests using mock store
 
-var errMock = errors.New("mock error")
+var errExecutorMock = errors.New("mock error")
 
 func TestExecuteEntry_PersistError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.StageEntryErr = errMock
+	store.StageEntryErr = errExecutorMock
 	executor := NewExecutor(store)
 
 	state := EntryState{
@@ -642,14 +535,14 @@ func TestExecuteEntry_PersistError(t *testing.T) {
 		t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"},
 		state, EntryActionAdd{Value: "new-value"}, nil,
 	)
-	assert.ErrorIs(t, err, errMock)
+	assert.ErrorIs(t, err, errExecutorMock)
 }
 
 func TestExecuteEntry_UnstageTagError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.UnstageTagErr = errMock
+	store.UnstageTagErr = errExecutorMock
 
 	// Pre-stage entry so UnstageEntry succeeds
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
@@ -667,44 +560,24 @@ func TestExecuteEntry_UnstageTagError(t *testing.T) {
 
 	// Delete CREATE with UnstageTag error (not ErrNotStaged)
 	_, err := executor.ExecuteEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, state, EntryActionDelete{}, nil)
-	assert.ErrorIs(t, err, errMock)
+	assert.ErrorIs(t, err, errExecutorMock)
 }
 
 func TestExecuteTag_PersistError(t *testing.T) {
 	t.Parallel()
 
 	store := testutil.NewMockStore()
-	store.StageTagErr = errMock
+	store.StageTagErr = errExecutorMock
 	executor := NewExecutor(store)
 
 	action := TagActionTag{
 		Tags:              map[string]string{"env": "prod"},
 		CurrentRemoteTags: nil, // nil disables auto-skip
 	}
-	existingValue := testExistingValue
+	existingValue := executorTestExistingValue
 	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateNotStaged{}}
 
 	// Tag should fail due to StageTag error
 	_, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entryState, StagedTags{}, action, nil)
-	assert.ErrorIs(t, err, errMock)
-}
-
-func TestLoadEntryState_Error(t *testing.T) {
-	t.Parallel()
-
-	store := testutil.NewMockStore()
-	store.GetEntryErr = errMock
-
-	_, err := LoadEntryState(t.Context(), store, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, nil)
-	assert.ErrorIs(t, err, errMock)
-}
-
-func TestLoadStagedTags_Error(t *testing.T) {
-	t.Parallel()
-
-	store := testutil.NewMockStore()
-	store.GetTagErr = errMock
-
-	_, _, err := LoadStagedTags(t.Context(), store, staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
-	assert.ErrorIs(t, err, errMock)
+	assert.ErrorIs(t, err, errExecutorMock)
 }

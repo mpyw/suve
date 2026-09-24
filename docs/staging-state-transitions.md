@@ -211,8 +211,10 @@ Use `--ignore-conflicts` to force apply despite conflicts.
 The state machine is implemented in `internal/staging/transition/`:
 
 - `state.go`: State type definitions
+- `staged_tags.go`: The staged tag changes (`StagedTags`)
 - `action.go`: Action type definitions
 - `reducer.go`: Pure reducer functions (`ReduceEntry`, `ReduceTag`)
 - `executor.go`: Persists reducer results to the store
+- `load.go`: Loads the current entry and tag state from the store (`LoadEntryState`, `LoadStagedTags`)
 
 The reducer functions are pure (no side effects) and deterministic, making the staging behavior predictable and testable.

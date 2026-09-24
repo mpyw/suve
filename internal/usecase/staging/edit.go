@@ -108,7 +108,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 	}
 
 	// Build options with metadata
-	opts := &transition.EntryExecuteOptions{
+	opts := &transition.EntryExecutorOptions{
 		BaseModifiedAt: baseModifiedAt,
 		ValueType:      valueType,
 	}

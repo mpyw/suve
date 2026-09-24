@@ -32,7 +32,7 @@ func TestImportPassphrase(t *testing.T) {
 
 		var err error
 
-		runWithCmd(t, importFlags(), bytes.NewBufferString("pw123\n"), &bytes.Buffer{}, &bytes.Buffer{},
+		runFakeLeafCommand(t, importFlags(), bytes.NewBufferString("pw123\n"), &bytes.Buffer{}, &bytes.Buffer{},
 			[]string{"--passphrase-stdin"}, func(cmd *cli.Command) {
 				pass, err = importPassphrase(cmd, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -44,7 +44,7 @@ func TestImportPassphrase(t *testing.T) {
 	t.Run("--passphrase-stdin surfaces a read error", func(t *testing.T) {
 		var err error
 
-		runWithCmd(t, importFlags(), errReader{}, &bytes.Buffer{}, &bytes.Buffer{},
+		runFakeLeafCommand(t, importFlags(), fakeFailingReader{}, &bytes.Buffer{}, &bytes.Buffer{},
 			[]string{"--passphrase-stdin"}, func(cmd *cli.Command) {
 				_, err = importPassphrase(cmd, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -56,7 +56,7 @@ func TestImportPassphrase(t *testing.T) {
 	t.Run("non-TTY without --passphrase-stdin is refused", func(t *testing.T) {
 		var err error
 
-		runWithCmd(t, importFlags(), &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{},
+		runFakeLeafCommand(t, importFlags(), &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{},
 			nil, func(cmd *cli.Command) {
 				_, err = importPassphrase(cmd, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -66,11 +66,11 @@ func TestImportPassphrase(t *testing.T) {
 	})
 
 	t.Run("TTY prompt error is wrapped", func(t *testing.T) {
-		mockTTY(t)
+		fakeIsTTY(t)
 
 		var err error
 
-		runWithCmd(t, importFlags(), &fakeTTY{}, &fakeTTY{}, &fakeTTY{},
+		runFakeLeafCommand(t, importFlags(), &fakeTTY{}, &fakeTTY{}, &fakeTTY{},
 			nil, func(cmd *cli.Command) {
 				_, err = importPassphrase(cmd, bufio.NewReader(cmd.Root().Reader))
 			})
@@ -101,7 +101,7 @@ func TestNewReAnchorResolver(t *testing.T) {
 	t.Run("namespaced provider resolves per namespace without caching", func(t *testing.T) {
 		t.Parallel()
 
-		sentinel := &stubFullStrategy{}
+		sentinel := &fakeFullStrategy{}
 
 		var namespaces []string
 
@@ -135,13 +135,13 @@ func TestNewReAnchorResolver(t *testing.T) {
 
 		var calls int
 
-		var built []*stubFullStrategy
+		var built []*fakeFullStrategy
 
 		resolver := newImportReAnchorResolver(t.Context(), map[staging.Service]importReAnchorSpec{
 			staging.ServiceParam: {
 				factory: func(context.Context) (staging.FullStrategy, error) {
 					calls++
-					s := &stubFullStrategy{}
+					s := &fakeFullStrategy{}
 					built = append(built, s)
 
 					return s, nil
