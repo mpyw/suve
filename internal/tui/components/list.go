@@ -38,11 +38,6 @@ type EntryList struct {
 	// selected row is drawn with the active cursor when focused and a dimmed cursor
 	// when not, so the list and history never look equally selected at once.
 	focused bool
-	// hasMore, when true, appends a "… load more (L)" footer occupying the last
-	// visible row. It is set only when the source reports a real next page (a
-	// non-empty NextToken); the un-loaded count is unknown, so no phantom number
-	// is shown.
-	hasMore bool
 }
 
 // NewEntryList builds an empty list with the given styles.
@@ -50,11 +45,9 @@ func NewEntryList(st styles.Styles) EntryList {
 	return EntryList{styles: st}
 }
 
-// SetRows replaces the rows, clamping the selection into range. hasMore appends
-// the load-more footer; pass true only when the source reports a real next page.
-func (l *EntryList) SetRows(rows []ListRow, hasMore bool) {
+// SetRows replaces the rows, clamping the selection into range.
+func (l *EntryList) SetRows(rows []ListRow) {
 	l.rows = rows
-	l.hasMore = hasMore
 	l.clampSelection()
 	l.ensureVisible()
 }
@@ -153,18 +146,13 @@ func (l *EntryList) RowAtLine(line int) (int, bool) {
 }
 
 // View renders the list body (without a title/border; the page frames it) into
-// width×height. The selected row carries a cursor; a load-more footer takes the
-// last line when rows are truncated.
+// width×height. The selected row carries a cursor.
 func (l *EntryList) View() string {
 	if l.height <= 0 || l.width <= 0 {
 		return ""
 	}
 
 	lines, _ := l.window()
-
-	if l.hasMore {
-		lines = append(lines, l.styles.PageHint.Render(truncate("  … load more (L)", l.width)))
-	}
 
 	// Pad to the full height so the pane border stays rectangular.
 	for len(lines) < l.height {
@@ -246,15 +234,11 @@ func (l *EntryList) renderRow(idx int) string {
 	return truncate(left+strings.Repeat(" ", gap)+badges, l.width)
 }
 
-// visibleRows is the window's height in rendered lines, reserving one line for
-// the load-more footer when there is a next page. It is the per-View line budget
-// window() fills, not a row count: a values-mode row renders as two lines, so the
-// offset math below converts between the two by summing per-row line counts.
+// visibleRows is the window's height in rendered lines. It is the per-View line
+// budget window() fills, not a row count: a values-mode row renders as two
+// lines, so the offset math below converts between the two by summing per-row
+// line counts.
 func (l *EntryList) visibleRows() int {
-	if l.hasMore {
-		return max(l.height-1, 0)
-	}
-
 	return l.height
 }
 

@@ -34,7 +34,7 @@ func TestEntryListMoveReportsScroll(t *testing.T) {
 	t.Parallel()
 
 	l := NewEntryList(styles.New())
-	l.SetRows(scrollReportListRows(12), false)
+	l.SetRows(scrollReportListRows(12))
 	l.SetSize(40, 4)
 
 	deltas := []int{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}
@@ -78,7 +78,7 @@ func TestEntryListScrollReportsChange(t *testing.T) {
 	t.Parallel()
 
 	l := NewEntryList(styles.New())
-	l.SetRows(scrollReportListRows(12), false)
+	l.SetRows(scrollReportListRows(12))
 	l.SetSize(40, 4)
 
 	assert.False(t, l.Scroll(-1), "already at top: scrolling up does not change the offset")
@@ -96,7 +96,7 @@ func TestEntryListSelectIndexReportsScroll(t *testing.T) {
 	t.Parallel()
 
 	l := NewEntryList(styles.New())
-	l.SetRows(scrollReportListRows(12), false)
+	l.SetRows(scrollReportListRows(12))
 	l.SetSize(40, 4)
 
 	assert.False(t, l.SelectIndex(0), "selecting the already-visible top row does not scroll")

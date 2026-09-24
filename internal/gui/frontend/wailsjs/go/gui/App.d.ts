@@ -23,7 +23,7 @@ export function ParamDelete(arg1:string,arg2:string):Promise<gui.ParamDeleteResu
 
 export function ParamDiff(arg1:string,arg2:string,arg3:string):Promise<gui.ParamDiffResult>;
 
-export function ParamList(arg1:string,arg2:boolean,arg3:boolean,arg4:string,arg5:number,arg6:string):Promise<gui.ParamListResult>;
+export function ParamList(arg1:string,arg2:boolean,arg3:boolean,arg4:string):Promise<gui.ParamListResult>;
 
 export function ParamLog(arg1:string,arg2:number,arg3:string):Promise<gui.ParamLogResult>;
 
@@ -45,7 +45,7 @@ export function SecretDelete(arg1:string,arg2:boolean):Promise<gui.SecretDeleteR
 
 export function SecretDiff(arg1:string,arg2:string):Promise<gui.SecretDiffResult>;
 
-export function SecretList(arg1:string,arg2:boolean,arg3:string,arg4:number,arg5:string):Promise<gui.SecretListResult>;
+export function SecretList(arg1:string,arg2:boolean,arg3:string):Promise<gui.SecretListResult>;
 
 export function SecretLog(arg1:string,arg2:number):Promise<gui.SecretLogResult>;
 

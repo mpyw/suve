@@ -6,7 +6,6 @@
 package components
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,7 +56,7 @@ func TestEntryListValuesOffSingleLine(t *testing.T) {
 	}
 
 	l := NewEntryList(styles.New())
-	l.SetRows(rows, false)
+	l.SetRows(rows)
 	l.SetSize(40, 4)
 
 	for i := range rows {
@@ -76,7 +75,7 @@ func TestEntryListValuesOnTwoLines(t *testing.T) {
 	l := NewEntryList(styles.New())
 	l.SetRows([]ListRow{
 		{Name: "/app/db", Preview: "postgres://db.internal:5432/app", Badges: []string{"staged"}},
-	}, false)
+	})
 	l.SetSize(60, 6)
 
 	lines := l.rowLines(0)
@@ -94,7 +93,7 @@ func TestEntryListRowAtLineMapsBothLines(t *testing.T) {
 	t.Parallel()
 
 	l := NewEntryList(styles.New())
-	l.SetRows(valuedListRows(3), false)
+	l.SetRows(valuedListRows(3))
 	l.SetSize(40, 6)
 
 	// Rows render as: line0=name0, line1=value0, line2=name1, line3=value1, ...
@@ -119,7 +118,7 @@ func TestEntryListSelectLastRowFullyVisible(t *testing.T) {
 	t.Parallel()
 
 	l := NewEntryList(styles.New())
-	l.SetRows(valuedListRows(8), false)
+	l.SetRows(valuedListRows(8))
 	l.SetSize(40, 5) // fits ~2 rows
 
 	last := l.Len() - 1
@@ -127,18 +126,4 @@ func TestEntryListSelectLastRowFullyVisible(t *testing.T) {
 
 	assert.Equal(t, len(l.rowLines(last)), listWindowRowSpan(&l, last),
 		"selecting the last row must show all of its rendered lines")
-}
-
-// TestEntryListLoadMoreReservesFooterLine pins that the load-more footer still
-// takes the last visible line when a next page is reported, with two-line rows.
-func TestEntryListLoadMoreReservesFooterLine(t *testing.T) {
-	t.Parallel()
-
-	l := NewEntryList(styles.New())
-	l.SetRows(valuedListRows(8), true) // hasMore
-	l.SetSize(40, 5)
-
-	view := l.View()
-	assert.Contains(t, view, "load more (L)", "the footer renders when there is a next page")
-	assert.Len(t, strings.Split(view, "\n"), l.height, "the view is padded to exactly the pane height")
 }

@@ -39,7 +39,7 @@ func dtoContract() []any {
 		ParamLogResult{}, ParamLogEntry{}, ParamDiffResult{}, ParamSetResult{},
 		ParamDeleteResult{},
 		// secret.go
-		SecretListResult{}, SecretListEntry{}, SecretShowTag{}, SecretShowResult{},
+		SecretListResult{}, SecretListEntry{}, SecretShowTag{}, SecretExtraField{}, SecretShowResult{},
 		SecretLogResult{}, SecretLogEntry{}, SecretCreateResult{}, SecretUpdateResult{},
 		SecretDeleteResult{}, SecretDiffResult{}, SecretRestoreResult{},
 		// staging.go

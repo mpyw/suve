@@ -162,19 +162,3 @@ func TestHelpKeyMap_NoStagingShortcut(t *testing.T) {
 
 	assert.NotContains(t, fullHelpDescs(m.HelpKeyMap()), "staging", "the broken S staging shortcut is gone (#785)")
 }
-
-// TestHelpKeyMap_LoadMoreGatedOnNextPage pins that load-more only appears while a
-// next page is pending.
-func TestHelpKeyMap_LoadMoreGatedOnNextPage(t *testing.T) {
-	t.Parallel()
-
-	m := newModel(t, &stubSource{svcCap: awsSecretCap()})
-
-	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "k"}}}})
-	assert.NotContains(t, fullHelpDescs(m.HelpKeyMap()), "load more", "no next page → no load-more key")
-
-	m, _ = update(t, m, listLoadedMsg{
-		seq: m.listSeq, res: data.ListResult{Items: []data.Item{{Name: "k"}}, NextToken: "tok"},
-	})
-	assert.Contains(t, fullHelpDescs(m.HelpKeyMap()), "load more", "a pending next page surfaces load-more")
-}

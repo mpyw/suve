@@ -42,12 +42,13 @@ test.describe('Secret CRUD Operations', () => {
     test('should display secret metadata (version ID, staging labels)', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
       await expect(page.locator('.meta-label').filter({ hasText: 'Version ID' })).toBeVisible();
-      await expect(page.locator('.meta-label').filter({ hasText: 'Staging labels' })).toBeVisible();
+      await expect(page.locator('.meta-label').filter({ hasText: 'Labels' })).toBeVisible();
     });
 
-    test('should display ARN', async ({ page }) => {
+    test('should display the ARN extra field', async ({ page }) => {
       await clickItemByName(page, 'my-secret');
-      await expect(page.locator('.arn-display')).toContainText('arn:aws:secretsmanager');
+      await expect(page.locator('.detail-section h4', { hasText: 'ARN' })).toBeVisible();
+      await expect(page.locator('.extra-value')).toContainText('arn:aws:secretsmanager');
     });
 
     test('should close detail panel when close button clicked', async ({ page }) => {
@@ -468,7 +469,7 @@ test.describe('Secret provider-neutral presence gating (#268)', () => {
   // involved.
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page, {
-      secrets: [{ name: 'neutral-secret', value: 'v', arn: '', stagingLabels: [], state: '' }],
+      secrets: [{ name: 'neutral-secret', value: 'v', arn: '', labels: [], state: '' }],
       secretTags: {},
     } as Partial<MockState>);
     await page.goto('/');
@@ -478,13 +479,13 @@ test.describe('Secret provider-neutral presence gating (#268)', () => {
     await expect(page.locator('.detail-panel')).toBeVisible();
   });
 
-  test('hides the ARN section when arn is empty', async ({ page }) => {
-    await expect(page.locator('.arn-display')).toHaveCount(0);
+  test('hides the ARN section when there are no extra fields', async ({ page }) => {
+    await expect(page.locator('.extra-value')).toHaveCount(0);
   });
 
   test('hides the State / Staging-labels row when neither is set', async ({ page }) => {
     await expect(page.locator('.meta-label').filter({ hasText: 'State' })).toHaveCount(0);
-    await expect(page.locator('.meta-label').filter({ hasText: 'Staging labels' })).toHaveCount(0);
+    await expect(page.locator('.meta-label').filter({ hasText: 'Labels' })).toHaveCount(0);
   });
 
   test('still renders always-present metadata (Version ID)', async ({ page }) => {
@@ -506,7 +507,7 @@ test.describe('Secret version-meta heading is concept-driven (#419)', () => {
     await setupWailsMocks(
       page,
       createGoogleCloudState({
-        secrets: [{ name: 'gcloud-secret-1', value: 'v1', arn: '', stagingLabels: [], state: 'enabled' }],
+        secrets: [{ name: 'gcloud-secret-1', value: 'v1', arn: '', labels: [], state: 'enabled' }],
       }),
     );
     await page.goto('/');
@@ -517,7 +518,7 @@ test.describe('Secret version-meta heading is concept-driven (#419)', () => {
     await expect(page.locator('.detail-panel')).toBeVisible();
 
     await expect(metaLabel(page, 'State')).toBeVisible();
-    await expect(metaLabel(page, 'Staging labels')).toHaveCount(0);
+    await expect(metaLabel(page, 'Labels')).toHaveCount(0);
     await expect(page.locator('.detail-meta .badge-stage')).toHaveText('enabled');
   });
 
@@ -525,7 +526,7 @@ test.describe('Secret version-meta heading is concept-driven (#419)', () => {
     await setupWailsMocks(
       page,
       createAzureState({
-        secrets: [{ name: 'kv-secret', value: 'v', arn: '', stagingLabels: [], state: 'enabled', versionId: 'a1b2c3d4e5f6' }],
+        secrets: [{ name: 'kv-secret', value: 'v', arn: '', labels: [], state: 'enabled', version: 'a1b2c3d4e5f6' }],
       }),
     );
     await page.goto('/');
@@ -536,14 +537,14 @@ test.describe('Secret version-meta heading is concept-driven (#419)', () => {
     await expect(page.locator('.detail-panel')).toBeVisible();
 
     await expect(metaLabel(page, 'State')).toBeVisible();
-    await expect(metaLabel(page, 'Staging labels')).toHaveCount(0);
+    await expect(metaLabel(page, 'Labels')).toHaveCount(0);
     await expect(page.locator('.detail-meta .badge-stage')).toHaveText('enabled');
   });
 
-  test('AWS Secrets Manager: staging labels are headed "Staging labels", every label badge shows', async ({ page }) => {
+  test('AWS Secrets Manager: staging labels are headed "Labels", every label badge shows', async ({ page }) => {
     // AWS default; seed multiple staging labels to prove they all render.
     await setupWailsMocks(page, {
-      secrets: [{ name: 'my-secret', value: 'v', stagingLabels: ['AWSCURRENT', 'AWSPREVIOUS'] }],
+      secrets: [{ name: 'my-secret', value: 'v', labels: ['AWSCURRENT', 'AWSPREVIOUS'] }],
     } as Partial<MockState>);
     await page.goto('/');
     await navigateTo(page, 'Secrets Manager');
@@ -552,7 +553,7 @@ test.describe('Secret version-meta heading is concept-driven (#419)', () => {
     await clickItemByName(page, 'my-secret');
     await expect(page.locator('.detail-panel')).toBeVisible();
 
-    await expect(metaLabel(page, 'Staging labels')).toBeVisible();
+    await expect(metaLabel(page, 'Labels')).toBeVisible();
     await expect(metaLabel(page, 'State')).toHaveCount(0);
     await expect(page.locator('.detail-meta .badge-stage')).toHaveText(['AWSCURRENT', 'AWSPREVIOUS']);
   });

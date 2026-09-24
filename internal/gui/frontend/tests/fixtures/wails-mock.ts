@@ -21,17 +21,19 @@ export interface Secret {
   name: string;
   value: string;
   // Optional overrides for SecretShow. When omitted, SecretShow synthesizes an
-  // AWS-shaped ARN and an ['AWSCURRENT'] staging label (backward compatible).
-  // A provider without these (e.g. an empty arn / empty stagingLabels, as Google
-  // Cloud and Azure return) drives the presence-gated rendering in SecretView.
+  // AWS-shaped ARN extra field and an ['AWSCURRENT'] label (backward
+  // compatible). A provider without these (e.g. an empty arn / empty labels,
+  // as Google Cloud and Azure return) drives the presence-gated rendering in
+  // SecretView. arn is mock backend data: SecretShow returns it as an "ARN"
+  // entry of extra, like the Secrets Manager adapter's Entry.Extra.
   //
-  // stagingLabels and state are the two independent concepts (#419): AWS Secrets
-  // Manager populates stagingLabels; Google Cloud + Azure Key Vault populate
+  // labels and state are the two independent concepts (#419): AWS Secrets
+  // Manager populates labels; Google Cloud + Azure Key Vault populate
   // state (enabled/disabled/destroyed). A version never has both.
   arn?: string;
-  stagingLabels?: string[];
+  labels?: string[];
   state?: string;
-  versionId?: string;
+  version?: string;
   // Optional human-readable description surfaced by SecretShow. Empty / omitted
   // renders nothing (the detail pane gates on a non-empty value).
   description?: string;
@@ -77,10 +79,10 @@ export interface ParamLogEntry {
 }
 
 export interface SecretLogEntry {
-  versionId: string;
-  // Two independent concepts (#419): stagingLabels for AWS Secrets Manager,
+  version: string;
+  // Two independent concepts (#419): labels for AWS Secrets Manager,
   // state (enabled/disabled/destroyed) for Google Cloud + Azure Key Vault.
-  stagingLabels?: string[];
+  labels?: string[];
   state?: string;
   value: string;
   isCurrent: boolean;
@@ -168,9 +170,6 @@ export interface MockState {
   // Advanced: version history for diff testing
   paramVersions: Record<string, ParamLogEntry[]>;
   secretVersions: Record<string, SecretLogEntry[]>;
-  // Pagination support
-  enablePagination: boolean;
-  pageSize: number;
   // AWS Identity
   awsIdentity: AWSIdentity;
   // Virtual file system for export/import, keyed by path. Import tests seed
@@ -353,13 +352,11 @@ export const defaultMockState: MockState = {
   },
   secretVersions: {
     'my-secret': [
-      { versionId: 'v3-current', stagingLabels: ['AWSCURRENT'], value: 'secret-value-1', isCurrent: true, created: new Date().toISOString() },
-      { versionId: 'v2-previous', stagingLabels: ['AWSPREVIOUS'], value: 'secret-value-old', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
-      { versionId: 'v1-initial', stagingLabels: [], value: 'secret-value-initial', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
+      { version: 'v3-current', labels: ['AWSCURRENT'], value: 'secret-value-1', isCurrent: true, created: new Date().toISOString() },
+      { version: 'v2-previous', labels: ['AWSPREVIOUS'], value: 'secret-value-old', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+      { version: 'v1-initial', labels: [], value: 'secret-value-initial', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
     ],
   },
-  enablePagination: false,
-  pageSize: 50,
   awsIdentity: {
     accountId: '123456789012',
     region: 'ap-northeast-1',
@@ -506,18 +503,18 @@ export function createVersionHistoryState(): Partial<MockState> {
     },
     secretVersions: {
       'my-secret': [
-        { versionId: 'ver-003', stagingLabels: ['AWSCURRENT'], value: '{"current": "v3"}', isCurrent: true, created: new Date().toISOString() },
-        { versionId: 'ver-002', stagingLabels: ['AWSPREVIOUS'], value: '{"previous": "v2"}', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
-        { versionId: 'ver-001', stagingLabels: [], value: '{"initial": "v1"}', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
+        { version: 'ver-003', labels: ['AWSCURRENT'], value: '{"current": "v3"}', isCurrent: true, created: new Date().toISOString() },
+        { version: 'ver-002', labels: ['AWSPREVIOUS'], value: '{"previous": "v2"}', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+        { version: 'ver-001', labels: [], value: '{"initial": "v1"}', isCurrent: false, created: new Date(Date.now() - 172800000).toISOString() },
       ],
     },
   };
 }
 
 /**
- * State with large dataset for pagination testing
+ * State with a larger dataset (every provider lists all names in one call)
  */
-export function createPaginationTestState(itemCount: number = 25): Partial<MockState> {
+export function createLargeListState(itemCount: number = 25): Partial<MockState> {
   const params: Parameter[] = [];
   const secrets: Secret[] = [];
 
@@ -529,8 +526,6 @@ export function createPaginationTestState(itemCount: number = 25): Partial<MockS
   return {
     params,
     secrets,
-    enablePagination: true,
-    pageSize: 10,
   };
 }
 
@@ -641,13 +636,13 @@ export function createGoogleCloudState(overrides: Partial<MockState> = {}): Part
     secrets: [
       // gcloud-secret-1 carries a description (the "description" annotation) so a
       // spec can assert the detail view surfaces it (#666 gcloud support).
-      { name: 'gcloud-secret-1', value: 'v1', arn: '', stagingLabels: [], state: 'enabled', description: 'app credentials' },
-      { name: 'gcloud-secret-2', value: 'v2', arn: '', stagingLabels: [], state: 'enabled' },
+      { name: 'gcloud-secret-1', value: 'v1', arn: '', labels: [], state: 'enabled', description: 'app credentials' },
+      { name: 'gcloud-secret-2', value: 'v2', arn: '', labels: [], state: 'enabled' },
     ],
     secretVersions: {
       'gcloud-secret-1': [
-        { versionId: '2', stagingLabels: [], state: 'enabled', value: 'v2', isCurrent: true, created: new Date().toISOString() },
-        { versionId: '1', stagingLabels: [], state: 'disabled', value: 'v1', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
+        { version: '2', labels: [], state: 'enabled', value: 'v2', isCurrent: true, created: new Date().toISOString() },
+        { version: '1', labels: [], state: 'disabled', value: 'v1', isCurrent: false, created: new Date(Date.now() - 86400000).toISOString() },
       ],
     },
     ...overrides,
@@ -681,12 +676,12 @@ export function createAzureState(overrides: Partial<MockState> = {}): Partial<Mo
     paramTags: {
       'app/config/key': [{ key: 'env', value: 'prod' }],
     },
-    secrets: [{ name: 'kv-secret', value: 'v', arn: '', stagingLabels: [], state: 'enabled', versionId: 'a1b2c3d4e5f6' }],
+    secrets: [{ name: 'kv-secret', value: 'v', arn: '', labels: [], state: 'enabled', version: 'a1b2c3d4e5f6' }],
     // Key Vault versions are opaque hex ids with no AWS staging labels; they
     // carry a per-version enabled/disabled state instead.
     secretVersions: {
       'kv-secret': [
-        { versionId: 'a1b2c3d4e5f6', stagingLabels: [], state: 'enabled', value: 'v', isCurrent: true, created: new Date().toISOString() },
+        { version: 'a1b2c3d4e5f6', labels: [], state: 'enabled', value: 'v', isCurrent: true, created: new Date().toISOString() },
       ],
     },
     ...overrides,
@@ -939,7 +934,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
 
       // Parameter operations
-      ParamList: async (prefix: string, _recursive: boolean, withValue: boolean, filter: string, pageSize?: number, nextToken?: string) => {
+      ParamList: async (prefix: string, _recursive: boolean, withValue: boolean, filter: string) => {
         // Simulate error if configured
         if (state.simulateError?.operation === 'ParamList') {
           throw new Error(state.simulateError.message);
@@ -962,22 +957,6 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           }
         }
 
-        // Handle pagination
-        if (state.enablePagination && pageSize) {
-          const startIndex = nextToken ? parseInt(nextToken) : 0;
-          const endIndex = startIndex + pageSize;
-          const hasMore = endIndex < filtered.length;
-          return {
-            entries: filtered.slice(startIndex, endIndex).map((p: any) => ({
-              name: p.name,
-              type: p.type,
-              secret: p.type === 'SecureString',
-              value: withValue ? p.value : undefined,
-              namespace: p.namespace ?? (state.currentScope?.namespace ?? '')
-            })),
-            nextToken: hasMore ? String(endIndex) : '',
-          };
-        }
 
         return {
           entries: filtered.map((p: any) => ({
@@ -987,7 +966,6 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
             value: withValue ? p.value : undefined,
             namespace: p.namespace ?? (state.currentScope?.namespace ?? '')
           })),
-          nextToken: '',
         };
       },
       ParamShow: async (name: string, namespace?: string) => {
@@ -1114,7 +1092,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
 
       // Secret operations
-      SecretList: async (prefix: string, withValue: boolean, filter: string, pageSize?: number, nextToken?: string) => {
+      SecretList: async (prefix: string, withValue: boolean, filter: string) => {
         // Simulate error if configured
         if (state.simulateError?.operation === 'SecretList') {
           throw new Error(state.simulateError.message);
@@ -1137,36 +1115,23 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           }
         }
 
-        // Handle pagination
-        if (state.enablePagination && pageSize) {
-          const startIndex = nextToken ? parseInt(nextToken) : 0;
-          const endIndex = startIndex + pageSize;
-          const hasMore = endIndex < filtered.length;
-          return {
-            entries: filtered.slice(startIndex, endIndex).map((s: any) => ({
-              name: s.name,
-              value: withValue ? s.value : undefined
-            })),
-            nextToken: hasMore ? String(endIndex) : '',
-          };
-        }
 
         return {
           entries: filtered.map((s: any) => ({
             name: s.name,
             value: withValue ? s.value : undefined
           })),
-          nextToken: '',
         };
       },
       SecretShow: async (name: string) => {
         const secret = state.secrets.find((s: any) => s.name === name);
         const tags = state.secretTags[name] || [];
+        const arn = secret?.arn !== undefined ? secret.arn : `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}`;
         return {
           name,
-          arn: secret?.arn !== undefined ? secret.arn : `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}`,
-          versionId: secret?.versionId ?? 'v1',
-          stagingLabels: secret?.stagingLabels !== undefined ? secret.stagingLabels : ['AWSCURRENT'],
+          extra: arn ? [{ label: 'ARN', value: arn }] : [],
+          version: secret?.version ?? 'v1',
+          labels: secret?.labels !== undefined ? secret.labels : ['AWSCURRENT'],
           state: secret?.state ?? '',
           value: secret?.value || 'mock-secret',
           description: secret?.description ?? '',
@@ -1176,7 +1141,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
       SecretLog: async (name: string, _limit?: number) => {
         const versions = state.secretVersions[name] || [
-          { versionId: 'v1', stagingLabels: ['AWSCURRENT'], value: 'current', isCurrent: true, created: new Date().toISOString() },
+          { version: 'v1', labels: ['AWSCURRENT'], value: 'current', isCurrent: true, created: new Date().toISOString() },
         ];
         return {
           name,
@@ -1191,7 +1156,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           throw new Error(state.simulateError.message);
         }
         state.secrets.push({ name, value, description: description ?? '' });
-        return { name, versionId: 'v1', arn: `arn:aws:secretsmanager:us-east-1:123456789:secret:${name}` };
+        return { name, version: 'v1' };
       },
       SecretUpdate: async (name: string, value: string, description?: string) => {
         const existing = state.secrets.find((s: any) => s.name === name);
@@ -1200,7 +1165,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           // Empty description preserves the existing one (a no-op on update).
           if (description) existing.description = description;
         }
-        return { name, versionId: 'v2', arn: '' };
+        return { name, version: 'v2' };
       },
       SecretDelete: async (name: string, force?: boolean) => {
         const removed = state.secrets.filter((s: any) => s.name === name);
@@ -1210,26 +1175,26 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           (window as any).__softDeleted = (window as any).__softDeleted ?? [];
           (window as any).__softDeleted.push(...removed);
         }
-        return { name, deletionDate: new Date().toISOString(), arn: '' };
+        return { name, deletionDate: new Date().toISOString() };
       },
       SecretDiff: async (spec1: string, spec2: string) => {
         // Parse specs like "my-secret#v1" and "my-secret#v2"
         const parseSpec = (s: string) => {
           const hashIdx = s.lastIndexOf('#');
-          if (hashIdx === -1) return { name: s, versionId: '' };
-          return { name: s.substring(0, hashIdx), versionId: s.substring(hashIdx + 1) };
+          if (hashIdx === -1) return { name: s, version: '' };
+          return { name: s.substring(0, hashIdx), version: s.substring(hashIdx + 1) };
         };
         const s1 = parseSpec(spec1);
         const s2 = parseSpec(spec2);
         const versions = state.secretVersions[s1.name] || [];
-        const v1 = versions.find((v: any) => v.versionId === s1.versionId);
-        const v2 = versions.find((v: any) => v.versionId === s2.versionId);
+        const v1 = versions.find((v: any) => v.version === s1.version);
+        const v2 = versions.find((v: any) => v.version === s2.version);
         return {
           oldName: s1.name,
-          oldVersionId: s1.versionId,
+          oldVersion: s1.version,
           oldValue: v1?.value || '',
           newName: s2.name,
-          newVersionId: s2.versionId,
+          newVersion: s2.version,
           newValue: v2?.value || '',
         };
       },
@@ -1242,7 +1207,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           state.secrets.push(soft[idx]);
           soft.splice(idx, 1);
         }
-        return { name, arn: '' };
+        return { name };
       },
       SecretAddTag: async (name: string, key: string, value: string) => {
         if (!state.secretTags[name]) state.secretTags[name] = [];

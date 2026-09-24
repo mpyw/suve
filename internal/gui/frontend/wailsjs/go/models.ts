@@ -157,7 +157,6 @@ export namespace gui {
 	}
 	export class ParamListResult {
 	    entries: ParamListEntry[];
-	    nextToken?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ParamListResult(source);
@@ -166,7 +165,6 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.entries = this.convertValues(source["entries"], ParamListEntry);
-	        this.nextToken = source["nextToken"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -385,8 +383,7 @@ export namespace gui {
 	
 	export class SecretCreateResult {
 	    name: string;
-	    versionId: string;
-	    arn: string;
+	    version: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SecretCreateResult(source);
@@ -395,14 +392,12 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
-	        this.versionId = source["versionId"];
-	        this.arn = source["arn"];
+	        this.version = source["version"];
 	    }
 	}
 	export class SecretDeleteResult {
 	    name: string;
 	    deletionDate?: string;
-	    arn: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SecretDeleteResult(source);
@@ -412,15 +407,14 @@ export namespace gui {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.deletionDate = source["deletionDate"];
-	        this.arn = source["arn"];
 	    }
 	}
 	export class SecretDiffResult {
 	    oldName: string;
-	    oldVersionId: string;
+	    oldVersion: string;
 	    oldValue: string;
 	    newName: string;
-	    newVersionId: string;
+	    newVersion: string;
 	    newValue: string;
 	
 	    static createFrom(source: any = {}) {
@@ -430,11 +424,25 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.oldName = source["oldName"];
-	        this.oldVersionId = source["oldVersionId"];
+	        this.oldVersion = source["oldVersion"];
 	        this.oldValue = source["oldValue"];
 	        this.newName = source["newName"];
-	        this.newVersionId = source["newVersionId"];
+	        this.newVersion = source["newVersion"];
 	        this.newValue = source["newValue"];
+	    }
+	}
+	export class SecretExtraField {
+	    label: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretExtraField(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.value = source["value"];
 	    }
 	}
 	export class SecretListEntry {
@@ -453,7 +461,6 @@ export namespace gui {
 	}
 	export class SecretListResult {
 	    entries: SecretListEntry[];
-	    nextToken?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SecretListResult(source);
@@ -462,7 +469,6 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.entries = this.convertValues(source["entries"], SecretListEntry);
-	        this.nextToken = source["nextToken"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -498,8 +504,8 @@ export namespace gui {
 	    }
 	}
 	export class SecretLogEntry {
-	    versionId: string;
-	    stagingLabels: string[];
+	    version: string;
+	    labels: string[];
 	    state?: string;
 	    value: string;
 	    isCurrent: boolean;
@@ -512,8 +518,8 @@ export namespace gui {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.versionId = source["versionId"];
-	        this.stagingLabels = source["stagingLabels"];
+	        this.version = source["version"];
+	        this.labels = source["labels"];
 	        this.state = source["state"];
 	        this.value = source["value"];
 	        this.isCurrent = source["isCurrent"];
@@ -573,7 +579,6 @@ export namespace gui {
 	}
 	export class SecretRestoreResult {
 	    name: string;
-	    arn: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SecretRestoreResult(source);
@@ -582,19 +587,18 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
-	        this.arn = source["arn"];
 	    }
 	}
 	export class SecretShowResult {
 	    name: string;
-	    arn: string;
-	    versionId: string;
-	    stagingLabels: string[];
+	    version: string;
+	    labels: string[];
 	    state?: string;
 	    value: string;
 	    description?: string;
 	    createdDate?: string;
 	    tags: SecretShowTag[];
+	    extra: SecretExtraField[];
 	
 	    static createFrom(source: any = {}) {
 	        return new SecretShowResult(source);
@@ -603,14 +607,14 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
-	        this.arn = source["arn"];
-	        this.versionId = source["versionId"];
-	        this.stagingLabels = source["stagingLabels"];
+	        this.version = source["version"];
+	        this.labels = source["labels"];
 	        this.state = source["state"];
 	        this.value = source["value"];
 	        this.description = source["description"];
 	        this.createdDate = source["createdDate"];
 	        this.tags = this.convertValues(source["tags"], SecretShowTag);
+	        this.extra = this.convertValues(source["extra"], SecretExtraField);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -634,8 +638,7 @@ export namespace gui {
 	
 	export class SecretUpdateResult {
 	    name: string;
-	    versionId: string;
-	    arn: string;
+	    version: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SecretUpdateResult(source);
@@ -644,8 +647,7 @@ export namespace gui {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
-	        this.versionId = source["versionId"];
-	        this.arn = source["arn"];
+	        this.version = source["version"];
 	    }
 	}
 	export class StagingAddResult {

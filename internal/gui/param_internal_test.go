@@ -86,7 +86,7 @@ func TestParamList_PopulatesSecretAndType(t *testing.T) {
 	app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAWS}}
 
 	// withValue=true so each entry's value (and thus its type) is fetched.
-	res, err := app.ParamList("", false, true, "", 0, "")
+	res, err := app.ParamList("", false, true, "")
 	require.NoError(t, err)
 	require.Len(t, res.Entries, 2)
 

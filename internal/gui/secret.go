@@ -24,8 +24,7 @@ var errSecretRestoreUnsupported = stringError("restore is not supported by this 
 
 // SecretListResult represents the result of listing secrets.
 type SecretListResult struct {
-	Entries   []SecretListEntry `json:"entries"`
-	NextToken string            `json:"nextToken,omitempty"`
+	Entries []SecretListEntry `json:"entries"`
 }
 
 // SecretListEntry represents a single secret in the list.
@@ -40,23 +39,32 @@ type SecretShowTag struct {
 	Value string `json:"value"`
 }
 
+// SecretExtraField is one provider-specific, display-only detail of a secret
+// (domain.Entry.Extra, e.g. the AWS Secrets Manager ARN). The frontend renders
+// it verbatim and never interprets it.
+type SecretExtraField struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
 // SecretShowResult represents the result of showing a secret.
 //
-// StagingLabels and State carry two independent concepts that must NOT be
-// conflated (#419): StagingLabels holds AWS Secrets Manager staging labels
-// (empty for other providers), while State holds the per-version lifecycle
-// state (enabled/disabled/destroyed) for Google Cloud + Azure Key Vault (empty
-// for AWS). A version never has both.
+// Labels and State carry two independent concepts that must NOT be conflated
+// (#419): Labels holds a version's movable labels (AWS Secrets Manager's
+// AWSCURRENT/AWSPREVIOUS; empty for other providers), while State holds the
+// per-version lifecycle state (enabled/disabled/destroyed) for Google Cloud +
+// Azure Key Vault (empty for AWS). A version never has both.
 type SecretShowResult struct {
-	Name          string          `json:"name"`
-	ARN           string          `json:"arn"`
-	VersionID     string          `json:"versionId"`
-	StagingLabels []string        `json:"stagingLabels"`
-	State         string          `json:"state,omitempty"`
-	Value         string          `json:"value"`
-	Description   string          `json:"description,omitempty"`
-	CreatedDate   string          `json:"createdDate,omitempty"`
-	Tags          []SecretShowTag `json:"tags"`
+	Name        string          `json:"name"`
+	Version     string          `json:"version"`
+	Labels      []string        `json:"labels"`
+	State       string          `json:"state,omitempty"`
+	Value       string          `json:"value"`
+	Description string          `json:"description,omitempty"`
+	CreatedDate string          `json:"createdDate,omitempty"`
+	Tags        []SecretShowTag `json:"tags"`
+	// Extra is the provider's display-only metadata, in order.
+	Extra []SecretExtraField `json:"extra"`
 }
 
 // SecretLogResult represents the result of showing secret history.
@@ -65,59 +73,50 @@ type SecretLogResult struct {
 	Entries []SecretLogEntry `json:"entries"`
 }
 
-// SecretLogEntry represents a single version in the history.
-//
-// StagingLabels and State carry two independent concepts that must NOT be
-// conflated (#419): StagingLabels holds AWS Secrets Manager staging labels
-// (empty for other providers), while State holds the per-version lifecycle
-// state (enabled/disabled/destroyed) for Google Cloud + Azure Key Vault (empty
-// for AWS). A version never has both.
+// SecretLogEntry represents a single version in the history. Labels and State
+// are independent, as on SecretShowResult.
 type SecretLogEntry struct {
-	VersionID     string   `json:"versionId"`
-	StagingLabels []string `json:"stagingLabels"`
-	State         string   `json:"state,omitempty"`
-	Value         string   `json:"value"`
-	IsCurrent     bool     `json:"isCurrent"`
-	Created       string   `json:"created,omitempty"`
+	Version   string   `json:"version"`
+	Labels    []string `json:"labels"`
+	State     string   `json:"state,omitempty"`
+	Value     string   `json:"value"`
+	IsCurrent bool     `json:"isCurrent"`
+	Created   string   `json:"created,omitempty"`
 	// Tags attached to THIS version (Azure Key Vault only; empty otherwise).
 	Tags []SecretShowTag `json:"tags"`
 }
 
 // SecretCreateResult represents the result of creating a secret.
 type SecretCreateResult struct {
-	Name      string `json:"name"`
-	VersionID string `json:"versionId"`
-	ARN       string `json:"arn"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
 }
 
 // SecretUpdateResult represents the result of updating a secret.
 type SecretUpdateResult struct {
-	Name      string `json:"name"`
-	VersionID string `json:"versionId"`
-	ARN       string `json:"arn"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
 }
 
 // SecretDeleteResult represents the result of deleting a secret.
 type SecretDeleteResult struct {
 	Name         string `json:"name"`
 	DeletionDate string `json:"deletionDate,omitempty"`
-	ARN          string `json:"arn"`
 }
 
 // SecretDiffResult represents the result of comparing secrets.
 type SecretDiffResult struct {
-	OldName      string `json:"oldName"`
-	OldVersionID string `json:"oldVersionId"`
-	OldValue     string `json:"oldValue"`
-	NewName      string `json:"newName"`
-	NewVersionID string `json:"newVersionId"`
-	NewValue     string `json:"newValue"`
+	OldName    string `json:"oldName"`
+	OldVersion string `json:"oldVersion"`
+	OldValue   string `json:"oldValue"`
+	NewName    string `json:"newName"`
+	NewVersion string `json:"newVersion"`
+	NewValue   string `json:"newValue"`
 }
 
 // SecretRestoreResult represents the result of restoring a secret.
 type SecretRestoreResult struct {
 	Name string `json:"name"`
-	ARN  string `json:"arn"`
 }
 
 // =============================================================================
@@ -125,7 +124,7 @@ type SecretRestoreResult struct {
 // =============================================================================
 
 // SecretList lists Secrets Manager secrets.
-func (a *App) SecretList(prefix string, withValue bool, filter string, _ int, _ string) (*SecretListResult, error) {
+func (a *App) SecretList(prefix string, withValue bool, filter string) (*SecretListResult, error) {
 	store, err := a.secretStore()
 	if err != nil {
 		return nil, err
@@ -149,7 +148,7 @@ func (a *App) SecretList(prefix string, withValue bool, filter string, _ int, _ 
 		}
 	})
 
-	return &SecretListResult{Entries: entries, NextToken: result.NextToken}, nil
+	return &SecretListResult{Entries: entries}, nil
 }
 
 // SecretShow shows a secret value.
@@ -172,15 +171,17 @@ func (a *App) SecretShow(specStr string) (*SecretShowResult, error) {
 	}
 
 	r := &SecretShowResult{
-		Name:          result.Name,
-		ARN:           lo.FindOrElse(result.Extra, domain.Field{}, func(f domain.Field) bool { return f.Label == "ARN" }).Value,
-		VersionID:     result.Version,
-		StagingLabels: result.Labels,
-		State:         result.State,
-		Value:         result.Value,
-		Description:   result.Description,
+		Name:        result.Name,
+		Version:     result.Version,
+		Labels:      result.Labels,
+		State:       result.State,
+		Value:       result.Value,
+		Description: result.Description,
 		Tags: lo.Map(result.Tags, func(tag secret.ShowTag, _ int) SecretShowTag {
 			return SecretShowTag{Key: tag.Key, Value: tag.Value}
+		}),
+		Extra: lo.Map(result.Extra, func(f domain.Field, _ int) SecretExtraField {
+			return SecretExtraField{Label: f.Label, Value: f.Value}
 		}),
 	}
 	if result.CreatedDate != nil {
@@ -209,11 +210,11 @@ func (a *App) SecretLog(name string, maxResults int32) (*SecretLogResult, error)
 
 	entries := lo.Map(result.Entries, func(e secret.LogEntry, _ int) SecretLogEntry {
 		entry := SecretLogEntry{
-			VersionID:     e.Version,
-			StagingLabels: e.Labels,
-			State:         e.State,
-			Value:         e.Value,
-			IsCurrent:     e.IsCurrent,
+			Version:   e.Version,
+			Labels:    e.Labels,
+			State:     e.State,
+			Value:     e.Value,
+			IsCurrent: e.IsCurrent,
 			Tags: lo.Map(e.Tags, func(tag domain.Tag, _ int) SecretShowTag {
 				return SecretShowTag{Key: tag.Key, Value: tag.Value}
 			}),
@@ -253,8 +254,8 @@ func (a *App) SecretCreate(name, value, description string) (*SecretCreateResult
 	}
 
 	return &SecretCreateResult{
-		Name:      result.Name,
-		VersionID: result.Version,
+		Name:    result.Name,
+		Version: result.Version,
 	}, nil
 }
 
@@ -283,8 +284,8 @@ func (a *App) SecretUpdate(name, value, description string) (*SecretUpdateResult
 	}
 
 	return &SecretUpdateResult{
-		Name:      result.Name,
-		VersionID: result.Version,
+		Name:    result.Name,
+		Version: result.Version,
 	}, nil
 }
 
@@ -391,12 +392,12 @@ func (a *App) SecretDiff(spec1Str, spec2Str string) (*SecretDiffResult, error) {
 	}
 
 	return &SecretDiffResult{
-		OldName:      result.OldName,
-		OldVersionID: result.OldVersion,
-		OldValue:     result.OldValue,
-		NewName:      result.NewName,
-		NewVersionID: result.NewVersion,
-		NewValue:     result.NewValue,
+		OldName:    result.OldName,
+		OldVersion: result.OldVersion,
+		OldValue:   result.OldValue,
+		NewName:    result.NewName,
+		NewVersion: result.NewVersion,
+		NewValue:   result.NewValue,
 	}, nil
 }
 

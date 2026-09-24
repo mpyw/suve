@@ -148,7 +148,7 @@ func TestSecretSourceStateNotInferred(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "enabled", d.State)
 	assert.Empty(t, d.Labels, "a State-bearing version has no staging labels")
-	assert.Equal(t, "arn:test", d.ARN)
+	assert.Contains(t, d.Meta, data.MetaRow{Label: "ARN", Value: "arn:test"}, "Extra fields render as meta rows")
 }
 
 // TestParamSourceListFilters pins that the list source applies prefix/filter via

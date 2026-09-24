@@ -43,10 +43,7 @@ func (m *Model) rebuildRows() {
 		return row
 	})
 
-	// Show the load-more affordance only when the source reports a real next page.
-	// Every provider today lists all names in one shot (NextToken always empty), so
-	// the footer stays hidden rather than advertising a phantom "more".
-	m.list.SetRows(rows, m.nextToken != "")
+	m.list.SetRows(rows)
 }
 
 // previewWidth is the column budget a list value preview may occupy: the list

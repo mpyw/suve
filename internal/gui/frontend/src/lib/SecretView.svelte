@@ -40,13 +40,12 @@
   const forceDeleteEnabled = $derived(capability?.hasForceDelete ?? true);
   const recoveryWindowEnabled = $derived(capability?.hasRecoveryWindow ?? true);
 
-  // Staging labels and per-version state are two independent concepts (#419), so
+  // Version labels and per-version state are two independent concepts (#419), so
   // render each from the field that actually carries it rather than guessing
-  // from the provider string. AWS Secrets Manager populates stagingLabels
+  // from the provider string. AWS Secrets Manager populates labels
   // (AWSCURRENT/AWSPENDING/...); Google Cloud + Azure Key Vault populate state
   // (enabled/disabled/destroyed). A version never has both.
 
-  const PAGE_SIZE = 50;
   const debounce = createDebouncer(300);
   const diffMode = createDiffMode<string>();
 
@@ -57,8 +56,6 @@
   let prefix = $state('');
   let filter = $state('');
   let withValue = $state(false);
-  let nextToken = $state('');
-  let loadingMore = $state(false);
 
   // Track if initial load has happened
   let initialLoadDone = $state(false);
@@ -93,8 +90,7 @@
   // delays dispatch — it does not serialize in-flight requests. A slow broader
   // query resolving after a fast narrower one would otherwise overwrite the list
   // with stale rows. Each loadSecrets bumps the id and only the latest run may
-  // assign entries/nextToken; loadMore captures the current id and appends only
-  // while it is still current (#539).
+  // assign entries (#539).
   let loadSeq = 0;
 
   let entries: gui.SecretListEntry[] = $state([]);
@@ -141,20 +137,14 @@
   let removeTagLoading = $state(false);
   let removeTagError = $state('');
 
-  // Infinite scroll
-  let sentinelElement: HTMLDivElement | undefined = $state(undefined);
-  let observer: IntersectionObserver | null = null;
-
   async function loadSecrets(opts: LoadSecretsOptions) {
     const seq = ++loadSeq;
     loading = true;
     error = '';
-    nextToken = '';
     try {
-      const result = await SecretList(opts.prefix, opts.withValue, opts.filter, PAGE_SIZE, '');
+      const result = await SecretList(opts.prefix, opts.withValue, opts.filter);
       if (seq !== loadSeq) return; // superseded by a newer query
       entries = result?.entries || [];
-      nextToken = result?.nextToken || '';
     } catch (e) {
       if (seq !== loadSeq) return; // superseded by a newer query
       error = parseError(e);
@@ -163,52 +153,6 @@
       if (seq === loadSeq) loading = false;
     }
   }
-
-  async function loadMore(opts: LoadSecretsOptions) {
-    if (!nextToken || loadingMore || loading) return;
-
-    // Continuation of the current query: capture the id without bumping so a
-    // loadSecrets starting mid-flight supersedes this append.
-    const seq = loadSeq;
-    loadingMore = true;
-    try {
-      const result = await SecretList(opts.prefix, opts.withValue, opts.filter, PAGE_SIZE, nextToken);
-      if (seq !== loadSeq) return; // superseded by a newer query
-      entries = [...entries, ...(result?.entries || [])];
-      nextToken = result?.nextToken || '';
-    } catch (e) {
-      if (seq !== loadSeq) return; // superseded by a newer query
-      error = parseError(e);
-    } finally {
-      loadingMore = false;
-    }
-  }
-
-  function setupIntersectionObserver() {
-    if (observer) observer.disconnect();
-
-    observer = new IntersectionObserver(
-      (observedEntries) => {
-        if (observedEntries[0]?.isIntersecting && nextToken && !loadingMore && !loading) {
-          loadMore({ prefix, filter, withValue });
-        }
-      },
-      { rootMargin: '100px' }
-    );
-
-    if (sentinelElement) {
-      observer.observe(sentinelElement);
-    }
-  }
-
-  $effect(() => {
-    if (sentinelElement) {
-      setupIntersectionObserver();
-    }
-    return () => {
-      if (observer) observer.disconnect();
-    };
-  });
 
   async function selectSecret(name: string) {
     selectedSecret = name;
@@ -524,14 +468,6 @@
             </li>
           {/each}
         </ul>
-        <!-- Sentinel for infinite scroll -->
-        <div bind:this={sentinelElement} class="scroll-sentinel">
-          {#if loadingMore}
-            <div class="loading-more">Loading more...</div>
-          {:else if nextToken}
-            <div class="load-more-hint">Scroll for more</div>
-          {/if}
-        </div>
       {/if}
     </div>
 
@@ -585,7 +521,7 @@
             <div class="detail-meta">
               <div class="meta-item">
                 <span class="meta-label">Version ID</span>
-                <span class="meta-value mono">{secretDetail.versionId}</span>
+                <span class="meta-value mono">{secretDetail.version}</span>
               </div>
               {#if secretDetail.state}
                 <div class="meta-item">
@@ -594,11 +530,11 @@
                     <span class="badge badge-stage">{secretDetail.state}</span>
                   </span>
                 </div>
-              {:else if (secretDetail.stagingLabels || []).length > 0}
+              {:else if (secretDetail.labels || []).length > 0}
                 <div class="meta-item">
-                  <span class="meta-label">Staging labels</span>
+                  <span class="meta-label">Labels</span>
                   <span class="meta-value">
-                    {#each secretDetail.stagingLabels || [] as label}
+                    {#each secretDetail.labels || [] as label}
                       <span class="badge badge-stage">{label}</span>
                     {/each}
                   </span>
@@ -617,12 +553,14 @@
               </div>
             {/if}
 
-            {#if secretDetail.arn}
+            <!-- Provider-specific, display-only details (e.g. the Secrets Manager
+                 ARN), rendered verbatim in backend order. -->
+            {#each secretDetail.extra ?? [] as field}
               <div class="detail-section">
-                <h4>ARN</h4>
-                <code class="arn-display">{secretDetail.arn}</code>
+                <h4>{field.label}</h4>
+                <code class="extra-value">{field.value}</code>
               </div>
-            {/if}
+            {/each}
 
             {#if tagsEnabled && !tagsPerVersion}
               <TagList tags={secretDetail.tags} serviceClass="secret" nativeTagName={capability.nativeTagName} {providerName} onadd={openTagModal} onremove={openRemoveTagModal} />
@@ -647,21 +585,21 @@
                       class="history-item"
                       class:current-secret={logEntry.isCurrent}
                       class:selectable={diffMode.active}
-                      class:selected={diffMode.isSelected(logEntry.versionId)}
+                      class:selected={diffMode.isSelected(logEntry.version)}
                     >
                       {#if diffMode.active}
                         <label class="diff-checkbox">
                           <input
                             type="checkbox"
-                            checked={diffMode.isSelected(logEntry.versionId)}
-                            disabled={diffMode.isDisabled(logEntry.versionId)}
-                            onchange={() => diffMode.toggleSelection(logEntry.versionId)}
+                            checked={diffMode.isSelected(logEntry.version)}
+                            disabled={diffMode.isDisabled(logEntry.version)}
+                            onchange={() => diffMode.toggleSelection(logEntry.version)}
                           />
                         </label>
                       {/if}
                       <div class="history-content">
                         <div class="history-header">
-                          <span class="history-version mono" title={logEntry.versionId}>{logEntry.versionId}</span>
+                          <span class="history-version mono" title={logEntry.version}>{logEntry.version}</span>
                           {#if logEntry.isCurrent}
                             <span class="badge badge-current">current</span>
                           {/if}
@@ -671,9 +609,9 @@
                           <div class="history-labels">
                             <span class="badge badge-stage small">{logEntry.state}</span>
                           </div>
-                        {:else if (logEntry.stagingLabels || []).length > 0}
+                        {:else if (logEntry.labels || []).length > 0}
                           <div class="history-labels">
-                            {#each logEntry.stagingLabels || [] as label}
+                            {#each logEntry.labels || [] as label}
                               <span class="badge badge-stage small">{label}</span>
                             {/each}
                           </div>
@@ -872,8 +810,8 @@
       secret={true}
       oldLabel="Old"
       newLabel="New"
-      oldSubLabel={diffResult.oldVersionId}
-      newSubLabel={diffResult.newVersionId}
+      oldSubLabel={diffResult.oldVersion}
+      newSubLabel={diffResult.newVersion}
     />
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick={closeDiffModal}>Close</button>

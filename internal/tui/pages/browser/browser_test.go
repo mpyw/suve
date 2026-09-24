@@ -127,8 +127,8 @@ func TestStaleListResponseDropped(t *testing.T) {
 	m := newModel(t, src)
 
 	// Two loads issued: listSeq advances to 2.
-	_ = m.loadListCmd(false)
-	_ = m.loadListCmd(false)
+	_ = m.loadListCmd()
+	_ = m.loadListCmd()
 	require.Equal(t, 2, m.listSeq)
 
 	// A response tagged with the stale seq 1 is dropped.
@@ -152,13 +152,13 @@ func TestCrossPageListResponseFenced(t *testing.T) {
 
 	// Page A is the first tab; it issues its initial list load (seq → 1).
 	pageA := tokenModel(t, 1, &stubSource{svcCap: awsParamCap()})
-	_ = pageA.loadListCmd(false)
+	_ = pageA.loadListCmd()
 	require.Equal(t, 1, pageA.listSeq)
 
 	// Page B is the second tab's freshly built page: its listSeq ALSO resets to 1,
 	// so A's response would collide on seq alone.
 	pageB := tokenModel(t, 2, &stubSource{svcCap: awsSecretCap()})
-	_ = pageB.loadListCmd(false)
+	_ = pageB.loadListCmd()
 	require.Equal(t, 1, pageB.listSeq)
 
 	// A's in-flight response lands after the switch to B. Its seq (1) matches B's
@@ -768,7 +768,7 @@ func TestSelectionSurvivesReloadByIdentity(t *testing.T) {
 	require.Equal(t, "/zzz", sel.Name)
 
 	// A mutation reload inserts /aaa at the top: /zzz moves from index 1 to 2.
-	_ = m.loadListCmd(false) // advance listSeq as a reload would
+	_ = m.loadListCmd() // advance listSeq as a reload would
 	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
 		{Name: "/aaa"}, {Name: "/bbb"}, {Name: "/zzz"},
 	}}})
@@ -799,7 +799,7 @@ func TestSelectionSurvivesReloadWithDuplicateNamespaces(t *testing.T) {
 	require.Equal(t, "prod", sel.Namespace)
 
 	// Reload inserts a staging duplicate above prod: prod moves from 1 to 2.
-	_ = m.loadListCmd(false)
+	_ = m.loadListCmd()
 	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
 		{Name: "app/Feature", Namespace: ""},
 		{Name: "app/Feature", Namespace: "staging"},
@@ -830,7 +830,7 @@ func TestSelectionSurvivesDeleteAboveSelection(t *testing.T) {
 	require.Equal(t, "/bbb", sel.Name)
 
 	// Delete /aaa (above the selection): /bbb moves from index 1 to 0.
-	_ = m.loadListCmd(false)
+	_ = m.loadListCmd()
 	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
 		{Name: "/bbb"}, {Name: "/zzz"},
 	}}})
@@ -860,7 +860,7 @@ func TestSelectionFallsBackWhenSelectedDeleted(t *testing.T) {
 	require.Equal(t, "/bbb", sel.Name)
 
 	// Delete /bbb (the selected entry): it is gone, so the selection clamps.
-	_ = m.loadListCmd(false)
+	_ = m.loadListCmd()
 	m, cmd := update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{
 		{Name: "/aaa"}, {Name: "/zzz"},
 	}}})
@@ -873,50 +873,12 @@ func TestSelectionFallsBackWhenSelectedDeleted(t *testing.T) {
 	// A further reload draining the list to empty clears the detail rather than
 	// pointing it at a phantom entry.
 	m.detailOK = true // pretend a detail is currently shown
-	_ = m.loadListCmd(false)
+	_ = m.loadListCmd()
 	m, cmd = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{Items: []data.Item{}}})
 	_, ok = m.selectedItem()
 	assert.False(t, ok, "an empty list has no selection")
 	assert.False(t, m.detailOK, "the detail is cleared when nothing is selected")
 	assert.Nil(t, cmd, "an empty list issues no detail load")
-}
-
-// TestLoadMoreInFlightGuard pins #700: loadMore issues an append when a next page
-// is present, but a second loadMore fired while that append is still pending is a
-// no-op — no new fetch (listSeq does not advance), so a hammered `L` can never
-// splice a duplicate or stale page.
-func TestLoadMoreInFlightGuard(t *testing.T) {
-	t.Parallel()
-
-	m := newModel(t, &stubSource{svcCap: awsSecretCap()})
-
-	// A loaded page reports a real next page.
-	m, _ = update(t, m, listLoadedMsg{seq: m.listSeq, res: data.ListResult{
-		Items: []data.Item{{Name: "prod/a"}}, NextToken: "tok",
-	}})
-	require.Equal(t, "tok", m.nextToken)
-	require.False(t, m.loading, "no fetch is in flight after the page loads")
-
-	// First loadMore issues the append and marks the fetch in flight.
-	seqBefore := m.listSeq
-	cmd := m.loadMore()
-	require.NotNil(t, cmd, "loadMore with a next page issues an append")
-	require.True(t, m.loading, "the append is now in flight")
-	require.Equal(t, seqBefore+1, m.listSeq, "the append advanced the list sequence")
-
-	// A second loadMore while the first is still pending is a no-op.
-	seqDuring := m.listSeq
-	assert.Nil(t, m.loadMore(), "a second loadMore while one is in-flight is a no-op")
-	assert.Equal(t, seqDuring, m.listSeq, "the blocked loadMore issues no fetch (no duplicate/stale splice)")
-
-	// loadMore is likewise suppressed during an ordinary (non-append) reload.
-	m2 := newModel(t, &stubSource{svcCap: awsSecretCap()})
-	m2, _ = update(t, m2, listLoadedMsg{seq: m2.listSeq, res: data.ListResult{
-		Items: []data.Item{{Name: "prod/a"}}, NextToken: "tok",
-	}})
-	_ = m2.loadListCmd(false) // a filter/mutation reload is now in flight
-	require.True(t, m2.loading)
-	assert.Nil(t, m2.loadMore(), "loadMore is a no-op while a full reload is pending")
 }
 
 // TestOnStagedLoadedSurfacesProbeErrors pins the read-path error surfacing (#695):

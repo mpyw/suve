@@ -2,7 +2,7 @@ import { test, expect } from './fixtures/coverage';
 import {
   setupWailsMocks,
   createErrorState,
-  createPaginationTestState,
+  createLargeListState,
   waitForItemList,
   waitForViewLoaded,
   clickItemByName,
@@ -225,57 +225,29 @@ test.describe('Data Validation', () => {
 });
 
 // ============================================================================
-// Pagination/Infinite Scroll Tests
+// Large list Tests
 // ============================================================================
 
-test.describe('Pagination - Parameters', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupWailsMocks(page, createPaginationTestState(25));
+test.describe('Large lists - Parameters', () => {
+  test('loads every parameter in one call, with no load-more affordance', async ({ page }) => {
+    await setupWailsMocks(page, createLargeListState(25));
     await page.goto('/');
     await waitForItemList(page);
-  });
 
-  test('should load parameters with pagination enabled', async ({ page }) => {
-    // With pagination enabled, items should load
-    const items = page.locator('.item-button');
-    const count = await items.count();
-    // Should have some items loaded (pagination limits first page)
-    expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThanOrEqual(25);
-  });
-
-  test('should display scroll sentinel element', async ({ page }) => {
-    const sentinel = page.locator('.scroll-sentinel');
-    await expect(sentinel).toBeVisible();
-  });
-
-  test('should have scroll capability', async ({ page }) => {
-    // Verify the list panel exists and can be scrolled
-    const listPanel = page.locator('.list-panel');
-    await expect(listPanel).toBeVisible();
+    await expect(page.locator('.item-button')).toHaveCount(25);
+    await expect(page.getByText('Scroll for more')).toHaveCount(0);
   });
 });
 
-test.describe('Pagination - Secrets', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupWailsMocks(page, createPaginationTestState(25));
+test.describe('Large lists - Secrets', () => {
+  test('loads every secret in one call, with no load-more affordance', async ({ page }) => {
+    await setupWailsMocks(page, createLargeListState(25));
     await page.goto('/');
     await navigateTo(page, 'Secrets Manager');
     await waitForItemList(page);
-  });
 
-  test('should load secrets with pagination enabled', async ({ page }) => {
-    // With pagination enabled, items should load
-    const items = page.locator('.item-button');
-    const count = await items.count();
-    // Should have some items loaded
-    expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThanOrEqual(25);
-  });
-
-  test('should display scroll sentinel for secrets', async ({ page }) => {
-    const sentinel = page.locator('.scroll-sentinel');
-    await expect(sentinel).toBeVisible();
+    await expect(page.locator('.item-button')).toHaveCount(25);
+    await expect(page.getByText('Scroll for more')).toHaveCount(0);
   });
 });
 

@@ -429,7 +429,7 @@
 }
 
 /* ARN Display */
-.arn-display {
+.extra-value {
   display: block;
   padding: 8px 12px;
   background: #0f0f1a;
@@ -677,23 +677,6 @@
 
 .regex-input {
   flex: 0.6;
-}
-
-/* Infinite Scroll */
-.scroll-sentinel {
-  padding: 16px;
-  text-align: center;
-  min-height: 50px;
-}
-
-.loading-more {
-  color: #888;
-  font-size: 14px;
-}
-
-.load-more-hint {
-  color: #555;
-  font-size: 12px;
 }
 
 /* Tags */
