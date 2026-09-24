@@ -3,12 +3,12 @@ package secret
 import (
 	"github.com/urfave/cli/v3"
 
-	generictag "github.com/mpyw/suve/internal/cli/commands/generic/tag"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 )
 
 // UntagCommand returns the Azure Key Vault untag command.
 func UntagCommand() *cli.Command {
-	return generictag.UntagCommand(generictag.Config{
+	return generic.UntagCommand(generic.TagConfig{
 		Usage:     "Remove tags from a secret",
 		ArgsUsage: "<name> <key>...",
 		Description: `Remove one or more tags from an existing secret.

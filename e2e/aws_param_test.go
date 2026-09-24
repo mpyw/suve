@@ -15,9 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
-	paramcreate "github.com/mpyw/suve/internal/cli/commands/aws/param/create"
-	paramdelete "github.com/mpyw/suve/internal/cli/commands/aws/param/delete"
-	paramupdate "github.com/mpyw/suve/internal/cli/commands/aws/param/update"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
 	paramstage "github.com/mpyw/suve/internal/cli/commands/aws/stage/param"
 	globalstatus "github.com/mpyw/suve/internal/cli/commands/aws/stage/status"
@@ -36,14 +33,14 @@ func TestAWSParam_FullWorkflow(t *testing.T) {
 	paramName := "/suve-e2e-test/basic/param"
 
 	// Cleanup: delete parameter if it exists (ignore errors)
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// 1. Create parameter
 	t.Run("create", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+		stdout, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
 		require.NoError(t, err)
 		t.Logf("create output: %s", stdout)
 	})
@@ -66,7 +63,7 @@ func TestAWSParam_FullWorkflow(t *testing.T) {
 
 	// 4. Update parameter
 	t.Run("update", func(t *testing.T) {
-		_, _, err := runCommand(t, paramupdate.Command(), "--yes", paramName, "updated-value")
+		_, _, err := runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "updated-value")
 		require.NoError(t, err)
 	})
 
@@ -149,7 +146,7 @@ func TestAWSParam_FullWorkflow(t *testing.T) {
 
 	// 11. Delete (with -y to skip confirmation)
 	t.Run("delete", func(t *testing.T) {
-		_, _, err := runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, err := runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 		require.NoError(t, err)
 	})
 
@@ -167,17 +164,17 @@ func TestAWSParam_VersionSpecifiers(t *testing.T) {
 	paramName := "/suve-e2e-test/version/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create 3 versions
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "v1")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "v1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "v2")
+	_, _, err = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "v2")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "v3")
+	_, _, err = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "v3")
 	require.NoError(t, err)
 
 	// Test #VERSION
@@ -230,15 +227,15 @@ func TestAWSParam_ParseJSONFlag(t *testing.T) {
 	paramName := "/suve-e2e-test/json/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create with JSON value
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, `{"b":2,"a":1}`)
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, `{"b":2,"a":1}`)
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, `{"c":3,"b":2,"a":1}`)
+	_, _, err = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, `{"c":3,"b":2,"a":1}`)
 	require.NoError(t, err)
 
 	// Test diff with -j flag (should format and sort keys)
@@ -273,14 +270,14 @@ func TestAWSParam_StagingWorkflow(t *testing.T) {
 	paramName := "/suve-e2e-staging/workflow/param"
 
 	// Cleanup: delete parameter if it exists
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// 1. Create initial parameter
 	t.Run("setup", func(t *testing.T) {
-		_, _, err := runCommand(t, paramcreate.Command(), paramName, "original-value")
+		_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "original-value")
 		require.NoError(t, err)
 	})
 
@@ -384,14 +381,14 @@ func TestAWSParam_StagingTagThenDeleteApply(t *testing.T) {
 	paramName := "/suve-e2e-staging/tag-delete/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// 1. Create the parameter.
 	t.Run("setup", func(t *testing.T) {
-		_, _, err := runCommand(t, paramcreate.Command(), paramName, "original-value")
+		_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "original-value")
 		require.NoError(t, err)
 	})
 
@@ -435,9 +432,9 @@ func TestAWSParam_StagingAdd(t *testing.T) {
 	paramName := "/suve-e2e-staging/add/newparam"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// 1. Stage add (using store directly since add requires interactive editor)
@@ -482,17 +479,17 @@ func TestAWSParam_StagingResetWithVersion(t *testing.T) {
 	paramName := "/suve-e2e-staging/reset-version/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter with multiple versions
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "v1")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "v1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "v2")
+	_, _, err = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "v2")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "v3")
+	_, _, err = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "v3")
 	require.NoError(t, err)
 
 	// 1. Reset with version spec (restore old version to staging)
@@ -542,16 +539,16 @@ func TestAWSParam_StagingResetAll(t *testing.T) {
 	param2 := "/suve-e2e-staging/reset-all/param2"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param2)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", param1)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", param2)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param2)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", param1)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", param2)
 	})
 
 	// Create parameters
-	_, _, _ = runCommand(t, paramcreate.Command(), param1, "value1")
-	_, _, _ = runCommand(t, paramcreate.Command(), param2, "value2")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), param1, "value1")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), param2, "value2")
 
 	// Stage both
 	store := newStore()
@@ -601,16 +598,16 @@ func TestAWSParam_StagingApplySingle(t *testing.T) {
 	param2 := "/suve-e2e-staging/apply-single/param2"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param2)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", param1)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", param2)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param1)
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", param2)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", param1)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", param2)
 	})
 
 	// Create parameters
-	_, _, _ = runCommand(t, paramcreate.Command(), param1, "original1")
-	_, _, _ = runCommand(t, paramcreate.Command(), param2, "original2")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), param1, "original1")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), param2, "original2")
 
 	// Stage both
 	store := newStore()
@@ -672,7 +669,7 @@ func TestAWSParam_ErrorCases(t *testing.T) {
 
 	// Delete non-existent parameter
 	t.Run("delete-nonexistent", func(t *testing.T) {
-		_, _, err := runCommand(t, paramdelete.Command(), "--yes", "/nonexistent/param/12345")
+		_, _, err := runCommand(t, cmdparam.DeleteCommand(), "--yes", "/nonexistent/param/12345")
 		assert.Error(t, err)
 	})
 
@@ -684,7 +681,7 @@ func TestAWSParam_ErrorCases(t *testing.T) {
 
 	// Missing required args
 	t.Run("missing-args-create", func(t *testing.T) {
-		_, _, err := runCommand(t, paramcreate.Command())
+		_, _, err := runCommand(t, cmdparam.CreateCommand())
 		assert.Error(t, err)
 	})
 
@@ -705,9 +702,9 @@ func TestAWSParam_SpecialCharactersInValue(t *testing.T) {
 	paramName := "/suve-e2e-test/special/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	testCases := []struct {
@@ -725,8 +722,8 @@ func TestAWSParam_SpecialCharactersInValue(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure clean state before each test case
-			_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-			_, _, err := runCommand(t, paramcreate.Command(), paramName, tc.value)
+			_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+			_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, tc.value)
 			require.NoError(t, err)
 
 			stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
@@ -743,15 +740,15 @@ func TestAWSParam_LongValue(t *testing.T) {
 	paramName := "/suve-e2e-test/long/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create a long value (SSM Parameter Store limit is 4KB for standard, 8KB for advanced)
 	longValue := strings.Repeat("a", 4000)
 
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, longValue)
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, longValue)
 	require.NoError(t, err)
 
 	stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
@@ -771,9 +768,9 @@ func TestAWSParam_StagingAddViaCLI(t *testing.T) {
 	paramName := "/suve-e2e-staging/add-cli/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// 1. Stage add via CLI (with value argument - no editor needed)
@@ -814,9 +811,9 @@ func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 	paramName := "/suve-e2e-staging/add-options/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Stage add with description
@@ -894,9 +891,9 @@ func TestAWSParam_StagingEditViaCLI(t *testing.T) {
 	paramName := "/suve-e2e-staging/edit-cli/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// 1. Stage add first
@@ -932,9 +929,9 @@ func TestAWSParam_StagingDiffViaCLI(t *testing.T) {
 	paramName := "/suve-e2e-staging/diff-cli/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// 1. Stage add and check diff
@@ -974,13 +971,13 @@ func TestAWSParam_GlobalDiffWithJSON(t *testing.T) {
 	paramName := "/suve-e2e-global/json-diff/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create param with JSON value
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, `{"a":1}`)
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, `{"a":1}`)
 	require.NoError(t, err)
 
 	// Stage update with different JSON
@@ -1008,17 +1005,17 @@ func TestAWSParam_OutputOption(t *testing.T) {
 	paramName := "/suve-e2e-output/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create param
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "test-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "test-value")
 	require.NoError(t, err)
 
 	// Update to create version 2
-	_, _, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "updated-value")
+	_, _, err = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "updated-value")
 	require.NoError(t, err)
 
 	t.Run("show --output=json", func(t *testing.T) {
@@ -1073,21 +1070,21 @@ func TestAWSParam_FilterOption(t *testing.T) {
 	prefix := "/suve-e2e-filter"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/foo")
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/bar")
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/baz")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/foo")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/bar")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/baz")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/foo")
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/bar")
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/baz")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/foo")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/bar")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/baz")
 	})
 
 	// Create params
-	_, _, err := runCommand(t, paramcreate.Command(), prefix+"/foo", "foo-val")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), prefix+"/foo", "foo-val")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramcreate.Command(), prefix+"/bar", "bar-val")
+	_, _, err = runCommand(t, cmdparam.CreateCommand(), prefix+"/bar", "bar-val")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramcreate.Command(), prefix+"/baz", "baz-val")
+	_, _, err = runCommand(t, cmdparam.CreateCommand(), prefix+"/baz", "baz-val")
 	require.NoError(t, err)
 
 	t.Run("filter ba", func(t *testing.T) {
@@ -1115,17 +1112,17 @@ func TestAWSParam_ShowOption(t *testing.T) {
 	prefix := "/suve-e2e-show"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/param1")
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/param2")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/param1")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/param2")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/param1")
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", prefix+"/param2")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/param1")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", prefix+"/param2")
 	})
 
 	// Create params
-	_, _, err := runCommand(t, paramcreate.Command(), prefix+"/param1", "value1")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), prefix+"/param1", "value1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramcreate.Command(), prefix+"/param2", "value2")
+	_, _, err = runCommand(t, cmdparam.CreateCommand(), prefix+"/param2", "value2")
 	require.NoError(t, err)
 
 	t.Run("list without --show", func(t *testing.T) {
@@ -1162,13 +1159,13 @@ func TestAWSParam_StagingAddExistingResourceFails(t *testing.T) {
 	paramName := "/suve-e2e-staging/add-existing/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create the parameter first
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "existing-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "existing-value")
 	require.NoError(t, err)
 
 	// Try to stage add - should fail because resource already exists
@@ -1188,7 +1185,7 @@ func TestAWSParam_StagingDeleteNonExistingResourceFails(t *testing.T) {
 	paramName := "/suve-e2e-staging/delete-nonexisting/param-does-not-exist"
 
 	// Ensure parameter doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to stage delete - should fail because resource doesn't exist
 	t.Run("delete-nonexisting-fails", func(t *testing.T) {
@@ -1207,7 +1204,7 @@ func TestAWSParam_StagingTagNonExistingResourceFails(t *testing.T) {
 	paramName := "/suve-e2e-staging/tag-nonexisting/param-does-not-exist"
 
 	// Ensure parameter doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to stage tag - should fail because resource doesn't exist
 	t.Run("tag-nonexisting-fails", func(t *testing.T) {
@@ -1226,7 +1223,7 @@ func TestAWSParam_StagingUntagNonExistingResourceFails(t *testing.T) {
 	paramName := "/suve-e2e-staging/untag-nonexisting/param-does-not-exist"
 
 	// Ensure parameter doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to stage untag - should fail because resource doesn't exist
 	t.Run("untag-nonexisting-fails", func(t *testing.T) {
@@ -1245,9 +1242,9 @@ func TestAWSParam_StagingDeleteStagedCreateSucceeds(t *testing.T) {
 	paramName := "/suve-e2e-staging/delete-staged-create/param"
 
 	// Ensure parameter doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Stage add first
@@ -1289,9 +1286,9 @@ func TestAWSParam_StagingTagStagedCreateSucceeds(t *testing.T) {
 	paramName := "/suve-e2e-staging/tag-staged-create/param"
 
 	// Ensure parameter doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Stage add first
@@ -1341,14 +1338,14 @@ func TestAWSParam_TagAndUntag(t *testing.T) {
 	paramName := "/suve-e2e-tag/test-param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter first
 	t.Run("create", func(t *testing.T) {
-		_, _, err := runCommand(t, paramcreate.Command(), paramName, "test-value")
+		_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "test-value")
 		require.NoError(t, err)
 	})
 
@@ -1392,13 +1389,13 @@ func TestAWSParam_TagInvalidFormat(t *testing.T) {
 	paramName := "/suve-e2e-tag/invalid-format"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter first
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "test-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "test-value")
 	require.NoError(t, err)
 
 	// Try to add invalid tag format
@@ -1416,7 +1413,7 @@ func TestAWSParam_TagNonExistent(t *testing.T) {
 	paramName := "/suve-e2e-tag/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to tag non-existent parameter
 	_, _, err := runCommand(t, cmdparam.TagCommand(), paramName, "env=test")
@@ -1431,7 +1428,7 @@ func TestAWSParam_UntagNonExistent(t *testing.T) {
 	paramName := "/suve-e2e-untag/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to untag non-existent parameter
 	_, _, err := runCommand(t, cmdparam.UntagCommand(), paramName, "env")
@@ -1450,20 +1447,20 @@ func TestAWSParam_UpdateWithType(t *testing.T) {
 	paramName := "/suve-e2e-update/type-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter first
 	t.Run("create", func(t *testing.T) {
-		_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+		_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
 		require.NoError(t, err)
 	})
 
 	// Update with type change to SecureString
 	t.Run("update-secure", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramupdate.Command(), "--yes", "--secure", paramName, "secure-value")
+		stdout, _, err := runCommand(t, cmdparam.UpdateCommand(), "--yes", "--secure", paramName, "secure-value")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Updated")
 	})
@@ -1477,7 +1474,7 @@ func TestAWSParam_UpdateWithType(t *testing.T) {
 
 	// Update with explicit type StringList
 	t.Run("update-stringlist", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramupdate.Command(), "--yes", "--type", "StringList", paramName, "item1,item2,item3")
+		stdout, _, err := runCommand(t, cmdparam.UpdateCommand(), "--yes", "--type", "StringList", paramName, "item1,item2,item3")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Updated")
 	})
@@ -1492,14 +1489,14 @@ func TestAWSParam_UpdatePreservesTypeWhenUnspecified(t *testing.T) {
 	paramName := "/suve-e2e-update/preserve-type-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create as SecureString.
 	t.Run("create-secure", func(t *testing.T) {
-		_, _, err := runCommand(t, paramcreate.Command(), "--secure", paramName, "secret-v1")
+		_, _, err := runCommand(t, cmdparam.CreateCommand(), "--secure", paramName, "secret-v1")
 		require.NoError(t, err)
 	})
 
@@ -1511,7 +1508,7 @@ func TestAWSParam_UpdatePreservesTypeWhenUnspecified(t *testing.T) {
 
 	// Update the value only, with neither --secure nor --type.
 	t.Run("update-value-only", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramupdate.Command(), "--yes", paramName, "secret-v2")
+		stdout, _, err := runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "secret-v2")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Updated")
 	})
@@ -1532,18 +1529,18 @@ func TestAWSParam_UpdateConflictingFlags(t *testing.T) {
 	paramName := "/suve-e2e-update/conflicting-flags"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter first
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
 	require.NoError(t, err)
 
 	// Try to use both --secure and --type
 	t.Run("secure-and-type-conflict", func(t *testing.T) {
-		_, _, err := runCommand(t, paramupdate.Command(), "--yes", "--secure", "--type", "String", paramName, "new-value")
+		_, _, err := runCommand(t, cmdparam.UpdateCommand(), "--yes", "--secure", "--type", "String", paramName, "new-value")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot use --secure with --type")
 	})
@@ -1556,18 +1553,18 @@ func TestAWSParam_UpdateWithDescription(t *testing.T) {
 	paramName := "/suve-e2e-update/description-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter first
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
 	require.NoError(t, err)
 
 	// Update with description
 	t.Run("update-with-description", func(t *testing.T) {
-		stdout, _, err := runCommand(t, paramupdate.Command(), "--yes", "--description", "Updated description", paramName, "new-value")
+		stdout, _, err := runCommand(t, cmdparam.UpdateCommand(), "--yes", "--description", "Updated description", paramName, "new-value")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Updated")
 	})
@@ -1580,10 +1577,10 @@ func TestAWSParam_UpdateNonExistent(t *testing.T) {
 	paramName := "/suve-e2e-update/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to update non-existent parameter
-	_, _, err := runCommand(t, paramupdate.Command(), "--yes", paramName, "new-value")
+	_, _, err := runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "new-value")
 	assert.Error(t, err)
 }
 
@@ -1593,14 +1590,14 @@ func TestAWSParam_UpdateMissingArgs(t *testing.T) {
 
 	// No arguments at all
 	t.Run("no-args", func(t *testing.T) {
-		_, _, err := runCommand(t, paramupdate.Command())
+		_, _, err := runCommand(t, cmdparam.UpdateCommand())
 		assert.Error(t, err)
 	})
 
 	// Only name, no value: with a non-interactive stdin the editor fallback must
 	// NOT be launched (it would hang); it must fail fast with an actionable error.
 	t.Run("no-value", func(t *testing.T) {
-		_, _, err := runCommandWithStdin(t, paramupdate.Command(), strings.NewReader(""), "/test/param")
+		_, _, err := runCommandWithStdin(t, cmdparam.UpdateCommand(), strings.NewReader(""), "/test/param")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "value is required")
 	})
@@ -1617,17 +1614,17 @@ func TestAWSParam_LogWithNumber(t *testing.T) {
 	paramName := "/suve-e2e-log/num-flag-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter with multiple versions
-	stdout, stderr, err := runCommand(t, paramcreate.Command(), paramName, "first-value")
+	stdout, stderr, err := runCommand(t, cmdparam.CreateCommand(), paramName, "first-value")
 	t.Logf("create: stdout=%s, stderr=%s, err=%v", stdout, stderr, err)
 	require.NoError(t, err)
 
-	stdout, stderr, err = runCommand(t, paramupdate.Command(), "--yes", paramName, "second-value")
+	stdout, stderr, err = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "second-value")
 	t.Logf("update: stdout=%s, stderr=%s, err=%v", stdout, stderr, err)
 	require.NoError(t, err)
 
@@ -1660,7 +1657,7 @@ func TestAWSParam_LogNonExistent(t *testing.T) {
 	paramName := "/suve-e2e-log/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to get log
 	_, _, err := runCommand(t, cmdparam.LogCommand(), paramName)
@@ -1674,13 +1671,13 @@ func TestAWSParam_LogWithFormat(t *testing.T) {
 	paramName := "/suve-e2e-log/format-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "test-value")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "test-value")
 
 	// Test JSON format
 	t.Run("json-format", func(t *testing.T) {
@@ -1706,14 +1703,14 @@ func TestAWSParam_LogWithPatch(t *testing.T) {
 	paramName := "/suve-e2e-log/patch-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create and update to have multiple versions
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "initial-value")
-	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "updated-value")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
+	_, _, _ = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "updated-value")
 
 	// Test with patch flag
 	t.Run("with-patch", func(t *testing.T) {
@@ -1736,13 +1733,13 @@ func TestAWSParam_LogWithOneline(t *testing.T) {
 	paramName := "/suve-e2e-log/oneline-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "test-value")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "test-value")
 
 	// Test with oneline flag
 	t.Run("with-oneline", func(t *testing.T) {
@@ -1767,15 +1764,15 @@ func TestAWSParam_LogWithReverse(t *testing.T) {
 	paramName := "/suve-e2e-log/reverse-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create and update to have multiple versions
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "v1")
-	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "v2")
-	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "v3")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "v1")
+	_, _, _ = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "v2")
+	_, _, _ = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "v3")
 
 	// Test with reverse flag
 	t.Run("with-reverse", func(t *testing.T) {
@@ -1793,13 +1790,13 @@ func TestAWSParam_LogFlagWarnings(t *testing.T) {
 	paramName := "/suve-e2e-log/warnings-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "test-value")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "test-value")
 
 	// Test --parse-json without --patch (should warn)
 	t.Run("parse-json-without-patch", func(t *testing.T) {
@@ -1840,14 +1837,14 @@ func TestAWSParam_LogWithParseJson(t *testing.T) {
 	paramName := "/suve-e2e-log/parsejson-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create with JSON value
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, `{"key": "value1"}`)
-	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, `{"key": "value2"}`)
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, `{"key": "value1"}`)
+	_, _, _ = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, `{"key": "value2"}`)
 
 	// Test with --parse-json and -p
 	t.Run("parse-json-with-patch", func(t *testing.T) {
@@ -1868,15 +1865,15 @@ func TestAWSParam_DiffVersions(t *testing.T) {
 	paramName := "/suve-e2e-diff/versions-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create and update parameter
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "version1-value")
-	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "version2-value")
-	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "version3-value")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "version1-value")
+	_, _, _ = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "version2-value")
+	_, _, _ = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "version3-value")
 
 	// Diff between version 1 and version 3
 	t.Run("diff-v1-v3", func(t *testing.T) {
@@ -1902,7 +1899,7 @@ func TestAWSParam_DiffNonExistent(t *testing.T) {
 	paramName := "/suve-e2e-diff/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to diff
 	_, _, err := runCommand(t, cmdparam.DiffCommand(), paramName)
@@ -1916,14 +1913,14 @@ func TestAWSParam_DiffNoChanges(t *testing.T) {
 	paramName := "/suve-e2e-diff/no-changes"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "same-value")
-	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "same-value")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "same-value")
+	_, _, _ = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "same-value")
 
 	// Diff should show no changes (or be empty)
 	stdout, _, err := runCommand(t, cmdparam.DiffCommand(), paramName+"~1", paramName)
@@ -1944,13 +1941,13 @@ func TestAWSParam_ShowRaw(t *testing.T) {
 	paramValue := "raw-value-with-special-chars\ttab\nnewline"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter with special characters
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, paramValue)
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, paramValue)
 	require.NoError(t, err)
 
 	// Show raw (just the value)
@@ -1979,14 +1976,14 @@ func TestAWSParam_ShowWithVersion(t *testing.T) {
 	paramName := "/suve-e2e-show/version-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create and update
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "v1")
-	_, _, _ = runCommand(t, paramupdate.Command(), "--yes", paramName, "v2")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "v1")
+	_, _, _ = runCommand(t, cmdparam.UpdateCommand(), "--yes", paramName, "v2")
 
 	// Show specific version
 	t.Run("show-v1", func(t *testing.T) {
@@ -2010,7 +2007,7 @@ func TestAWSParam_ShowNonExistent(t *testing.T) {
 	paramName := "/suve-e2e-show/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to show
 	_, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
@@ -2028,13 +2025,13 @@ func TestAWSParam_CreateAndTag(t *testing.T) {
 	paramName := "/suve-e2e-create/and-tag"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create parameter
-	stdout, _, err := runCommand(t, paramcreate.Command(), paramName, "value")
+	stdout, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "value")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Created")
 
@@ -2056,13 +2053,13 @@ func TestAWSParam_CreateWithDescription(t *testing.T) {
 	paramName := "/suve-e2e-create/with-description"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create with description
-	stdout, _, err := runCommand(t, paramcreate.Command(), "--description", "Test parameter description", paramName, "value")
+	stdout, _, err := runCommand(t, cmdparam.CreateCommand(), "--description", "Test parameter description", paramName, "value")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Created")
 
@@ -2089,17 +2086,17 @@ func TestAWSParam_CreateDuplicate(t *testing.T) {
 	paramName := "/suve-e2e-create/duplicate"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create first
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "value")
 	require.NoError(t, err)
 
 	// Try to create again
-	_, _, err = runCommand(t, paramcreate.Command(), paramName, "value2")
+	_, _, err = runCommand(t, cmdparam.CreateCommand(), paramName, "value2")
 	assert.Error(t, err)
 }
 
@@ -2109,14 +2106,14 @@ func TestAWSParam_CreateMissingArgs(t *testing.T) {
 
 	// No arguments at all
 	t.Run("no-args", func(t *testing.T) {
-		_, _, err := runCommand(t, paramcreate.Command())
+		_, _, err := runCommand(t, cmdparam.CreateCommand())
 		assert.Error(t, err)
 	})
 
 	// Only name, no value: with a non-interactive stdin the editor fallback must
 	// NOT be launched (it would hang); it must fail fast with an actionable error.
 	t.Run("no-value", func(t *testing.T) {
-		_, _, err := runCommandWithStdin(t, paramcreate.Command(), strings.NewReader(""), "/test/param")
+		_, _, err := runCommandWithStdin(t, cmdparam.CreateCommand(), strings.NewReader(""), "/test/param")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "value is required")
 	})
@@ -2133,10 +2130,10 @@ func TestAWSParam_DeleteNonExistent(t *testing.T) {
 	paramName := "/suve-e2e-delete/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 
 	// Try to delete (should fail since it doesn't exist)
-	_, _, err := runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, err := runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	assert.Error(t, err)
 }
 
@@ -2151,19 +2148,19 @@ func TestAWSParam_ListWithPath(t *testing.T) {
 	basePath := "/suve-e2e-list/path-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param1")
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param2")
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/subdir/param3")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/param1")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/param2")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/subdir/param3")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param1")
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param2")
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/subdir/param3")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/param1")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/param2")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/subdir/param3")
 	})
 
 	// Create parameters
-	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/param1", "v1")
-	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/param2", "v2")
-	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/subdir/param3", "v3")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), basePath+"/param1", "v1")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), basePath+"/param2", "v2")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), basePath+"/subdir/param3", "v3")
 
 	// List all under basePath (non-recursive)
 	t.Run("list-all", func(t *testing.T) {
@@ -2190,16 +2187,16 @@ func TestAWSParam_ListWithFilter(t *testing.T) {
 	basePath := "/suve-e2e-list/filter-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/app-config")
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/db-config")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/app-config")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/db-config")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/app-config")
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/db-config")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/app-config")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/db-config")
 	})
 
 	// Create parameters
-	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/app-config", "v1")
-	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/db-config", "v2")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), basePath+"/app-config", "v1")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), basePath+"/db-config", "v2")
 
 	// List with filter
 	stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--filter", "app", basePath)
@@ -2215,13 +2212,13 @@ func TestAWSParam_ListJSON(t *testing.T) {
 	basePath := "/suve-e2e-list/json-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param1")
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/param1")
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", basePath+"/param1")
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", basePath+"/param1")
 	})
 
 	// Create parameter
-	_, _, _ = runCommand(t, paramcreate.Command(), basePath+"/param1", "v1")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), basePath+"/param1", "v1")
 
 	// List with JSON format
 	stdout, _, err := runCommand(t, cmdparam.ListCommand(), "--output", "json", basePath)
@@ -2350,9 +2347,9 @@ func TestAWSParam_ExportImportEncrypted(t *testing.T) {
 	exportPath := filepath.Join(t.TempDir(), "param.json")
 
 	// Cleanup: the round-trip is proven end to end by applying to localstack.
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "secret-value")
@@ -2408,15 +2405,15 @@ func TestAWSParam_ValueStdin(t *testing.T) {
 
 	paramName := "/suve-e2e-test/value-stdin/param"
 
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create with the value supplied on stdin (no positional value argument).
 	t.Run("create via --value-stdin", func(t *testing.T) {
 		stdin := strings.NewReader("stdin-created-value\n")
-		stdout, stderr, err := runCommandWithStdin(t, paramcreate.Command(), stdin, "--secure", paramName, "--value-stdin")
+		stdout, stderr, err := runCommandWithStdin(t, cmdparam.CreateCommand(), stdin, "--secure", paramName, "--value-stdin")
 		require.NoError(t, err, "create failed: stdout=%s stderr=%s", stdout, stderr)
 
 		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
@@ -2427,7 +2424,7 @@ func TestAWSParam_ValueStdin(t *testing.T) {
 	// Update with the value supplied on stdin (no positional value argument).
 	t.Run("update via --value-stdin", func(t *testing.T) {
 		stdin := strings.NewReader("stdin-updated-value\n")
-		stdout, stderr, err := runCommandWithStdin(t, paramupdate.Command(), stdin, "--yes", "--secure", paramName, "--value-stdin")
+		stdout, stderr, err := runCommandWithStdin(t, cmdparam.UpdateCommand(), stdin, "--yes", "--secure", paramName, "--value-stdin")
 		require.NoError(t, err, "update failed: stdout=%s stderr=%s", stdout, stderr)
 
 		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)

@@ -12,8 +12,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/azure/param"
-	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
-	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
@@ -96,7 +95,7 @@ func TestLogPresenter_AcidTest(t *testing.T) {
 		},
 	}
 
-	presenter := param.NewLogPresenter(store, genericlog.Request{Name: "my-key"})
+	presenter := param.NewLogPresenter(store, generic.LogRequest{Name: "my-key"})
 	err := presenter.Fetch(t.Context())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "does not support versions")
@@ -441,9 +440,9 @@ func TestDiffPresenter_RenderJSON(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &genericdiff.Runner{
+	r := &generic.DiffRunner{
 		Presenter: presenter,
-		Options:   genericdiff.Options{Output: output.FormatJSON},
+		Options:   generic.DiffOptions{Output: output.FormatJSON},
 		Stdout:    &stdout,
 		Stderr:    &stderr,
 	}
@@ -466,11 +465,11 @@ func TestDiffPresenter_RenderJSON(t *testing.T) {
 
 // TestLogPresenter_RenderStubs covers the App Configuration log presenter's
 // render stubs. App Configuration has no version history, so these methods only
-// exist to satisfy the genericlog.Presenter interface and must be safe no-ops.
+// exist to satisfy the generic.Presenter interface and must be safe no-ops.
 func TestLogPresenter_RenderStubs(t *testing.T) {
 	t.Parallel()
 
-	presenter := param.NewLogPresenter(&providermock.Store{}, genericlog.Request{Name: "my-key"})
+	presenter := param.NewLogPresenter(&providermock.Store{}, generic.LogRequest{Name: "my-key"})
 
 	var buf, errBuf bytes.Buffer
 

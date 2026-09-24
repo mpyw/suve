@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
@@ -37,7 +37,7 @@ type diffPresenter struct {
 
 // NewDiffPresenter builds a param diff presenter over the given reader and specs.
 // It is exported for the shared golden-output test harness.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *awsparamversion.Spec) genericdiff.Presenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *awsparamversion.Spec) generic.DiffPresenter {
 	return &diffPresenter{uc: &param.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
@@ -84,7 +84,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the SSM Parameter Store diff command.
 func DiffCommand() *cli.Command {
-	return genericdiff.Command(genericdiff.Config[*awsparamversion.Spec]{
+	return generic.DiffCommand(generic.DiffConfig[*awsparamversion.Spec]{
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
 		Description: `Compare two versions of a parameter in unified diff format.
@@ -106,7 +106,7 @@ EXAMPLES:
 
 For comparing staged values, use: suve aws stage param diff`,
 		ParseDiffArgs: awsparamversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *awsparamversion.Spec) (genericdiff.Presenter, error) {
+		NewPresenter: func(ctx context.Context, spec1, spec2 *awsparamversion.Spec) (generic.DiffPresenter, error) {
 			store, err := cliinternal.AWSParamStore(ctx)
 			if err != nil {
 				return nil, err

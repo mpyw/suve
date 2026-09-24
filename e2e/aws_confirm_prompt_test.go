@@ -12,13 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
-	paramcreate "github.com/mpyw/suve/internal/cli/commands/aws/param/create"
-	paramdelete "github.com/mpyw/suve/internal/cli/commands/aws/param/delete"
-	paramupdate "github.com/mpyw/suve/internal/cli/commands/aws/param/update"
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	secretcreate "github.com/mpyw/suve/internal/cli/commands/aws/secret/create"
-	secretdelete "github.com/mpyw/suve/internal/cli/commands/aws/secret/delete"
-	secretupdate "github.com/mpyw/suve/internal/cli/commands/aws/secret/update"
 )
 
 // =============================================================================
@@ -68,18 +62,18 @@ func TestAWSParam_UpdateConfirmPrompt(t *testing.T) {
 
 	paramName := "/suve-e2e-test/confirm/update-param"
 
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
 	require.NoError(t, err)
 
 	// Confirm with "y": the diff+prompt renders and the update is applied.
 	t.Run("confirm-yes", func(t *testing.T) {
 		_, stderr, err := runCommandWithStdin(
-			t, paramupdate.Command(), strings.NewReader("y\n"), paramName, "confirmed-value",
+			t, cmdparam.UpdateCommand(), strings.NewReader("y\n"), paramName, "confirmed-value",
 		)
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "Update parameter")
@@ -96,7 +90,7 @@ func TestAWSParam_UpdateConfirmPrompt(t *testing.T) {
 	// Abort with "n": the prompt renders but the value is left unchanged.
 	t.Run("abort-no", func(t *testing.T) {
 		_, stderr, err := runCommandWithStdin(
-			t, paramupdate.Command(), strings.NewReader("n\n"), paramName, "aborted-value",
+			t, cmdparam.UpdateCommand(), strings.NewReader("n\n"), paramName, "aborted-value",
 		)
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "Update parameter")
@@ -115,12 +109,12 @@ func TestAWSParam_DeleteConfirmPrompt(t *testing.T) {
 
 	paramName := "/suve-e2e-test/confirm/delete-param"
 
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "delete-me")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "delete-me")
 	require.NoError(t, err)
 
 	// Abort with "n": the current value + prompt render but nothing is deleted.
@@ -128,7 +122,7 @@ func TestAWSParam_DeleteConfirmPrompt(t *testing.T) {
 		var stderr string
 
 		withOSStdin(t, "n\n", func() {
-			_, stderr, err = runCommand(t, paramdelete.Command(), paramName)
+			_, stderr, err = runCommand(t, cmdparam.DeleteCommand(), paramName)
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "delete-me", "current value should be shown before the prompt")
@@ -146,7 +140,7 @@ func TestAWSParam_DeleteConfirmPrompt(t *testing.T) {
 		var stderr string
 
 		withOSStdin(t, "y\n", func() {
-			_, stderr, err = runCommand(t, paramdelete.Command(), paramName)
+			_, stderr, err = runCommand(t, cmdparam.DeleteCommand(), paramName)
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "permanently delete")
@@ -165,18 +159,18 @@ func TestAWSSecret_UpdateConfirmPrompt(t *testing.T) {
 
 	secretName := "suve-e2e-test/confirm/update-secret"
 
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, "initial-secret")
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "initial-secret")
 	require.NoError(t, err)
 
 	// Confirm with "y": the diff+prompt renders and the update is applied.
 	t.Run("confirm-yes", func(t *testing.T) {
 		_, stderr, err := runCommandWithStdin(
-			t, secretupdate.Command(), strings.NewReader("y\n"), secretName, "confirmed-secret",
+			t, cmdsecret.UpdateCommand(), strings.NewReader("y\n"), secretName, "confirmed-secret",
 		)
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "Update secret")
@@ -192,7 +186,7 @@ func TestAWSSecret_UpdateConfirmPrompt(t *testing.T) {
 	// Abort with "n": the prompt renders but the value is left unchanged.
 	t.Run("abort-no", func(t *testing.T) {
 		_, stderr, err := runCommandWithStdin(
-			t, secretupdate.Command(), strings.NewReader("n\n"), secretName, "aborted-secret",
+			t, cmdsecret.UpdateCommand(), strings.NewReader("n\n"), secretName, "aborted-secret",
 		)
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "Update secret")
@@ -211,12 +205,12 @@ func TestAWSSecret_DeleteConfirmPrompt(t *testing.T) {
 
 	secretName := "suve-e2e-test/confirm/delete-secret"
 
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, "delete-me-secret")
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "delete-me-secret")
 	require.NoError(t, err)
 
 	// Abort with "n": the current value + prompt render but nothing is deleted.
@@ -224,7 +218,7 @@ func TestAWSSecret_DeleteConfirmPrompt(t *testing.T) {
 		var stderr string
 
 		withOSStdin(t, "n\n", func() {
-			_, stderr, err = runCommand(t, secretdelete.Command(), secretName)
+			_, stderr, err = runCommand(t, cmdsecret.DeleteCommand(), secretName)
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "delete-me-secret", "current value should be shown before the prompt")
@@ -242,7 +236,7 @@ func TestAWSSecret_DeleteConfirmPrompt(t *testing.T) {
 		var stderr string
 
 		withOSStdin(t, "y\n", func() {
-			_, stderr, err = runCommand(t, secretdelete.Command(), "--force", secretName)
+			_, stderr, err = runCommand(t, cmdsecret.DeleteCommand(), "--force", secretName)
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "permanently delete")

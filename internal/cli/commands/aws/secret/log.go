@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
-	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
@@ -31,14 +31,14 @@ type logJSONItem struct {
 // logPresenter renders Secrets Manager log output byte-for-byte as before.
 type logPresenter struct {
 	uc           *secret.LogUseCase
-	req          genericlog.Request
+	req          generic.LogRequest
 	result       *secret.LogOutput
 	secretValues map[string]string
 }
 
 // NewLogPresenter builds a secret log presenter over the given reader and request.
 // It is exported for the shared golden-output test harness.
-func NewLogPresenter(reader provider.Reader, req genericlog.Request) genericlog.Presenter {
+func NewLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
 	return &logPresenter{uc: &secret.LogUseCase{Reader: reader}, req: req}
 }
 
@@ -138,7 +138,7 @@ func (p *logPresenter) RenderValue(_ io.Writer, _, _ int) {}
 
 func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, reverse bool) {
 	entries := p.result.Entries
-	parentIdx, oldest := genericlog.PatchParent(i, len(entries), reverse)
+	parentIdx, oldest := generic.LogPatchParent(i, len(entries), reverse)
 
 	newEntry := entries[i]
 
@@ -191,9 +191,9 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 
 // LogCommand returns the Secrets Manager log command.
 func LogCommand() *cli.Command {
-	return genericlog.Command(genericlog.Config{
+	return generic.LogCommand(generic.LogConfig{
 		Usage:     "Show secret version history",
-		ArgsUsage: "<name>",
+		ArgsUsage: argsUsageName,
 		Description: `Display the version history of a secret, showing each version's
 UUID (truncated), staging labels, and creation date.
 
@@ -260,7 +260,7 @@ EXAMPLES:
 				Usage: "Output format: text (default) or json",
 			},
 		},
-		NewPresenter: func(ctx context.Context, req genericlog.Request) (genericlog.Presenter, error) {
+		NewPresenter: func(ctx context.Context, req generic.LogRequest) (generic.LogPresenter, error) {
 			store, err := cliinternal.AWSSecretStore(ctx)
 			if err != nil {
 				return nil, err

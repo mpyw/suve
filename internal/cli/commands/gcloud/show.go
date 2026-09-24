@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	genericshow "github.com/mpyw/suve/internal/cli/commands/generic/show"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
@@ -36,7 +36,7 @@ type showPresenter struct {
 }
 
 // NewShowPresenter builds a Google Cloud show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *gcloudversion.Spec) genericshow.Presenter {
+func NewShowPresenter(reader provider.Reader, spec *gcloudversion.Spec) generic.ShowPresenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -119,7 +119,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Google Cloud Secret Manager show command.
 func ShowCommand() *cli.Command {
-	return genericshow.Command(genericshow.Config[*gcloudversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*gcloudversion.Spec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
@@ -139,7 +139,7 @@ EXAMPLES:
   suve gcloud secret show --output=json my-secret          Output as JSON`,
 		UsageError: "usage: suve gcloud secret show <name>",
 		ParseSpec:  gcloudversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *gcloudversion.Spec) (genericshow.Presenter, error) {
+		NewPresenter: func(ctx context.Context, spec *gcloudversion.Spec) (generic.ShowPresenter, error) {
 			store, err := cliinternal.GoogleCloudSecretStore(ctx)
 			if err != nil {
 				return nil, err

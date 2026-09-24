@@ -62,13 +62,13 @@ Slice → slice:
 
 ```go
 // avoid
-entries := make([]genericlist.Entry, len(result.Entries))
+entries := make([]generic.ListEntry, len(result.Entries))
 for i, e := range result.Entries {
-	entries[i] = genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
+	entries[i] = generic.ListEntry{Name: e.Name, Value: e.Value, Error: e.Error}
 }
 // prefer
-entries := lo.Map(result.Entries, func(e ListEntry, _ int) genericlist.Entry {
-	return genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
+entries := lo.Map(result.Entries, func(e ListEntry, _ int) generic.ListEntry {
+	return generic.ListEntry{Name: e.Name, Value: e.Value, Error: e.Error}
 })
 ```
 

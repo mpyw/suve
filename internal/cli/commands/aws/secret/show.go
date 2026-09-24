@@ -8,7 +8,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	genericshow "github.com/mpyw/suve/internal/cli/commands/generic/show"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
@@ -43,7 +43,7 @@ type showPresenter struct {
 
 // NewShowPresenter builds a secret show presenter over the given reader and spec.
 // It is exported for the shared golden-output test harness.
-func NewShowPresenter(reader provider.Reader, spec *awssecretversion.Spec) genericshow.Presenter {
+func NewShowPresenter(reader provider.Reader, spec *awssecretversion.Spec) generic.ShowPresenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -139,7 +139,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Secrets Manager show command.
 func ShowCommand() *cli.Command {
-	return genericshow.Command(genericshow.Config[*awssecretversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*awssecretversion.Spec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION | :LABEL][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
@@ -162,7 +162,7 @@ EXAMPLES:
   API_KEY=$(suve aws secret show --raw my-secret)             Use in shell variable`,
 		UsageError: "usage: suve aws secret show <name>",
 		ParseSpec:  awssecretversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *awssecretversion.Spec) (genericshow.Presenter, error) {
+		NewPresenter: func(ctx context.Context, spec *awssecretversion.Spec) (generic.ShowPresenter, error) {
 			store, err := cliinternal.AWSSecretStore(ctx)
 			if err != nil {
 				return nil, err

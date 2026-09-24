@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"io/fs"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -32,27 +33,6 @@ func TestNoCloudSDKOutsideProvider(t *testing.T) {
 	// permitted to import a cloud SDK and are therefore skipped during the walk.
 	allowedRoots := map[string]struct{}{
 		"provider": {},
-	}
-
-	// forbiddenPrefixes are import paths banned in non-test packages under a
-	// guarded root. SDK service packages are matched by prefix so their
-	// subpackages (e.g. .../service/ssm/types, .../secretmanager/apiv1/...) are
-	// caught too.
-	forbiddenPrefixes := []string{
-		"github.com/aws/aws-sdk-go-v2/service/ssm",
-		"github.com/aws/aws-sdk-go-v2/service/secretsmanager",
-		"cloud.google.com/go/secretmanager",
-		"github.com/Azure/azure-sdk-for-go",
-	}
-
-	isForbidden := func(importPath string) bool {
-		for _, p := range forbiddenPrefixes {
-			if importPath == p || strings.HasPrefix(importPath, p+"/") {
-				return true
-			}
-		}
-
-		return false
 	}
 
 	fset := token.NewFileSet()
@@ -86,7 +66,7 @@ func TestNoCloudSDKOutsideProvider(t *testing.T) {
 					continue
 				}
 
-				if isForbidden(importPath) {
+				if isCloudSDKImport(importPath) {
 					t.Errorf(
 						"%s imports %q: cloud SDKs must stay behind the provider seam "+
 							"(only internal/provider/<cloud> may import its own SDK)",
@@ -99,6 +79,64 @@ func TestNoCloudSDKOutsideProvider(t *testing.T) {
 		})
 		if err != nil {
 			t.Fatalf("walking %q: %v", root, err)
+		}
+	}
+}
+
+// isCloudSDKImport reports whether importPath is a cloud SDK package banned
+// outside the provider seam. SDK service packages are matched by prefix so their
+// subpackages (e.g. .../service/ssm/types, .../secretmanager/apiv1/...) are
+// caught too.
+func isCloudSDKImport(importPath string) bool {
+	forbiddenPrefixes := []string{
+		"github.com/aws/aws-sdk-go-v2/service/ssm",
+		"github.com/aws/aws-sdk-go-v2/service/secretsmanager",
+		"cloud.google.com/go/secretmanager",
+		"github.com/Azure/azure-sdk-for-go",
+	}
+
+	return slices.ContainsFunc(forbiddenPrefixes, func(p string) bool {
+		return importPath == p || strings.HasPrefix(importPath, p+"/")
+	})
+}
+
+// TestSDKFreeProviderVocabulary enforces that the provider vocabulary packages
+// the TUI and GUI import directly stay SDK-free even though they sit under
+// internal/provider, where the SDK is otherwise allowed.
+func TestSDKFreeProviderVocabulary(t *testing.T) {
+	t.Parallel()
+
+	sdkFreeDirs := []string{
+		"provider/aws/paramtype",
+	}
+
+	fset := token.NewFileSet()
+
+	for _, dir := range sdkFreeDirs {
+		paths, err := filepath.Glob(filepath.Join(dir, "*.go"))
+		if err != nil {
+			t.Fatalf("listing %q: %v", dir, err)
+		}
+
+		if len(paths) == 0 {
+			t.Fatalf("%q has no Go files; update sdkFreeDirs", dir)
+		}
+
+		for _, path := range paths {
+			if strings.HasSuffix(path, "_test.go") {
+				continue
+			}
+
+			file, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+			if err != nil {
+				t.Fatalf("parsing %q: %v", path, err)
+			}
+
+			for _, imp := range file.Imports {
+				if importPath, err := strconv.Unquote(imp.Path.Value); err == nil && isCloudSDKImport(importPath) {
+					t.Errorf("%s imports %q: this package must stay SDK-free", path, importPath)
+				}
+			}
 		}
 	}
 }
