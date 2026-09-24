@@ -7,6 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
@@ -164,7 +165,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	store, err := cliinternal.AWSParamStore(ctx)
+	store, err := awsinternal.ParamStore(ctx)
 	if err != nil {
 		return err
 	}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -48,7 +48,7 @@ func restoreAction(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("usage: suve aws secret restore <name>")
 	}
 
-	store, err := cliinternal.AWSSecretStore(ctx)
+	store, err := awsinternal.SecretStore(ctx)
 	if err != nil {
 		return err
 	}

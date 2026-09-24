@@ -7,8 +7,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -102,7 +102,7 @@ EXAMPLES:
   suve azure secret diff --output=json my-secret~     Output comparison as JSON`,
 		ParseDiffArgs: azurekvversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *azurekvversion.Spec) (generic.DiffPresenter, error) {
-			store, err := cliinternal.AzureKeyVaultStore(ctx)
+			store, err := azureinternal.KeyVaultStore(ctx)
 			if err != nil {
 				return nil, err
 			}

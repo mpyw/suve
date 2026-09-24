@@ -19,6 +19,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 )
 
@@ -54,7 +55,7 @@ AZURE_KEYVAULT_NAME environment variable.`,
 		// deferred to store construction, so `suve azure secret --help` works
 		// without a vault.
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			return cliinternal.WithAzureVaultName(ctx, cmd.String("vault-name")), nil
+			return azureinternal.WithVaultName(ctx, cmd.String("vault-name")), nil
 		},
 		Commands: []*cli.Command{
 			ShowCommand(),

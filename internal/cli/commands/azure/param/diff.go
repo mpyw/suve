@@ -6,8 +6,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -96,7 +96,7 @@ EXAMPLES:
   suve azure param diff --output=json key-a key-b      Output comparison as JSON`,
 		ParseDiffArgs: azureappconfigversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *azureappconfigversion.Spec) (generic.DiffPresenter, error) {
-			store, err := cliinternal.AzureAppConfigStore(ctx)
+			store, err := azureinternal.AppConfigStore(ctx)
 			if err != nil {
 				return nil, err
 			}

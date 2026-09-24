@@ -1,4 +1,4 @@
-package gcloud
+package secret
 
 import (
 	"github.com/urfave/cli/v3"

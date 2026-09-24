@@ -7,8 +7,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
@@ -121,7 +121,7 @@ EXAMPLES:
 		UsageError: "usage: suve azure param show <key>",
 		ParseSpec:  azureappconfigversion.Parse,
 		NewPresenter: func(ctx context.Context, spec *azureappconfigversion.Spec) (generic.ShowPresenter, error) {
-			store, err := cliinternal.AzureAppConfigStore(ctx)
+			store, err := azureinternal.AppConfigStore(ctx)
 			if err != nil {
 				return nil, err
 			}

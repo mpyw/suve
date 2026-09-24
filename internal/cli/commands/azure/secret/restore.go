@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -47,7 +47,7 @@ func restoreAction(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("usage: suve azure secret restore <name>")
 	}
 
-	store, err := cliinternal.AzureKeyVaultStore(ctx)
+	store, err := azureinternal.KeyVaultStore(ctx)
 	if err != nil {
 		return err
 	}

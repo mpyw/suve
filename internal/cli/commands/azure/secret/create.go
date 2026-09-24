@@ -7,6 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -77,7 +78,7 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	store, err := cliinternal.AzureKeyVaultStore(ctx)
+	store, err := azureinternal.KeyVaultStore(ctx)
 	if err != nil {
 		return err
 	}

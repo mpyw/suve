@@ -142,13 +142,13 @@ func TestApp_getStagingStore_ScopeKeyed(t *testing.T) {
 // scope to the Key Vault key (VaultName is checked first), which silently keyed
 // App Configuration staging under the Key Vault bucket.
 //
-// The CLI resolvers (internal/cli/commands/internal, not importable here under
-// Go's internal rule) are thin wrappers over the provider.*Scope constructors
-// asserted below, so those keys ARE the CLI's staging keys:
-//   - AzureAppConfigStagingScopeResolver -> provider.AzureAppConfigScope(store)
-//   - AzureKeyVaultStagingScopeResolver  -> provider.AzureKeyVaultScope(vault)
-//   - GoogleCloudStagingScopeResolver    -> provider.GoogleCloudScope(project)
-//   - AWSStagingScopeResolver            -> provider.AWSScope(account, region)
+// The CLI resolvers (internal/cli/commands/<cloud>/internal, not importable
+// here under Go's internal rule) are thin wrappers over the provider.*Scope
+// constructors asserted below, so those keys ARE the CLI's staging keys:
+//   - azure AppConfigStagingScopeResolver -> provider.AzureAppConfigScope(store)
+//   - azure KeyVaultStagingScopeResolver  -> provider.AzureKeyVaultScope(vault)
+//   - gcloud StagingScopeResolver         -> provider.GoogleCloudScope(project)
+//   - aws StagingScopeResolver            -> provider.AWSScope(account, region)
 func TestStagingScope_GUICLIParity(t *testing.T) {
 	t.Parallel()
 

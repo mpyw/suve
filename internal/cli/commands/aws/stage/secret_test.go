@@ -1,4 +1,4 @@
-package secret_test
+package stage_test
 
 import (
 	"testing"
@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/secret"
+	"github.com/mpyw/suve/internal/cli/commands/aws/stage"
 )
 
-func TestCommand(t *testing.T) {
+func TestSecretCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 
 	require.NotNil(t, cmd)
 	assert.Equal(t, "secret", cmd.Name)
@@ -24,10 +24,10 @@ func TestCommand(t *testing.T) {
 	assert.NotNil(t, cmd.CommandNotFound)
 }
 
-func TestCommand_HasExpectedSubcommands(t *testing.T) {
+func TestSecretCommand_HasExpectedSubcommands(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Extract subcommand names
@@ -55,10 +55,10 @@ func TestCommand_HasExpectedSubcommands(t *testing.T) {
 	}
 }
 
-func TestCommand_AddSubcommand(t *testing.T) {
+func TestSecretCommand_AddSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find add subcommand
@@ -73,10 +73,10 @@ func TestCommand_AddSubcommand(t *testing.T) {
 	assert.NotNil(t, addCmd.Action)
 }
 
-func TestCommand_EditSubcommand(t *testing.T) {
+func TestSecretCommand_EditSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find edit subcommand
@@ -91,10 +91,10 @@ func TestCommand_EditSubcommand(t *testing.T) {
 	assert.NotNil(t, editCmd.Action)
 }
 
-func TestCommand_DeleteSubcommand(t *testing.T) {
+func TestSecretCommand_DeleteSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find delete subcommand
@@ -109,10 +109,10 @@ func TestCommand_DeleteSubcommand(t *testing.T) {
 	assert.NotNil(t, deleteCmd.Action)
 }
 
-func TestCommand_StatusSubcommand(t *testing.T) {
+func TestSecretCommand_StatusSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find status subcommand
@@ -126,10 +126,10 @@ func TestCommand_StatusSubcommand(t *testing.T) {
 	assert.NotNil(t, statusCmd.Action)
 }
 
-func TestCommand_DiffSubcommand(t *testing.T) {
+func TestSecretCommand_DiffSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find diff subcommand
@@ -143,10 +143,10 @@ func TestCommand_DiffSubcommand(t *testing.T) {
 	assert.NotNil(t, diffCmd.Action)
 }
 
-func TestCommand_ApplySubcommand(t *testing.T) {
+func TestSecretCommand_ApplySubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find apply subcommand
@@ -160,10 +160,10 @@ func TestCommand_ApplySubcommand(t *testing.T) {
 	assert.NotNil(t, applyCmd.Action)
 }
 
-func TestCommand_ResetSubcommand(t *testing.T) {
+func TestSecretCommand_ResetSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find reset subcommand
@@ -177,10 +177,10 @@ func TestCommand_ResetSubcommand(t *testing.T) {
 	assert.NotNil(t, resetCmd.Action)
 }
 
-func TestCommand_TagSubcommand(t *testing.T) {
+func TestSecretCommand_TagSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find tag subcommand
@@ -194,10 +194,10 @@ func TestCommand_TagSubcommand(t *testing.T) {
 	assert.NotNil(t, tagCmd.Action)
 }
 
-func TestCommand_UntagSubcommand(t *testing.T) {
+func TestSecretCommand_UntagSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	// Find untag subcommand
@@ -211,10 +211,10 @@ func TestCommand_UntagSubcommand(t *testing.T) {
 	assert.NotNil(t, untagCmd.Action)
 }
 
-func TestCommand_ExportImportSubcommands(t *testing.T) {
+func TestSecretCommand_ExportImportSubcommands(t *testing.T) {
 	t.Parallel()
 
-	cmd := secret.Command()
+	cmd := stage.SecretCommand()
 	require.NotNil(t, cmd)
 
 	for _, name := range []string{"export", "import"} {

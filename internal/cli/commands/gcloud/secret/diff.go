@@ -1,4 +1,4 @@
-package gcloud
+package secret
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -100,7 +100,7 @@ EXAMPLES:
   suve gcloud secret diff --output=json my-secret~     Output comparison as JSON`,
 		ParseDiffArgs: gcloudversion.ParseDiffArgs,
 		NewPresenter: func(ctx context.Context, spec1, spec2 *gcloudversion.Spec) (generic.DiffPresenter, error) {
-			store, err := cliinternal.GoogleCloudSecretStore(ctx)
+			store, err := gcloudinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

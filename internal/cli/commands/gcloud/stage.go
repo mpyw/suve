@@ -3,24 +3,29 @@ package gcloud
 import (
 	"github.com/urfave/cli/v3"
 
+	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
-// gcloudStageConfig is the staging command config for Google Cloud Secret Manager.
+// stageNounSecret is the command / item name of the staged Secret Manager
+// secrets.
+const stageNounSecret = "secret"
+
+// stageConfig is the staging command config for Google Cloud Secret Manager.
 // Because Google Cloud is secret-only, the single config drives the whole
 // `gcloud stage` group directly (no param/secret split). The ScopeResolver keys
 // on-disk staging state by the resolved project.
-func gcloudStageConfig() stgcli.CommandConfig {
+func stageConfig() stgcli.CommandConfig {
 	return stgcli.CommandConfig{
-		CommandName:    nounSecret,
-		ItemName:       nounSecret,
+		CommandName:    stageNounSecret,
+		ItemName:       stageNounSecret,
 		ProviderLabel:  "Google Cloud",
 		CommandPath:    "suve gcloud stage",
-		Factory:        cliinternal.StrategyFactory(provider.ProviderGoogleCloud, provider.KindSecret, cliinternal.GoogleCloudSecretStore),
+		Factory:        cliinternal.StrategyFactory(provider.ProviderGoogleCloud, provider.KindSecret, gcloudinternal.SecretStore),
 		ParserFactory:  cliinternal.ParserFactory(provider.ProviderGoogleCloud, provider.KindSecret),
-		ScopeResolver:  cliinternal.GoogleCloudStagingScopeResolver,
+		ScopeResolver:  gcloudinternal.StagingScopeResolver,
 		HasDescription: true,
 	}
 }
@@ -70,7 +75,7 @@ func StageCommand() *cli.Command {
 		Aliases:         []string{"stg"},
 		Usage:           "Manage staged changes for Google Cloud Secret Manager",
 		Description:     stageDescription,
-		Commands:        stageSubcommands(gcloudStageConfig()),
+		Commands:        stageSubcommands(stageConfig()),
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }
@@ -88,7 +93,7 @@ func FlatStageCommand(name string) *cli.Command {
 		Description:     stageDescription,
 		Flags:           projectFlags(),
 		Before:          resolveProject,
-		Commands:        stageSubcommands(gcloudStageConfig()),
+		Commands:        stageSubcommands(stageConfig()),
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }

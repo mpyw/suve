@@ -10,8 +10,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/jsonutil"
@@ -260,7 +260,7 @@ EXAMPLES:
 			},
 		},
 		NewPresenter: func(ctx context.Context, req generic.LogRequest) (generic.LogPresenter, error) {
-			store, err := cliinternal.AzureKeyVaultStore(ctx)
+			store, err := azureinternal.KeyVaultStore(ctx)
 			if err != nil {
 				return nil, err
 			}

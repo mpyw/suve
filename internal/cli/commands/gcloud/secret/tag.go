@@ -1,12 +1,12 @@
-package gcloud
+package secret
 
 import (
 	"context"
 
 	"github.com/urfave/cli/v3"
 
+	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
 )
 
@@ -14,7 +14,7 @@ import (
 //
 //declscope:package // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
-	return cliinternal.GoogleCloudSecretStore(ctx)
+	return gcloudinternal.SecretStore(ctx)
 }
 
 // TagCommand returns the Google Cloud Secret Manager tag command.

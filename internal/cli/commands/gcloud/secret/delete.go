@@ -1,4 +1,4 @@
-package gcloud
+package secret
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/usecase/secret"
@@ -60,7 +60,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	store, err := cliinternal.GoogleCloudSecretStore(ctx)
+	store, err := gcloudinternal.SecretStore(ctx)
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
-	paramstage "github.com/mpyw/suve/internal/cli/commands/aws/stage/param"
+	awsstage "github.com/mpyw/suve/internal/cli/commands/aws/stage"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
@@ -294,7 +294,7 @@ func TestAWSParam_StagingWorkflow(t *testing.T) {
 
 	// 3. Status - verify staged parameter is listed
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "M") // M = Modified (update operation)
@@ -303,7 +303,7 @@ func TestAWSParam_StagingWorkflow(t *testing.T) {
 
 	// 4. Stage diff - compare staged vs current
 	t.Run("stage-diff", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "diff", paramName)
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "diff", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-original-value")
 		assert.Contains(t, stdout, "+staged-value")
@@ -312,7 +312,7 @@ func TestAWSParam_StagingWorkflow(t *testing.T) {
 
 	// 5. Push - apply staged changes (with -y to skip confirmation, --ignore-conflicts since we staged directly)
 	t.Run("apply", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes", "--ignore-conflicts")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		t.Logf("apply output: %s", stdout)
@@ -327,20 +327,20 @@ func TestAWSParam_StagingWorkflow(t *testing.T) {
 
 	// 7. Status after apply - should be empty
 	t.Run("status-after-apply", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 	})
 
 	// 8. Stage for delete
 	t.Run("stage-delete", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "delete", paramName)
 		require.NoError(t, err)
 	})
 
 	// 9. Status shows delete operation
 	t.Run("status-delete", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "D") // D = Delete
@@ -348,7 +348,7 @@ func TestAWSParam_StagingWorkflow(t *testing.T) {
 
 	// 10. Reset - unstage the delete
 	t.Run("reset", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", paramName)
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "reset", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Unstaged")
 		t.Logf("reset output: %s", stdout)
@@ -356,7 +356,7 @@ func TestAWSParam_StagingWorkflow(t *testing.T) {
 
 	// 11. Status after reset - should be empty
 	t.Run("status-after-reset", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 	})
@@ -393,25 +393,25 @@ func TestAWSParam_StagingTagThenDeleteApply(t *testing.T) {
 
 	// 2. Stage a tag against the existing parameter.
 	t.Run("stage-tag", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "tag", paramName, "env=prod")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "tag", paramName, "env=prod")
 		require.NoError(t, err)
 	})
 
 	// 3. Stage the parameter for deletion - this must discard the staged tag.
 	t.Run("stage-delete", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "delete", paramName)
 		require.NoError(t, err)
 	})
 
 	// 4. Apply - must succeed (not wedge on the orphan tag) and delete the param.
 	t.Run("apply", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes", "--ignore-conflicts")
 		require.NoError(t, err)
 	})
 
 	// 5. Status must be empty - nothing left staged.
 	t.Run("status-after-apply", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 	})
@@ -450,7 +450,7 @@ func TestAWSParam_StagingAdd(t *testing.T) {
 
 	// 2. Status shows add operation
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "A") // A = Add
@@ -458,7 +458,7 @@ func TestAWSParam_StagingAdd(t *testing.T) {
 
 	// 3. Push to create
 	t.Run("apply", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
@@ -493,7 +493,7 @@ func TestAWSParam_StagingResetWithVersion(t *testing.T) {
 
 	// 1. Reset with version spec (restore old version to staging)
 	t.Run("reset-with-version", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", paramName+"#1")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "reset", paramName+"#1")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Restored")
 		t.Logf("reset with version output: %s", stdout)
@@ -501,7 +501,7 @@ func TestAWSParam_StagingResetWithVersion(t *testing.T) {
 
 	// 2. Status shows staged value
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -517,7 +517,7 @@ func TestAWSParam_StagingResetWithVersion(t *testing.T) {
 
 	// 4. Push to apply (use --ignore-conflicts for robustness in test environment)
 	t.Run("apply", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes", "--ignore-conflicts")
 		require.NoError(t, err)
 	})
 
@@ -565,7 +565,7 @@ func TestAWSParam_StagingResetAll(t *testing.T) {
 
 	// Verify both staged
 	t.Run("verify-staged", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, param1)
 		assert.Contains(t, stdout, param2)
@@ -573,7 +573,7 @@ func TestAWSParam_StagingResetAll(t *testing.T) {
 
 	// Reset all
 	t.Run("reset-all", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "reset", "--all")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "reset", "--all")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Unstaged")
 		t.Logf("reset --all output: %s", stdout)
@@ -581,7 +581,7 @@ func TestAWSParam_StagingResetAll(t *testing.T) {
 
 	// Verify empty
 	t.Run("verify-empty", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, param1)
 		assert.NotContains(t, stdout, param2)
@@ -624,7 +624,7 @@ func TestAWSParam_StagingApplySingle(t *testing.T) {
 
 	// Push only param1 (use --ignore-conflicts since we staged without original version)
 	t.Run("apply-single", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes", "--ignore-conflicts", param1)
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes", "--ignore-conflicts", param1)
 		require.NoError(t, err)
 	})
 
@@ -639,7 +639,7 @@ func TestAWSParam_StagingApplySingle(t *testing.T) {
 		assert.Equal(t, "original2", stdout) // Not applied yet
 
 		// param2 should still be staged
-		stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err = runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, param1) // Already applied
 		assert.Contains(t, stdout, param2)    // Still staged
@@ -774,7 +774,7 @@ func TestAWSParam_StagingAddViaCLI(t *testing.T) {
 
 	// 1. Stage add via CLI (with value argument - no editor needed)
 	t.Run("add-via-cli", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "cli-staged-value")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "cli-staged-value")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 		t.Logf("stage add output: %s", stdout)
@@ -782,7 +782,7 @@ func TestAWSParam_StagingAddViaCLI(t *testing.T) {
 
 	// 2. Verify status shows add operation
 	t.Run("status", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "A") // A = Add
@@ -790,7 +790,7 @@ func TestAWSParam_StagingAddViaCLI(t *testing.T) {
 
 	// 3. Push to create
 	t.Run("apply", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
@@ -817,7 +817,7 @@ func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 
 	// Stage add with description
 	t.Run("add-with-description", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "add",
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "add",
 			"--description", "Test description",
 			paramName, "value-with-options")
 		require.NoError(t, err)
@@ -827,7 +827,7 @@ func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 
 	// Stage tags separately
 	t.Run("add-tags", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "tag",
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "tag",
 			paramName, "env=test", "owner=e2e")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
@@ -836,7 +836,7 @@ func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 
 	// Verify service-specific status shows tag changes
 	t.Run("service-status-shows-tags", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "T")         // T = Tag change marker
 		assert.Contains(t, stdout, "+2 tag(s)") // Two tags being added
@@ -873,7 +873,7 @@ func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 
 	// Push and verify
 	t.Run("apply-and-verify", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
 
 		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
@@ -897,13 +897,13 @@ func TestAWSParam_StagingEditViaCLI(t *testing.T) {
 
 	// 1. Stage add first
 	t.Run("stage-add", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "initial-value")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "initial-value")
 		require.NoError(t, err)
 	})
 
 	// 2. Re-add (edit) the staged value
 	t.Run("re-add-edit", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "edited-value")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "edited-value")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 		t.Logf("re-add output: %s", stdout)
@@ -911,7 +911,7 @@ func TestAWSParam_StagingEditViaCLI(t *testing.T) {
 
 	// 3. Push and verify
 	t.Run("apply-and-verify", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
 
 		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
@@ -935,10 +935,10 @@ func TestAWSParam_StagingDiffViaCLI(t *testing.T) {
 
 	// 1. Stage add and check diff
 	t.Run("diff-for-create", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "new-value")
 		require.NoError(t, err)
 
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "diff", paramName)
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "diff", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "+new-value")
 		t.Logf("diff output for create: %s", stdout)
@@ -946,16 +946,16 @@ func TestAWSParam_StagingDiffViaCLI(t *testing.T) {
 
 	// 2. Push and setup for update
 	t.Run("apply-and-setup", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
 	})
 
 	// 3. Stage delete and check diff
 	t.Run("diff-for-delete", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "delete", paramName)
 		require.NoError(t, err)
 
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "diff", paramName)
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "diff", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "-new-value")
 		t.Logf("diff output for delete: %s", stdout)
@@ -1169,7 +1169,7 @@ func TestAWSParam_StagingAddExistingResourceFails(t *testing.T) {
 
 	// Try to stage add - should fail because resource already exists
 	t.Run("add-existing-fails", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "new-value")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 		t.Logf("expected error: %v", err)
@@ -1188,7 +1188,7 @@ func TestAWSParam_StagingDeleteNonExistingResourceFails(t *testing.T) {
 
 	// Try to stage delete - should fail because resource doesn't exist
 	t.Run("delete-nonexisting-fails", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "delete", paramName)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 		t.Logf("expected error: %v", err)
@@ -1207,7 +1207,7 @@ func TestAWSParam_StagingTagNonExistingResourceFails(t *testing.T) {
 
 	// Try to stage tag - should fail because resource doesn't exist
 	t.Run("tag-nonexisting-fails", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "tag", paramName, "env=test")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "tag", paramName, "env=test")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 		t.Logf("expected error: %v", err)
@@ -1226,7 +1226,7 @@ func TestAWSParam_StagingUntagNonExistingResourceFails(t *testing.T) {
 
 	// Try to stage untag - should fail because resource doesn't exist
 	t.Run("untag-nonexisting-fails", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "untag", paramName, "env")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "untag", paramName, "env")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 		t.Logf("expected error: %v", err)
@@ -1248,14 +1248,14 @@ func TestAWSParam_StagingDeleteStagedCreateSucceeds(t *testing.T) {
 
 	// Stage add first
 	t.Run("stage-add", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "new-value")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 	})
 
 	// Verify it's staged
 	t.Run("verify-staged", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "A") // A = Add
@@ -1263,7 +1263,7 @@ func TestAWSParam_StagingDeleteStagedCreateSucceeds(t *testing.T) {
 
 	// Delete the staged CREATE - should unstage it
 	t.Run("delete-staged-create", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "delete", paramName)
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "delete", paramName)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Unstaged") // Should say "Unstaged" not "Staged for deletion"
 		t.Logf("delete staged create output: %s", stdout)
@@ -1271,7 +1271,7 @@ func TestAWSParam_StagingDeleteStagedCreateSucceeds(t *testing.T) {
 
 	// Verify it's no longer staged
 	t.Run("verify-unstaged", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 	})
@@ -1292,14 +1292,14 @@ func TestAWSParam_StagingTagStagedCreateSucceeds(t *testing.T) {
 
 	// Stage add first
 	t.Run("stage-add", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "new-value")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "new-value")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 	})
 
 	// Tag the staged CREATE - should succeed
 	t.Run("tag-staged-create", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "tag", paramName, "env=test")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "tag", paramName, "env=test")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "Staged")
 		t.Logf("tag staged create output: %s", stdout)
@@ -1307,7 +1307,7 @@ func TestAWSParam_StagingTagStagedCreateSucceeds(t *testing.T) {
 
 	// Verify both entry and tag are staged
 	t.Run("verify-staged-with-tags", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 		assert.Contains(t, stdout, "A") // A = Add
@@ -1316,7 +1316,7 @@ func TestAWSParam_StagingTagStagedCreateSucceeds(t *testing.T) {
 
 	// Apply and verify
 	t.Run("apply-and-verify", func(t *testing.T) {
-		_, _, err := runSubCommand(t, paramstage.Command(), "apply", "--yes")
+		_, _, err := runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
 		require.NoError(t, err)
 
 		stdout, _, err := runCommand(t, cmdparam.ShowCommand(), paramName)
@@ -2245,12 +2245,12 @@ func TestAWSParam_ExportImport(t *testing.T) {
 	exportPath := filepath.Join(t.TempDir(), "param.json")
 
 	// Stage a parameter in the working staging area.
-	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "test-value")
+	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "test-value")
 	require.NoError(t, err)
 
 	// Export writes the file and clears the working area.
 	t.Run("export", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "export", exportPath)
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "export", exportPath)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "exported")
 
@@ -2260,20 +2260,20 @@ func TestAWSParam_ExportImport(t *testing.T) {
 
 	// The working area is now empty.
 	t.Run("working-cleared", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.NotContains(t, stdout, paramName)
 	})
 
 	// Import restores the working area.
 	t.Run("import", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "import", exportPath)
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "import", exportPath)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "imported")
 	})
 
 	t.Run("working-restored", func(t *testing.T) {
-		stdout, _, err := runSubCommand(t, paramstage.Command(), "status")
+		stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "status")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, paramName)
 	})
@@ -2287,10 +2287,10 @@ func TestAWSParam_ExportKeep(t *testing.T) {
 	paramName := "/suve-e2e-param-export-keep/test"
 	exportPath := filepath.Join(t.TempDir(), "param.json")
 
-	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "keep-value")
+	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "keep-value")
 	require.NoError(t, err)
 
-	stdout, _, err := runSubCommand(t, paramstage.Command(), "export", exportPath, "--keep")
+	stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "export", exportPath, "--keep")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "kept in the working staging area")
 
@@ -2299,7 +2299,7 @@ func TestAWSParam_ExportKeep(t *testing.T) {
 	require.NoError(t, statErr)
 
 	// ...and the parameter is still staged.
-	stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+	stdout, _, err = runSubCommand(t, awsstage.ParamCommand(), "status")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, paramName)
 }
@@ -2315,21 +2315,21 @@ func TestAWSParam_ImportMerge(t *testing.T) {
 	exportPath := filepath.Join(t.TempDir(), "param.json")
 
 	// Stage param1 and export it (this clears the working area).
-	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName1, "value1")
+	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName1, "value1")
 	require.NoError(t, err)
-	_, _, err = runSubCommand(t, paramstage.Command(), "export", exportPath)
+	_, _, err = runSubCommand(t, awsstage.ParamCommand(), "export", exportPath)
 	require.NoError(t, err)
 
 	// Stage param2 in the working area.
-	_, _, err = runSubCommand(t, paramstage.Command(), "add", paramName2, "value2")
+	_, _, err = runSubCommand(t, awsstage.ParamCommand(), "add", paramName2, "value2")
 	require.NoError(t, err)
 
 	// Import merges param1 back in alongside param2.
-	stdout, _, err := runSubCommand(t, paramstage.Command(), "import", exportPath, "--merge")
+	stdout, _, err := runSubCommand(t, awsstage.ParamCommand(), "import", exportPath, "--merge")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "merged")
 
-	stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+	stdout, _, err = runSubCommand(t, awsstage.ParamCommand(), "status")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, paramName1)
 	assert.Contains(t, stdout, paramName2)
@@ -2351,30 +2351,30 @@ func TestAWSParam_ExportImportEncrypted(t *testing.T) {
 		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
-	_, _, err := runSubCommand(t, paramstage.Command(), "add", paramName, "secret-value")
+	_, _, err := runSubCommand(t, awsstage.ParamCommand(), "add", paramName, "secret-value")
 	require.NoError(t, err)
 
 	// Export encrypted.
 	stdout, stderr, err := runSubCommandWithStdin(
-		t, paramstage.Command(), strings.NewReader("testpass\n"), "export", exportPath, "--passphrase-stdin",
+		t, awsstage.ParamCommand(), strings.NewReader("testpass\n"), "export", exportPath, "--passphrase-stdin",
 	)
 	require.NoError(t, err, "export failed: stdout=%s stderr=%s", stdout, stderr)
 	assert.Contains(t, stdout, "encrypted")
 
 	// Import back with the same passphrase.
 	stdout, stderr, err = runSubCommandWithStdin(
-		t, paramstage.Command(), strings.NewReader("testpass\n"), "import", exportPath, "--passphrase-stdin",
+		t, awsstage.ParamCommand(), strings.NewReader("testpass\n"), "import", exportPath, "--passphrase-stdin",
 	)
 	require.NoError(t, err, "import failed: stdout=%s stderr=%s", stdout, stderr)
 	assert.Contains(t, stdout, "imported")
 
-	stdout, _, err = runSubCommand(t, paramstage.Command(), "status")
+	stdout, _, err = runSubCommand(t, awsstage.ParamCommand(), "status")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, paramName)
 
 	// Prove the VALUE (not just the key) survived the encrypt -> decrypt
 	// round-trip: apply the re-imported staged create and read it back.
-	_, _, err = runSubCommand(t, paramstage.Command(), "apply", "--yes")
+	_, _, err = runSubCommand(t, awsstage.ParamCommand(), "apply", "--yes")
 	require.NoError(t, err)
 
 	stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
@@ -2389,7 +2389,7 @@ func TestAWSParam_ImportMissingFile(t *testing.T) {
 	setupTempHome(t)
 
 	_, _, err := runSubCommand(
-		t, paramstage.Command(), "import", filepath.Join(t.TempDir(), "does-not-exist.json"),
+		t, awsstage.ParamCommand(), "import", filepath.Join(t.TempDir(), "does-not-exist.json"),
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
