@@ -4,7 +4,8 @@ description: >-
   Load when wiring a top-level command group, adding a cloud, or touching
   internal/provider/registry.go, internal/provider/detect/,
   internal/staging/binding/, internal/cli/commands/launch.go, or
-  internal/cli/commands/internal/client.go. Explains how a provider is selected
+  internal/cli/commands/internal/client.go or
+  internal/cli/commands/<cloud>/internal. Explains how a provider is selected
   (explicit groups plus env-detected flat aliases), how the registry composes
   backends, how each provider's scope and staging binding are built, how the
   TUI/GUI launch scope is resolved, and the SDK-confinement boundary.
@@ -21,12 +22,12 @@ the CLI and staging layers talk to a provider-neutral `provider.Store`, and a
 Two ways to reach a provider coexist:
 
 1. **Explicit groups — always present.** `suve aws`, `suve gcloud`, and
-   `suve azure` are registered unconditionally (`internal/cli/commands/app.go:47-51`).
+   `suve azure` are registered unconditionally (`internal/cli/commands/app.go:50-54`).
 
 2. **Flat aliases — env-detected.** The bare `param`, `secret`, and `stage`
    commands are aliases added only when exactly one provider is active for that
    service. Detection runs at process start
-   (`detect.Resolve(detect.OSEnvironment())`, invoked at `app.go:39`) and is
+   (`detect.Resolve(detect.OSEnvironment())`, invoked at `app.go:42`) and is
    implemented in `internal/provider/detect/detect.go`. It reads only env vars
    (no network, no credential-chain resolution):
 
@@ -40,8 +41,12 @@ Two ways to reach a provider coexist:
    A flat alias for a service is exposed only when exactly ONE provider is active
    for it — zero or two-plus active means no alias, and the user picks an
    explicit group. There is no priority order. So `suve secret` may resolve to
-   AWS, Google Cloud, or Azure depending on the environment, and each flat alias
-   reuses its provider's real command implementation (`app.go:220-260`).
+   AWS, Google Cloud, or Azure depending on the environment. Each flat alias is
+   built by the provider's `Flat{Param,Secret,Stage}Command(name)`
+   (`aws.FlatParamCommand`, `gcloud.FlatSecretCommand`, `azure.FlatStageCommand`,
+   and so on), which reuses the real command and folds in any group-level flag
+   (`gcloud` adds `--project`). `app.go`'s `flatCommand`/`flatStageCommand`
+   pick one per provider.
 
 ## Registry composition
 
@@ -56,13 +61,14 @@ gcloud.Register(reg)
 azure.Register(reg)
 ```
 
-The CLI (`internal/cli/commands/internal/client.go`), GUI (`internal/gui/app.go`)
+The CLI (`internal/cli/commands/internal/client.go`, which exposes it as
+`Store(ctx, scope, kind)`), GUI (`internal/gui/app.go`)
 and TUI (`internal/tui/run.go`) all use it. No provider is a default: an
 unknown or unselected provider is an error everywhere (registry lookup, staging
 scope resolution, strategy selection), never a silent fallback to AWS.
 
 Each command group resolves its store through this shared registry via
-`registry.Store(ctx, scope, kind)` (`kind` is `provider.KindParam` or
+`cliinternal.Store(ctx, scope, kind)` (`kind` is `provider.KindParam` or
 `provider.KindSecret`). A `Factory` returns `provider.ErrUnsupportedKind` when a
 provider does not offer a requested kind, and the registry returns
 `provider.ErrNoFactory` for an unregistered provider
@@ -72,17 +78,24 @@ provider does not offer a requested kind, and the registry returns
 
 Each group builds a provider-specific `provider.Scope` (`internal/provider/scope.go`):
 
-- **AWS** — read/write commands resolve stores through `AWSParamStore` /
-  `AWSSecretStore` (`client.go`) with `provider.Scope{Provider: provider.ProviderAWS}`.
+Each provider's store and staging-scope resolvers, and any context keys they
+read, live in `internal/cli/commands/<cloud>/internal` (imported as
+`awsinternal`, `gcloudinternal`, `azureinternal`), shared by that provider's
+root group, service packages and stage commands.
+
+- **AWS** — read/write commands resolve stores through `awsinternal.ParamStore` /
+  `awsinternal.SecretStore` with `provider.Scope{Provider: provider.ProviderAWS}`.
   Only the provider field is needed because the AWS factory builds its client
   from the ambient AWS config (region from env/profile), so no STS
   `GetCallerIdentity` call is made on the read/write path. The full
   account/region identity (`infra.GetAWSIdentity` → `provider.AWSScope(accountID, region)`)
   is resolved separately by `binding.StagingScope` (the CLI's
-  `AWSStagingScopeResolver`, the GUI and the TUI all go through it), only where
+  `awsinternal.StagingScopeResolver`, the GUI and the TUI all go through it), only where
   staging state must be keyed.
 - **Google Cloud** — the project id from `--project` or `GOOGLE_CLOUD_PROJECT`
-  (`provider.GoogleCloudScope(project)`).
+  (`provider.GoogleCloudScope(project)`). The `gcloud` root package owns the
+  flag and the Before hook, which stores the id with `gcloudinternal.WithProject`
+  for both `gcloud secret` and `gcloud stage`.
 - **Azure** — the Key Vault name (`--vault-name` / `AZURE_KEYVAULT_NAME`) via
   `provider.AzureKeyVaultScope(vault)`, or the App Configuration store name
   (`--store-name` / `AZURE_APPCONFIG_NAME`) via
@@ -102,11 +115,11 @@ An unknown provider is `binding.ErrUnknownProvider`; a known provider without
 the kind is `provider.ErrUnsupportedKind`.
 
 Every staging command config (`stgcli.CommandConfig`, `stgcli.GlobalConfig`,
-`stgcli.GlobalServiceSpec`) must set a `ScopeResolver`. The CLI resolvers in
-`internal/cli/commands/internal/client.go` (`AWSStagingScopeResolver`,
-`GoogleCloudStagingScopeResolver`, `AzureKeyVaultStagingScopeResolver`,
-`AzureAppConfigStagingScopeResolver`) check the flag/env value and then call
-`binding.StagingScope`. Stage configs get `Factory` from
+`stgcli.GlobalServiceSpec`) must set a `ScopeResolver`. The CLI resolvers
+(`awsinternal.StagingScopeResolver`, `gcloudinternal.StagingScopeResolver`,
+`azureinternal.KeyVaultStagingScopeResolver`,
+`azureinternal.AppConfigStagingScopeResolver`) check the flag/env value and
+then call `binding.StagingScope`. Stage configs get `Factory` from
 `cliinternal.StrategyFactory(p, kind, store)` and `ParserFactory` from
 `cliinternal.ParserFactory(p, kind)`. A nil resolver fails the command. Each
 scope keys its on-disk staging state (`provider.Scope.Key`), partitioning staged
@@ -150,7 +163,8 @@ stores through the registry rather than a cloud SDK.
 4. Add its detection signal and env hydration in
    `internal/provider/detect/detect.go`, its launch-scope flags in
    `internal/cli/commands/launch.go`, and wire a command group in
-   `internal/cli/commands/<cloud>/` that builds the provider's `provider.Scope`.
+   `internal/cli/commands/<cloud>/` (with `Flat*Command` constructors) whose
+   `<cloud>/internal` package builds the provider's `provider.Scope`.
 5. Add its staging entry to the descriptor table in
    `internal/staging/binding/binding.go`.
 

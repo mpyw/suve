@@ -18,10 +18,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	awscmd "github.com/mpyw/suve/internal/cli/commands/aws"
-	"github.com/mpyw/suve/internal/cli/commands/aws/param"
-	"github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage"
+	"github.com/mpyw/suve/internal/cli/commands/aws"
 	"github.com/mpyw/suve/internal/cli/commands/azure"
 	"github.com/mpyw/suve/internal/cli/commands/gcloud"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
@@ -51,7 +48,7 @@ func MakeApp() *cli.Command {
 func MakeAppWithDetect(det detect.Result) *cli.Command {
 	// The explicit provider groups are always present and unambiguous.
 	commands := []*cli.Command{
-		awscmd.Command(),
+		aws.Command(),
 		gcloud.Command(),
 		azure.Command(),
 	}
@@ -228,7 +225,7 @@ func flatCommand(p provider.Provider, kind provider.Kind) *cli.Command {
 	case provider.KindParam:
 		switch p {
 		case provider.ProviderAWS:
-			return param.Command()
+			return aws.FlatParamCommand("param")
 		case provider.ProviderAzure:
 			return azure.FlatParamCommand("param")
 		case provider.ProviderGoogleCloud:
@@ -238,7 +235,7 @@ func flatCommand(p provider.Provider, kind provider.Kind) *cli.Command {
 	case provider.KindSecret:
 		switch p {
 		case provider.ProviderAWS:
-			return secret.Command()
+			return aws.FlatSecretCommand("secret")
 		case provider.ProviderGoogleCloud:
 			return gcloud.FlatSecretCommand("secret")
 		case provider.ProviderAzure:
@@ -255,7 +252,7 @@ func flatCommand(p provider.Provider, kind provider.Kind) *cli.Command {
 func flatStageCommand(p provider.Provider) *cli.Command {
 	switch p {
 	case provider.ProviderAWS:
-		return stage.Command()
+		return aws.FlatStageCommand("stage")
 	case provider.ProviderGoogleCloud:
 		return gcloud.FlatStageCommand("stage")
 	case provider.ProviderAzure:

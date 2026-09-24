@@ -38,3 +38,35 @@ shared config/credentials files, or an instance role).`,
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }
+
+// FlatParamCommand returns the AWS Parameter Store (param) command as a
+// standalone top-level command named `name`. AWS needs no group-level flags, so
+// the param group is self-contained. Used for the flat `suve param` alias when
+// AWS is the uniquely active param provider.
+func FlatParamCommand(name string) *cli.Command {
+	c := param.Command()
+	c.Name = name
+
+	return c
+}
+
+// FlatSecretCommand returns the AWS Secrets Manager (secret) command as a
+// standalone top-level command named `name`. Used for the flat `suve secret`
+// alias when AWS is the uniquely active secret provider.
+func FlatSecretCommand(name string) *cli.Command {
+	c := secret.Command()
+	c.Name = name
+
+	return c
+}
+
+// FlatStageCommand returns the AWS stage command as a standalone top-level
+// command named `name` (e.g. "stage"), carrying the per-service subgroups and
+// the all-service commands. Used for the flat `suve stage` alias when AWS is
+// the uniquely active staging provider.
+func FlatStageCommand(name string) *cli.Command {
+	c := stage.Command()
+	c.Name = name
+
+	return c
+}

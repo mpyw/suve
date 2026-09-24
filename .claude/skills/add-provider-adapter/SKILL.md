@@ -47,9 +47,18 @@ same shape.
 - Expose `Register(reg)` from the adapter package and call it from
   `builtin.NewRegistry()` (`internal/provider/builtin/builtin.go`), which the
   CLI, GUI and TUI all build from; wire the command group in
-  `internal/cli/commands/app.go`.
+  `internal/cli/commands/app.go`. The provider root package
+  (`internal/cli/commands/<cloud>`) exports `Command()` plus a
+  `Flat<Service>Command(name)` for each service and for stage, which `app.go`
+  uses for the env-detected flat aliases.
+- Put the provider's context keys, store resolvers (a scope built from the
+  flag/env value, then `cliinternal.Store(ctx, scope, kind)`) and staging-scope
+  resolvers in `internal/cli/commands/<cloud>/internal`, shared by the root
+  group and its service packages. `internal/cli/commands/internal` holds only
+  the provider-neutral registry and staging wiring.
 - Lay out each service's CLI as one flat package,
-  `internal/cli/commands/<cloud>/<service>`, with one file per subcommand
+  `internal/cli/commands/<cloud>/<service>`, even when the provider has only one
+  service, with one file per subcommand
   (`show.go` exposes `ShowCommand()`, `create.go` exposes `CreateCommand()`,
   and so on). Build the read commands on the flat
   `internal/cli/commands/generic` package (`generic.ShowCommand`,
@@ -89,8 +98,8 @@ Staging is a distinct increment on top of read/write (#247 → #261, #262):
   if the scope needs a network call), and the namespace flag if the service has
   one. The CLI, GUI and TUI all read it from there; do not add a per-provider
   switch in any UI.
-- Implement the provider `ScopeResolver` (next to the others in
-  `internal/cli/commands/internal/client.go`, a flag/env check plus
+- Implement the provider `ScopeResolver` (in
+  `internal/cli/commands/<cloud>/internal`, a flag/env check plus
   `binding.StagingScope`) and set it on every staging config; there is no
   default resolver. Build the config's `Factory` / `ParserFactory` with
   `cliinternal.StrategyFactory` / `cliinternal.ParserFactory`.
@@ -98,6 +107,8 @@ Staging is a distinct increment on top of read/write (#247 → #261, #262):
   stage path, e.g. `"suve gcloud stage"`) on every `stgcli.CommandConfig` and
   `stgcli.GlobalConfig`. The shared staging help, usage errors, and prompts
   render from them, so a missing value shows up as a blank path or "remote".
+- Keep one file per staged service, not a subpackage per service (the flat
+  `aws/stage` package has `param.go` and `secret.go`).
 - Register the service spec in `GlobalConfig` (#261).
 
 ## PR conventions

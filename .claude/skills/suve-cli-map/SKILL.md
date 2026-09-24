@@ -28,7 +28,9 @@ options and examples, read the full docs:
 - Explicit group form is always available: `suve <provider> <service> <command>`.
 - The bare `param` / `secret` / `stage` form works when exactly one provider is
   active for that service in the environment (see the
-  `provider-selection-and-registry` skill).
+  `provider-selection-and-registry` skill). Each provider builds its flat form
+  with `Flat{Param,Secret,Stage}Command` in `internal/cli/commands/<cloud>`, so
+  the flat and explicit forms share one command tree and help text.
 - Staging shares one workflow across providers:
   `add` / `edit` / `delete` / `status` / `diff` / `apply` / `reset` /
   `tag` / `untag` / `export` / `import`. The `stage` alias is `stg`.
@@ -57,3 +59,14 @@ options and examples, read the full docs:
   (no modified-after conflict check).
 - AWS also honors the standard AWS SDK credential chain; the env vars above are
   the signals suve's provider detection uses to activate the flat alias.
+
+## Where the commands live
+
+| Provider | Service commands | Stage commands |
+|----------|------------------|----------------|
+| AWS | `internal/cli/commands/aws/{param,secret}` | `aws/stage` (`param.go`, `secret.go`, all-service `command.go`) |
+| Google Cloud | `internal/cli/commands/gcloud/secret` | `gcloud/stage.go` |
+| Azure | `internal/cli/commands/azure/{param,secret}` | `azure/stage.go` |
+
+Group-level flags sit in the provider root (`gcloud` owns `--project`); the
+store and staging-scope resolvers sit in `internal/cli/commands/<cloud>/internal`.

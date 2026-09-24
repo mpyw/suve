@@ -5,8 +5,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
 )
 
@@ -14,7 +14,7 @@ import (
 //
 //declscope:package // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
-	return cliinternal.AWSSecretStore(ctx)
+	return awsinternal.SecretStore(ctx)
 }
 
 // TagCommand returns the Secrets Manager tag command.

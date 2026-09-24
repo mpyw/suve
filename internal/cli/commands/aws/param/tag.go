@@ -5,8 +5,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
 )
 
@@ -14,7 +14,7 @@ import (
 //
 //declscope:package // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
-	return cliinternal.AWSParamStore(ctx)
+	return awsinternal.ParamStore(ctx)
 }
 
 // TagCommand returns the SSM Parameter Store tag command.

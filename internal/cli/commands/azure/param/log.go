@@ -7,8 +7,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -109,7 +109,7 @@ EXAMPLES:
 			},
 		},
 		NewPresenter: func(ctx context.Context, req generic.LogRequest) (generic.LogPresenter, error) {
-			store, err := cliinternal.AzureAppConfigStore(ctx)
+			store, err := azureinternal.AppConfigStore(ctx)
 			if err != nil {
 				return nil, err
 			}

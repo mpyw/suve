@@ -8,7 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider/aws/infra"
@@ -60,7 +60,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	store, err := cliinternal.AWSParamStore(ctx)
+	store, err := awsinternal.ParamStore(ctx)
 	if err != nil {
 		return err
 	}

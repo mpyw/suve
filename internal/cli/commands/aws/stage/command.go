@@ -1,27 +1,36 @@
 // Package stage provides the "suve aws stage" command group: the param and
 // secret staging subgroups plus the all-service commands (status / diff /
 // apply / reset / export / import) that span both AWS services.
+//
+// command.go is this package's subject: the stage command group it assembles
+// from the per-service subgroups in param.go and secret.go. Hence core.
+//
+//declscope:core
 package stage
 
 import (
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/param"
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/secret"
+	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
 )
 
+// providerLabel names AWS in staging prompts and messages.
+//
+//declscope:package // param.go and secret.go label their stage configs with it
+const providerLabel = "AWS"
+
 // GlobalConfig builds the provider-wide stage config for AWS: param + secret
 // share one account/region staging scope.
 func GlobalConfig() stgcli.GlobalConfig {
-	paramCfg, secretCfg := param.Config(), secret.Config()
+	paramCfg, secretCfg := ParamConfig(), SecretConfig()
 
 	return stgcli.GlobalConfig{
-		ProviderLabel: "AWS",
+		ProviderLabel: providerLabel,
 		CommandPath:   "suve aws stage",
-		ScopeResolver: cliinternal.AWSStagingScopeResolver,
+		ScopeResolver: awsinternal.StagingScopeResolver,
 		Services: []stgcli.GlobalServiceSpec{
 			{
 				Service:       staging.ServiceParam,
@@ -68,8 +77,8 @@ EXAMPLES:
    suve aws stage export ./backup           Export staged changes to a directory
    suve aws stage import ./backup           Import staged changes from a directory`,
 		Commands: []*cli.Command{
-			param.Command(),
-			secret.Command(),
+			ParamCommand(),
+			SecretCommand(),
 			stgcli.NewGlobalStatusCommand(gcfg),
 			stgcli.NewGlobalDiffCommand(gcfg),
 			stgcli.NewGlobalApplyCommand(gcfg),

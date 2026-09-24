@@ -5,6 +5,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
@@ -22,7 +23,7 @@ const stageProviderLabel = "Azure"
 //
 //nolint:gochecknoglobals // static staging wiring, built once
 var appConfigStageStrategyFactory = cliinternal.StrategyFactory(
-	provider.ProviderAzure, provider.KindParam, cliinternal.AzureAppConfigStore,
+	provider.ProviderAzure, provider.KindParam, azureinternal.AppConfigStore,
 )
 
 // keyVaultStageConfig is the staging config for Azure Key Vault secrets. The
@@ -33,9 +34,9 @@ func keyVaultStageConfig() stgcli.CommandConfig {
 		ItemName:      stageNounSecret,
 		ProviderLabel: stageProviderLabel,
 		CommandPath:   "suve azure stage secret",
-		Factory:       cliinternal.StrategyFactory(provider.ProviderAzure, provider.KindSecret, cliinternal.AzureKeyVaultStore),
+		Factory:       cliinternal.StrategyFactory(provider.ProviderAzure, provider.KindSecret, azureinternal.KeyVaultStore),
 		ParserFactory: cliinternal.ParserFactory(provider.ProviderAzure, provider.KindSecret),
-		ScopeResolver: cliinternal.AzureKeyVaultStagingScopeResolver,
+		ScopeResolver: azureinternal.KeyVaultStagingScopeResolver,
 	}
 }
 
@@ -49,14 +50,14 @@ func appConfigStageConfig() stgcli.CommandConfig {
 		CommandPath:   "suve azure stage param",
 		Factory:       appConfigStageStrategyFactory,
 		ParserFactory: cliinternal.ParserFactory(provider.ProviderAzure, provider.KindParam),
-		ScopeResolver: cliinternal.AzureAppConfigStagingScopeResolver,
+		ScopeResolver: azureinternal.AppConfigStagingScopeResolver,
 		// App Configuration keys are per-(name, namespace): the --namespace value
 		// (resolved into ctx) is recorded on each staged entry, and status/diff/
 		// apply resolve a store scoped to each entry's own namespace so one
 		// per-store staging file spans every namespace (#431).
-		Namespace: cliinternal.AzureAppConfigNamespace,
+		Namespace: azureinternal.AppConfigNamespace,
 		StrategyForNamespace: func(ctx context.Context, namespace string) (staging.FullStrategy, error) {
-			return appConfigStageStrategyFactory(cliinternal.WithAzureAppConfigNamespace(ctx, namespace))
+			return appConfigStageStrategyFactory(azureinternal.WithAppConfigNamespace(ctx, namespace))
 		},
 	}
 }
@@ -113,7 +114,7 @@ func keyVaultStageGroup() *cli.Command {
 			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			return cliinternal.WithAzureVaultName(ctx, cmd.String("vault-name")), nil
+			return azureinternal.WithVaultName(ctx, cmd.String("vault-name")), nil
 		},
 		Commands:        keyVaultStageSubcommands(keyVaultStageConfig()),
 		CommandNotFound: cliinternal.CommandNotFound,
@@ -143,8 +144,8 @@ func appConfigStageGroup() *cli.Command {
 			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			ctx = cliinternal.WithAzureStoreName(ctx, cmd.String("store-name"))
-			ctx = cliinternal.WithAzureAppConfigNamespace(ctx, cmd.String("namespace"))
+			ctx = azureinternal.WithStoreName(ctx, cmd.String("store-name"))
+			ctx = azureinternal.WithAppConfigNamespace(ctx, cmd.String("namespace"))
 
 			return ctx, nil
 		},
@@ -247,8 +248,8 @@ func StageCommand() *cli.Command {
 			// resolvers can key state. The per-service subgroups own the same flags
 			// and re-inject in their own Before, so subgroup invocations are
 			// unaffected.
-			ctx = cliinternal.WithAzureStoreName(ctx, cmd.String("store-name"))
-			ctx = cliinternal.WithAzureVaultName(ctx, cmd.String("vault-name"))
+			ctx = azureinternal.WithStoreName(ctx, cmd.String("store-name"))
+			ctx = azureinternal.WithVaultName(ctx, cmd.String("vault-name"))
 
 			return ctx, nil
 		},

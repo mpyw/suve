@@ -1,4 +1,4 @@
-package gcloud
+package secret
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
+	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
@@ -242,7 +242,7 @@ EXAMPLES:
 			},
 		},
 		NewPresenter: func(ctx context.Context, req generic.LogRequest) (generic.LogPresenter, error) {
-			store, err := cliinternal.GoogleCloudSecretStore(ctx)
+			store, err := gcloudinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

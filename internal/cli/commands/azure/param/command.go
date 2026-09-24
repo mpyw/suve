@@ -19,6 +19,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 )
 
@@ -62,8 +63,8 @@ variable.`,
 		// Resolution is deferred to store construction, so `suve azure param
 		// --help` works without a store.
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			ctx = cliinternal.WithAzureStoreName(ctx, cmd.String("store-name"))
-			ctx = cliinternal.WithAzureAppConfigNamespace(ctx, cmd.String("namespace"))
+			ctx = azureinternal.WithStoreName(ctx, cmd.String("store-name"))
+			ctx = azureinternal.WithAppConfigNamespace(ctx, cmd.String("namespace"))
 
 			return ctx, nil
 		},

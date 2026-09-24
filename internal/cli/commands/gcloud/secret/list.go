@@ -1,4 +1,4 @@
-package gcloud
+package secret
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
+	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -50,7 +50,7 @@ EXAMPLES:
 		NewList: func(
 			ctx context.Context, cmd *cli.Command, withValue bool,
 		) (func(context.Context) ([]generic.ListEntry, error), error) {
-			store, err := cliinternal.GoogleCloudSecretStore(ctx)
+			store, err := gcloudinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

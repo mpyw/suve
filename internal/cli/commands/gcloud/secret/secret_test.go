@@ -1,22 +1,19 @@
-package gcloud_test
+package secret_test
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
-	"github.com/mpyw/suve/internal/cli/commands/gcloud"
+	"github.com/mpyw/suve/internal/cli/commands/gcloud/secret"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
@@ -103,12 +100,12 @@ func TestCreateRunner(t *testing.T) {
 
 	var buf, errBuf bytes.Buffer
 
-	r := &gcloud.CreateRunner{
+	r := &secret.CreateRunner{
 		UseCase: &secretusecase.CreateUseCase{Writer: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
-	require.NoError(t, r.Run(t.Context(), gcloud.CreateOptions{Name: "my-secret", Value: "value", Description: "app credentials"}))
+	require.NoError(t, r.Run(t.Context(), secret.CreateOptions{Name: "my-secret", Value: "value", Description: "app credentials"}))
 	assert.Contains(t, buf.String(), "Created secret my-secret")
 	assert.Contains(t, buf.String(), "version: 1")
 	assert.Equal(t, "app credentials", gotDescription, "the --description value reaches the writer")
@@ -136,12 +133,12 @@ func TestUpdateRunner(t *testing.T) {
 
 	var buf, errBuf bytes.Buffer
 
-	r := &gcloud.UpdateRunner{
+	r := &secret.UpdateRunner{
 		UseCase: &secretusecase.UpdateUseCase{Store: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
-	require.NoError(t, r.Run(t.Context(), gcloud.UpdateOptions{Name: "my-secret", Value: "new", Description: "rotated key"}))
+	require.NoError(t, r.Run(t.Context(), secret.UpdateOptions{Name: "my-secret", Value: "new", Description: "rotated key"}))
 	assert.Contains(t, buf.String(), "Updated secret my-secret")
 	assert.Contains(t, buf.String(), "version: 2")
 	assert.Equal(t, "rotated key", gotDescription, "the --description value reaches the writer")
@@ -158,12 +155,12 @@ func TestUpdateRunner_NotFound(t *testing.T) {
 
 	var buf, errBuf bytes.Buffer
 
-	r := &gcloud.UpdateRunner{
+	r := &secret.UpdateRunner{
 		UseCase: &secretusecase.UpdateUseCase{Store: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
-	err := r.Run(t.Context(), gcloud.UpdateOptions{Name: "missing", Value: "new"})
+	err := r.Run(t.Context(), secret.UpdateOptions{Name: "missing", Value: "new"})
 	require.ErrorIs(t, err, secretusecase.ErrSecretNotFound)
 }
 
@@ -182,12 +179,12 @@ func TestDeleteRunner(t *testing.T) {
 
 	var buf, errBuf bytes.Buffer
 
-	r := &gcloud.DeleteRunner{
+	r := &secret.DeleteRunner{
 		UseCase: &secretusecase.DeleteUseCase{Store: store},
 		Stdout:  &buf,
 		Stderr:  &errBuf,
 	}
-	require.NoError(t, r.Run(t.Context(), gcloud.DeleteOptions{Name: "my-secret"}))
+	require.NoError(t, r.Run(t.Context(), secret.DeleteOptions{Name: "my-secret"}))
 	assert.Equal(t, "my-secret", deleted)
 	assert.Contains(t, buf.String(), "Permanently deleted secret my-secret")
 }
@@ -218,7 +215,7 @@ func TestShowPresenter(t *testing.T) {
 	spec, err := gcloudversion.Parse("my-secret")
 	require.NoError(t, err)
 
-	presenter := gcloud.NewShowPresenter(store, spec)
+	presenter := secret.NewShowPresenter(store, spec)
 	require.NoError(t, presenter.Fetch(t.Context()))
 
 	var buf, errBuf bytes.Buffer
@@ -288,7 +285,7 @@ func TestLogPresenter(t *testing.T) {
 		},
 	}
 
-	presenter := gcloud.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
+	presenter := secret.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 	require.NoError(t, presenter.Fetch(t.Context()))
 	assert.Equal(t, 2, presenter.Len())
 
@@ -364,7 +361,7 @@ func TestLogPresenter_Patch(t *testing.T) {
 		},
 	}
 
-	presenter := gcloud.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
+	presenter := secret.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 	require.NoError(t, presenter.Fetch(t.Context()))
 
 	var buf, errBuf bytes.Buffer
@@ -430,7 +427,7 @@ func TestDiffPresenter(t *testing.T) {
 			"#2": {Name: "my-secret", Value: "new-value", Version: domain.Version{ID: "2"}},
 		})
 
-		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
+		presenter := secret.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
 		out, err := runDiff(t, presenter, generic.DiffOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, out, "-old-value")
@@ -448,7 +445,7 @@ func TestDiffPresenter(t *testing.T) {
 			"#2": {Name: "my-secret", Value: "new-value", Version: domain.Version{ID: "2"}},
 		})
 
-		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
+		presenter := secret.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
 		out, err := runDiff(t, presenter, generic.DiffOptions{Output: output.FormatJSON})
 		require.NoError(t, err)
 
@@ -482,7 +479,7 @@ func TestDiffPresenter(t *testing.T) {
 			"#2": {Name: "my-secret", Value: "new-value", Version: domain.Version{ID: "2"}},
 		})
 
-		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
+		presenter := secret.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
 		_, err := runDiff(t, presenter, generic.DiffOptions{})
 		require.Error(t, err)
 	})
@@ -495,7 +492,7 @@ func TestDiffPresenter(t *testing.T) {
 			"#2": {Name: "my-secret", Value: "same-value", Version: domain.Version{ID: "2"}},
 		})
 
-		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
+		presenter := secret.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
 		out, err := runDiff(t, presenter, generic.DiffOptions{Output: output.FormatJSON})
 		require.NoError(t, err)
 
@@ -507,43 +504,4 @@ func TestDiffPresenter(t *testing.T) {
 		assert.True(t, diffOut.Identical)
 		assert.Empty(t, diffOut.Diff)
 	})
-}
-
-// TestGoogleCloudStageHelpWording verifies the stage help text names Google Cloud and uses the explicit
-// "suve gcloud stage" command paths, never another provider's wording or the flat
-// alias paths.
-func TestGoogleCloudStageHelpWording(t *testing.T) {
-	t.Parallel()
-
-	for path, text := range gcloudStageHelpTexts(gcloud.StageCommand(), "suve gcloud stage") {
-		assert.NotContains(t, text, "AWS", path)
-		for _, m := range regexp.MustCompile(`suve (?:aws|gcloud|azure|param|secret|stage|stg)\b`).FindAllString(text, -1) {
-			assert.Equal(t, "suve gcloud", m, "%s: %q", path, text)
-		}
-	}
-}
-
-// gcloudStageHelpTexts returns every help string (usage, description, flag usages) in the
-// command tree, keyed by the command path.
-func gcloudStageHelpTexts(cmd *cli.Command, path string) map[string]string {
-	texts := map[string]string{}
-
-	var walk func(c *cli.Command, p string)
-	walk = func(c *cli.Command, p string) {
-		parts := []string{c.Usage, c.Description}
-		for _, f := range c.Flags {
-			if u, ok := f.(interface{ GetUsage() string }); ok {
-				parts = append(parts, u.GetUsage())
-			}
-		}
-
-		texts[p] = strings.Join(parts, "\n")
-
-		for _, sub := range c.Commands {
-			walk(sub, p+" "+sub.Name)
-		}
-	}
-	walk(cmd, path)
-
-	return texts
 }

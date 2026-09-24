@@ -8,8 +8,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
+	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/jsonutil"
@@ -163,7 +163,7 @@ EXAMPLES:
 		UsageError: "usage: suve aws secret show <name>",
 		ParseSpec:  awssecretversion.Parse,
 		NewPresenter: func(ctx context.Context, spec *awssecretversion.Spec) (generic.ShowPresenter, error) {
-			store, err := cliinternal.AWSSecretStore(ctx)
+			store, err := awsinternal.SecretStore(ctx)
 			if err != nil {
 				return nil, err
 			}

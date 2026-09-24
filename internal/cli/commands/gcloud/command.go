@@ -3,12 +3,13 @@
 // "suve gcloud stage <op>" staging workflow.
 //
 // Google Cloud is secret-only (no parameter store). The read/write/tag commands
-// (show, log, list, diff, create, update, delete, tag, untag) and the staging
-// commands reuse the same generic scaffolding as their AWS counterparts via
-// Google Cloud-specific presenters, use cases, and staging strategy.
+// live in the gcloud/secret package; the staging commands (stage.go) drive the
+// shared staging scaffolding with the Google Cloud strategy. This package owns
+// the --project flag and the Before hook that resolves it, so both subgroups
+// see the same project.
 //
 // command.go is this package's subject: the gcloud command group it assembles,
-// together with the vocabulary and hooks its sibling files share. Hence core.
+// together with the flag and hook its sibling files share. Hence core.
 //
 //declscope:core
 package gcloud
@@ -19,13 +20,10 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
+	"github.com/mpyw/suve/internal/cli/commands/gcloud/secret"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 )
-
-// nounSecret is the command name / noun used across the Google Cloud secret commands.
-//
-//declscope:package // tag.go, untag.go and stage.go name their commands with it
-const nounSecret = "secret"
 
 // Command returns the gcloud command with the secret subcommand group.
 func Command() *cli.Command {
@@ -47,7 +45,7 @@ environment variable. Authentication uses Application Default Credentials.`,
 		// `suve gcloud secret --help` still works without a project.
 		Before: resolveProject,
 		Commands: []*cli.Command{
-			SecretCommand(),
+			secret.Command(),
 			StageCommand(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
@@ -60,7 +58,7 @@ environment variable. Authentication uses Application Default Credentials.`,
 // project-resolving Before hook. Used for the flat `suve secret` alias when
 // Google Cloud is the uniquely active secret provider.
 func FlatSecretCommand(name string) *cli.Command {
-	c := SecretCommand()
+	c := secret.Command()
 	c.Name = name
 	c.Flags = projectFlags()
 	c.Before = resolveProject
@@ -91,26 +89,5 @@ func resolveProject(ctx context.Context, cmd *cli.Command) (context.Context, err
 		project = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	}
 
-	return cliinternal.WithGoogleCloudProject(ctx, project), nil
-}
-
-// SecretCommand returns the "gcloud secret" subcommand group.
-func SecretCommand() *cli.Command {
-	return &cli.Command{
-		Name:    nounSecret,
-		Aliases: []string{"secrets", "sm"},
-		Usage:   "Interact with Google Cloud Secret Manager secrets",
-		Commands: []*cli.Command{
-			ShowCommand(),
-			LogCommand(),
-			DiffCommand(),
-			ListCommand(),
-			CreateCommand(),
-			UpdateCommand(),
-			DeleteCommand(),
-			TagCommand(),
-			UntagCommand(),
-		},
-		CommandNotFound: cliinternal.CommandNotFound,
-	}
+	return gcloudinternal.WithProject(ctx, project), nil
 }

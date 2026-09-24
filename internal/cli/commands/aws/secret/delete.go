@@ -9,7 +9,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
@@ -126,7 +126,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	store, err := cliinternal.AWSSecretStore(ctx)
+	store, err := awsinternal.SecretStore(ctx)
 	if err != nil {
 		return err
 	}

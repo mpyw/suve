@@ -8,7 +8,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -59,7 +59,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 	name := cmd.Args().First()
 	skipConfirm := cmd.Bool("yes")
 
-	store, err := cliinternal.AzureAppConfigStore(ctx)
+	store, err := azureinternal.AppConfigStore(ctx)
 	if err != nil {
 		return err
 	}

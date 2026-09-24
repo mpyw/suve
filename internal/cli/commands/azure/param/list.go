@@ -9,8 +9,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/cli/commands/generic"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
@@ -301,7 +301,7 @@ EXAMPLES:
 				return err
 			}
 
-			store, err := cliinternal.AzureAppConfigStore(ctx)
+			store, err := azureinternal.AppConfigStore(ctx)
 			if err != nil {
 				return err
 			}
@@ -323,7 +323,7 @@ EXAMPLES:
 				Show:      cmd.Bool("show"),
 				HideNS:    cmd.Bool("hide-namespace"),
 				Output:    outputFormat,
-				Namespace: cliinternal.AzureAppConfigNamespace(ctx),
+				Namespace: azureinternal.AppConfigNamespace(ctx),
 			})
 		},
 	}

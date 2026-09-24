@@ -1,4 +1,4 @@
-package param_test
+package stage_test
 
 import (
 	"testing"
@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/stage/param"
+	"github.com/mpyw/suve/internal/cli/commands/aws/stage"
 )
 
-func TestCommand(t *testing.T) {
+func TestParamCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 
 	require.NotNil(t, cmd)
 	assert.Equal(t, "param", cmd.Name)
@@ -25,10 +25,10 @@ func TestCommand(t *testing.T) {
 	assert.NotNil(t, cmd.CommandNotFound)
 }
 
-func TestCommand_HasExpectedSubcommands(t *testing.T) {
+func TestParamCommand_HasExpectedSubcommands(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Extract subcommand names
@@ -56,10 +56,10 @@ func TestCommand_HasExpectedSubcommands(t *testing.T) {
 	}
 }
 
-func TestCommand_AddSubcommand(t *testing.T) {
+func TestParamCommand_AddSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find add subcommand
@@ -74,10 +74,10 @@ func TestCommand_AddSubcommand(t *testing.T) {
 	assert.NotNil(t, addCmd.Action)
 }
 
-func TestCommand_EditSubcommand(t *testing.T) {
+func TestParamCommand_EditSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find edit subcommand
@@ -92,10 +92,10 @@ func TestCommand_EditSubcommand(t *testing.T) {
 	assert.NotNil(t, editCmd.Action)
 }
 
-func TestCommand_AddEditHaveTypeFlags(t *testing.T) {
+func TestParamCommand_AddEditHaveTypeFlags(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	for _, name := range []string{"add", "edit"} {
@@ -112,10 +112,10 @@ func TestCommand_AddEditHaveTypeFlags(t *testing.T) {
 	}
 }
 
-func TestCommand_DeleteSubcommand(t *testing.T) {
+func TestParamCommand_DeleteSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find delete subcommand
@@ -130,10 +130,10 @@ func TestCommand_DeleteSubcommand(t *testing.T) {
 	assert.NotNil(t, deleteCmd.Action)
 }
 
-func TestCommand_StatusSubcommand(t *testing.T) {
+func TestParamCommand_StatusSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find status subcommand
@@ -147,10 +147,10 @@ func TestCommand_StatusSubcommand(t *testing.T) {
 	assert.NotNil(t, statusCmd.Action)
 }
 
-func TestCommand_DiffSubcommand(t *testing.T) {
+func TestParamCommand_DiffSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find diff subcommand
@@ -164,10 +164,10 @@ func TestCommand_DiffSubcommand(t *testing.T) {
 	assert.NotNil(t, diffCmd.Action)
 }
 
-func TestCommand_ApplySubcommand(t *testing.T) {
+func TestParamCommand_ApplySubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find apply subcommand
@@ -181,10 +181,10 @@ func TestCommand_ApplySubcommand(t *testing.T) {
 	assert.NotNil(t, applyCmd.Action)
 }
 
-func TestCommand_ResetSubcommand(t *testing.T) {
+func TestParamCommand_ResetSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find reset subcommand
@@ -198,10 +198,10 @@ func TestCommand_ResetSubcommand(t *testing.T) {
 	assert.NotNil(t, resetCmd.Action)
 }
 
-func TestCommand_TagSubcommand(t *testing.T) {
+func TestParamCommand_TagSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find tag subcommand
@@ -215,10 +215,10 @@ func TestCommand_TagSubcommand(t *testing.T) {
 	assert.NotNil(t, tagCmd.Action)
 }
 
-func TestCommand_UntagSubcommand(t *testing.T) {
+func TestParamCommand_UntagSubcommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	// Find untag subcommand
@@ -232,10 +232,10 @@ func TestCommand_UntagSubcommand(t *testing.T) {
 	assert.NotNil(t, untagCmd.Action)
 }
 
-func TestCommand_ExportImportSubcommands(t *testing.T) {
+func TestParamCommand_ExportImportSubcommands(t *testing.T) {
 	t.Parallel()
 
-	cmd := param.Command()
+	cmd := stage.ParamCommand()
 	require.NotNil(t, cmd)
 
 	for _, name := range []string{"export", "import"} {
