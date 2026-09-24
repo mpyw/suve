@@ -276,9 +276,9 @@ func formatDate(t *time.Time) string {
 // =============================================================================
 // Shared seam types
 //
-// These types are shared across the seam files (mutator*.go, probe.go,
-// staging.go) and their consumers; they live here because their names
-// are package-wide vocabulary rather than any one file's.
+// These types are shared across the seam files (mutator*.go, stage.go) and
+// their consumers; they live here because their names are package-wide
+// vocabulary rather than any one file's.
 // =============================================================================
 
 // WriteOutcome carries the semantic result of a mutation the UI must voice.
