@@ -545,7 +545,7 @@ Output will look like:
 > For detailed documentation, see [Stage Lifecycle](docs/staging-state-transitions.md).
 
 > [!TIP]
-> Staged values live in encrypted files under `~/.suve/staging/`. Use `suve stage export <dir>` to write them to portable snapshot files and `suve stage import <dir>` to restore them later.
+> Staged values live in encrypted files under `~/.suve/staging/`. Use `suve stage export` to write them to portable snapshot files and `suve stage import` to restore them later. See [Export / Import Commands](#export--import-commands) for the forms each backend supports.
 
 **1. Stage changes** (opens editor or accepts value directly):
 
@@ -635,6 +635,9 @@ suve stage param export ./param-backup.json
 # Import a single service from a specific file
 suve stage param import ./param-backup.json
 ```
+
+> [!IMPORTANT]
+> The directory form (`suve stage export <dir>` / `suve stage import <dir>`) is AWS-only. On Azure, export and import each service to its own file (`suve stage secret export <file>`, `suve stage param export <file>`). Google Cloud is secret-only, so `suve stage export <file>` exports its one service.
 
 > [!NOTE]
 > `export` writes the working area out wholesale (no merge). `import` prompts to Merge or Overwrite only when the working area already holds changes; pass `--merge` / `--overwrite` to choose non-interactively.
@@ -1004,7 +1007,7 @@ Every backend shares one staging workflow, invoked as `suve <provider> stage <se
 | `apply` | `--yes`<br>`--ignore-conflicts`² | Apply staged changes |
 | `reset` | `--all` | Unstage; or `reset <name>#<VERSION>` / `<name>~N` restores that live version as the staged value³ |
 | `tag` / `untag` | `<KEY>=<VALUE>...` / `<KEY>...` | Stage tag additions / removals |
-| `export` / `import` | see [Export / Import Commands](#export--import-commands) | Portable snapshot files (per service or whole scope) |
+| `export` / `import` | see [Export / Import Commands](#export--import-commands) | Portable snapshot files (per service, or every AWS service at once) |
 
 ¹ Only where the backend stores a description (AWS, Google Cloud); Azure omits the flag. AWS Parameter Store staging additionally accepts its type flags (`--type`, `--secure`).
 
@@ -1027,15 +1030,20 @@ Every backend shares one staging workflow, invoked as `suve <provider> stage <se
 
 Export writes the working staging area out to portable snapshot files (one per service) and import reads them back. Each file is a plaintext JSON envelope (`{version, provider, scope, service, payload}`) whose `payload` is passphrase-encrypted (Argon2id) or plaintext when the passphrase is empty. The full scope is embedded and validated on import.
 
-| Command | Argument | Options | Description |
-|---------|----------|---------|-------------|
-| `suve stage export` | `<dir>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export every service with staged changes to `<dir>/param.json` + `<dir>/secret.json` |
-| `suve stage {param,secret} export` | `<file>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export a single service to `<file>` |
-| `suve stage import` | `<dir>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--allow-scope-mismatch` | Import `param.json` / `secret.json` from `<dir>` (missing files skipped; nothing imported if both absent) |
-| `suve stage {param,secret} import` | `<file>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--allow-scope-mismatch` | Import a single service from `<file>` (missing file or service mismatch is a hard error) |
+| Command | Backend | Argument | Options | Description |
+|---------|---------|----------|---------|-------------|
+| `suve stage export` | AWS | `<dir>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export every service with staged changes to `<dir>/param.json` + `<dir>/secret.json` |
+| `suve stage {param,secret} export` | AWS, Azure | `<file>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export a single service to `<file>` |
+| `suve stage export` | Google Cloud | `<file>` | `--keep`<br>`--yes` (`--force`)<br>`--passphrase-stdin` | Export the staged Secret Manager changes to `<file>` |
+| `suve stage import` | AWS | `<dir>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--allow-scope-mismatch` | Import `param.json` / `secret.json` from `<dir>` (missing files skipped; nothing imported if both absent) |
+| `suve stage {param,secret} import` | AWS, Azure | `<file>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--allow-scope-mismatch` | Import a single service from `<file>` (missing file or service mismatch is a hard error) |
+| `suve stage import` | Google Cloud | `<file>` | `--merge`<br>`--overwrite`<br>`--yes`<br>`--passphrase-stdin`<br>`--allow-scope-mismatch` | Import Secret Manager changes from `<file>` (missing file or service mismatch is a hard error) |
+
+> [!NOTE]
+> Azure has no all-service `export` / `import`. Key Vault and App Configuration keep separate staging scopes, and one snapshot directory holds one scope. Export each Azure service to its own file instead.
 
 - **`export`** writes the working area out wholesale; there is no `--merge` / `--overwrite`. By default it clears the working staging area; `--keep` retains it. `--yes` / `--force` skip the overwrite confirmation.
-- **Directory export is not atomic across files.** `suve stage export <dir>` writes `param.json` and `secret.json` as separate files. If the first write succeeds and the second fails (for example a full disk or a permissions error), the command aborts with an error and leaves a partial directory — a freshly written `param.json` alongside a stale or missing `secret.json`. Your working staging area is never touched, so no staged changes are lost; just re-run the export once the underlying problem is resolved and it overwrites the directory cleanly. Because each snapshot file embeds and validates its own scope on import, a later `stage import <dir>` restores whatever files are present per service without silently merging a mismatched pair; still, avoid importing a directory left behind by a failed export.
+- **Directory export is not atomic across files.** On AWS, `suve stage export <dir>` writes `param.json` and `secret.json` as separate files. If the first write succeeds and the second fails (for example a full disk or a permissions error), the command aborts with an error and leaves a partial directory — a freshly written `param.json` alongside a stale or missing `secret.json`. Your working staging area is never touched, so no staged changes are lost; just re-run the export once the underlying problem is resolved and it overwrites the directory cleanly. Because each snapshot file embeds and validates its own scope on import, a later `stage import <dir>` restores whatever files are present per service without silently merging a mismatched pair; still, avoid importing a directory left behind by a failed export.
 - **`import`** has no `--keep` (it is read-only on the file). `--merge` / `--overwrite` are mutually exclusive and only matter when the working area already holds changes; otherwise the file is applied directly. `--allow-scope-mismatch` imports even when the file's embedded scope differs from the current scope.
 
 ## Environment Variables
