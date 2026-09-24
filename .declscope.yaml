@@ -11,3 +11,7 @@ rules:
   # as a whole. One that no other namespace needs is narrowed with
   # //declscope:private.
   surplus: strict
+  # Report and delete a scope directive that names the scope its declarations
+  # would have without it, under this configuration, so every directive left
+  # changes something today.
+  unused: strict

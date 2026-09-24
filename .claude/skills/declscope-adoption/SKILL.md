@@ -3,14 +3,14 @@ name: declscope-adoption
 description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when clearing a declscope baseline, or when a declscope diagnostic is hard to act on. Covers reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence.
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.11.0
-x-embedded-at: "2026-09-24T00:21:03Z"
-x-embedded-digest: "sha256:2ff911d401ec223a7756f28ac1415918b8484b4909d04ecb65173548860572ae"
+x-embedded-version: 0.12.0
+x-embedded-at: "2026-09-24T07:05:04Z"
+x-embedded-digest: "sha256:3ff360b2bf9880e00a36ba22f0de09062eb5545f8fccf2a48874b717712d6f58"
 ---
 
 # Adopting declscope
 
-Written against **declscope 0.11.0**. Check the version first: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.12.0**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
@@ -28,6 +28,7 @@ Two of the three rules are off unless the repository asks for them. A count of z
 | `rules.naming.exported` | `false` | Even when on, it skips exported declarations |
 | `rules.surplus` | `loose` | The surplus rule is **on**. `strict` also judges each declaration a directive widens; `off` turns it off |
 | `rules.boundary` | `on` | The boundary rule is **on**. `off` leaves only the naming rule |
+| `rules.unused` | `loose` | The unused rule is **on**. It reports an ignore that silenced nothing, and a scope directive no configuration could make bind. `strict` also reports one that restates the scope in force; `off` turns it off. Malformed directives are the `directive` rule's, which is always on |
 | `filter.only` | None | When set anywhere in the chain, files outside it are never read |
 
 The config is looked up from each analyzed package's directory **upwards**, so a subtree can carry its own and a repository can have several. Find them all, and do not read the root alone:
@@ -65,6 +66,8 @@ declscope survey -config /tmp/s.yaml -format=json ./... | jq .totals.surplus
 ```
 
 A throwaway `-config` replaces the repository's own config. Copy its keys in first, or the count is taken under the defaults.
+
+**Offer `rules.unused: strict` the same way.** Under `loose`, a `//declscope:private` that names the scope `defaults.unexported` gives is kept, since another default could make it bind. `strict` reports it, and one `declscope -fix` run deletes it. Offer it only where `defaults.unexported` is settled. Under `strict`, a change of the default reports every directive that restates the new one. Size it the same way, with `jq .totals.unused`.
 
 **If the goal is a tidier codebase, offer the naming rule on top.** It is a convention. It fires where nothing is wrong, and it costs real work. Size it before offering, with a throwaway config rather than by counting message fragments:
 
