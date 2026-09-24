@@ -64,3 +64,7 @@ Thumbs.db
 
 # Generated GitHub Pages site (assembled source, build output, and local venv)
 /.site/
+
+# Python bytecode (docs-site scripts)
+__pycache__/
+*.pyc
