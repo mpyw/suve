@@ -5,8 +5,6 @@ import (
 	"strconv"
 
 	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
 // ErrInvalidNumericVersion is returned when # is not followed by a version number.
@@ -52,7 +50,7 @@ func (g NumericGrammar) Parse(input string) (*NumericSpec, error) {
 	parsers := []specifierParser[NumericAbsolute]{
 		{
 			PrefixChar: '#',
-			IsChar:     internal.IsDigit,
+			IsChar:     isDigitChar,
 			Error:      ErrInvalidNumericVersion,
 			Duplicated: NumericAbsolute.IsSet,
 			Apply: func(value string, abs NumericAbsolute) (NumericAbsolute, error) {

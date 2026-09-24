@@ -11,8 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
 // Sentinel errors for testing.
@@ -30,7 +28,7 @@ func testParser() absoluteParser[parseTestAbsolute] {
 		Parsers: []specifierParser[parseTestAbsolute]{
 			{
 				PrefixChar: '#',
-				IsChar:     internal.IsDigit,
+				IsChar:     isDigitChar,
 				Error:      errParseTestMustHaveNumber,
 				Duplicated: func(abs parseTestAbsolute) bool {
 					return abs.Number != nil
@@ -48,7 +46,7 @@ func testParser() absoluteParser[parseTestAbsolute] {
 			},
 			{
 				PrefixChar: ':',
-				IsChar:     internal.IsLetter,
+				IsChar:     isLetterChar,
 				Error:      nil, // No error, treat as part of name if not followed by letter
 				Duplicated: func(abs parseTestAbsolute) bool {
 					return abs.Label != ""
@@ -268,7 +266,7 @@ func TestParse_ApplyError(t *testing.T) {
 		Parsers: []specifierParser[parseTestAbsolute]{
 			{
 				PrefixChar: '#',
-				IsChar:     internal.IsDigit,
+				IsChar:     isDigitChar,
 				Error:      errParseTestMustHaveNumber,
 				Apply: func(_ string, _ parseTestAbsolute) (parseTestAbsolute, error) {
 					return parseTestAbsolute{}, errParseTestApplyFailed
@@ -293,7 +291,7 @@ func TestParse_NoDuplicatedCheck(t *testing.T) {
 		Parsers: []specifierParser[parseTestAbsolute]{
 			{
 				PrefixChar: '#',
-				IsChar:     internal.IsDigit,
+				IsChar:     isDigitChar,
 				Error:      nil,
 				Duplicated: nil, // No duplicate check
 				Apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
@@ -340,7 +338,7 @@ func TestParse_UnknownCharAfterAbsolute(t *testing.T) {
 		Parsers: []specifierParser[parseTestAbsolute]{
 			{
 				PrefixChar: '#',
-				IsChar:     internal.IsDigit,
+				IsChar:     isDigitChar,
 				Error:      errParseTestMustHaveNumber,
 				Duplicated: func(abs parseTestAbsolute) bool {
 					return abs.Number != nil
@@ -398,7 +396,7 @@ func TestParse_MatchParserNoMatch(t *testing.T) {
 		Parsers: []specifierParser[parseTestAbsolute]{
 			{
 				PrefixChar: '#',
-				IsChar:     internal.IsDigit,
+				IsChar:     isDigitChar,
 				Error:      errParseTestMustHaveNumber,
 				Apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
 					n := 0

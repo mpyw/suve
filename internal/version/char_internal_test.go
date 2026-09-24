@@ -1,14 +1,12 @@
-package internal_test
+package version
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
-func TestIsDigit(t *testing.T) {
+func TestIsDigitChar(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -24,11 +22,11 @@ func TestIsDigit(t *testing.T) {
 		{'/', false},
 	}
 	for _, tt := range tests {
-		assert.Equal(t, tt.want, internal.IsDigit(tt.c), "IsDigit(%q)", tt.c)
+		assert.Equal(t, tt.want, isDigitChar(tt.c), "isDigitChar(%q)", tt.c)
 	}
 }
 
-func TestIsLetter(t *testing.T) {
+func TestIsLetterChar(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -47,6 +45,6 @@ func TestIsLetter(t *testing.T) {
 		{'_', false},
 	}
 	for _, tt := range tests {
-		assert.Equal(t, tt.want, internal.IsLetter(tt.c), "IsLetter(%q)", tt.c)
+		assert.Equal(t, tt.want, isLetterChar(tt.c), "isLetterChar(%q)", tt.c)
 	}
 }

@@ -2,8 +2,6 @@ package version
 
 import (
 	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
 // OpaqueAbsolute is the absolute specifier of an opaque grammar: an optional
@@ -109,7 +107,7 @@ func (OpaqueGrammar) Suffix(spec *OpaqueSpec) string {
 
 // isOpaqueLabelChar reports whether c is valid within a staging label.
 func isOpaqueLabelChar(c byte) bool {
-	return internal.IsLetter(c) || internal.IsDigit(c) || c == '-' || c == '_'
+	return isLetterChar(c) || isDigitChar(c) || c == '-' || c == '_'
 }
 
 // Split parses input and returns its name plus the rebuilt suffix (Suffix), the

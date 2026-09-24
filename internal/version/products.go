@@ -7,8 +7,6 @@ package version
 
 import (
 	"errors"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
 // Product-specific errors.
@@ -79,11 +77,11 @@ var (
 // alongside letters, digits and '-'. Excludes the specifier characters '#',
 // ':', '~'.
 func isSecretsManagerIDChar(c byte) bool {
-	return internal.IsLetter(c) || internal.IsDigit(c) || c == '-' || c == '_' || c == '.'
+	return isLetterChar(c) || isDigitChar(c) || c == '-' || c == '_' || c == '.'
 }
 
 // isKeyVaultIDChar reports whether c is valid within a Key Vault version id
 // (hex-like: letters, digits, and dashes).
 func isKeyVaultIDChar(c byte) bool {
-	return internal.IsLetter(c) || internal.IsDigit(c) || c == '-'
+	return isLetterChar(c) || isDigitChar(c) || c == '-'
 }

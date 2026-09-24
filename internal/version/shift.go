@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
 // parseShift parses shift specifiers from the beginning of a string.
@@ -29,12 +27,12 @@ func parseShift(s string) (int, error) {
 
 		i++
 		// After ~, expect: end of string, digit, or another ~
-		if i < len(s) && !internal.IsDigit(s[i]) && s[i] != '~' {
+		if i < len(s) && !isDigitChar(s[i]) && s[i] != '~' {
 			return 0, fmt.Errorf("invalid shift: ~ followed by %q", s[i:])
 		}
 		// Check for number after ~
 		numStart := i
-		for i < len(s) && internal.IsDigit(s[i]) {
+		for i < len(s) && isDigitChar(s[i]) {
 			i++
 		}
 
@@ -76,5 +74,5 @@ func parsesAsShift(s string, i int) bool {
 		return false
 	}
 	// ~ followed by digit, ~, or end = shift
-	return i+1 >= len(s) || internal.IsDigit(s[i+1]) || s[i+1] == '~'
+	return i+1 >= len(s) || isDigitChar(s[i+1]) || s[i+1] == '~'
 }

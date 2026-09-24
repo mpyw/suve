@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
 // Errors for a specification the engine cannot split.
@@ -141,7 +139,7 @@ func parseNameEnd[A any](input string, parsers []specifierParser[A]) (int, error
 				return i, nil // Found shift start
 			}
 			// "~" followed by letter is ambiguous (e.g., "param~backup")
-			if i+1 < len(input) && internal.IsLetter(input[i+1]) {
+			if i+1 < len(input) && isLetterChar(input[i+1]) {
 				return 0, fmt.Errorf("%w: use ~N for version shift", errParseAmbiguousTilde)
 			}
 			// "~" followed by other char - treat as part of name, keep scanning
