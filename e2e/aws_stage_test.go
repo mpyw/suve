@@ -16,11 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
-	paramcreate "github.com/mpyw/suve/internal/cli/commands/aws/param/create"
-	paramdelete "github.com/mpyw/suve/internal/cli/commands/aws/param/delete"
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	secretcreate "github.com/mpyw/suve/internal/cli/commands/aws/secret/create"
-	secretdelete "github.com/mpyw/suve/internal/cli/commands/aws/secret/delete"
 	globalstage "github.com/mpyw/suve/internal/cli/commands/aws/stage"
 	globalapply "github.com/mpyw/suve/internal/cli/commands/aws/stage/apply"
 	globaldiff "github.com/mpyw/suve/internal/cli/commands/aws/stage/diff"
@@ -52,16 +48,16 @@ func TestAWSGlobal_StageWorkflow(t *testing.T) {
 	secretName := "suve-e2e-global/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create resources
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "original-param")
-	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original-secret")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "original-param")
+	_, _, _ = runCommand(t, cmdsecret.CreateCommand(), secretName, "original-secret")
 
 	// Stage both
 	store := newStore()
@@ -137,16 +133,16 @@ func TestAWSGlobal_StageResetAll(t *testing.T) {
 	secretName := "suve-e2e-global-reset/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create and stage
-	_, _, _ = runCommand(t, paramcreate.Command(), paramName, "original")
-	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "original")
+	_, _, _ = runCommand(t, cmdparam.CreateCommand(), paramName, "original")
+	_, _, _ = runCommand(t, cmdsecret.CreateCommand(), secretName, "original")
 
 	store := newStore()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName}, staging.Entry{
@@ -267,13 +263,13 @@ func TestAWSGlobal_StagingWithTags(t *testing.T) {
 	paramName := "/suve-e2e-global/stage-tags/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create a parameter first
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
 	require.NoError(t, err)
 
 	// Stage tag changes using the staging store directly
@@ -333,13 +329,13 @@ func TestAWSGlobal_TagConflictDetection(t *testing.T) {
 	paramName := "/suve-e2e-global/tag-conflict/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create a parameter; its LastModified is now.
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
 	require.NoError(t, err)
 
 	// Stage a tag change whose BaseModifiedAt predates the parameter — as if the
@@ -386,13 +382,13 @@ func TestAWSGlobal_ResetWithTags(t *testing.T) {
 	paramName := "/suve-e2e-global/reset-tags/param"
 
 	// Cleanup
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
 	// Create a parameter first
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, "initial-value")
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "initial-value")
 	require.NoError(t, err)
 
 	// Stage entry and tag changes

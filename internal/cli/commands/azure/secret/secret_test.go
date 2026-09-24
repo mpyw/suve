@@ -15,8 +15,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/azure/secret"
-	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
-	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
@@ -193,7 +192,7 @@ func TestLogPresenter(t *testing.T) {
 		},
 	}
 
-	presenter := secret.NewLogPresenter(store, genericlog.Request{Name: "my-secret"})
+	presenter := secret.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 	require.NoError(t, presenter.Fetch(t.Context()))
 	assert.Equal(t, 2, presenter.Len())
 
@@ -225,7 +224,7 @@ func TestLogPresenter_Patch(t *testing.T) {
 		},
 	}
 
-	presenter := secret.NewLogPresenter(store, genericlog.Request{Name: "my-secret"})
+	presenter := secret.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 	require.NoError(t, presenter.Fetch(t.Context()))
 
 	var buf, errBuf bytes.Buffer
@@ -326,9 +325,9 @@ func TestDiffPresenter_RenderJSON(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	r := &genericdiff.Runner{
+	r := &generic.DiffRunner{
 		Presenter: presenter,
-		Options:   genericdiff.Options{Output: output.FormatJSON},
+		Options:   generic.DiffOptions{Output: output.FormatJSON},
 		Stdout:    &stdout,
 		Stderr:    &stderr,
 	}
@@ -386,7 +385,7 @@ func TestLogPresenter_RenderJSON(t *testing.T) {
 		{ID: "old", State: "disabled", Created: &created},
 	}, "old")
 
-	presenter := secret.NewLogPresenter(store, genericlog.Request{Name: "my-secret"})
+	presenter := secret.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 	require.NoError(t, presenter.Fetch(t.Context()))
 
 	var buf bytes.Buffer
@@ -426,7 +425,7 @@ func TestLogPresenter_RenderOneline(t *testing.T) {
 		{ID: "new", State: "enabled", Created: &created},
 	})
 
-	presenter := secret.NewLogPresenter(store, genericlog.Request{Name: "my-secret"})
+	presenter := secret.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 	require.NoError(t, presenter.Fetch(t.Context()))
 
 	var buf bytes.Buffer
@@ -458,7 +457,7 @@ func TestLogPresenter_PatchSkips(t *testing.T) {
 			{ID: "old", State: "disabled"},
 		}, "old")
 
-		presenter := secret.NewLogPresenter(store, genericlog.Request{Name: "my-secret"})
+		presenter := secret.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 		require.NoError(t, presenter.Fetch(t.Context()))
 
 		var buf, errBuf bytes.Buffer
@@ -479,7 +478,7 @@ func TestLogPresenter_PatchSkips(t *testing.T) {
 			{ID: "old", State: "enabled"},
 		})
 
-		presenter := secret.NewLogPresenter(store, genericlog.Request{Name: "my-secret", MaxResults: 1})
+		presenter := secret.NewLogPresenter(store, generic.LogRequest{Name: "my-secret", MaxResults: 1})
 		require.NoError(t, presenter.Fetch(t.Context()))
 		require.Equal(t, 1, presenter.Len())
 

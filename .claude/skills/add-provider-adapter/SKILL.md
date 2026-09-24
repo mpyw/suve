@@ -48,6 +48,15 @@ same shape.
   `builtin.NewRegistry()` (`internal/provider/builtin/builtin.go`), which the
   CLI, GUI and TUI all build from; wire the command group in
   `internal/cli/commands/app.go`.
+- Lay out each service's CLI as one flat package,
+  `internal/cli/commands/<cloud>/<service>`, with one file per subcommand
+  (`show.go` exposes `ShowCommand()`, `create.go` exposes `CreateCommand()`,
+  and so on). Build the read commands on the flat
+  `internal/cli/commands/generic` package (`generic.ShowCommand`,
+  `generic.LogCommand`, `generic.DiffCommand`, `generic.ListCommand`,
+  `generic.TagCommand`, `generic.UntagCommand`). Do not add a subpackage per
+  subcommand: declscope already scopes each file, and `//declscope:package`
+  marks what sibling files share.
 - Add the provider's scope flag plus its environment-variable fallback.
 
 ## SDK confinement guards
@@ -56,6 +65,10 @@ same shape.
   `.golangci.yaml` to gate the new SDK module so it can only be imported from
   the provider directory. Confinement is enforced across all of `internal/`
   (#488, #502) — keep that breadth.
+- Provider vocabulary that the TUI or GUI imports directly (such as
+  `internal/provider/aws/paramtype`) lives in its own SDK-free package under
+  the provider directory. List it in `TestSDKFreeProviderVocabulary` and in the
+  `aws-sdk-free-vocabulary`-style depguard rule so it stays SDK-free.
 
 ## Staging support (separate work)
 

@@ -10,13 +10,13 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/colors"
-	"github.com/mpyw/suve/internal/cli/commands/aws/param/paramtype"
-	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/cli/terminal"
 	"github.com/mpyw/suve/internal/jsonutil"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/aws/paramtype"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -33,13 +33,13 @@ type logJSONItem struct {
 // logPresenter renders SSM Parameter Store log output byte-for-byte as before.
 type logPresenter struct {
 	uc     *param.LogUseCase
-	req    genericlog.Request
+	req    generic.LogRequest
 	result *param.LogOutput
 }
 
 // NewLogPresenter builds a param log presenter over the given reader and request.
 // It is exported for the shared golden-output test harness.
-func NewLogPresenter(reader provider.Reader, req genericlog.Request) genericlog.Presenter {
+func NewLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
 	return &logPresenter{uc: &param.LogUseCase{Reader: reader}, req: req}
 }
 
@@ -164,7 +164,7 @@ func (p *logPresenter) RenderValue(stdout io.Writer, i, maxValueLength int) {
 
 func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, reverse bool) {
 	entries := p.result.Entries
-	parentIdx, oldest := genericlog.PatchParent(i, len(entries), reverse)
+	parentIdx, oldest := generic.LogPatchParent(i, len(entries), reverse)
 
 	newEntry := entries[i]
 	// A version whose value failed to fetch has no content to diff against.
@@ -245,7 +245,7 @@ func logSanitizeControl(s string) string {
 
 // LogCommand returns the SSM Parameter Store log command.
 func LogCommand() *cli.Command {
-	return genericlog.Command(genericlog.Config{
+	return generic.LogCommand(generic.LogConfig{
 		Usage:     "Show parameter version history",
 		ArgsUsage: "<name>",
 		Description: `Display the version history of a parameter, showing each version's
@@ -323,7 +323,7 @@ EXAMPLES:
 				Usage: "Maximum value preview length (0 = auto: unlimited for normal, terminal width for oneline)",
 			},
 		},
-		NewPresenter: func(ctx context.Context, req genericlog.Request) (genericlog.Presenter, error) {
+		NewPresenter: func(ctx context.Context, req generic.LogRequest) (generic.LogPresenter, error) {
 			store, err := cliinternal.AWSParamStore(ctx)
 			if err != nil {
 				return nil, err

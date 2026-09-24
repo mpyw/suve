@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -16,14 +16,14 @@ import (
 // logPresenter renders Azure App Configuration log output. App Configuration has
 // no version history: Fetch always surfaces the provider's
 // ErrVersioningUnsupported error, so the render methods are never reached (they
-// exist only to satisfy the genericlog.Presenter interface).
+// exist only to satisfy the generic.Presenter interface).
 type logPresenter struct {
 	uc  *param.LogUseCase
-	req genericlog.Request
+	req generic.LogRequest
 }
 
 // NewLogPresenter builds an Azure App Configuration log presenter over the given reader and request.
-func NewLogPresenter(reader provider.Reader, req genericlog.Request) genericlog.Presenter {
+func NewLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
 	return &logPresenter{uc: &param.LogUseCase{Reader: reader}, req: req}
 }
 
@@ -55,7 +55,7 @@ func (p *logPresenter) RenderPatch(_, _ io.Writer, _ int, _, _ bool) {}
 // Configuration is unversioned, running it produces a clear error (it never
 // crashes).
 func LogCommand() *cli.Command {
-	return genericlog.Command(genericlog.Config{
+	return generic.LogCommand(generic.LogConfig{
 		Usage:     "Show setting version history (unsupported)",
 		ArgsUsage: argsUsageKey,
 		Description: `App Configuration has no version history.
@@ -108,7 +108,7 @@ EXAMPLES:
 				Usage: "Output format: text (default) or json",
 			},
 		},
-		NewPresenter: func(ctx context.Context, req genericlog.Request) (genericlog.Presenter, error) {
+		NewPresenter: func(ctx context.Context, req generic.LogRequest) (generic.LogPresenter, error) {
 			store, err := cliinternal.AzureAppConfigStore(ctx)
 			if err != nil {
 				return nil, err

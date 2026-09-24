@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	genericshow "github.com/mpyw/suve/internal/cli/commands/generic/show"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
@@ -35,7 +35,7 @@ type showPresenter struct {
 }
 
 // NewShowPresenter builds an Azure Key Vault show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *azurekvversion.Spec) genericshow.Presenter {
+func NewShowPresenter(reader provider.Reader, spec *azurekvversion.Spec) generic.ShowPresenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -113,7 +113,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Azure Key Vault show command.
 func ShowCommand() *cli.Command {
-	return genericshow.Command(genericshow.Config[*azurekvversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*azurekvversion.Spec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
 		Description: `Display a secret's value along with its metadata.
@@ -133,7 +133,7 @@ EXAMPLES:
   suve azure secret show --output=json my-secret          Output as JSON`,
 		UsageError: "usage: suve azure secret show <name>",
 		ParseSpec:  azurekvversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *azurekvversion.Spec) (genericshow.Presenter, error) {
+		NewPresenter: func(ctx context.Context, spec *azurekvversion.Spec) (generic.ShowPresenter, error) {
 			store, err := cliinternal.AzureKeyVaultStore(ctx)
 			if err != nil {
 				return nil, err

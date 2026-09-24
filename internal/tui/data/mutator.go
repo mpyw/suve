@@ -5,10 +5,10 @@ import (
 	"errors"
 
 	"github.com/mpyw/suve/internal/capability"
-	"github.com/mpyw/suve/internal/cli/commands/aws/param/paramtype"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/aws/paramtype"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"

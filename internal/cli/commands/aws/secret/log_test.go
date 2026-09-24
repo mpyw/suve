@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	awssecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
@@ -40,13 +40,13 @@ func logStore() *providermock.Store {
 }
 
 func runLog(
-	t *testing.T, presenter genericlog.Presenter, opts genericlog.Options,
+	t *testing.T, presenter generic.LogPresenter, opts generic.LogOptions,
 ) string {
 	t.Helper()
 
 	var stdout, stderr bytes.Buffer
 
-	r := &genericlog.Runner{Presenter: presenter, Options: opts, Stdout: &stdout, Stderr: &stderr}
+	r := &generic.LogRunner{Presenter: presenter, Options: opts, Stdout: &stdout, Stderr: &stderr}
 	require.NoError(t, r.Run(t.Context()))
 
 	return stdout.String()
@@ -59,8 +59,8 @@ func runLog(
 func TestLogPresenter_RenderValueNoop(t *testing.T) {
 	t.Parallel()
 
-	presenter := awssecret.NewLogPresenter(logStore(), genericlog.Request{Name: "my-secret"})
-	out := runLog(t, presenter, genericlog.Options{})
+	presenter := awssecret.NewLogPresenter(logStore(), generic.LogRequest{Name: "my-secret"})
+	out := runLog(t, presenter, generic.LogOptions{})
 
 	// Truncated version IDs appear in the headers.
 	assert.Contains(t, out, "Version new-vers")
@@ -75,8 +75,8 @@ func TestLogPresenter_RenderValueNoop(t *testing.T) {
 func TestLogPresenter_Oneline(t *testing.T) {
 	t.Parallel()
 
-	presenter := awssecret.NewLogPresenter(logStore(), genericlog.Request{Name: "my-secret"})
-	out := runLog(t, presenter, genericlog.Options{Oneline: true})
+	presenter := awssecret.NewLogPresenter(logStore(), generic.LogRequest{Name: "my-secret"})
+	out := runLog(t, presenter, generic.LogOptions{Oneline: true})
 
 	assert.Contains(t, out, "AWSCURRENT")
 	assert.Contains(t, out, "AWSPREVIOUS")
@@ -87,8 +87,8 @@ func TestLogPresenter_Oneline(t *testing.T) {
 func TestLogPresenter_JSON(t *testing.T) {
 	t.Parallel()
 
-	presenter := awssecret.NewLogPresenter(logStore(), genericlog.Request{Name: "my-secret"})
-	out := runLog(t, presenter, genericlog.Options{Output: output.FormatJSON})
+	presenter := awssecret.NewLogPresenter(logStore(), generic.LogRequest{Name: "my-secret"})
+	out := runLog(t, presenter, generic.LogOptions{Output: output.FormatJSON})
 
 	var items []struct {
 		VersionID string   `json:"versionId"`

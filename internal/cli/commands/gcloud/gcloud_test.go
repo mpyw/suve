@@ -17,8 +17,7 @@ import (
 
 	appcli "github.com/mpyw/suve/internal/cli/commands"
 	"github.com/mpyw/suve/internal/cli/commands/gcloud"
-	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
-	genericlog "github.com/mpyw/suve/internal/cli/commands/generic/log"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
@@ -289,7 +288,7 @@ func TestLogPresenter(t *testing.T) {
 		},
 	}
 
-	presenter := gcloud.NewLogPresenter(store, genericlog.Request{Name: "my-secret"})
+	presenter := gcloud.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 	require.NoError(t, presenter.Fetch(t.Context()))
 	assert.Equal(t, 2, presenter.Len())
 
@@ -365,7 +364,7 @@ func TestLogPresenter_Patch(t *testing.T) {
 		},
 	}
 
-	presenter := gcloud.NewLogPresenter(store, genericlog.Request{Name: "my-secret"})
+	presenter := gcloud.NewLogPresenter(store, generic.LogRequest{Name: "my-secret"})
 	require.NoError(t, presenter.Fetch(t.Context()))
 
 	var buf, errBuf bytes.Buffer
@@ -408,13 +407,13 @@ func diffStore(byRef map[string]*domain.Entry) *providermock.Store {
 }
 
 func runDiff(
-	t *testing.T, presenter genericdiff.Presenter, opts genericdiff.Options,
+	t *testing.T, presenter generic.DiffPresenter, opts generic.DiffOptions,
 ) (string, error) {
 	t.Helper()
 
 	var stdout, stderr bytes.Buffer
 
-	r := &genericdiff.Runner{Presenter: presenter, Options: opts, Stdout: &stdout, Stderr: &stderr}
+	r := &generic.DiffRunner{Presenter: presenter, Options: opts, Stdout: &stdout, Stderr: &stderr}
 	err := r.Run(t.Context())
 
 	return stdout.String(), err
@@ -432,7 +431,7 @@ func TestDiffPresenter(t *testing.T) {
 		})
 
 		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
-		out, err := runDiff(t, presenter, genericdiff.Options{})
+		out, err := runDiff(t, presenter, generic.DiffOptions{})
 		require.NoError(t, err)
 		assert.Contains(t, out, "-old-value")
 		assert.Contains(t, out, "+new-value")
@@ -450,7 +449,7 @@ func TestDiffPresenter(t *testing.T) {
 		})
 
 		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
-		out, err := runDiff(t, presenter, genericdiff.Options{Output: output.FormatJSON})
+		out, err := runDiff(t, presenter, generic.DiffOptions{Output: output.FormatJSON})
 		require.NoError(t, err)
 
 		var diffOut struct {
@@ -484,7 +483,7 @@ func TestDiffPresenter(t *testing.T) {
 		})
 
 		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
-		_, err := runDiff(t, presenter, genericdiff.Options{})
+		_, err := runDiff(t, presenter, generic.DiffOptions{})
 		require.Error(t, err)
 	})
 
@@ -497,7 +496,7 @@ func TestDiffPresenter(t *testing.T) {
 		})
 
 		presenter := gcloud.NewDiffPresenter(store, diffVersionSpec(1), diffVersionSpec(2))
-		out, err := runDiff(t, presenter, genericdiff.Options{Output: output.FormatJSON})
+		out, err := runDiff(t, presenter, generic.DiffOptions{Output: output.FormatJSON})
 		require.NoError(t, err)
 
 		var diffOut struct {

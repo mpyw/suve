@@ -5,7 +5,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	generictag "github.com/mpyw/suve/internal/cli/commands/generic/tag"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/provider"
 )
@@ -19,7 +19,7 @@ func newTagger(ctx context.Context) (provider.Tagger, error) {
 
 // TagCommand returns the SSM Parameter Store tag command.
 func TagCommand() *cli.Command {
-	return generictag.TagCommand(generictag.Config{
+	return generic.TagCommand(generic.TagConfig{
 		Usage:     "Add or update tags on a parameter",
 		ArgsUsage: "<name> <key=value>...",
 		Description: `Add or update one or more tags on an existing parameter.

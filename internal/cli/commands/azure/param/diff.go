@@ -6,7 +6,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
@@ -36,7 +36,7 @@ type diffPresenter struct {
 }
 
 // NewDiffPresenter builds an Azure App Configuration diff presenter over the given reader and specs.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *azureappconfigversion.Spec) genericdiff.Presenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *azureappconfigversion.Spec) generic.DiffPresenter {
 	return &diffPresenter{uc: &param.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
@@ -82,7 +82,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the Azure App Configuration diff command.
 func DiffCommand() *cli.Command {
-	return genericdiff.Command(genericdiff.Config[*azureappconfigversion.Spec]{
+	return generic.DiffCommand(generic.DiffConfig[*azureappconfigversion.Spec]{
 		Usage:     "Show diff between two settings",
 		ArgsUsage: "<key1> [key2]",
 		Description: `Compare two App Configuration settings in unified diff format.
@@ -95,7 +95,7 @@ EXAMPLES:
   suve azure param diff key-a key-b                    Compare two settings
   suve azure param diff --output=json key-a key-b      Output comparison as JSON`,
 		ParseDiffArgs: azureappconfigversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *azureappconfigversion.Spec) (genericdiff.Presenter, error) {
+		NewPresenter: func(ctx context.Context, spec1, spec2 *azureappconfigversion.Spec) (generic.DiffPresenter, error) {
 			store, err := cliinternal.AzureAppConfigStore(ctx)
 			if err != nil {
 				return nil, err

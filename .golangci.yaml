@@ -138,6 +138,14 @@ linters:
               desc: "The AWS Secrets Manager SDK must stay behind the provider seam (internal/provider/aws only)"
             - pkg: "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
               desc: "The AWS Secrets Manager SDK must stay behind the provider seam (internal/provider/aws only)"
+        aws-sdk-free-vocabulary:
+          # The TUI and GUI import this AWS vocabulary directly, so it stays
+          # SDK-free even though it sits under internal/provider/aws.
+          files:
+            - "**/internal/provider/aws/paramtype/**"
+          deny:
+            - pkg: "github.com/aws/aws-sdk-go-v2"
+              desc: "internal/provider/aws/paramtype is SDK-free vocabulary shared with the TUI and GUI"
         gcloud-sdk:
           files:
             - "!**/internal/provider/gcloud/**"

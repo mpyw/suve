@@ -9,7 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	genericlist "github.com/mpyw/suve/internal/cli/commands/generic/list"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
@@ -94,9 +94,9 @@ func (r *ListRunner) Run(ctx context.Context, opts ListOptions) error {
 // runKeyOnly reuses the shared generic list renderer so --hide-namespace output
 // is byte-for-byte the neutral listing.
 func (r *ListRunner) runKeyOnly(ctx context.Context, opts ListOptions) error {
-	runner := &genericlist.Runner{
+	runner := &generic.ListRunner{
 		List:    r.keyOnlyEntries(opts),
-		Options: genericlist.Options{Show: opts.Show, Output: opts.Output},
+		Options: generic.ListOptions{Show: opts.Show, Output: opts.Output},
 		Stdout:  r.Stdout,
 		Stderr:  r.Stderr,
 	}
@@ -110,7 +110,7 @@ func (r *ListRunner) runKeyOnly(ctx context.Context, opts ListOptions) error {
 // Get fails (Get cannot address all/multiple namespaces), so the whole listing
 // would be error rows. In that case source the values from the namespaced list
 // — whose response already carries them — and collapse it to key-only rows.
-func (r *ListRunner) keyOnlyEntries(opts ListOptions) func(context.Context) ([]genericlist.Entry, error) {
+func (r *ListRunner) keyOnlyEntries(opts ListOptions) func(context.Context) ([]generic.ListEntry, error) {
 	if opts.Show && r.Namespace != nil {
 		if _, err := aznamespace.Literal(opts.Namespace); err != nil {
 			return r.keyOnlyEntriesFromNamespaced(opts)
@@ -122,8 +122,8 @@ func (r *ListRunner) keyOnlyEntries(opts ListOptions) func(context.Context) ([]g
 
 // keyOnlyEntriesFromReader is the neutral path: keys (and, with --show, values)
 // come from the provider-neutral use case, byte-for-byte the shared listing.
-func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Context) ([]genericlist.Entry, error) {
-	return func(ctx context.Context) ([]genericlist.Entry, error) {
+func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Context) ([]generic.ListEntry, error) {
+	return func(ctx context.Context) ([]generic.ListEntry, error) {
 		result, err := r.KeyOnly.Execute(ctx, param.ListInput{
 			Prefix: opts.Prefix, PlainPrefix: true, Filter: opts.Filter, WithValue: opts.Show,
 		})
@@ -131,8 +131,8 @@ func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Con
 			return nil, err
 		}
 
-		entries := lo.Map(result.Entries, func(e param.ListEntry, _ int) genericlist.Entry {
-			return genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
+		entries := lo.Map(result.Entries, func(e param.ListEntry, _ int) generic.ListEntry {
+			return generic.ListEntry{Name: e.Name, Value: e.Value, Error: e.Error}
 		})
 
 		return entries, nil
@@ -142,8 +142,8 @@ func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Con
 // keyOnlyEntriesFromNamespaced sources values from the namespaced list (which
 // already carries them) and collapses the per-(key, namespace) rows to the
 // deduped key-only rows the --hide-namespace listing shows.
-func (r *ListRunner) keyOnlyEntriesFromNamespaced(opts ListOptions) func(context.Context) ([]genericlist.Entry, error) {
-	return func(ctx context.Context) ([]genericlist.Entry, error) {
+func (r *ListRunner) keyOnlyEntriesFromNamespaced(opts ListOptions) func(context.Context) ([]generic.ListEntry, error) {
+	return func(ctx context.Context) ([]generic.ListEntry, error) {
 		result, err := r.Namespace.Execute(ctx, param.ListNamespacesInput{
 			Prefix: opts.Prefix, Filter: opts.Filter, WithValue: true,
 		})
@@ -159,7 +159,7 @@ func (r *ListRunner) keyOnlyEntriesFromNamespaced(opts ListOptions) func(context
 // key-only rows the --hide-namespace listing shows, carrying each key's value.
 // A key that resolves to different values across namespaces cannot be shown as
 // one value, so it becomes an error row rather than an arbitrary pick.
-func collapseToKeyOnlyList(rows []param.ListNamespacesEntry) []genericlist.Entry {
+func collapseToKeyOnlyList(rows []param.ListNamespacesEntry) []generic.ListEntry {
 	type collapsed struct {
 		value     string
 		ambiguous bool
@@ -186,13 +186,13 @@ func collapseToKeyOnlyList(rows []param.ListNamespacesEntry) []genericlist.Entry
 
 	slices.Sort(names)
 
-	return lo.Map(names, func(name string, _ int) genericlist.Entry {
+	return lo.Map(names, func(name string, _ int) generic.ListEntry {
 		c := byName[name]
 		if c.ambiguous {
-			return genericlist.Entry{Name: name, Error: errAmbiguousListValue}
+			return generic.ListEntry{Name: name, Error: errAmbiguousListValue}
 		}
 
-		return genericlist.Entry{Name: name, Value: lo.ToPtr(c.value)}
+		return generic.ListEntry{Name: name, Value: lo.ToPtr(c.value)}
 	})
 }
 

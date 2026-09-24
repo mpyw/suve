@@ -15,10 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
-	secretcreate "github.com/mpyw/suve/internal/cli/commands/aws/secret/create"
-	secretdelete "github.com/mpyw/suve/internal/cli/commands/aws/secret/delete"
-	secretrestore "github.com/mpyw/suve/internal/cli/commands/aws/secret/restore"
-	secretupdate "github.com/mpyw/suve/internal/cli/commands/aws/secret/update"
 	secretstage "github.com/mpyw/suve/internal/cli/commands/aws/stage/secret"
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -34,14 +30,14 @@ func TestAWSSecret_FullWorkflow(t *testing.T) {
 	secretName := "suve-e2e-test/basic/secret"
 
 	// Cleanup: force delete secret if it exists
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// 1. Create secret
 	t.Run("create", func(t *testing.T) {
-		stdout, _, err := runCommand(t, secretcreate.Command(), secretName, "initial-secret")
+		stdout, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "initial-secret")
 		require.NoError(t, err)
 		t.Logf("create output: %s", stdout)
 	})
@@ -63,7 +59,7 @@ func TestAWSSecret_FullWorkflow(t *testing.T) {
 
 	// 4. Update secret (with -y to skip confirmation)
 	t.Run("update", func(t *testing.T) {
-		_, _, err := runCommand(t, secretupdate.Command(), "--yes", secretName, "updated-secret")
+		_, _, err := runCommand(t, cmdsecret.UpdateCommand(), "--yes", secretName, "updated-secret")
 		require.NoError(t, err)
 	})
 
@@ -131,13 +127,13 @@ func TestAWSSecret_FullWorkflow(t *testing.T) {
 
 	// 11. Delete with recovery window
 	t.Run("delete-with-recovery", func(t *testing.T) {
-		_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--recovery-window", "7", secretName)
+		_, _, err := runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--recovery-window", "7", secretName)
 		require.NoError(t, err)
 	})
 
 	// 12. Restore
 	t.Run("restore", func(t *testing.T) {
-		_, _, err := runCommand(t, secretrestore.Command(), secretName)
+		_, _, err := runCommand(t, cmdsecret.RestoreCommand(), secretName)
 		require.NoError(t, err)
 	})
 
@@ -149,7 +145,7 @@ func TestAWSSecret_FullWorkflow(t *testing.T) {
 
 	// 14. Force delete
 	t.Run("force-delete", func(t *testing.T) {
-		_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, err := runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 		require.NoError(t, err)
 	})
 
@@ -167,17 +163,17 @@ func TestAWSSecret_VersionSpecifiers(t *testing.T) {
 	secretName := "suve-e2e-test/version/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create with multiple versions
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, "v1")
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "v1")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, secretupdate.Command(), "--yes", secretName, "v2")
+	_, _, err = runCommand(t, cmdsecret.UpdateCommand(), "--yes", secretName, "v2")
 	require.NoError(t, err)
-	_, _, err = runCommand(t, secretupdate.Command(), "--yes", secretName, "v3")
+	_, _, err = runCommand(t, cmdsecret.UpdateCommand(), "--yes", secretName, "v3")
 	require.NoError(t, err)
 
 	// Test :LABEL
@@ -232,14 +228,14 @@ func TestAWSSecret_StagingWorkflow(t *testing.T) {
 	secretName := "suve-e2e-staging/workflow/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// 1. Create initial secret
 	t.Run("setup", func(t *testing.T) {
-		_, _, err := runCommand(t, secretcreate.Command(), secretName, "original-secret")
+		_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "original-secret")
 		require.NoError(t, err)
 	})
 
@@ -320,13 +316,13 @@ func TestAWSSecret_StagingDeleteOptions(t *testing.T) {
 	secretName := "suve-e2e-staging/delete-opts/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create secret
-	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "test-value")
+	_, _, _ = runCommand(t, cmdsecret.CreateCommand(), secretName, "test-value")
 
 	// Test delete with recovery window
 	t.Run("delete-with-recovery-window", func(t *testing.T) {
@@ -364,7 +360,7 @@ func TestAWSSecret_ErrorCases(t *testing.T) {
 
 	// Invalid recovery window
 	t.Run("invalid-recovery-window", func(t *testing.T) {
-		_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--recovery-window", "5", "some-secret")
+		_, _, err := runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--recovery-window", "5", "some-secret")
 		assert.Error(t, err) // Must be 7-30
 	})
 }
@@ -385,12 +381,12 @@ func TestAWSSecret_SpecialCharactersInName(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Cleanup
-			_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", tc.secretName)
+			_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", tc.secretName)
 			t.Cleanup(func() {
-				_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", tc.secretName)
+				_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", tc.secretName)
 			})
 
-			_, _, err := runCommand(t, secretcreate.Command(), tc.secretName, "test-value")
+			_, _, err := runCommand(t, cmdsecret.CreateCommand(), tc.secretName, "test-value")
 			require.NoError(t, err)
 
 			stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", tc.secretName)
@@ -408,9 +404,9 @@ func TestAWSSecret_StagingAddViaCLI(t *testing.T) {
 	secretName := "suve-e2e-staging/add-cli/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// 1. Stage add via CLI
@@ -451,13 +447,13 @@ func TestAWSSecret_StagingAddExistingResourceFails(t *testing.T) {
 	secretName := "suve-e2e-staging/add-existing/secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create the secret first
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, "existing-value")
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "existing-value")
 	require.NoError(t, err)
 
 	// Try to stage add - should fail because resource already exists
@@ -476,14 +472,14 @@ func TestAWSSecret_TagAndUntag(t *testing.T) {
 	secretName := "suve-e2e-tag/test-secret"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create secret first
 	t.Run("create", func(t *testing.T) {
-		_, _, err := runCommand(t, secretcreate.Command(), secretName, "test-value")
+		_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "test-value")
 		require.NoError(t, err)
 	})
 
@@ -527,13 +523,13 @@ func TestAWSSecret_TagInvalidFormat(t *testing.T) {
 	secretName := "suve-e2e-tag/invalid-format"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create secret first
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, "test-value")
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "test-value")
 	require.NoError(t, err)
 
 	// Try to add invalid tag format
@@ -551,7 +547,7 @@ func TestAWSSecret_TagNonExistent(t *testing.T) {
 	secretName := "suve-e2e-tag/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 
 	// Try to tag non-existent secret
 	_, _, err := runCommand(t, cmdsecret.TagCommand(), secretName, "env=test")
@@ -566,7 +562,7 @@ func TestAWSSecret_UntagNonExistent(t *testing.T) {
 	secretName := "suve-e2e-untag/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 
 	// Try to untag non-existent secret
 	_, _, err := runCommand(t, cmdsecret.UntagCommand(), secretName, "env")
@@ -581,10 +577,10 @@ func TestAWSSecret_UpdateNonExistent(t *testing.T) {
 	secretName := "suve-e2e-update/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 
 	// Try to update non-existent secret
-	_, _, err := runCommand(t, secretupdate.Command(), "--yes", secretName, "new-value")
+	_, _, err := runCommand(t, cmdsecret.UpdateCommand(), "--yes", secretName, "new-value")
 	assert.Error(t, err)
 }
 
@@ -594,14 +590,14 @@ func TestAWSSecret_UpdateMissingArgs(t *testing.T) {
 
 	// No arguments at all
 	t.Run("no-args", func(t *testing.T) {
-		_, _, err := runCommand(t, secretupdate.Command())
+		_, _, err := runCommand(t, cmdsecret.UpdateCommand())
 		assert.Error(t, err)
 	})
 
 	// Only name, no value: with a non-interactive stdin the editor fallback must
 	// NOT be launched (it would hang); it must fail fast with an actionable error.
 	t.Run("no-value", func(t *testing.T) {
-		_, _, err := runCommandWithStdin(t, secretupdate.Command(), strings.NewReader(""), "test/secret")
+		_, _, err := runCommandWithStdin(t, cmdsecret.UpdateCommand(), strings.NewReader(""), "test/secret")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "value is required")
 	})
@@ -614,7 +610,7 @@ func TestAWSSecret_LogNonExistent(t *testing.T) {
 	secretName := "suve-e2e-log/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 
 	// Try to get log
 	_, _, err := runCommand(t, cmdsecret.LogCommand(), secretName)
@@ -628,7 +624,7 @@ func TestAWSSecret_DiffNonExistent(t *testing.T) {
 	secretName := "suve-e2e-diff/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 
 	// Try to diff
 	_, _, err := runCommand(t, cmdsecret.DiffCommand(), secretName)
@@ -643,13 +639,13 @@ func TestAWSSecret_ShowRaw(t *testing.T) {
 	secretValue := "raw-secret-value"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create secret
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, secretValue)
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, secretValue)
 	require.NoError(t, err)
 
 	// Show raw
@@ -667,7 +663,7 @@ func TestAWSSecret_ShowNonExistent(t *testing.T) {
 	secretName := "suve-e2e-show/non-existent"
 
 	// Ensure it doesn't exist
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 
 	// Try to show
 	_, _, err := runCommand(t, cmdsecret.ShowCommand(), secretName)
@@ -681,13 +677,13 @@ func TestAWSSecret_CreateAndTag(t *testing.T) {
 	secretName := "suve-e2e-create/and-tag"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create secret
-	stdout, _, err := runCommand(t, secretcreate.Command(), secretName, "value")
+	stdout, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "value")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Created")
 
@@ -711,13 +707,13 @@ func TestAWSSecret_CreateWithDescription(t *testing.T) {
 	secretName := "suve-e2e-create/with-description"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create secret with description
-	stdout, _, err := runCommand(t, secretcreate.Command(), "--description", "app credentials", secretName, "value")
+	stdout, _, err := runCommand(t, cmdsecret.CreateCommand(), "--description", "app credentials", secretName, "value")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Created")
 
@@ -742,17 +738,17 @@ func TestAWSSecret_CreateDuplicate(t *testing.T) {
 	secretName := "suve-e2e-create/duplicate"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create first
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, "value")
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "value")
 	require.NoError(t, err)
 
 	// Try to create again
-	_, _, err = runCommand(t, secretcreate.Command(), secretName, "value2")
+	_, _, err = runCommand(t, cmdsecret.CreateCommand(), secretName, "value2")
 	assert.Error(t, err)
 }
 
@@ -762,14 +758,14 @@ func TestAWSSecret_CreateMissingArgs(t *testing.T) {
 
 	// No arguments at all
 	t.Run("no-args", func(t *testing.T) {
-		_, _, err := runCommand(t, secretcreate.Command())
+		_, _, err := runCommand(t, cmdsecret.CreateCommand())
 		assert.Error(t, err)
 	})
 
 	// Only name, no value: with a non-interactive stdin the editor fallback must
 	// NOT be launched (it would hang); it must fail fast with an actionable error.
 	t.Run("no-value", func(t *testing.T) {
-		_, _, err := runCommandWithStdin(t, secretcreate.Command(), strings.NewReader(""), "test/secret")
+		_, _, err := runCommandWithStdin(t, cmdsecret.CreateCommand(), strings.NewReader(""), "test/secret")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "value is required")
 	})
@@ -783,7 +779,7 @@ func TestAWSSecret_DeleteNonExistent(t *testing.T) {
 
 	// Try to delete (should fail since it doesn't exist)
 	// Note: AWS Secrets Manager returns ResourceNotFoundException for non-existent secrets
-	_, _, err := runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, err := runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	// Localstack may return success for non-existent secrets, so we just log the result
 	if err != nil {
 		t.Logf("Delete non-existent returned error as expected: %v", err)
@@ -797,22 +793,22 @@ func TestAWSSecret_DeleteWithRecoveryWindow(t *testing.T) {
 	secretName := "suve-e2e-delete/scheduled"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create secret
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, "value")
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "value")
 	require.NoError(t, err)
 
 	// Delete with recovery window (7 days minimum)
-	stdout, _, err := runCommand(t, secretdelete.Command(), "--yes", "--recovery-window", "7", secretName)
+	stdout, _, err := runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--recovery-window", "7", secretName)
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Scheduled")
 
 	// Restore it (to clean up properly)
-	_, _, _ = runCommand(t, secretrestore.Command(), "--yes", secretName)
+	_, _, _ = runCommand(t, cmdsecret.RestoreCommand(), "--yes", secretName)
 }
 
 // TestAWSSecret_ListJSON tests secret list with JSON output.
@@ -822,13 +818,13 @@ func TestAWSSecret_ListJSON(t *testing.T) {
 	secretName := "suve-e2e-list/json-test"
 
 	// Cleanup
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
 	// Create secret
-	_, _, _ = runCommand(t, secretcreate.Command(), secretName, "v1")
+	_, _, _ = runCommand(t, cmdsecret.CreateCommand(), secretName, "v1")
 
 	// List with JSON format
 	stdout, _, err := runCommand(t, cmdsecret.ListCommand(), "--output", "json")

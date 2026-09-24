@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	genericdiff "github.com/mpyw/suve/internal/cli/commands/generic/diff"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
@@ -36,7 +36,7 @@ type diffPresenter struct {
 }
 
 // NewDiffPresenter builds a Google Cloud diff presenter over the given reader and specs.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *gcloudversion.Spec) genericdiff.Presenter {
+func NewDiffPresenter(reader provider.Reader, spec1, spec2 *gcloudversion.Spec) generic.DiffPresenter {
 	return &diffPresenter{uc: &secret.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
@@ -83,7 +83,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // DiffCommand returns the Google Cloud Secret Manager diff command.
 func DiffCommand() *cli.Command {
-	return genericdiff.Command(genericdiff.Config[*gcloudversion.Spec]{
+	return generic.DiffCommand(generic.DiffConfig[*gcloudversion.Spec]{
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
 		Description: `Compare two versions of a secret in unified diff format.
@@ -99,7 +99,7 @@ EXAMPLES:
   suve gcloud secret diff --parse-json my-secret~      Format JSON values before diffing
   suve gcloud secret diff --output=json my-secret~     Output comparison as JSON`,
 		ParseDiffArgs: gcloudversion.ParseDiffArgs,
-		NewPresenter: func(ctx context.Context, spec1, spec2 *gcloudversion.Spec) (genericdiff.Presenter, error) {
+		NewPresenter: func(ctx context.Context, spec1, spec2 *gcloudversion.Spec) (generic.DiffPresenter, error) {
 			store, err := cliinternal.GoogleCloudSecretStore(ctx)
 			if err != nil {
 				return nil, err

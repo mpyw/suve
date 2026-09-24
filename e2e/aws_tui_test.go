@@ -15,10 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
-	paramcreate "github.com/mpyw/suve/internal/cli/commands/aws/param/create"
-	paramdelete "github.com/mpyw/suve/internal/cli/commands/aws/param/delete"
-	secretcreate "github.com/mpyw/suve/internal/cli/commands/aws/secret/create"
-	secretdelete "github.com/mpyw/suve/internal/cli/commands/aws/secret/delete"
+	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/tui"
@@ -122,18 +119,18 @@ func TestTUIAWS_ParamBrowse(t *testing.T) {
 	)
 
 	for _, name := range []string{alphaName, bravoName} {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", name)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", name)
 	}
 
 	t.Cleanup(func() {
 		for _, name := range []string{alphaName, bravoName} {
-			_, _, _ = runCommand(t, paramdelete.Command(), "--yes", name)
+			_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", name)
 		}
 	})
 
-	_, _, err := runCommand(t, paramcreate.Command(), alphaName, alphaValue)
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), alphaName, alphaValue)
 	require.NoError(t, err)
-	_, _, err = runCommand(t, paramcreate.Command(), bravoName, bravoValue)
+	_, _, err = runCommand(t, cmdparam.CreateCommand(), bravoName, bravoValue)
 	require.NoError(t, err)
 
 	tm := teatest.NewTestModel(t, newTUIModel(t, string(staging.ServiceParam)),
@@ -173,12 +170,12 @@ func TestTUIAWS_SecretBrowse(t *testing.T) {
 		secretValue = "s3cr3t-token-value"
 	)
 
-	_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, secretdelete.Command(), "--yes", "--force", secretName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
 	})
 
-	_, _, err := runCommand(t, secretcreate.Command(), secretName, secretValue)
+	_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, secretValue)
 	require.NoError(t, err)
 
 	tm := teatest.NewTestModel(t, newTUIModel(t, string(staging.ServiceSecret)),
@@ -219,12 +216,12 @@ func TestTUIAWS_StageApply(t *testing.T) {
 		stagedVal   = "applied-via-tui"
 	)
 
-	_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	t.Cleanup(func() {
-		_, _, _ = runCommand(t, paramdelete.Command(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
 	})
 
-	_, _, err := runCommand(t, paramcreate.Command(), paramName, originalVal)
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, originalVal)
 	require.NoError(t, err)
 
 	// Pre-stage an update through the same staging store the TUI reads (matched

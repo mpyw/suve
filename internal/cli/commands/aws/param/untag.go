@@ -3,12 +3,12 @@ package param
 import (
 	"github.com/urfave/cli/v3"
 
-	generictag "github.com/mpyw/suve/internal/cli/commands/generic/tag"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 )
 
 // UntagCommand returns the SSM Parameter Store untag command.
 func UntagCommand() *cli.Command {
-	return generictag.UntagCommand(generictag.Config{
+	return generic.UntagCommand(generic.TagConfig{
 		Usage:     "Remove tags from a parameter",
 		ArgsUsage: "<name> <key>...",
 		Description: `Remove one or more tags from an existing parameter.

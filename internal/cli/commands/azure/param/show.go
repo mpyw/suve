@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	genericshow "github.com/mpyw/suve/internal/cli/commands/generic/show"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/jsonutil"
@@ -34,7 +34,7 @@ type showPresenter struct {
 }
 
 // NewShowPresenter builds an Azure App Configuration show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *azureappconfigversion.Spec) genericshow.Presenter {
+func NewShowPresenter(reader provider.Reader, spec *azureappconfigversion.Spec) generic.ShowPresenter {
 	return &showPresenter{uc: &param.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -103,7 +103,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // ShowCommand returns the Azure App Configuration show command.
 func ShowCommand() *cli.Command {
-	return genericshow.Command(genericshow.Config[*azureappconfigversion.Spec]{
+	return generic.ShowCommand(generic.ShowConfig[*azureappconfigversion.Spec]{
 		Usage:     "Show setting value with metadata",
 		ArgsUsage: argsUsageKey,
 		Description: `Display an App Configuration setting's value along with its metadata.
@@ -120,7 +120,7 @@ EXAMPLES:
   suve azure param show --output=json my-key          Output as JSON`,
 		UsageError: "usage: suve azure param show <key>",
 		ParseSpec:  azureappconfigversion.Parse,
-		NewPresenter: func(ctx context.Context, spec *azureappconfigversion.Spec) (genericshow.Presenter, error) {
+		NewPresenter: func(ctx context.Context, spec *azureappconfigversion.Spec) (generic.ShowPresenter, error) {
 			store, err := cliinternal.AzureAppConfigStore(ctx)
 			if err != nil {
 				return nil, err

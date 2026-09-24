@@ -4,9 +4,6 @@ package param
 import (
 	"github.com/urfave/cli/v3"
 
-	"github.com/mpyw/suve/internal/cli/commands/aws/param/create"
-	paramdelete "github.com/mpyw/suve/internal/cli/commands/aws/param/delete"
-	"github.com/mpyw/suve/internal/cli/commands/aws/param/update"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 )
 
@@ -21,9 +18,9 @@ func Command() *cli.Command {
 			LogCommand(),
 			DiffCommand(),
 			ListCommand(),
-			create.Command(),
-			update.Command(),
-			paramdelete.Command(),
+			CreateCommand(),
+			UpdateCommand(),
+			DeleteCommand(),
 			TagCommand(),
 			UntagCommand(),
 		},

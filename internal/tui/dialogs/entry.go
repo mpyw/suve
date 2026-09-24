@@ -12,8 +12,8 @@ import (
 	"golang.org/x/term"
 
 	"github.com/mpyw/suve/internal/capability"
-	"github.com/mpyw/suve/internal/cli/commands/aws/param/paramtype"
 	"github.com/mpyw/suve/internal/cli/editor"
+	"github.com/mpyw/suve/internal/provider/aws/paramtype"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/styles"
 )

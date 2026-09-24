@@ -6,14 +6,14 @@ import (
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
-	genericlist "github.com/mpyw/suve/internal/cli/commands/generic/list"
+	"github.com/mpyw/suve/internal/cli/commands/generic"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
 // ListCommand returns the Azure Key Vault list command.
 func ListCommand() *cli.Command {
-	return genericlist.Command(genericlist.Config{
+	return generic.ListCommand(generic.ListConfig{
 		Usage:     "List secrets",
 		ArgsUsage: "[filter-prefix]",
 		Description: `List secrets in Azure Key Vault.
@@ -49,7 +49,7 @@ EXAMPLES:
 		},
 		NewList: func(
 			ctx context.Context, cmd *cli.Command, withValue bool,
-		) (func(context.Context) ([]genericlist.Entry, error), error) {
+		) (func(context.Context) ([]generic.ListEntry, error), error) {
 			store, err := cliinternal.AzureKeyVaultStore(ctx)
 			if err != nil {
 				return nil, err
@@ -62,14 +62,14 @@ EXAMPLES:
 				WithValue: withValue,
 			}
 
-			return func(ctx context.Context) ([]genericlist.Entry, error) {
+			return func(ctx context.Context) ([]generic.ListEntry, error) {
 				result, err := uc.Execute(ctx, input)
 				if err != nil {
 					return nil, err
 				}
 
-				entries := lo.Map(result.Entries, func(e secret.ListEntry, _ int) genericlist.Entry {
-					return genericlist.Entry{Name: e.Name, Value: e.Value, Error: e.Error}
+				entries := lo.Map(result.Entries, func(e secret.ListEntry, _ int) generic.ListEntry {
+					return generic.ListEntry{Name: e.Name, Value: e.Value, Error: e.Error}
 				})
 
 				return entries, nil
