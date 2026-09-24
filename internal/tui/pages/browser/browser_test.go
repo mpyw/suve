@@ -1408,6 +1408,41 @@ func TestMouseClickHistoryRowInCompareSelectsRow(t *testing.T) {
 	assert.True(t, isDiff, "a compare click that completes two picks opens the diff (like enter)")
 }
 
+// TestRecursiveToggleGatedOnCapability pins the recursive chip and the `r`
+// toggle to capability.HasRecursiveList: Parameter Store shows and flips it,
+// while App Configuration and a secret service draw no chip and `r` only
+// reloads.
+func TestRecursiveToggleGatedOnCapability(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		svcCap capability.ServiceCapability
+		want   bool
+	}{
+		{"parameter store", awsParamCap(), true},
+		{"app configuration", appConfigCap(), false},
+		{"secrets manager", awsSecretCap(), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := newModel(t, &stubSource{svcCap: tt.svcCap})
+			_ = m.View(m.width, m.height)
+
+			_, _, drawn := m.hits.Origin(regionRecursive)
+			assert.Equal(t, tt.want, drawn, "recursive chip drawn")
+
+			before := m.recursive
+			m, cmd := update(t, m, keyPress('r'))
+			assert.Equal(t, tt.want, m.recursive != before, "r flips recursive")
+			assert.NotNil(t, cmd, "r always reloads")
+		})
+	}
+}
+
 // TestMouseClickHeaderRegionsMatchKeys pins #663's browser-header coverage: a
 // click on each header affordance reduces to the SAME action its key equivalent
 // performs — focusing the prefix/filter inputs (p, /), toggling values/recursive

@@ -51,12 +51,7 @@ func (awsParamHooks) traits() versionedTraits {
 }
 
 func (awsParamHooks) parse(input string) (name, suffix string, err error) {
-	spec, err := version.ParameterStore.Parse(input)
-	if err != nil {
-		return "", "", err
-	}
-
-	return spec.Name, version.ParameterStore.Suffix(spec), nil
+	return version.ParameterStore.Split(input)
 }
 
 func (awsParamHooks) versionLabel(id string) string { return "#" + id }

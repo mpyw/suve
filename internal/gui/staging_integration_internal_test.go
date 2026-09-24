@@ -1371,6 +1371,40 @@ func TestApp_StagingApply_ExecuteError(t *testing.T) {
 	assert.Contains(t, err.Error(), "list boom")
 }
 
+// TestNewStagingApplyResult_KeepsEachNamespace pins that one key applied under
+// two App Configuration namespaces yields two entry rows and two tag rows, each
+// with its own namespace, in the use case's (name, namespace) order. Grouping by
+// name would drop one of them.
+func TestNewStagingApplyResult_KeepsEachNamespace(t *testing.T) {
+	t.Parallel()
+
+	out := &stagingusecase.ApplyOutput{
+		ServiceName:    "App Configuration",
+		EntrySucceeded: 2,
+		TagSucceeded:   2,
+		EntryResults: []stagingusecase.ApplyEntryResult{
+			{Name: "/app/config", Status: stagingusecase.ApplyResultUpdated},
+			{Name: "/app/config", Namespace: "prod", Status: stagingusecase.ApplyResultUpdated},
+		},
+		TagResults: []stagingusecase.ApplyTagResult{
+			{Name: "/app/config", AddTags: map[string]string{"env": "dev"}},
+			{Name: "/app/config", Namespace: "prod", AddTags: map[string]string{"env": "prod"}},
+		},
+		Conflicts: []staging.EntryKey{{Name: "/app/other"}, {Name: "/app/other", Namespace: "prod"}},
+	}
+
+	result := newStagingApplyResult(out)
+
+	assert.Equal(t, []StagingApplyEntryResult{
+		{Name: "/app/config", Status: "updated"},
+		{Name: "/app/config", Namespace: "prod", Status: "updated"},
+	}, result.EntryResults)
+	require.Len(t, result.TagResults, 2)
+	assert.Empty(t, result.TagResults[0].Namespace)
+	assert.Equal(t, "prod", result.TagResults[1].Namespace)
+	assert.Equal(t, []string{"/app/other", "/app/other [prod]"}, result.Conflicts)
+}
+
 // TestNewStagingApplyResult_UnstageError verifies the GUI apply-result mapping
 // carries a post-apply UnstageError (cloud write succeeded but the entry/tag
 // could not be cleared from staging) into the DTO so the frontend can warn,

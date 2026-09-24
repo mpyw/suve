@@ -508,6 +508,8 @@ func (a *App) getService(service string) (staging.Service, error) {
 // stagingBinding looks up the shared staging binding for sc's provider and a
 // frontend service string. An unknown provider, or one that does not offer the
 // service, is errUnsupportedService.
+//
+//declscope:package // shared with the spec namespace
 func (a *App) stagingBinding(sc provider.Scope, service string) (binding.Binding, error) {
 	if _, err := a.getService(service); err != nil {
 		return binding.Binding{}, err

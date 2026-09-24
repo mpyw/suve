@@ -165,6 +165,26 @@ test.describe('Provider selection', () => {
       await expect(page.locator('#param-type')).toHaveCount(0);
     });
 
+    test('the Recursive toggle follows hasRecursiveList, not the provider', async ({ page }) => {
+      // App Configuration has no path hierarchy toggle.
+      await setupWailsMocks(page, createAzureState());
+      await page.goto('/');
+      await waitForItemList(page);
+      await expect(page.getByLabel('Recursive')).toHaveCount(0);
+    });
+
+    test('an AWS param capability without hasRecursiveList hides the Recursive toggle', async ({ page }) => {
+      const capabilities = defaultCapabilities.map((c) => ({
+        ...c,
+        services: c.services.map((sv) => (sv.service === 'param' ? { ...sv, hasRecursiveList: false } : sv)),
+      }));
+      await setupWailsMocks(page, { capabilities });
+      await page.goto('/');
+      await waitForItemList(page);
+      await expect(page.getByLabel('Recursive')).toHaveCount(0);
+      await expect(page.getByLabel('Show Values')).toBeVisible();
+    });
+
     test('App Configuration detail shows the value even though history is unsupported', async ({ page }) => {
       // Regression: ParamLog fails on App Config (no history). The detail (value)
       // must still render and no history-error banner must appear — the value

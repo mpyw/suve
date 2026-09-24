@@ -15,7 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/version"
 )
 
-func TestApp_parseParamSpec(t *testing.T) {
+func TestApp_parseSpec_Param(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -61,6 +61,15 @@ func TestApp_parseParamSpec(t *testing.T) {
 			name: "azure ASP.NET-style colon key is kept whole", provider: provider.ProviderAzure,
 			input: "Logging:LogLevel:Default", wantName: "Logging:LogLevel:Default",
 		},
+		{
+			// Google Cloud has no param service, so there is no grammar to use.
+			name: "google cloud has no param service", provider: provider.ProviderGoogleCloud,
+			input: "/my/param#3", wantErr: errUnsupportedService,
+		},
+		{
+			name: "unknown provider has no grammar", provider: "",
+			input: "/my/param#3", wantErr: errUnsupportedService,
+		},
 	}
 
 	for _, tt := range tests {
@@ -69,7 +78,7 @@ func TestApp_parseParamSpec(t *testing.T) {
 
 			app := appWithProvider(tt.provider)
 
-			name, suffix, err := app.parseParamSpec(tt.input)
+			name, suffix, err := app.parseSpec(provider.KindParam, tt.input)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 
@@ -83,7 +92,7 @@ func TestApp_parseParamSpec(t *testing.T) {
 	}
 }
 
-func TestApp_parseSecretSpec(t *testing.T) {
+func TestApp_parseSpec_Secret(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -133,7 +142,7 @@ func TestApp_parseSecretSpec(t *testing.T) {
 
 			app := appWithProvider(tt.provider)
 
-			name, suffix, err := app.parseSecretSpec(tt.input)
+			name, suffix, err := app.parseSpec(provider.KindSecret, tt.input)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 

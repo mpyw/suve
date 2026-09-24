@@ -46,10 +46,5 @@ func (googleCloudSecretHooks) traits() versionedTraits {
 }
 
 func (googleCloudSecretHooks) parse(input string) (name, suffix string, err error) {
-	spec, err := version.SecretManager.Parse(input)
-	if err != nil {
-		return "", "", err
-	}
-
-	return spec.Name, version.SecretManager.Suffix(spec), nil
+	return version.SecretManager.Split(input)
 }

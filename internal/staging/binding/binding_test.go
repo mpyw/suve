@@ -11,6 +11,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/binding"
+	"github.com/mpyw/suve/internal/version"
 )
 
 func TestLookup_PerProvider(t *testing.T) {
@@ -38,6 +39,51 @@ func TestLookup_PerProvider(t *testing.T) {
 			assert.IsType(t, tt.want, b.Strategy(nil))
 			assert.IsType(t, tt.want, b.Parser())
 			assert.IsType(t, tt.want, b.ParserFactory()())
+		})
+	}
+}
+
+// TestBinding_SplitSpec pins each product's grammar: the same input splits
+// differently per (provider, kind).
+func TestBinding_SplitSpec(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		provider   provider.Provider
+		kind       provider.Kind
+		input      string
+		wantName   string
+		wantSuffix string
+		wantErr    error
+	}{
+		{"aws param numeric", provider.ProviderAWS, provider.KindParam, "/p#3~~", "/p", "#3~2", nil},
+		{"aws param rejects id", provider.ProviderAWS, provider.KindParam, "/p#abc", "", "", version.ErrInvalidNumericVersion},
+		{"aws secret label", provider.ProviderAWS, provider.KindSecret, "s:AWSPREVIOUS~1", "s", ":AWSPREVIOUS~1", nil},
+		{"google cloud secret numeric", provider.ProviderGoogleCloud, provider.KindSecret, "s#5~", "s", "#5~1", nil},
+		{"google cloud secret rejects label", provider.ProviderGoogleCloud, provider.KindSecret, "s:x", "", "", version.ErrSecretManagerLabelUnsupported},
+		{"azure param keeps the whole key", provider.ProviderAzure, provider.KindParam, "k#3~1", "k#3~1", "", nil},
+		{"azure secret opaque id", provider.ProviderAzure, provider.KindSecret, "s#deadbeef", "s", "#deadbeef", nil},
+		{"azure secret rejects label", provider.ProviderAzure, provider.KindSecret, "s:x", "", "", version.ErrKeyVaultLabelUnsupported},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			b, err := binding.Lookup(tt.provider, tt.kind)
+			require.NoError(t, err)
+
+			name, suffix, err := b.SplitSpec(tt.input)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantName, name)
+			assert.Equal(t, tt.wantSuffix, suffix)
 		})
 	}
 }

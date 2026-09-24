@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { capability, gui } from '../../wailsjs/go/models';
+  import { scopeFieldSpecs, scopeFieldValue, selectionFor } from './scopeFields';
 
   type ViewKey = 'param' | 'secret' | 'staging';
 
@@ -64,28 +65,25 @@
   // Service key → stable nav icon/letter (labels come from capability names).
   const NAV_ICON: Record<string, string> = { param: 'P', secret: 'S' };
 
-  // ---- Scope-form inputs (seeded from the prefill for the pending provider) --
-  let projectInput = $state('');
-  let vaultInput = $state('');
-  let storeInput = $state('');
-  let namespaceInput = $state('');
+  // ---- Scope form: one input per capability scope field of the pending provider
+  const pendingCap = $derived(capabilities.find((c) => c.provider === pendingProvider) ?? null);
+  const formFields = $derived(pendingProvider ? scopeFieldSpecs(pendingCap) : []);
+  let fieldInputs = $state<Record<string, string>>({});
   let formError = $state('');
-  let firstFieldEl: HTMLInputElement | undefined = $state();
+  let fieldEls: (HTMLInputElement | undefined)[] = $state([]);
 
   $effect(() => {
     // Re-seed the inputs whenever the pending provider (or its prefill) changes.
     const s = formScope;
-    projectInput = pendingProvider === 'googlecloud' ? (s?.projectId ?? '') : '';
-    vaultInput = pendingProvider === 'azure' ? (s?.vaultName ?? '') : '';
-    storeInput = pendingProvider === 'azure' ? (s?.storeName ?? '') : '';
-    namespaceInput = pendingProvider === 'azure' ? (s?.namespace ?? '') : '';
+    fieldInputs = Object.fromEntries(formFields.map(([field]) => [field, scopeFieldValue(s, field)]));
     formError = '';
   });
 
   // Focus the first field when a scope form opens (a11y).
   $effect(() => {
-    if (pendingProvider && firstFieldEl) {
-      firstFieldEl.focus();
+    const first = fieldEls[0];
+    if (pendingProvider && first) {
+      first.focus();
     }
   });
 
@@ -125,26 +123,9 @@
   // Submitting empty is intentional: the parent treats a no-scope submission as
   // "disconnect + clear", so Connect stays enabled and there is no required-field
   // guard here.
-  function submitProject(e: SubmitEvent) {
+  function submitScope(e: SubmitEvent) {
     e.preventDefault();
-    onselectscope?.({
-      provider: 'googlecloud',
-      projectId: projectInput.trim(),
-      vaultName: '',
-      storeName: '',
-      namespace: '',
-    } as gui.ScopeSelection);
-  }
-
-  function submitAzure(e: SubmitEvent) {
-    e.preventDefault();
-    onselectscope?.({
-      provider: 'azure',
-      projectId: '',
-      vaultName: vaultInput.trim(),
-      storeName: storeInput.trim(),
-      namespace: namespaceInput.trim(),
-    } as gui.ScopeSelection);
+    onselectscope?.(selectionFor(pendingCap, pendingProvider, (field) => (fieldInputs[field] ?? '').trim()));
   }
 </script>
 
@@ -170,44 +151,22 @@
   </div>
 
   <!-- Scope form: shown while a selected provider still needs input -->
-  {#if pendingProvider === 'googlecloud'}
-    <form class="scope-form" onsubmit={submitProject}>
-      <label class="scope-label" for="gcloud-project">Project ID</label>
-      <input
-        id="gcloud-project"
-        class="scope-input"
-        type="text"
-        placeholder="my-project"
-        bind:value={projectInput}
-        bind:this={firstFieldEl}
-      />
-      {#if formError || scopeError}
-        <div class="scope-error">{formError || scopeError}</div>
-      {/if}
-      <button type="submit" class="scope-submit">Connect</button>
-    </form>
-  {:else if pendingProvider === 'azure'}
-    <form class="scope-form" onsubmit={submitAzure}>
-      <label class="scope-label" for="azure-vault">Key Vault name</label>
-      <input
-        id="azure-vault"
-        class="scope-input"
-        type="text"
-        placeholder="my-vault (secrets)"
-        bind:value={vaultInput}
-        bind:this={firstFieldEl}
-      />
-      <label class="scope-label" for="azure-store">App Configuration store</label>
-      <input id="azure-store" class="scope-input" type="text" placeholder="my-store (params)" bind:value={storeInput} />
-      <label class="scope-label" for="azure-namespace">App Configuration NS</label>
-      <input
-        id="azure-namespace"
-        class="scope-input"
-        type="text"
-        placeholder="(NULL)"
-        bind:value={namespaceInput}
-      />
-      <p class="scope-hint">Azure calls this a label; empty means (NULL).</p>
+  {#if formFields.length > 0}
+    <form class="scope-form" onsubmit={submitScope}>
+      {#each formFields as [field, spec], i (field)}
+        <label class="scope-label" for={spec.id}>{spec.label}</label>
+        <input
+          id={spec.id}
+          class="scope-input"
+          type="text"
+          placeholder={spec.placeholder}
+          bind:value={fieldInputs[field]}
+          bind:this={fieldEls[i]}
+        />
+        {#if spec.hint}
+          <p class="scope-hint">{spec.hint}</p>
+        {/if}
+      {/each}
       {#if formError || scopeError}
         <div class="scope-error">{formError || scopeError}</div>
       {/if}

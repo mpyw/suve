@@ -153,3 +153,15 @@ func TestAppConfigurationParse_SpecifierLikeKeysAccepted(t *testing.T) {
 		assert.Equal(t, input, spec.Name)
 	}
 }
+
+func TestAppConfigurationSplit(t *testing.T) {
+	t.Parallel()
+
+	name, suffix, err := version.AppConfiguration.Split(" weird#key~1 ")
+	require.NoError(t, err)
+	assert.Equal(t, "weird#key~1", name)
+	assert.Empty(t, suffix, "an unversioned service has no suffix")
+
+	_, _, err = version.AppConfiguration.Split("  ")
+	require.ErrorIs(t, err, version.ErrEmptySpec)
+}

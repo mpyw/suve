@@ -226,6 +226,36 @@ func TestLookups(t *testing.T) {
 	assert.Equal(t, "mystery", capability.DisplayName(provider.Provider("mystery")), "an unknown provider keeps its key")
 }
 
+// scopeWithField returns a scope of provider p with only the named scope field
+// set.
+func scopeWithField(p, field string) provider.Scope {
+	sc := provider.Scope{Provider: provider.Provider(p)}
+
+	switch field {
+	case "project":
+		sc.ProjectID = "p"
+	case "vault":
+		sc.VaultName = "v"
+	case "store":
+		sc.StoreName = "s"
+	}
+
+	return sc
+}
+
+// TestAll_HasRecursiveListParameterStoreOnly pins the recursive-list toggle to
+// AWS Parameter Store, the only service with a '/'-path hierarchy.
+func TestAll_HasRecursiveListParameterStoreOnly(t *testing.T) {
+	t.Parallel()
+
+	for _, pc := range capability.All() {
+		for _, sc := range pc.Services {
+			want := pc.Provider == string(provider.ProviderAWS) && sc.Service == "param"
+			assert.Equal(t, want, sc.HasRecursiveList, "%s %s", pc.Provider, sc.Service)
+		}
+	}
+}
+
 // TestAll_ScopeFieldMatchesScope pins each service's ScopeField to the scope
 // field provider.Scope.SupportsService checks, so the GUI's service tabs agree
 // with the backend.
@@ -239,9 +269,16 @@ func TestAll_ScopeFieldMatchesScope(t *testing.T) {
 			}
 
 			kind := provider.Kind(sc.Service)
-			empty := provider.Scope{Provider: provider.Provider(pc.Provider), ProjectID: "p"}
-			assert.Equal(t, sc.ScopeField == "", empty.SupportsService(kind),
-				"%s %s: a service without a ScopeField is offered by the bare scope", pc.Provider, sc.Service)
+			if sc.ScopeField == "" {
+				bare := provider.Scope{Provider: provider.Provider(pc.Provider)}
+				assert.True(t, bare.SupportsService(kind),
+					"%s %s: a service without a ScopeField is offered by the bare scope", pc.Provider, sc.Service)
+
+				continue
+			}
+
+			assert.True(t, scopeWithField(pc.Provider, sc.ScopeField).SupportsService(kind),
+				"%s %s: a scope with only %q set offers the service", pc.Provider, sc.Service, sc.ScopeField)
 		}
 	}
 

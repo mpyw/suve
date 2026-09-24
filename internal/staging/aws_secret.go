@@ -51,12 +51,7 @@ func (awsSecretHooks) traits() versionedTraits {
 }
 
 func (awsSecretHooks) parse(input string) (name, suffix string, err error) {
-	spec, err := version.SecretsManager.Parse(input)
-	if err != nil {
-		return "", "", err
-	}
-
-	return spec.Name, version.SecretsManager.Suffix(spec), nil
+	return version.SecretsManager.Split(input)
 }
 
 func (awsSecretHooks) versionLabel(id string) string {

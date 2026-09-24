@@ -4,6 +4,7 @@ package dialogs
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -341,4 +342,29 @@ func TestApply_MouseClickResultsCloses(t *testing.T) {
 	done, ok := cmd().(MutationDoneMsg)
 	require.True(t, ok, "clicking close emits MutationDoneMsg (like enter)")
 	assert.Contains(t, done.Status, "Applied", "the outcome is voiced")
+}
+
+// TestApply_ResultsKeepEachNamespace pins one results line per namespace: the
+// same name applied under the null and "prod" namespaces shows twice, the
+// second with its [prod] badge, for entries, tags and unstage warnings.
+func TestApply_ResultsKeepEachNamespace(t *testing.T) {
+	t.Parallel()
+
+	d := appliedResults(t, data.StagingApplyResult{
+		ServiceLabel: "App Configuration",
+		Entries: []data.ApplyEntryResult{
+			{Name: "/app/config", Status: "updated"},
+			{Name: "/app/config", Namespace: "prod", Status: "updated", UnstageError: "locked"},
+		},
+		Tags: []data.ApplyTagResult{
+			{Name: "/app/config", Namespace: "prod"},
+		},
+	})
+
+	// Drop the SGR styling so the assertions read the plain lines.
+	body := regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(d.resultsBody(), "")
+	assert.Contains(t, body, "✓ updated  /app/config\n")
+	assert.Contains(t, body, "✓ updated  /app/config [prod]")
+	assert.Contains(t, body, "✓ tags  /app/config [prod]")
+	assert.Contains(t, body, "⚠ /app/config [prod] applied but could not be unstaged")
 }

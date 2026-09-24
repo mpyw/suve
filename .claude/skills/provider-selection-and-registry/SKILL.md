@@ -108,7 +108,7 @@ and TUI all use:
 
 | `binding` API | Owns |
 |---------------|------|
-| `Lookup(p, kind)` → `Binding` | `Parser()` / `ParserFactory()` (store-less parser), `Strategy(store)`, `Namespaced(sc)` / `NamespaceScope(sc, ns)` (App Configuration namespace override) |
+| `Lookup(p, kind)` → `Binding` | `SplitSpec` (the product's version grammar: name plus version suffix), `Parser()` / `ParserFactory()` (store-less parser), `Strategy(store)`, `Namespaced(sc)` / `NamespaceScope(sc, ns)` (App Configuration namespace override) |
 | `StagingScope(ctx, sc, kind, lookup)` | the scope that keys staging state plus the confirmation target. Azure keys param by store and secret by vault; AWS resolves the STS identity (pass `lookup` to memoize or stub it; nil uses `DefaultIdentity`) |
 | `ResolveTarget(ctx, sc, lookup)` | the display target (see below) with any pending part filled in by the same identity lookup |
 

@@ -701,9 +701,8 @@ Keymap (the in-app `?` toggles full help, which is the source of truth):
 | Global | `y` | copy value to the clipboard (the on-screen value stays masked) |
 | Browser | `p` / `/` | edit prefix / filter |
 | Browser | `v` | toggle value display |
-| Browser | `r` | recursive toggle / refresh |
+| Browser | `r` | recursive toggle (Parameter Store) / refresh |
 | Browser | `[` / `]` | narrow / widen the list pane |
-| Browser | `L` | load more (paged secrets) |
 | Browser | `x` | reveal a masked value |
 | Browser | `c`, `space`, `enter` | compare mode: toggle, pick a version, open diff |
 | Browser | `space` | pick namespace (App Configuration) |

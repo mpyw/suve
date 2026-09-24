@@ -351,3 +351,15 @@ func TestParameterStoreSuffix(t *testing.T) {
 		})
 	}
 }
+
+func TestParameterStoreSplit(t *testing.T) {
+	t.Parallel()
+
+	name, suffix, err := version.ParameterStore.Split("/app/key#5~~")
+	require.NoError(t, err)
+	assert.Equal(t, "/app/key", name)
+	assert.Equal(t, "#5~2", suffix)
+
+	_, _, err = version.ParameterStore.Split("/app/key#x")
+	require.ErrorIs(t, err, version.ErrInvalidNumericVersion)
+}

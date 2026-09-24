@@ -44,6 +44,9 @@
   // The namespace axis (Azure App Configuration calls it a "label") exists only
   // for a service with hasNamespaces.
   const hasNamespaces = $derived(capability.hasNamespaces);
+  // The Recursive toggle exists only for a '/'-path hierarchy (AWS Parameter
+  // Store); every other service always lists the whole subtree.
+  const hasRecursiveList = $derived(capability.hasRecursiveList);
 
   // The namespace of the currently selected row, shown in the detail panel.
   let selectedEntryNamespace = $state('');
@@ -443,10 +446,12 @@
       bind:value={filter}
       oninput={handleFilterInput}
     />
-    <label class="checkbox-label">
-      <input type="checkbox" bind:checked={recursive} />
-      Recursive
-    </label>
+    {#if hasRecursiveList}
+      <label class="checkbox-label">
+        <input type="checkbox" bind:checked={recursive} />
+        Recursive
+      </label>
+    {/if}
     <label class="checkbox-label">
       <input type="checkbox" bind:checked={withValue} />
       Show Values

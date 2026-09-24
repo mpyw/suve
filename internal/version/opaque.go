@@ -111,3 +111,14 @@ func (OpaqueGrammar) Suffix(spec *OpaqueSpec) string {
 func isOpaqueLabelChar(c byte) bool {
 	return internal.IsLetter(c) || internal.IsDigit(c) || c == '-' || c == '_'
 }
+
+// Split parses input and returns its name plus the rebuilt suffix (Suffix), the
+// pair the use cases take.
+func (g OpaqueGrammar) Split(input string) (name, suffix string, err error) {
+	spec, err := g.Parse(input)
+	if err != nil {
+		return "", "", err
+	}
+
+	return spec.Name, g.Suffix(spec), nil
+}

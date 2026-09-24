@@ -6,6 +6,7 @@ import {
   waitForItemList,
   waitForViewLoaded,
   navigateTo,
+  defaultCapabilities,
   type MockState,
 } from './fixtures/wails-mock';
 
@@ -319,5 +320,55 @@ test.describe('Azure scope form', () => {
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
     );
     expect(noOverflow).toBe(true);
+  });
+});
+
+test.describe('Scope form follows the capability descriptor', () => {
+  test('renders only the fields a provider lists in scopeFields', async ({ page }) => {
+    // Azure with only a vault field: the store and namespace inputs vanish and
+    // the App Configuration service drops out with its field.
+    const capabilities = defaultCapabilities.map((c) =>
+      c.provider === 'azure'
+        ? { ...c, scopeFields: ['vault'], services: c.services.filter((sv) => sv.scopeField === 'vault') }
+        : c,
+    );
+    await setupWailsMocks(page, { capabilities });
+    await page.goto('/');
+    await waitForItemList(page);
+
+    await pickProvider(page, 'azure');
+    await expect(page.locator('#azure-vault')).toBeVisible();
+    await expect(page.locator('#azure-store')).toHaveCount(0);
+    await expect(page.locator('#azure-namespace')).toHaveCount(0);
+    await expect(page.locator('.scope-hint')).toHaveCount(0);
+
+    await page.locator('#azure-vault').fill('the-vault');
+    await page.getByRole('button', { name: 'Connect' }).click();
+    await waitForViewLoaded(page);
+
+    const calls = await getSelectScopeCalls(page);
+    expect(calls[calls.length - 1]).toEqual({
+      provider: 'azure',
+      projectId: '',
+      vaultName: 'the-vault',
+      storeName: '',
+      namespace: '',
+    });
+  });
+
+  test('a scope is complete once a service scopeField is set', async ({ page }) => {
+    // Only the namespace (no service's scopeField) is not enough: the form
+    // treats the submission as a disconnect instead of calling SelectScope.
+    await setupWailsMocks(page);
+    await page.goto('/');
+    await waitForItemList(page);
+    const before = (await getSelectScopeCalls(page)).length;
+
+    await pickProvider(page, 'azure');
+    await page.locator('#azure-namespace').fill('dev');
+    await page.getByRole('button', { name: 'Connect' }).click();
+
+    await expect(page.locator('#azure-vault')).toHaveCount(0);
+    expect((await getSelectScopeCalls(page)).length).toBe(before);
   });
 });

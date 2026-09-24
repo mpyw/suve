@@ -1,6 +1,8 @@
 // Package binding is the single per-(provider, service kind) lookup that the
-// CLI, GUI and TUI share for staging. For each provider and kind it owns:
+// CLI, GUI and TUI share. For each provider and kind it owns:
 //
+//   - the version grammar that splits "name#VERSION~SHIFT" into the name and
+//     the suffix the use cases take (SplitSpec),
 //   - the store-less parser (status, reset, export/import parsing),
 //   - the staging strategy built over a resolved provider.Store,
 //   - the scope that keys on-disk staging state, derived from the selected
@@ -26,6 +28,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/version"
 )
 
 // ErrUnknownProvider is returned for a provider that has no staging binding
@@ -40,6 +43,14 @@ type IdentityLookup func(ctx context.Context) (staging.ResolvedScope, error)
 // Binding is the staging binding for one (provider, kind) pair. Get one from
 // Lookup.
 type Binding struct {
+	// SplitSpec splits a version spec into its name and the version suffix the
+	// use cases take, with the product's grammar (a version grammar's Split).
+	// An unversioned service (Azure App Configuration) keeps the whole argument
+	// as the name, so a key that contains '#' or '~' is not split. It is a
+	// field rather than a method because only the build-tagged GUI calls it,
+	// and the default-build dead-code gate cannot see that caller.
+	SplitSpec func(input string) (name, suffix string, err error)
+
 	parser   staging.ParserFactory
 	strategy func(provider.Store) staging.FullStrategy
 	// namespaced is set for a service with a namespace axis inside one store
@@ -98,12 +109,14 @@ var descriptors = map[provider.Provider]descriptor{
 	provider.ProviderAWS: {
 		kinds: map[provider.Kind]Binding{
 			provider.KindParam: {
-				parser:   staging.AWSParamParserFactory,
-				strategy: func(s provider.Store) staging.FullStrategy { return staging.NewAWSParamStrategy(s) },
+				SplitSpec: version.ParameterStore.Split,
+				parser:    staging.AWSParamParserFactory,
+				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewAWSParamStrategy(s) },
 			},
 			provider.KindSecret: {
-				parser:   staging.AWSSecretParserFactory,
-				strategy: func(s provider.Store) staging.FullStrategy { return staging.NewAWSSecretStrategy(s) },
+				SplitSpec: version.SecretsManager.Split,
+				parser:    staging.AWSSecretParserFactory,
+				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewAWSSecretStrategy(s) },
 			},
 		},
 		// Both AWS services share the account scope. A scope that already
@@ -120,8 +133,9 @@ var descriptors = map[provider.Provider]descriptor{
 	provider.ProviderGoogleCloud: {
 		kinds: map[provider.Kind]Binding{
 			provider.KindSecret: {
-				parser:   staging.GoogleCloudSecretParserFactory,
-				strategy: func(s provider.Store) staging.FullStrategy { return staging.NewGoogleCloudSecretStrategy(s) },
+				SplitSpec: version.SecretManager.Split,
+				parser:    staging.GoogleCloudSecretParserFactory,
+				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewGoogleCloudSecretStrategy(s) },
 			},
 		},
 		stagingScope: func(sc provider.Scope, _ provider.Kind) (staging.ResolvedScope, bool) {
@@ -131,13 +145,15 @@ var descriptors = map[provider.Provider]descriptor{
 	provider.ProviderAzure: {
 		kinds: map[provider.Kind]Binding{
 			provider.KindParam: {
+				SplitSpec:  version.AppConfiguration.Split,
 				parser:     staging.AzureAppConfigParamParserFactory,
 				strategy:   func(s provider.Store) staging.FullStrategy { return staging.NewAzureAppConfigParamStrategy(s) },
 				namespaced: true,
 			},
 			provider.KindSecret: {
-				parser:   staging.AzureKeyVaultSecretParserFactory,
-				strategy: func(s provider.Store) staging.FullStrategy { return staging.NewAzureKeyVaultSecretStrategy(s) },
+				SplitSpec: version.KeyVault.Split,
+				parser:    staging.AzureKeyVaultSecretParserFactory,
+				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewAzureKeyVaultSecretStrategy(s) },
 			},
 		},
 		// Key Vault and App Configuration are separate resources with separate

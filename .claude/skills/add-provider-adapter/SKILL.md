@@ -44,9 +44,12 @@ same shape.
   parse time (#231). App Configuration is unversioned, and its keys may contain
   `#`, `:` and `~`, so the whole argument is the key. Add a new grammar only
   when none of the three fits.
-- A versioned grammar has `Suffix(spec)` next to `Parse`. The CLI and GUI call
-  the neutral `usecase/{param,secret}` with `spec.Name` plus
-  `version.<Product>.Suffix(spec)`. There is no per-provider use case package.
+- A versioned grammar has `Suffix(spec)` next to `Parse`, and every grammar has
+  `Split(input)` (name plus suffix in one call). The CLI calls the neutral
+  `usecase/{param,secret}` with `spec.Name` plus `version.<Product>.Suffix(spec)`.
+  The GUI takes the grammar from the product's `internal/staging/binding` entry
+  (`SplitSpec`), so a new product's grammar goes there too. There is no
+  per-provider use case package.
 - The diff command's argument parsing lives in the CLI, not in
   `internal/version`: `diff.go` in each service package defines
   `parseDiffArgs`, which wraps `generic.ParseDiffArgs` with the

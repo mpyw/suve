@@ -67,10 +67,18 @@ type ServiceCapability struct {
 	// Parameter Store's String/SecureString/StringList). The frontends show the
 	// type selector only when true, and the GUI returns no type options otherwise.
 	HasValueType bool `json:"hasValueType"`
+	// HasRecursiveList is true when names form a '/'-separated hierarchy and a
+	// list can switch between the immediate children of a prefix and its whole
+	// subtree (AWS Parameter Store's --recursive). The frontends show the
+	// recursive toggle only when true; elsewhere a list always matches the
+	// whole subtree.
+	HasRecursiveList bool `json:"hasRecursiveList"`
 	// ScopeField names the provider scope field (one of the provider's
 	// ScopeFields) that must be set for this service to be available, or ""
-	// when the provider scope always offers it. Azure's two services are
-	// separate resources: App Configuration needs "store", Key Vault "vault".
+	// when the ambient scope always offers it (AWS). Google Cloud Secret
+	// Manager needs "project". Azure's two services are separate resources:
+	// App Configuration needs "store", Key Vault "vault". A scope is complete
+	// when at least one of its provider's services is available.
 	ScopeField string `json:"scopeField"`
 	// NativeTagName is what the cloud itself calls suve's tags, shown as a
 	// secondary hint next to "Tags" (Google Cloud Secret Manager: "labels").
@@ -109,7 +117,7 @@ func All() []ProviderCapability {
 					Service: serviceParam, DisplayName: "Parameter Store",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
-					HasValueType: true,
+					HasValueType: true, HasRecursiveList: true,
 				},
 				{
 					Service: serviceSecret, DisplayName: "Secrets Manager",
@@ -127,7 +135,7 @@ func All() []ProviderCapability {
 					Service: serviceSecret, DisplayName: "Secret Manager",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
-					NativeTagName: "labels",
+					NativeTagName: "labels", ScopeField: "project",
 				},
 			},
 		},

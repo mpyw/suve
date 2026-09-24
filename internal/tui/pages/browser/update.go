@@ -385,11 +385,12 @@ func (m *Model) toggleValues() tea.Cmd {
 	return m.loadListCmd()
 }
 
-// toggleRecursive flips recursive listing (param only; elsewhere `r`/⟳ is a plain
-// refresh) and reloads the list (the `r` key and a click on the recursive chip).
+// toggleRecursive flips recursive listing (HasRecursiveList only; elsewhere
+// `r`/⟳ is a plain refresh) and reloads the list (the `r` key and a click on the recursive chip).
 func (m *Model) toggleRecursive() tea.Cmd {
-	// Param supports recursive listing; elsewhere `r` is a plain refresh.
-	if m.svcCap.Service == "param" && !m.svcCap.HasNamespaces {
+	// A hierarchical service lists recursively on demand; elsewhere `r` is a
+	// plain refresh.
+	if m.svcCap.HasRecursiveList {
 		m.recursive = !m.recursive
 	}
 
