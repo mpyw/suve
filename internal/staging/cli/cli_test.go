@@ -52,6 +52,8 @@ type fullMockStrategy struct {
 	//declscope:private
 	applyErr error
 	//declscope:private
+	applyTagsErr error
+	//declscope:private
 	fetchLastModifiedVal time.Time
 	//declscope:private
 	fetchLastModifiedErr error
@@ -106,7 +108,7 @@ func (m *fullMockStrategy) Apply(_ context.Context, _ string, _ staging.Entry) e
 	return m.applyErr
 }
 func (m *fullMockStrategy) ApplyTags(_ context.Context, _ string, _ staging.TagEntry) error {
-	return nil
+	return m.applyTagsErr
 }
 func (m *fullMockStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
 	if m.fetchLastModifiedErr != nil {
@@ -2952,22 +2954,27 @@ func TestApplyRunner_Namespaces(t *testing.T) {
 }
 
 // TestApplyRunner_NamespacedFailure verifies that a failed apply names the
-// namespace it failed under.
+// namespace it failed under, for both value and tag changes.
 func TestApplyRunner_NamespacedFailure(t *testing.T) {
 	t.Parallel()
 
+	key := staging.EntryKey{Name: "/app/config", Namespace: "prod"}
 	store := testutil.NewMockStore()
-	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: "prod"}, staging.Entry{
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
 		Operation: staging.OperationUpdate,
 		Value:     lo.ToPtr("new-value"),
 		StagedAt:  time.Now(),
+	}))
+	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: time.Now(),
 	}))
 
 	var stdout, stderr bytes.Buffer
 
 	r := &cli.ApplyRunner{
 		UseCase: &stagingusecase.ApplyUseCase{
-			Strategy: &fullMockStrategy{service: staging.ServiceParam, applyErr: errors.New("boom")},
+			Strategy: &fullMockStrategy{service: staging.ServiceParam, applyErr: errors.New("boom"), applyTagsErr: errors.New("tag boom")},
 			Store:    store,
 		},
 		Stdout: &stdout,
@@ -2976,8 +2983,8 @@ func TestApplyRunner_NamespacedFailure(t *testing.T) {
 
 	err := r.Run(t.Context(), cli.ApplyOptions{})
 	require.Error(t, err)
-	assert.Contains(t, stderr.String(), "/app/config [prod]")
-	assert.Contains(t, stderr.String(), "boom")
+	assert.Contains(t, stderr.String(), "/app/config [prod]: boom")
+	assert.Contains(t, stderr.String(), "/app/config [prod] (tags): tag boom")
 }
 
 // TestDiffRunner_NamespacedAutoUnstage verifies that the auto-unstaged warning

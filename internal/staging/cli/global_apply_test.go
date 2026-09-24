@@ -7,6 +7,7 @@ package cli_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -1176,4 +1177,52 @@ func TestGlobalApply_AppliesEntriesUnderTheirNamespace(t *testing.T) {
 	// Both entries were unstaged under their own (name, namespace) key.
 	remaining, _ := st.ListEntries(ctx, staging.ServiceParam)
 	assert.Empty(t, remaining[staging.ServiceParam])
+}
+
+// TestGlobalApply_NamespacedFailureAndUnstageWarnings verifies that failures and
+// unstage warnings in the all-service apply name the namespace they belong to.
+func TestGlobalApply_NamespacedFailureAndUnstageWarnings(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	key := staging.EntryKey{Name: "k", Namespace: "dev"}
+	st := testutil.NewMockStore()
+	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, key, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+	}))
+	require.NoError(t, st.StageTag(ctx, staging.ServiceParam, key, staging.TagEntry{
+		Add: map[string]string{"env": "dev"}, StagedAt: time.Now(),
+	}))
+	require.NoError(t, st.StageTag(ctx, staging.ServiceParam, staging.EntryKey{Name: "k", Namespace: "prd"}, staging.TagEntry{
+		Add: map[string]string{"env": "prd"}, StagedAt: time.Now(),
+	}))
+
+	st.UnstageEntryErr = errors.New("disk full")
+	st.UnstageTagErr = errors.New("disk full")
+
+	strategy := newGlobalApplyParamStrategy()
+	strategy.applyTagsFunc = func(_ context.Context, _ string, tagEntry staging.TagEntry) error {
+		if tagEntry.Add["env"] == "prd" {
+			return errors.New("tag boom")
+		}
+
+		return nil
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:         globalApplyServices(globalApplyParam(strategy, st)),
+		ProviderLabel:   "Azure",
+		Stdout:          &stdout,
+		Stderr:          &stderr,
+		IgnoreConflicts: true,
+	}
+
+	require.Error(t, r.Run(ctx))
+	assert.Contains(t, stdout.String(), "SSM Parameter Store: Created k [dev]")
+	assert.Contains(t, stdout.String(), "SSM Parameter Store: Tagged k [dev] [+1]")
+	assert.Contains(t, stderr.String(), "failed to clear staging for k [dev]: disk full")
+	assert.Contains(t, stderr.String(), "failed to clear staging for k [dev] tags: disk full")
+	assert.Contains(t, stderr.String(), "SSM Parameter Store: k [prd] (tags): tag boom")
 }
