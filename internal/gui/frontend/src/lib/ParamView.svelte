@@ -31,15 +31,14 @@
 
   let { capability, providerName = '', selectedNamespace = NS_NULL, onnamespaces, onnavigatetostaging, onstagingchange }: Props = $props();
 
-  // Capability-driven visibility. Absent capability defaults to AWS-like (true)
-  // so the component degrades safely if mounted without one.
-  const stagingEnabled = $derived(capability?.hasStaging ?? true);
-  const tagsEnabled = $derived(capability?.hasTags ?? true);
-  const historyEnabled = $derived(capability?.hasVersionHistory ?? true);
+  // Capability-driven visibility: App mounts this view only with the service's
+  // capability, so every flag is read as-is.
+  const stagingEnabled = $derived(capability.hasStaging);
+  const tagsEnabled = $derived(capability.hasTags);
+  const historyEnabled = $derived(capability.hasVersionHistory);
   // The Description input is shown only where the provider persists it (AWS
   // param); Azure App Configuration ignores it, so it stays hidden there.
-  // Default false so a capability object missing the field hides the input.
-  const descriptionEnabled = $derived(capability?.hasDescription ?? false);
+  const descriptionEnabled = $derived(capability.hasDescription);
 
   // The namespace axis (Azure App Configuration calls it a "label") exists only
   // for a service with hasNamespaces.

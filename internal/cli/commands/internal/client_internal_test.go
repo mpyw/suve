@@ -31,7 +31,7 @@ func TestStrategyFactory(t *testing.T) {
 	_, err = failing(t.Context())
 	require.ErrorIs(t, err, errStore)
 
-	assert.IsType(t, &staging.AzureAppConfigParamStrategy{}, ParserFactory(provider.ProviderAzure, provider.KindParam)())
+	assert.IsType(t, &staging.AzureParamStrategy{}, ParserFactory(provider.ProviderAzure, provider.KindParam)())
 }
 
 func TestStrategyFactory_PanicsWithoutBinding(t *testing.T) {

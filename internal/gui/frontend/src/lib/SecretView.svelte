@@ -24,21 +24,22 @@
 
   let { capability, providerName = '', onnavigatetostaging, onstagingchange }: Props = $props();
 
-  // Capability-driven visibility. Absent capability defaults to AWS-like (true).
-  const stagingEnabled = $derived(capability?.hasStaging ?? true);
-  const tagsEnabled = $derived(capability?.hasTags ?? true);
+  // Capability-driven visibility: App mounts this view only with the service's
+  // capability, so every flag is read as-is.
+  const stagingEnabled = $derived(capability.hasStaging);
+  const tagsEnabled = $derived(capability.hasTags);
   // Azure Key Vault scopes tags per version: show them inside each Version
   // History entry (add/remove only on the latest) instead of one resource-level
   // list. Every other provider keeps the single top-level TagList.
-  const tagsPerVersion = $derived(capability?.tagsPerVersion ?? false);
-  const historyEnabled = $derived(capability?.hasVersionHistory ?? true);
-  const restoreEnabled = $derived(capability?.hasRestore ?? true);
+  const tagsPerVersion = $derived(capability.tagsPerVersion);
+  const historyEnabled = $derived(capability.hasVersionHistory);
+  const restoreEnabled = $derived(capability.hasRestore);
   // The Description input is shown only where the provider persists it (AWS
   // Secrets Manager, Google Cloud Secret Manager); Azure Key Vault ignores it,
-  // so it stays hidden. Default false so a capability missing the field hides it.
-  const descriptionEnabled = $derived(capability?.hasDescription ?? false);
-  const forceDeleteEnabled = $derived(capability?.hasForceDelete ?? true);
-  const recoveryWindowEnabled = $derived(capability?.hasRecoveryWindow ?? true);
+  // so it stays hidden.
+  const descriptionEnabled = $derived(capability.hasDescription);
+  const forceDeleteEnabled = $derived(capability.hasForceDelete);
+  const recoveryWindowEnabled = $derived(capability.hasRecoveryWindow);
 
   // Version labels and per-version state are two independent concepts (#419), so
   // render each from the field that actually carries it rather than guessing

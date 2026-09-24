@@ -16,10 +16,10 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-func TestAzureAppConfigParamStrategy_BasicMethods(t *testing.T) {
+func TestAzureParamStrategy_BasicMethods(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewAzureAppConfigParamStrategy(nil)
+	s := staging.NewAzureParamStrategy(nil)
 
 	assert.Equal(t, staging.ServiceParam, s.Service())
 	assert.Equal(t, "App Configuration", s.ServiceName())
@@ -28,7 +28,7 @@ func TestAzureAppConfigParamStrategy_BasicMethods(t *testing.T) {
 	assert.False(t, s.HasDeleteOptions())
 }
 
-func TestAzureAppConfigParamStrategy_Apply(t *testing.T) {
+func TestAzureParamStrategy_Apply(t *testing.T) {
 	t.Parallel()
 
 	t.Run("create", func(t *testing.T) {
@@ -46,7 +46,7 @@ func TestAzureAppConfigParamStrategy_Apply(t *testing.T) {
 				return domain.Version{}, nil
 			},
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 
 		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v1")})
 		require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestAzureAppConfigParamStrategy_Apply(t *testing.T) {
 				return domain.Version{}, nil
 			},
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 
 		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v2")})
 		require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestAzureAppConfigParamStrategy_Apply(t *testing.T) {
 				return nil
 			},
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 
 		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationDelete})
 		require.NoError(t, err)
@@ -102,7 +102,7 @@ func TestAzureAppConfigParamStrategy_Apply(t *testing.T) {
 				return secretNotFound(name)
 			},
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 
 		require.NoError(t, s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationDelete}))
 	})
@@ -110,13 +110,13 @@ func TestAzureAppConfigParamStrategy_Apply(t *testing.T) {
 	t.Run("unknown operation errors", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewAzureAppConfigParamStrategy(&providermock.Store{})
+		s := staging.NewAzureParamStrategy(&providermock.Store{})
 		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.Operation("bogus")})
 		require.Error(t, err)
 	})
 }
 
-func TestAzureAppConfigParamStrategy_ErrorWrapping(t *testing.T) {
+func TestAzureParamStrategy_ErrorWrapping(t *testing.T) {
 	t.Parallel()
 
 	boom := errors.New("boom")
@@ -129,7 +129,7 @@ func TestAzureAppConfigParamStrategy_ErrorWrapping(t *testing.T) {
 				return domain.Version{}, boom
 			},
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")})
 		require.ErrorIs(t, err, boom)
 	})
@@ -137,7 +137,7 @@ func TestAzureAppConfigParamStrategy_ErrorWrapping(t *testing.T) {
 	t.Run("update with nil value is a no-op", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewAzureAppConfigParamStrategy(&providermock.Store{})
+		s := staging.NewAzureParamStrategy(&providermock.Store{})
 		require.NoError(t, s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationUpdate}))
 	})
 
@@ -149,7 +149,7 @@ func TestAzureAppConfigParamStrategy_ErrorWrapping(t *testing.T) {
 				return domain.Version{}, boom
 			},
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v")})
 		require.ErrorIs(t, err, boom)
 	})
@@ -160,27 +160,27 @@ func TestAzureAppConfigParamStrategy_ErrorWrapping(t *testing.T) {
 		store := &providermock.Store{
 			DeleteFunc: func(_ context.Context, _ string, _ ...provider.DeleteOption) error { return boom },
 		}
-		err := staging.NewAzureAppConfigParamStrategy(store).Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationDelete})
+		err := staging.NewAzureParamStrategy(store).Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationDelete})
 		require.ErrorIs(t, err, boom)
 	})
 }
 
-// TestAzureAppConfigParamStrategy_LastWriteWins asserts the last-write-wins
+// TestAzureParamStrategy_LastWriteWins asserts the last-write-wins
 // semantics: FetchLastModified always returns zero time and never touches the
 // store, so no modified-after conflict is ever reported.
-func TestAzureAppConfigParamStrategy_LastWriteWins(t *testing.T) {
+func TestAzureParamStrategy_LastWriteWins(t *testing.T) {
 	t.Parallel()
 
 	// A store whose funcs would panic if called: FetchLastModified must not
 	// call the store at all.
-	got, err := staging.NewAzureAppConfigParamStrategy(&providermock.Store{}).FetchLastModified(t.Context(), "cfg")
+	got, err := staging.NewAzureParamStrategy(&providermock.Store{}).FetchLastModified(t.Context(), "cfg")
 	require.NoError(t, err)
 	assert.True(t, got.IsZero())
 }
 
-// TestAzureAppConfigParamStrategy_ApplyTags asserts staged tag changes forward
+// TestAzureParamStrategy_ApplyTags asserts staged tag changes forward
 // to the store's Tag (adds) and Untag (removes).
-func TestAzureAppConfigParamStrategy_ApplyTags(t *testing.T) {
+func TestAzureParamStrategy_ApplyTags(t *testing.T) {
 	t.Parallel()
 
 	t.Run("adds and removes forward to Tag/Untag", func(t *testing.T) {
@@ -203,7 +203,7 @@ func TestAzureAppConfigParamStrategy_ApplyTags(t *testing.T) {
 				return nil
 			},
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 
 		err := s.ApplyTags(t.Context(), "cfg", staging.TagEntry{
 			Add:    map[string]string{"env": "prod"},
@@ -221,7 +221,7 @@ func TestAzureAppConfigParamStrategy_ApplyTags(t *testing.T) {
 		store := &providermock.Store{
 			TagFunc: func(_ context.Context, _ string, _ map[string]string) error { return boom },
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 		err := s.ApplyTags(t.Context(), "cfg", staging.TagEntry{Add: map[string]string{"k": "v"}})
 		require.ErrorIs(t, err, boom)
 	})
@@ -233,13 +233,13 @@ func TestAzureAppConfigParamStrategy_ApplyTags(t *testing.T) {
 		store := &providermock.Store{
 			UntagFunc: func(_ context.Context, _ string, _ []string) error { return boom },
 		}
-		s := staging.NewAzureAppConfigParamStrategy(store)
+		s := staging.NewAzureParamStrategy(store)
 		err := s.ApplyTags(t.Context(), "cfg", staging.TagEntry{Remove: maputil.NewSet("k")})
 		require.ErrorIs(t, err, boom)
 	})
 }
 
-func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
+func TestAzureParamStrategy_Fetch(t *testing.T) {
 	t.Parallel()
 
 	t.Run("FetchCurrent returns value with empty identifier", func(t *testing.T) {
@@ -250,7 +250,7 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 				return &domain.Entry{Name: name, Value: "current"}, nil
 			},
 		}
-		fr, err := staging.NewAzureAppConfigParamStrategy(store).FetchCurrent(t.Context(), "cfg")
+		fr, err := staging.NewAzureParamStrategy(store).FetchCurrent(t.Context(), "cfg")
 		require.NoError(t, err)
 		assert.Equal(t, "current", fr.Value)
 		assert.Empty(t, fr.Identifier)
@@ -263,7 +263,7 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 		store := &providermock.Store{
 			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) { return nil, boom },
 		}
-		_, err := staging.NewAzureAppConfigParamStrategy(store).FetchCurrent(t.Context(), "cfg")
+		_, err := staging.NewAzureParamStrategy(store).FetchCurrent(t.Context(), "cfg")
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -278,7 +278,7 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 				}, nil
 			},
 		}
-		tags, err := staging.NewAzureAppConfigParamStrategy(store).FetchCurrentTags(t.Context(), "cfg")
+		tags, err := staging.NewAzureParamStrategy(store).FetchCurrentTags(t.Context(), "cfg")
 		require.NoError(t, err)
 		assert.Equal(t, map[string]string{"env": "prod", "team": "core"}, tags)
 	})
@@ -291,7 +291,7 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 				return nil, secretNotFound(name)
 			},
 		}
-		tags, err := staging.NewAzureAppConfigParamStrategy(notFound).FetchCurrentTags(t.Context(), "cfg")
+		tags, err := staging.NewAzureParamStrategy(notFound).FetchCurrentTags(t.Context(), "cfg")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
 
@@ -300,7 +300,7 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 				return &domain.Entry{Name: name}, nil
 			},
 		}
-		tags, err = staging.NewAzureAppConfigParamStrategy(noTags).FetchCurrentTags(t.Context(), "cfg")
+		tags, err = staging.NewAzureParamStrategy(noTags).FetchCurrentTags(t.Context(), "cfg")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
 	})
@@ -313,7 +313,7 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 				return &domain.Entry{Name: name, Value: "current"}, nil
 			},
 		}
-		result, err := staging.NewAzureAppConfigParamStrategy(store).FetchCurrentValue(t.Context(), "cfg")
+		result, err := staging.NewAzureParamStrategy(store).FetchCurrentValue(t.Context(), "cfg")
 		require.NoError(t, err)
 		assert.Equal(t, "current", result.Value)
 		assert.True(t, result.LastModified.IsZero())
@@ -327,7 +327,7 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 				return nil, secretNotFound(name)
 			},
 		}
-		_, err := staging.NewAzureAppConfigParamStrategy(notFound).FetchCurrentValue(t.Context(), "cfg")
+		_, err := staging.NewAzureParamStrategy(notFound).FetchCurrentValue(t.Context(), "cfg")
 
 		var rnf *staging.ResourceNotFoundError
 
@@ -337,15 +337,15 @@ func TestAzureAppConfigParamStrategy_Fetch(t *testing.T) {
 		errStore := &providermock.Store{
 			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) { return nil, boom },
 		}
-		_, err = staging.NewAzureAppConfigParamStrategy(errStore).FetchCurrentValue(t.Context(), "cfg")
+		_, err = staging.NewAzureParamStrategy(errStore).FetchCurrentValue(t.Context(), "cfg")
 		require.ErrorIs(t, err, boom)
 	})
 }
 
-func TestAzureAppConfigParamStrategy_ParseAndVersion(t *testing.T) {
+func TestAzureParamStrategy_ParseAndVersion(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewAzureAppConfigParamStrategy(&providermock.Store{})
+	s := staging.NewAzureParamStrategy(&providermock.Store{})
 
 	t.Run("ParseName: whole argument is the key, including specifier-like chars", func(t *testing.T) {
 		t.Parallel()
@@ -386,7 +386,7 @@ func TestAzureAppConfigParamStrategy_ParseAndVersion(t *testing.T) {
 				return &domain.Entry{Value: "current"}, nil
 			},
 		}
-		value, label, err := staging.NewAzureAppConfigParamStrategy(store).FetchVersion(t.Context(), "cfg")
+		value, label, err := staging.NewAzureParamStrategy(store).FetchVersion(t.Context(), "cfg")
 		require.NoError(t, err)
 		assert.Equal(t, "current", value)
 		assert.Equal(t, "current", label)
@@ -403,7 +403,7 @@ func TestAzureAppConfigParamStrategy_ParseAndVersion(t *testing.T) {
 				return &domain.Entry{Value: "current"}, nil
 			},
 		}
-		value, label, err := staging.NewAzureAppConfigParamStrategy(store).FetchVersion(t.Context(), "cfg#1")
+		value, label, err := staging.NewAzureParamStrategy(store).FetchVersion(t.Context(), "cfg#1")
 		require.NoError(t, err)
 		assert.Equal(t, "current", value)
 		assert.Equal(t, "current", label)
@@ -416,15 +416,15 @@ func TestAzureAppConfigParamStrategy_ParseAndVersion(t *testing.T) {
 		store := &providermock.Store{
 			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) { return nil, boom },
 		}
-		_, _, err := staging.NewAzureAppConfigParamStrategy(store).FetchVersion(t.Context(), "cfg")
+		_, _, err := staging.NewAzureParamStrategy(store).FetchVersion(t.Context(), "cfg")
 		require.ErrorIs(t, err, boom)
 	})
 }
 
-func TestAzureAppConfigParamParserFactory(t *testing.T) {
+func TestAzureParamParserFactory(t *testing.T) {
 	t.Parallel()
 
-	p := staging.AzureAppConfigParamParserFactory()
+	p := staging.AzureParamParserFactory()
 	assert.Equal(t, staging.ServiceParam, p.Service())
 	assert.False(t, p.HasDeleteOptions())
 }

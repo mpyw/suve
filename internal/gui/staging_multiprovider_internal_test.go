@@ -65,8 +65,8 @@ func TestApp_getParser_PerProvider(t *testing.T) {
 		{"aws param", provider.ProviderAWS, "param", &staging.AWSParamStrategy{}},
 		{"aws secret", provider.ProviderAWS, "secret", &staging.AWSSecretStrategy{}},
 		{"google cloud secret", provider.ProviderGoogleCloud, "secret", &staging.GoogleCloudSecretStrategy{}},
-		{"azure param", provider.ProviderAzure, "param", &staging.AzureAppConfigParamStrategy{}},
-		{"azure secret", provider.ProviderAzure, "secret", &staging.AzureKeyVaultSecretStrategy{}},
+		{"azure param", provider.ProviderAzure, "param", &staging.AzureParamStrategy{}},
+		{"azure secret", provider.ProviderAzure, "secret", &staging.AzureSecretStrategy{}},
 	}
 
 	for _, tt := range tests {

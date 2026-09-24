@@ -146,14 +146,14 @@ var descriptors = map[provider.Provider]descriptor{
 		kinds: map[provider.Kind]Binding{
 			provider.KindParam: {
 				SplitSpec:  version.AzureAppConfiguration.Split,
-				parser:     staging.AzureAppConfigParamParserFactory,
-				strategy:   func(s provider.Store) staging.FullStrategy { return staging.NewAzureAppConfigParamStrategy(s) },
+				parser:     staging.AzureParamParserFactory,
+				strategy:   func(s provider.Store) staging.FullStrategy { return staging.NewAzureParamStrategy(s) },
 				namespaced: true,
 			},
 			provider.KindSecret: {
 				SplitSpec: version.AzureKeyVault.Split,
-				parser:    staging.AzureKeyVaultSecretParserFactory,
-				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewAzureKeyVaultSecretStrategy(s) },
+				parser:    staging.AzureSecretParserFactory,
+				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewAzureSecretStrategy(s) },
 			},
 		},
 		// Key Vault and App Configuration are separate resources with separate

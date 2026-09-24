@@ -28,12 +28,13 @@ const (
 const secretServiceItemName = "secret"
 
 // ServiceStrategy defines the common interface for service-specific operations.
-// This enables Strategy Pattern to consolidate duplicate code across SSM Parameter Store and Secrets Manager commands.
+// Every provider's staging strategy implements it, so the stage commands are
+// written once for all services.
 type ServiceStrategy interface {
 	// Service returns the service type (ServiceParam or ServiceSecret).
 	Service() Service
 
-	// ServiceName returns the user-friendly service name (e.g., "SSM Parameter Store", "Secrets Manager").
+	// ServiceName returns the user-friendly service name (e.g., "SSM Parameter Store", "Key Vault").
 	ServiceName() string
 
 	// ItemName returns the item name for messages (e.g., "parameter", "secret").

@@ -17,10 +17,10 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-func TestAzureKeyVaultSecretStrategy_BasicMethods(t *testing.T) {
+func TestAzureSecretStrategy_BasicMethods(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewAzureKeyVaultSecretStrategy(nil)
+	s := staging.NewAzureSecretStrategy(nil)
 
 	assert.Equal(t, staging.ServiceSecret, s.Service())
 	assert.Equal(t, "Key Vault", s.ServiceName())
@@ -29,7 +29,7 @@ func TestAzureKeyVaultSecretStrategy_BasicMethods(t *testing.T) {
 	assert.False(t, s.HasDeleteOptions())
 }
 
-func TestAzureKeyVaultSecretStrategy_Apply(t *testing.T) {
+func TestAzureSecretStrategy_Apply(t *testing.T) {
 	t.Parallel()
 
 	t.Run("create", func(t *testing.T) {
@@ -47,7 +47,7 @@ func TestAzureKeyVaultSecretStrategy_Apply(t *testing.T) {
 				return domain.Version{ID: "abc"}, nil
 			},
 		}
-		s := staging.NewAzureKeyVaultSecretStrategy(store)
+		s := staging.NewAzureSecretStrategy(store)
 
 		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v1")})
 		require.NoError(t, err)
@@ -69,7 +69,7 @@ func TestAzureKeyVaultSecretStrategy_Apply(t *testing.T) {
 				return domain.Version{ID: "def"}, nil
 			},
 		}
-		s := staging.NewAzureKeyVaultSecretStrategy(store)
+		s := staging.NewAzureSecretStrategy(store)
 
 		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v2")})
 		require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestAzureKeyVaultSecretStrategy_Apply(t *testing.T) {
 				return nil
 			},
 		}
-		s := staging.NewAzureKeyVaultSecretStrategy(store)
+		s := staging.NewAzureSecretStrategy(store)
 
 		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationDelete})
 		require.NoError(t, err)
@@ -103,7 +103,7 @@ func TestAzureKeyVaultSecretStrategy_Apply(t *testing.T) {
 				return secretNotFound(name)
 			},
 		}
-		s := staging.NewAzureKeyVaultSecretStrategy(store)
+		s := staging.NewAzureSecretStrategy(store)
 
 		require.NoError(t, s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationDelete}))
 	})
@@ -111,13 +111,13 @@ func TestAzureKeyVaultSecretStrategy_Apply(t *testing.T) {
 	t.Run("unknown operation errors", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewAzureKeyVaultSecretStrategy(&providermock.Store{})
+		s := staging.NewAzureSecretStrategy(&providermock.Store{})
 		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.Operation("bogus")})
 		require.Error(t, err)
 	})
 }
 
-func TestAzureKeyVaultSecretStrategy_ApplyTags(t *testing.T) {
+func TestAzureSecretStrategy_ApplyTags(t *testing.T) {
 	t.Parallel()
 
 	var added map[string]string
@@ -136,7 +136,7 @@ func TestAzureKeyVaultSecretStrategy_ApplyTags(t *testing.T) {
 			return nil
 		},
 	}
-	s := staging.NewAzureKeyVaultSecretStrategy(store)
+	s := staging.NewAzureSecretStrategy(store)
 
 	err := s.ApplyTags(t.Context(), "sec", staging.TagEntry{
 		Add:    map[string]string{"env": "prod"},
@@ -147,7 +147,7 @@ func TestAzureKeyVaultSecretStrategy_ApplyTags(t *testing.T) {
 	assert.Equal(t, []string{"old"}, removed)
 }
 
-func TestAzureKeyVaultSecretStrategy_FetchLastModified(t *testing.T) {
+func TestAzureSecretStrategy_FetchLastModified(t *testing.T) {
 	t.Parallel()
 
 	mod := time.Date(2024, 3, 4, 5, 6, 7, 0, time.UTC)
@@ -160,7 +160,7 @@ func TestAzureKeyVaultSecretStrategy_FetchLastModified(t *testing.T) {
 				return &domain.Entry{Modified: &mod}, nil
 			},
 		}
-		got, err := staging.NewAzureKeyVaultSecretStrategy(store).FetchLastModified(t.Context(), "sec")
+		got, err := staging.NewAzureSecretStrategy(store).FetchLastModified(t.Context(), "sec")
 		require.NoError(t, err)
 		assert.Equal(t, mod, got)
 	})
@@ -173,7 +173,7 @@ func TestAzureKeyVaultSecretStrategy_FetchLastModified(t *testing.T) {
 				return nil, secretNotFound(name)
 			},
 		}
-		_, err := staging.NewAzureKeyVaultSecretStrategy(store).FetchLastModified(t.Context(), "sec")
+		_, err := staging.NewAzureSecretStrategy(store).FetchLastModified(t.Context(), "sec")
 		notFoundErr := (*staging.ResourceNotFoundError)(nil)
 		require.ErrorAs(t, err, &notFoundErr)
 		require.ErrorIs(t, err, provider.ErrNotFound)
@@ -187,13 +187,13 @@ func TestAzureKeyVaultSecretStrategy_FetchLastModified(t *testing.T) {
 				return &domain.Entry{Value: "v"}, nil
 			},
 		}
-		got, err := staging.NewAzureKeyVaultSecretStrategy(store).FetchLastModified(t.Context(), "sec")
+		got, err := staging.NewAzureSecretStrategy(store).FetchLastModified(t.Context(), "sec")
 		require.NoError(t, err)
 		assert.True(t, got.IsZero())
 	})
 }
 
-func TestAzureKeyVaultSecretStrategy_FetchAndTags(t *testing.T) {
+func TestAzureSecretStrategy_FetchAndTags(t *testing.T) {
 	t.Parallel()
 
 	mod := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
@@ -209,7 +209,7 @@ func TestAzureKeyVaultSecretStrategy_FetchAndTags(t *testing.T) {
 			}, nil
 		},
 	}
-	s := staging.NewAzureKeyVaultSecretStrategy(store)
+	s := staging.NewAzureSecretStrategy(store)
 
 	fr, err := s.FetchCurrent(t.Context(), "sec")
 	require.NoError(t, err)
@@ -226,10 +226,10 @@ func TestAzureKeyVaultSecretStrategy_FetchAndTags(t *testing.T) {
 	assert.Equal(t, mod, efr.LastModified)
 }
 
-func TestAzureKeyVaultSecretStrategy_ParseAndResolve(t *testing.T) {
+func TestAzureSecretStrategy_ParseAndResolve(t *testing.T) {
 	t.Parallel()
 
-	s := staging.NewAzureKeyVaultSecretStrategy(&providermock.Store{})
+	s := staging.NewAzureSecretStrategy(&providermock.Store{})
 
 	t.Run("ParseName rejects version specifiers", func(t *testing.T) {
 		t.Parallel()
@@ -273,7 +273,7 @@ func TestAzureKeyVaultSecretStrategy_ParseAndResolve(t *testing.T) {
 				return &domain.Entry{Value: "old", Version: domain.Version{ID: "abc123"}}, nil
 			},
 		}
-		value, label, err := staging.NewAzureKeyVaultSecretStrategy(store).FetchVersion(t.Context(), "sec#abc123")
+		value, label, err := staging.NewAzureSecretStrategy(store).FetchVersion(t.Context(), "sec#abc123")
 		require.NoError(t, err)
 		assert.Equal(t, "old", value)
 		assert.Equal(t, "#abc123", label)
@@ -292,12 +292,12 @@ func TestAzureKeyVaultSecretStrategy_ParseAndResolve(t *testing.T) {
 				return &domain.Entry{Value: "v", Version: domain.Version{ID: "older"}}, nil
 			},
 		}
-		_, _, err := staging.NewAzureKeyVaultSecretStrategy(store).FetchVersion(t.Context(), "sec#abc123~1")
+		_, _, err := staging.NewAzureSecretStrategy(store).FetchVersion(t.Context(), "sec#abc123~1")
 		require.NoError(t, err)
 	})
 }
 
-func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
+func TestAzureSecretStrategy_ErrorPaths(t *testing.T) {
 	t.Parallel()
 
 	boom := errors.New("boom")
@@ -310,7 +310,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 				return domain.Version{}, boom
 			},
 		}
-		s := staging.NewAzureKeyVaultSecretStrategy(store)
+		s := staging.NewAzureSecretStrategy(store)
 		err := s.Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")})
 		require.ErrorIs(t, err, boom)
 	})
@@ -318,7 +318,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 	t.Run("update with nil value is a no-op", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewAzureKeyVaultSecretStrategy(&providermock.Store{})
+		s := staging.NewAzureSecretStrategy(&providermock.Store{})
 		require.NoError(t, s.Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationUpdate}))
 	})
 
@@ -330,7 +330,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 				return domain.Version{}, boom
 			},
 		}
-		s := staging.NewAzureKeyVaultSecretStrategy(store)
+		s := staging.NewAzureSecretStrategy(store)
 		err := s.Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v")})
 		require.ErrorIs(t, err, boom)
 	})
@@ -341,7 +341,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 		store := &providermock.Store{
 			DeleteFunc: func(_ context.Context, _ string, _ ...provider.DeleteOption) error { return boom },
 		}
-		err := staging.NewAzureKeyVaultSecretStrategy(store).Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationDelete})
+		err := staging.NewAzureSecretStrategy(store).Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationDelete})
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -349,11 +349,11 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 		t.Parallel()
 
 		tagErr := &providermock.Store{TagFunc: func(_ context.Context, _ string, _ map[string]string) error { return boom }}
-		err := staging.NewAzureKeyVaultSecretStrategy(tagErr).ApplyTags(t.Context(), "s", staging.TagEntry{Add: map[string]string{"k": "v"}})
+		err := staging.NewAzureSecretStrategy(tagErr).ApplyTags(t.Context(), "s", staging.TagEntry{Add: map[string]string{"k": "v"}})
 		require.ErrorIs(t, err, boom)
 
 		untagErr := &providermock.Store{UntagFunc: func(_ context.Context, _ string, _ []string) error { return boom }}
-		err = staging.NewAzureKeyVaultSecretStrategy(untagErr).ApplyTags(t.Context(), "s", staging.TagEntry{Remove: maputil.NewSet("k")})
+		err = staging.NewAzureSecretStrategy(untagErr).ApplyTags(t.Context(), "s", staging.TagEntry{Remove: maputil.NewSet("k")})
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -363,7 +363,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 		store := &providermock.Store{
 			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) { return nil, boom },
 		}
-		_, err := staging.NewAzureKeyVaultSecretStrategy(store).FetchLastModified(t.Context(), "s")
+		_, err := staging.NewAzureSecretStrategy(store).FetchLastModified(t.Context(), "s")
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -373,7 +373,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 		store := &providermock.Store{
 			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) { return nil, boom },
 		}
-		_, err := staging.NewAzureKeyVaultSecretStrategy(store).FetchCurrent(t.Context(), "s")
+		_, err := staging.NewAzureSecretStrategy(store).FetchCurrent(t.Context(), "s")
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -385,7 +385,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 				return nil, secretNotFound(name)
 			},
 		}
-		tags, err := staging.NewAzureKeyVaultSecretStrategy(notFound).FetchCurrentTags(t.Context(), "s")
+		tags, err := staging.NewAzureSecretStrategy(notFound).FetchCurrentTags(t.Context(), "s")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
 
@@ -394,14 +394,14 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 				return &domain.Entry{}, nil
 			},
 		}
-		tags, err = staging.NewAzureKeyVaultSecretStrategy(empty).FetchCurrentTags(t.Context(), "s")
+		tags, err = staging.NewAzureSecretStrategy(empty).FetchCurrentTags(t.Context(), "s")
 		require.NoError(t, err)
 		assert.Nil(t, tags)
 
 		errStore := &providermock.Store{
 			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) { return nil, boom },
 		}
-		_, err = staging.NewAzureKeyVaultSecretStrategy(errStore).FetchCurrentTags(t.Context(), "s")
+		_, err = staging.NewAzureSecretStrategy(errStore).FetchCurrentTags(t.Context(), "s")
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -413,7 +413,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 				return nil, secretNotFound(name)
 			},
 		}
-		_, err := staging.NewAzureKeyVaultSecretStrategy(notFound).FetchCurrentValue(t.Context(), "s")
+		_, err := staging.NewAzureSecretStrategy(notFound).FetchCurrentValue(t.Context(), "s")
 
 		var rnf *staging.ResourceNotFoundError
 
@@ -422,14 +422,14 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 		errStore := &providermock.Store{
 			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) { return nil, boom },
 		}
-		_, err = staging.NewAzureKeyVaultSecretStrategy(errStore).FetchCurrentValue(t.Context(), "s")
+		_, err = staging.NewAzureSecretStrategy(errStore).FetchCurrentValue(t.Context(), "s")
 		require.ErrorIs(t, err, boom)
 	})
 
 	t.Run("parse errors surface", func(t *testing.T) {
 		t.Parallel()
 
-		s := staging.NewAzureKeyVaultSecretStrategy(&providermock.Store{})
+		s := staging.NewAzureSecretStrategy(&providermock.Store{})
 
 		_, err := s.ParseName("sec:label")
 		require.Error(t, err)
@@ -449,7 +449,7 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 				return provider.VersionRef{}, boom
 			},
 		}
-		_, _, err := staging.NewAzureKeyVaultSecretStrategy(resolveErr).FetchVersion(t.Context(), "sec#abc")
+		_, _, err := staging.NewAzureSecretStrategy(resolveErr).FetchVersion(t.Context(), "sec#abc")
 		require.ErrorIs(t, err, boom)
 
 		getErr := &providermock.Store{
@@ -458,15 +458,15 @@ func TestAzureKeyVaultSecretStrategy_ErrorPaths(t *testing.T) {
 			},
 			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) { return nil, boom },
 		}
-		_, _, err = staging.NewAzureKeyVaultSecretStrategy(getErr).FetchVersion(t.Context(), "sec#abc")
+		_, _, err = staging.NewAzureSecretStrategy(getErr).FetchVersion(t.Context(), "sec#abc")
 		require.ErrorIs(t, err, boom)
 	})
 }
 
-func TestAzureKeyVaultSecretParserFactory(t *testing.T) {
+func TestAzureSecretParserFactory(t *testing.T) {
 	t.Parallel()
 
-	p := staging.AzureKeyVaultSecretParserFactory()
+	p := staging.AzureSecretParserFactory()
 	assert.Equal(t, staging.ServiceSecret, p.Service())
 	assert.False(t, p.HasDeleteOptions())
 }

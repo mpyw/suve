@@ -88,6 +88,12 @@ const (
 	ProviderAzure Provider = "azure"
 )
 
+// Providers returns every provider in the stable order that listings and
+// messages use: AWS, Google Cloud, then Azure.
+func Providers() []Provider {
+	return []Provider{ProviderAWS, ProviderGoogleCloud, ProviderAzure}
+}
+
 // Kind selects a store kind within a provider (some providers offer only one).
 type Kind string
 

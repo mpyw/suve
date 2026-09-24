@@ -5,7 +5,7 @@ import (
 	"github.com/mpyw/suve/internal/version"
 )
 
-// AzureKeyVaultSecretStrategy implements the staging strategies for Azure Key
+// AzureSecretStrategy implements the staging strategies for Azure Key
 // Vault secrets over a provider.Store. Key Vault specifics:
 //
 //   - Versions are opaque ids, parsed with version.AzureKeyVault (#ID, ~SHIFT); a
@@ -16,27 +16,27 @@ import (
 //   - Conflict detection uses the secret's last-modified timestamp, like AWS.
 //
 // The zero value (no store) is a parser-only strategy (ParseName/ParseSpec).
-type AzureKeyVaultSecretStrategy struct {
-	versionedStrategy[azureKeyVaultSecretHooks]
+type AzureSecretStrategy struct {
+	versionedStrategy[azureSecretHooks]
 }
 
-// NewAzureKeyVaultSecretStrategy creates an Azure Key Vault staging strategy
+// NewAzureSecretStrategy creates an Azure Key Vault staging strategy
 // over the given provider store. A nil store is allowed for parser-only use.
-func NewAzureKeyVaultSecretStrategy(store provider.Store) *AzureKeyVaultSecretStrategy {
-	return &AzureKeyVaultSecretStrategy{versionedStrategy[azureKeyVaultSecretHooks]{store: store}}
+func NewAzureSecretStrategy(store provider.Store) *AzureSecretStrategy {
+	return &AzureSecretStrategy{versionedStrategy[azureSecretHooks]{store: store}}
 }
 
-// AzureKeyVaultSecretParserFactory yields a parser-only strategy.
-func AzureKeyVaultSecretParserFactory() Parser {
-	return NewAzureKeyVaultSecretStrategy(nil)
+// AzureSecretParserFactory yields a parser-only strategy.
+func AzureSecretParserFactory() Parser {
+	return NewAzureSecretStrategy(nil)
 }
 
-// azureKeyVaultSecretHooks supplies the Key Vault specifics.
-type azureKeyVaultSecretHooks struct {
+// azureSecretHooks supplies the Key Vault specifics.
+type azureSecretHooks struct {
 	versionedSecretHooks
 }
 
-func (azureKeyVaultSecretHooks) traits() versionedTraits {
+func (azureSecretHooks) traits() versionedTraits {
 	return versionedTraits{
 		service:        ServiceSecret,
 		serviceName:    "Key Vault",
@@ -45,6 +45,6 @@ func (azureKeyVaultSecretHooks) traits() versionedTraits {
 	}
 }
 
-func (azureKeyVaultSecretHooks) parse(input string) (name, suffix string, err error) {
+func (azureSecretHooks) parse(input string) (name, suffix string, err error) {
 	return version.AzureKeyVault.Split(input)
 }

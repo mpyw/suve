@@ -562,8 +562,8 @@
         emptyText="No staged {paramLabel} changes"
         entries={paramEntries}
         tagEntries={paramTagEntries}
-        hasTags={paramSvc?.hasTags ?? true}
-        showNamespace={paramSvc?.hasNamespaces ?? false}
+        hasTags={paramSvc.hasTags}
+        showNamespace={paramSvc.hasNamespaces}
         {viewMode}
         onapply={() => openApplyModal('param')}
         onreset={() => openResetModal('param')}
@@ -583,7 +583,7 @@
         emptyText="No staged {secretLabel} changes"
         entries={secretEntries}
         tagEntries={secretTagEntries}
-        hasTags={secretSvc?.hasTags ?? true}
+        hasTags={secretSvc.hasTags}
         secret={true}
         {viewMode}
         onapply={() => openApplyModal('secret')}
