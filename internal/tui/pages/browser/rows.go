@@ -11,7 +11,7 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/tui/components"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/styles"
@@ -92,7 +92,7 @@ func previewValue(value string, maxWidth int) string {
 // as "(NULL)".
 func namespaceBadge(namespace string) string {
 	if namespace == "" {
-		return aznamespace.NullDisplay
+		return namespaces.NullDisplay
 	}
 
 	return namespace
@@ -160,5 +160,5 @@ func namespaceOptions(discovered []string) []string {
 		}
 	}
 
-	return append(opts, aznamespace.AllNamespacesFilter)
+	return append(opts, namespaces.AllFilter)
 }

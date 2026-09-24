@@ -1,4 +1,4 @@
-package secret_test
+package secretmanager_test
 
 import (
 	"context"
@@ -15,12 +15,12 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	gcloudsecret "github.com/mpyw/suve/internal/provider/gcloud/secret"
+	"github.com/mpyw/suve/internal/provider/gcloud/secretmanager"
 )
 
 const testProject = "my-project"
 
-// mockClient is a configurable in-test implementation of gcloudsecret.Client.
+// mockClient is a configurable in-test implementation of secretmanager.Client.
 type mockClient struct {
 	accessFunc  func(ctx context.Context, req *secretmanagerpb.AccessSecretVersionRequest) (*secretmanagerpb.AccessSecretVersionResponse, error)
 	getVerFunc  func(ctx context.Context, req *secretmanagerpb.GetSecretVersionRequest) (*secretmanagerpb.SecretVersion, error)
@@ -89,8 +89,8 @@ func versionName(n int) string {
 	return "projects/" + testProject + "/secrets/my-secret/versions/" + strconv.Itoa(n)
 }
 
-func newStore(m *mockClient) *gcloudsecret.Store {
-	return gcloudsecret.New(m, testProject)
+func newStore(m *mockClient) *secretmanager.Store {
+	return secretmanager.New(m, testProject)
 }
 
 func TestResolve(t *testing.T) {

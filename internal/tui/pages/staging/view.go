@@ -12,7 +12,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/hit"
 )
@@ -504,7 +504,7 @@ func nsBadge(sec *section, namespace string) string {
 	}
 
 	if namespace == "" {
-		return " " + aznamespace.NullDisplay
+		return " " + namespaces.NullDisplay
 	}
 
 	return " [" + namespace + "]"

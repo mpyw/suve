@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/capability"
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/nav"
@@ -1104,7 +1104,7 @@ func TestOpenNewBlocksAllNamespaces(t *testing.T) {
 
 	// New() seeds namespaces = ["", "*"]; select the all-namespaces filter.
 	m.nsIndex = 1
-	require.Equal(t, aznamespace.AllNamespacesFilter, m.currentNamespace())
+	require.Equal(t, namespaces.AllFilter, m.currentNamespace())
 
 	cmd := m.openNew()
 	require.NotNil(t, cmd)

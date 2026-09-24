@@ -2,7 +2,7 @@
 // AWS SSM Parameter Store type names ("String", "SecureString", "StringList")
 // used in CLI output, the --type flag, and the TUI/GUI type pickers. It imports
 // no cloud SDK, so every frontend shares the SSM vocabulary without depending
-// on the SDK-backed adapter in internal/provider/aws/param, and the usecases
+// on the SDK-backed adapter in internal/provider/aws/parameterstore, and the usecases
 // carry no AWS type.
 package paramtype
 

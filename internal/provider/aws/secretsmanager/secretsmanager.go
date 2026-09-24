@@ -1,9 +1,9 @@
-// Package secret implements the provider.Store and provider.Restorer
+// Package secretsmanager implements the provider.Store and provider.Restorer
 // contracts for AWS Secrets Manager. It confines all
 // Secrets Manager SDK types to this package: version/label/shift resolution
 // lives here, so AWS staging labels (AWSCURRENT etc.) never leak past this
 // boundary. Spec PARSING stays generic via awssecretversion.Parse.
-package secret
+package secretsmanager
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	secretsmanagersdk "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/samber/lo"
 
@@ -29,38 +29,38 @@ import (
 //nolint:interfacebloat // mirrors the Secrets Manager operations this adapter uses; splitting adds no value
 type Client interface {
 	GetSecretValue(
-		ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.GetSecretValueOutput, error)
+		ctx context.Context, params *secretsmanagersdk.GetSecretValueInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.GetSecretValueOutput, error)
 	ListSecretVersionIds(
-		ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.ListSecretVersionIdsOutput, error)
+		ctx context.Context, params *secretsmanagersdk.ListSecretVersionIdsInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.ListSecretVersionIdsOutput, error)
 	DescribeSecret(
-		ctx context.Context, params *secretsmanager.DescribeSecretInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.DescribeSecretOutput, error)
+		ctx context.Context, params *secretsmanagersdk.DescribeSecretInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.DescribeSecretOutput, error)
 	CreateSecret(
-		ctx context.Context, params *secretsmanager.CreateSecretInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.CreateSecretOutput, error)
+		ctx context.Context, params *secretsmanagersdk.CreateSecretInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.CreateSecretOutput, error)
 	UpdateSecret(
-		ctx context.Context, params *secretsmanager.UpdateSecretInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.UpdateSecretOutput, error)
+		ctx context.Context, params *secretsmanagersdk.UpdateSecretInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.UpdateSecretOutput, error)
 	RotateSecret(
-		ctx context.Context, params *secretsmanager.RotateSecretInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.RotateSecretOutput, error)
+		ctx context.Context, params *secretsmanagersdk.RotateSecretInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.RotateSecretOutput, error)
 	DeleteSecret(
-		ctx context.Context, params *secretsmanager.DeleteSecretInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.DeleteSecretOutput, error)
+		ctx context.Context, params *secretsmanagersdk.DeleteSecretInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.DeleteSecretOutput, error)
 	RestoreSecret(
-		ctx context.Context, params *secretsmanager.RestoreSecretInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.RestoreSecretOutput, error)
+		ctx context.Context, params *secretsmanagersdk.RestoreSecretInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.RestoreSecretOutput, error)
 	TagResource(
-		ctx context.Context, params *secretsmanager.TagResourceInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.TagResourceOutput, error)
+		ctx context.Context, params *secretsmanagersdk.TagResourceInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.TagResourceOutput, error)
 	UntagResource(
-		ctx context.Context, params *secretsmanager.UntagResourceInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.UntagResourceOutput, error)
+		ctx context.Context, params *secretsmanagersdk.UntagResourceInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.UntagResourceOutput, error)
 	ListSecrets(
-		ctx context.Context, params *secretsmanager.ListSecretsInput, optFns ...func(*secretsmanager.Options),
-	) (*secretsmanager.ListSecretsOutput, error)
+		ctx context.Context, params *secretsmanagersdk.ListSecretsInput, optFns ...func(*secretsmanagersdk.Options),
+	) (*secretsmanagersdk.ListSecretsOutput, error)
 }
 
 // Store is the Secrets Manager implementation of provider.Store (+ Restorer).
@@ -141,7 +141,7 @@ func (s *Store) listAllVersions(ctx context.Context, name string) ([]types.Secre
 	)
 
 	for {
-		out, err := s.client.ListSecretVersionIds(ctx, &secretsmanager.ListSecretVersionIdsInput{
+		out, err := s.client.ListSecretVersionIds(ctx, &secretsmanagersdk.ListSecretVersionIdsInput{
 			SecretId:          aws.String(name),
 			IncludeDeprecated: aws.Bool(true),
 			NextToken:         token,
@@ -235,7 +235,7 @@ func sortNewestFirst(list []types.SecretVersionsListEntry) {
 // Get retrieves the secret at the given ref (current when ref is latest) and
 // maps it to a domain.Entry with description and tags. Type is always secret.
 func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
-	input := &secretsmanager.GetSecretValueInput{
+	input := &secretsmanagersdk.GetSecretValueInput{
 		SecretId: aws.String(name),
 	}
 	if !ref.IsLatest() {
@@ -273,7 +273,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 	}
 
 	// Description and tags are best-effort via DescribeSecret.
-	desc, err := s.client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
+	desc, err := s.client.DescribeSecret(ctx, &secretsmanagersdk.DescribeSecretInput{
 		SecretId: aws.String(name),
 	})
 	if err == nil && desc != nil {
@@ -324,7 +324,7 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 	)
 
 	for {
-		out, err := s.client.ListSecrets(ctx, &secretsmanager.ListSecretsInput{
+		out, err := s.client.ListSecrets(ctx, &secretsmanagersdk.ListSecretsInput{
 			NextToken: token,
 		})
 		if err != nil {
@@ -359,7 +359,7 @@ func (s *Store) List(ctx context.Context) ([]string, error) {
 func (s *Store) Create(
 	ctx context.Context, name, value string, _ domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
-	input := &secretsmanager.CreateSecretInput{
+	input := &secretsmanagersdk.CreateSecretInput{
 		Name:         aws.String(name),
 		SecretString: aws.String(value),
 	}
@@ -392,7 +392,7 @@ func (s *Store) Create(
 func (s *Store) Put(
 	ctx context.Context, name, value string, _ domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
-	createInput := &secretsmanager.CreateSecretInput{
+	createInput := &secretsmanagersdk.CreateSecretInput{
 		Name:         aws.String(name),
 		SecretString: aws.String(value),
 	}
@@ -416,7 +416,7 @@ func (s *Store) Put(
 		return domain.Version{}, fmt.Errorf("failed to create secret: %w", err)
 	}
 
-	updateInput := &secretsmanager.UpdateSecretInput{
+	updateInput := &secretsmanagersdk.UpdateSecretInput{
 		SecretId:     aws.String(name),
 		SecretString: aws.String(value),
 	}
@@ -457,7 +457,7 @@ func (s *Store) applyRotation(ctx context.Context, name string, opts []provider.
 // deletion (ForceDelete) or a custom recovery window (RecoveryWindow); with no
 // options the AWS default recovery window applies.
 func (s *Store) Delete(ctx context.Context, name string, opts ...provider.DeleteOption) error {
-	input := &secretsmanager.DeleteSecretInput{
+	input := &secretsmanagersdk.DeleteSecretInput{
 		SecretId: aws.String(name),
 	}
 
@@ -477,7 +477,7 @@ func (s *Store) Delete(ctx context.Context, name string, opts ...provider.Delete
 
 // Restore cancels a pending deletion for a secret.
 func (s *Store) Restore(ctx context.Context, name string) error {
-	_, err := s.client.RestoreSecret(ctx, &secretsmanager.RestoreSecretInput{
+	_, err := s.client.RestoreSecret(ctx, &secretsmanagersdk.RestoreSecretInput{
 		SecretId: aws.String(name),
 	})
 	if err != nil {
@@ -497,7 +497,7 @@ func (s *Store) Tag(ctx context.Context, name string, add map[string]string) err
 		return types.Tag{Key: aws.String(k), Value: aws.String(v)}
 	})
 
-	_, err := s.client.TagResource(ctx, &secretsmanager.TagResourceInput{
+	_, err := s.client.TagResource(ctx, &secretsmanagersdk.TagResourceInput{
 		SecretId: aws.String(name),
 		Tags:     tags,
 	})
@@ -514,7 +514,7 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 		return nil
 	}
 
-	_, err := s.client.UntagResource(ctx, &secretsmanager.UntagResourceInput{
+	_, err := s.client.UntagResource(ctx, &secretsmanagersdk.UntagResourceInput{
 		SecretId: aws.String(name),
 		TagKeys:  keys,
 	})

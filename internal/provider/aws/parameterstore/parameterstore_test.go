@@ -1,4 +1,4 @@
-package param_test
+package parameterstore_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/param"
+	"github.com/mpyw/suve/internal/provider/aws/parameterstore"
 )
 
 // mockClient is a configurable mock of the narrow SSM client interface.
@@ -92,7 +92,7 @@ func historyOldestFirst() []types.ParameterHistory {
 func TestResolve_Latest(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{})
+	store := parameterstore.New(&mockClient{})
 
 	ref, err := store.Resolve(t.Context(), "/my/param", "")
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestResolve_AbsoluteVersion(t *testing.T) {
 	t.Parallel()
 
 	// No shift => no history call needed.
-	store := param.New(&mockClient{})
+	store := parameterstore.New(&mockClient{})
 
 	ref, err := store.Resolve(t.Context(), "/my/param", "#3")
 	require.NoError(t, err)
@@ -115,7 +115,7 @@ func TestResolve_AbsoluteVersion(t *testing.T) {
 func TestResolve_Shift(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getHistory: func(_ *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
 			return &ssm.GetParameterHistoryOutput{Parameters: historyOldestFirst()}, nil
 		},
@@ -130,7 +130,7 @@ func TestResolve_Shift(t *testing.T) {
 func TestResolve_VersionThenShift(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getHistory: func(_ *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
 			return &ssm.GetParameterHistoryOutput{Parameters: historyOldestFirst()}, nil
 		},
@@ -148,7 +148,7 @@ func TestResolve_VersionThenShift(t *testing.T) {
 func TestResolve_HugeShiftDoesNotPanic(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getHistory: func(_ *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
 			return &ssm.GetParameterHistoryOutput{Parameters: historyOldestFirst()}, nil
 		},
@@ -162,7 +162,7 @@ func TestResolve_HugeShiftDoesNotPanic(t *testing.T) {
 func TestResolve_ShiftOutOfRange(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getHistory: func(_ *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
 			return &ssm.GetParameterHistoryOutput{Parameters: historyOldestFirst()}, nil
 		},
@@ -177,7 +177,7 @@ func TestGet_LatestWithTypeMappingAndTags(t *testing.T) {
 
 	var gotName string
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getParameter: func(in *ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
 			gotName = aws.ToString(in.Name)
 
@@ -219,7 +219,7 @@ func TestGet_LatestWithTypeMappingAndTags(t *testing.T) {
 func TestGet_DescriptionReadIsBestEffort(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getParameter: func(_ *ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{Parameter: &types.Parameter{
 				Name:    aws.String("/my/param"),
@@ -247,7 +247,7 @@ func TestGet_SpecificVersionSuffix(t *testing.T) {
 
 	var gotName string
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getParameter: func(in *ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
 			gotName = aws.ToString(in.Name)
 
@@ -272,7 +272,7 @@ func TestGet_SpecificVersionSuffix(t *testing.T) {
 func TestHistory_NewestFirst(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getHistory: func(_ *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
 			return &ssm.GetParameterHistoryOutput{Parameters: historyOldestFirst()}, nil
 		},
@@ -293,7 +293,7 @@ func TestList_Paginated(t *testing.T) {
 	t.Parallel()
 
 	calls := 0
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		describe: func(in *ssm.DescribeParametersInput) (*ssm.DescribeParametersOutput, error) {
 			calls++
 
@@ -321,7 +321,7 @@ func TestPut_MapsTypeAndReturnsVersion(t *testing.T) {
 
 	var got *ssm.PutParameterInput
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		putParameter: func(in *ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
 			got = in
 
@@ -342,7 +342,7 @@ func TestCreate_AppliesWriteOptions(t *testing.T) {
 
 	var got *ssm.PutParameterInput
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		putParameter: func(in *ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
 			got = in
 
@@ -351,10 +351,10 @@ func TestCreate_AppliesWriteOptions(t *testing.T) {
 	})
 
 	_, err := store.Create(t.Context(), "/my/param", "v", domain.ValueTypePlaintext, "",
-		param.Tier{Value: "Advanced"},
-		param.DataType{Value: "aws:ec2:image"},
-		param.AllowedPattern{Value: "^ami-"},
-		param.Policies{JSON: `[{"Type":"Expiration"}]`},
+		parameterstore.Tier{Value: "Advanced"},
+		parameterstore.DataType{Value: "aws:ec2:image"},
+		parameterstore.AllowedPattern{Value: "^ami-"},
+		parameterstore.Policies{JSON: `[{"Type":"Expiration"}]`},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, got)
@@ -369,7 +369,7 @@ func TestPut_AppliesWriteOptionsAndIgnoresUnknown(t *testing.T) {
 
 	var got *ssm.PutParameterInput
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		putParameter: func(in *ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
 			got = in
 
@@ -379,7 +379,7 @@ func TestPut_AppliesWriteOptionsAndIgnoresUnknown(t *testing.T) {
 
 	// unknownOption is not one this adapter understands; it must be ignored.
 	_, err := store.Put(t.Context(), "/my/param", "v", domain.ValueTypePlaintext, "",
-		param.Tier{Value: "Intelligent-Tiering"},
+		parameterstore.Tier{Value: "Intelligent-Tiering"},
 		unknownOption{},
 	)
 	require.NoError(t, err)
@@ -400,7 +400,7 @@ func TestDelete(t *testing.T) {
 
 	var gotName string
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		deleteParameter: func(in *ssm.DeleteParameterInput) (*ssm.DeleteParameterOutput, error) {
 			gotName = aws.ToString(in.Name)
 
@@ -417,7 +417,7 @@ func TestDelete(t *testing.T) {
 func TestDelete_NotFoundMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		deleteParameter: func(*ssm.DeleteParameterInput) (*ssm.DeleteParameterOutput, error) {
 			return nil, &types.ParameterNotFound{Message: aws.String("nope")}
 		},
@@ -433,7 +433,7 @@ func TestDelete_NotFoundMapsSentinel(t *testing.T) {
 func TestDelete_GenericErrorWrapped(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		deleteParameter: func(*ssm.DeleteParameterInput) (*ssm.DeleteParameterOutput, error) {
 			return nil, assert.AnError
 		},
@@ -453,7 +453,7 @@ func TestTagAndUntag(t *testing.T) {
 		removeIn *ssm.RemoveTagsFromResourceInput
 	)
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		addTags: func(in *ssm.AddTagsToResourceInput) (*ssm.AddTagsToResourceOutput, error) {
 			addIn = in
 
@@ -481,7 +481,7 @@ func TestTagAndUntag(t *testing.T) {
 func TestTag_EmptyIsNoop(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		addTags: func(*ssm.AddTagsToResourceInput) (*ssm.AddTagsToResourceOutput, error) {
 			t.Fatal("AddTagsToResource must not be called for an empty tag set")
 
@@ -495,7 +495,7 @@ func TestTag_EmptyIsNoop(t *testing.T) {
 func TestUntag_EmptyIsNoop(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		removeTags: func(*ssm.RemoveTagsFromResourceInput) (*ssm.RemoveTagsFromResourceOutput, error) {
 			t.Fatal("RemoveTagsFromResource must not be called for an empty key set")
 
@@ -510,7 +510,7 @@ func TestUntag_EmptyIsNoop(t *testing.T) {
 func TestTag_ErrorWrapped(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		addTags: func(*ssm.AddTagsToResourceInput) (*ssm.AddTagsToResourceOutput, error) {
 			return nil, assert.AnError
 		},
@@ -524,7 +524,7 @@ func TestTag_ErrorWrapped(t *testing.T) {
 func TestUntag_ErrorWrapped(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		removeTags: func(*ssm.RemoveTagsFromResourceInput) (*ssm.RemoveTagsFromResourceOutput, error) {
 			return nil, assert.AnError
 		},
@@ -540,7 +540,7 @@ func TestCreate_NewReturnsVersion(t *testing.T) {
 
 	var putIn *ssm.PutParameterInput
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		putParameter: func(in *ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
 			putIn = in
 
@@ -558,7 +558,7 @@ func TestCreate_NewReturnsVersion(t *testing.T) {
 func TestCreate_AlreadyExistsMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		putParameter: func(*ssm.PutParameterInput) (*ssm.PutParameterOutput, error) {
 			return nil, &types.ParameterAlreadyExists{Message: aws.String("exists")}
 		},
@@ -572,7 +572,7 @@ func TestCreate_AlreadyExistsMapsSentinel(t *testing.T) {
 func TestGet_NotFoundMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getParameter: func(*ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
 			return nil, &types.ParameterNotFound{Message: aws.String("nope")}
 		},
@@ -590,7 +590,7 @@ func TestGet_NotFoundMapsSentinel(t *testing.T) {
 func TestGet_VersionNotFoundMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getParameter: func(*ssm.GetParameterInput) (*ssm.GetParameterOutput, error) {
 			return nil, &types.ParameterVersionNotFound{Message: aws.String("no such version")}
 		},
@@ -608,7 +608,7 @@ func TestGet_VersionNotFoundMapsSentinel(t *testing.T) {
 func TestResolve_ShiftNotFoundMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := param.New(&mockClient{
+	store := parameterstore.New(&mockClient{
 		getHistory: func(*ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
 			return nil, &types.ParameterNotFound{Message: aws.String("nope")}
 		},
@@ -650,7 +650,7 @@ func paginatedHistoryClient() *mockClient {
 func TestHistory_Paginated(t *testing.T) {
 	t.Parallel()
 
-	versions, err := param.New(paginatedHistoryClient()).History(t.Context(), "/my/param")
+	versions, err := parameterstore.New(paginatedHistoryClient()).History(t.Context(), "/my/param")
 	require.NoError(t, err)
 	require.Len(t, versions, 3)
 	assert.Equal(t, "3", versions[0].ID) // newest first, across pages
@@ -663,12 +663,12 @@ func TestResolve_ShiftAcrossPages(t *testing.T) {
 	t.Parallel()
 
 	// ~1 from the true latest (v3, on page 2) => v2.
-	ref, err := param.New(paginatedHistoryClient()).Resolve(t.Context(), "/my/param", "~1")
+	ref, err := parameterstore.New(paginatedHistoryClient()).Resolve(t.Context(), "/my/param", "~1")
 	require.NoError(t, err)
 	assert.Equal(t, "2", ref.ID())
 
 	// #3 exists only on page 2; #3~2 => v1.
-	ref, err = param.New(paginatedHistoryClient()).Resolve(t.Context(), "/my/param", "#3~2")
+	ref, err = parameterstore.New(paginatedHistoryClient()).Resolve(t.Context(), "/my/param", "#3~2")
 	require.NoError(t, err)
 	assert.Equal(t, "1", ref.ID())
 }

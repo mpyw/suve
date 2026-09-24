@@ -1,4 +1,4 @@
-package aznamespace_test
+package namespaces_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 )
 
 func TestFilter(t *testing.T) {
@@ -29,7 +29,7 @@ func TestFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, aznamespace.Filter(tt.raw))
+			assert.Equal(t, tt.want, namespaces.Filter(tt.raw))
 		})
 	}
 }
@@ -54,7 +54,7 @@ func TestLiteral(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := aznamespace.Literal(tt.raw)
+			got, err := namespaces.Literal(tt.raw)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
@@ -78,7 +78,7 @@ func TestLiteral_UnescapedFilterCharsError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := aznamespace.Literal(tt.raw)
+			_, err := namespaces.Literal(tt.raw)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "single-item operation needs one")
 		})

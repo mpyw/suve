@@ -1,8 +1,8 @@
-// The functional-option types and the fold helpers that param.go applies
-// to SDK inputs: param.go's working parts, split out for readability.
-//declscope:namespace param
+// The functional-option types and the fold helpers that parameterstore.go applies
+// to SDK inputs: parameterstore.go's working parts, split out for readability.
+//declscope:namespace parameterstore
 
-package param
+package parameterstore
 
 import (
 	"github.com/aws/aws-sdk-go-v2/aws"

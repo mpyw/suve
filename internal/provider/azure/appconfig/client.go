@@ -85,7 +85,7 @@ func (a *apiClient) DeleteSetting(ctx context.Context, key, label string) (azapp
 
 // listSettingSelector is the selector used to enumerate settings: all keys,
 // restricted by the given LabelFilter. The filter is resolved by the store from
-// the raw --namespace value (empty -> the null-label filter, aznamespace.Filter).
+// the raw --namespace value (empty -> the null-label filter, namespaces.Filter).
 // A nil LabelFilter (SettingSelector{}) would enumerate every label.
 func listSettingSelector(filter string) azappconfig.SettingSelector {
 	return azappconfig.SettingSelector{

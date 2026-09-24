@@ -10,7 +10,7 @@ import (
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -130,11 +130,11 @@ func TestDeleteUseCase_Execute_ForwardsRecoveryWindow(t *testing.T) {
 
 	_, err := uc.Execute(t.Context(), secret.DeleteInput{
 		Name:    "my-secret",
-		Options: []provider.DeleteOption{awssecret.RecoveryWindow{Days: 7}},
+		Options: []provider.DeleteOption{secretsmanager.RecoveryWindow{Days: 7}},
 	})
 	require.NoError(t, err)
 	require.Len(t, gotOpts, 1)
-	rw, ok := gotOpts[0].(awssecret.RecoveryWindow)
+	rw, ok := gotOpts[0].(secretsmanager.RecoveryWindow)
 	require.True(t, ok, "expected a RecoveryWindow option")
 	assert.Equal(t, int64(7), rw.Days)
 }

@@ -13,8 +13,9 @@
 // does not offer a kind is provider.ErrUnsupportedKind. There is no default
 // provider.
 //
-// The package imports no cloud SDK. The AWS identity lookup goes through
-// internal/provider/aws/infra, which only loads the AWS config and calls STS.
+// The package imports no cloud SDK directly. The AWS identity lookup goes
+// through aws.LoadIdentity (internal/provider/aws), which loads the AWS config
+// and calls STS.
 package binding
 
 import (
@@ -23,7 +24,7 @@ import (
 	"fmt"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
+	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -217,7 +218,7 @@ func DefaultIdentity(p provider.Provider) IdentityLookup {
 // awsIdentity resolves the AWS staging scope (account and region) from the STS
 // caller identity.
 func awsIdentity(ctx context.Context) (staging.ResolvedScope, error) {
-	identity, err := infra.GetAWSIdentity(ctx)
+	identity, err := aws.LoadIdentity(ctx)
 	if err != nil {
 		return staging.ResolvedScope{}, fmt.Errorf("failed to get AWS identity: %w", err)
 	}

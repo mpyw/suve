@@ -13,8 +13,8 @@ import (
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/aws"
+	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -132,9 +132,9 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Get AWS identity for confirmation display
-	var identity *infra.AWSIdentity
+	var identity *aws.Identity
 	if !skipConfirm {
-		identity, _ = infra.GetAWSIdentity(ctx)
+		identity, _ = aws.LoadIdentity(ctx)
 	}
 
 	uc := &secret.DeleteUseCase{Store: store}
@@ -192,7 +192,7 @@ func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 	case opts.Force:
 		options = append(options, provider.ForceDelete{})
 	case opts.RecoveryWindow > 0:
-		options = append(options, awssecret.RecoveryWindow{Days: int64(opts.RecoveryWindow)})
+		options = append(options, secretsmanager.RecoveryWindow{Days: int64(opts.RecoveryWindow)})
 	}
 
 	result, err := r.UseCase.Execute(ctx, secret.DeleteInput{

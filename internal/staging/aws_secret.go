@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
 	"github.com/mpyw/suve/internal/version/awssecretversion"
 )
 
@@ -73,7 +73,7 @@ func (awsSecretHooks) deleteOptions(o *DeleteOptions) []provider.DeleteOption {
 	case o.Force:
 		return []provider.DeleteOption{provider.ForceDelete{}}
 	case o.RecoveryWindow > 0:
-		return []provider.DeleteOption{awssecret.RecoveryWindow{Days: int64(o.RecoveryWindow)}}
+		return []provider.DeleteOption{secretsmanager.RecoveryWindow{Days: int64(o.RecoveryWindow)}}
 	default:
 		return nil
 	}

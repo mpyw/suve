@@ -69,7 +69,7 @@ func azureParamCap(t *testing.T) capability.ServiceCapability {
 // TestParamMutator_RejectsFilterNamespace pins the server-side namespace guard on
 // the write path: a write whose App Configuration namespace names all/multiple
 // namespaces (`*` or a `,` OR-list) is rejected by literalNamespace ->
-// aznamespace.Literal BEFORE any provider or staging store is resolved, so a
+// namespaces.Literal BEFORE any provider or staging store is resolved, so a
 // filter value can never be written as if it were one literal namespace.
 //
 //nolint:paralleltest // symmetrical with the other mutator tests; no shared state anyway

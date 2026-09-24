@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
+	"github.com/mpyw/suve/internal/provider/aws/parameterstore"
 )
 
 func TestValidateWriteOptionTier(t *testing.T) {
@@ -44,9 +44,9 @@ func TestBuildWriteOptions(t *testing.T) {
 		})
 
 		require.Len(t, opts, 4)
-		assert.Contains(t, opts, awsparam.Tier{Value: "Advanced"})
-		assert.Contains(t, opts, awsparam.DataType{Value: "text"})
-		assert.Contains(t, opts, awsparam.AllowedPattern{Value: "^a"})
-		assert.Contains(t, opts, awsparam.Policies{JSON: "[]"})
+		assert.Contains(t, opts, parameterstore.Tier{Value: "Advanced"})
+		assert.Contains(t, opts, parameterstore.DataType{Value: "text"})
+		assert.Contains(t, opts, parameterstore.AllowedPattern{Value: "^a"})
+		assert.Contains(t, opts, parameterstore.Policies{JSON: "[]"})
 	})
 }

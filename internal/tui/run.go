@@ -19,7 +19,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
+	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/staging/store/file"
 	"github.com/mpyw/suve/internal/tui/components"
@@ -152,7 +152,7 @@ func ensureResolvable(ctx context.Context, scope provider.Scope) error {
 // provider package.
 func awsIdentityFetcher(ctx context.Context) identityFetcher {
 	return func() (components.AWSIdentity, error) {
-		id, err := infra.GetAWSIdentity(ctx)
+		id, err := aws.LoadIdentity(ctx)
 		if err != nil {
 			return components.AWSIdentity{}, err
 		}

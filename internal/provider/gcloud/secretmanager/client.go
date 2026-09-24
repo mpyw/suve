@@ -1,27 +1,27 @@
-// Adapts the concrete SDK client to the Client port that secret.go
-// declares: one unit with secret.go, split out for readability.
-//declscope:namespace secret
+// Adapts the concrete SDK client to the Client port that secretmanager.go
+// declares: one unit with secretmanager.go, split out for readability.
+//declscope:namespace secretmanager
 
-package secret
+package secretmanager
 
 import (
 	"context"
 	"errors"
 
-	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	secretmanagersdk "cloud.google.com/go/secretmanager/apiv1"
 	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"google.golang.org/api/iterator"
 )
 
-// apiClient adapts the concrete *secretmanager.Client to the narrow Client
+// apiClient adapts the concrete *secretmanagersdk.Client to the narrow Client
 // interface, draining the SDK's list iterators into slices. It is the only
 // place the concrete SDK client and its iterators are referenced.
 type apiClient struct {
-	c *secretmanager.Client
+	c *secretmanagersdk.Client
 }
 
 // Wrap adapts a concrete Secret Manager client to the narrow Client interface.
-func Wrap(c *secretmanager.Client) Client {
+func Wrap(c *secretmanagersdk.Client) Client {
 	return &apiClient{c: c}
 }
 

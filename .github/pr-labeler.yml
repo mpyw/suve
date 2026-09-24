@@ -23,7 +23,8 @@ param:
       - any-glob-to-any-file:
           - "internal/cli/commands/aws/param/**"
           - "internal/cli/commands/azure/param/**"
-          - "internal/provider/aws/param/**"
+          - "internal/provider/aws/parameterstore/**"
+          - "internal/provider/aws/paramtype/**"
           - "internal/provider/azure/appconfig/**"
           - "internal/usecase/param/**"
           - "internal/version/awsparamversion/**"
@@ -35,7 +36,7 @@ secret:
           - "internal/cli/commands/aws/secret/**"
           - "internal/cli/commands/azure/secret/**"
           - "internal/cli/commands/gcloud/**"
-          - "internal/provider/aws/secret/**"
+          - "internal/provider/aws/secretsmanager/**"
           - "internal/provider/azure/keyvault/**"
           - "internal/provider/gcloud/**"
           - "internal/usecase/secret/**"

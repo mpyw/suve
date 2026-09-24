@@ -160,6 +160,15 @@ linters:
           deny:
             - pkg: "github.com/Azure/azure-sdk-for-go"
               desc: "The Azure SDK must stay behind the provider seam (internal/provider/azure only)"
+        azure-sdk-free-vocabulary:
+          # The CLI, TUI and GUI import this App Configuration namespace grammar
+          # directly, so it stays SDK-free even though it sits under
+          # internal/provider/azure.
+          files:
+            - "**/internal/provider/azure/appconfig/namespaces/**"
+          deny:
+            - pkg: "github.com/Azure/azure-sdk-for-go"
+              desc: "internal/provider/azure/appconfig/namespaces is SDK-free vocabulary shared with the CLI, TUI and GUI"
     forbidigo:
       forbid:
         - pattern: 'fmt\.Fprint(ln|f)?'

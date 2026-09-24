@@ -1,4 +1,4 @@
-// Package aznamespace parses the value of the Azure App Configuration
+// Package namespaces parses the value of the Azure App Configuration
 // --namespace / --ns flag (env AZURE_APPCONFIG_NAMESPACE).
 //
 // suve calls this axis a "namespace"; Azure App Configuration calls it a
@@ -15,7 +15,7 @@
 //   - single-item ops (show/set/delete/...): exactly one concrete namespace
 //     (see Literal). `\` escapes are decoded; any unescaped `*` or `,` is a
 //     usage error because those name all/multiple namespaces.
-package aznamespace
+package namespaces
 
 import (
 	"fmt"
@@ -27,11 +27,11 @@ import (
 // encodes it as label=%00 (#352).
 const NullLabelFilter = "\x00"
 
-// AllNamespacesFilter is the App Configuration label filter that matches every
+// AllFilter is the App Configuration label filter that matches every
 // namespace (the degenerate `*` wildcard). Cross-namespace enumeration (see
 // appconfig.Store.ListWithNamespaces, #425) uses it to deliberately ignore the
 // store's configured namespace.
-const AllNamespacesFilter = "*"
+const AllFilter = "*"
 
 // NullDisplay is the human-readable rendering of the null (default) namespace,
 // used wherever a namespace is shown to a user (the CLI `param list` NAMESPACE

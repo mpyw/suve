@@ -1,7 +1,7 @@
-// In-package tests of secret.go's unexported version-index helpers.
-//declscope:namespace secret
+// In-package tests of secretsmanager.go's unexported version-index helpers.
+//declscope:namespace secretsmanager
 
-package secret
+package secretsmanager
 
 import (
 	"testing"

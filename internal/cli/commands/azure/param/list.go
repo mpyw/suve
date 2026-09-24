@@ -13,7 +13,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/generic"
 	"github.com/mpyw/suve/internal/cli/output"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -112,7 +112,7 @@ func (r *ListRunner) runKeyOnly(ctx context.Context, opts ListOptions) error {
 // — whose response already carries them — and collapse it to key-only rows.
 func (r *ListRunner) keyOnlyEntries(opts ListOptions) func(context.Context) ([]generic.ListEntry, error) {
 	if opts.Show && r.Namespace != nil {
-		if _, err := aznamespace.Literal(opts.Namespace); err != nil {
+		if _, err := namespaces.Literal(opts.Namespace); err != nil {
 			return r.keyOnlyEntriesFromNamespaced(opts)
 		}
 	}
@@ -222,7 +222,7 @@ func (r *ListRunner) runNamespaced(ctx context.Context, opts ListOptions) error 
 	for _, e := range result.Entries {
 		ns := e.Namespace
 		if ns == "" {
-			ns = aznamespace.NullDisplay
+			ns = namespaces.NullDisplay
 		}
 
 		if opts.Show {

@@ -10,8 +10,8 @@ import (
 	"sync"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/aws"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/provider/builtin"
 	"github.com/mpyw/suve/internal/provider/detect"
 	"github.com/mpyw/suve/internal/staging"
@@ -351,7 +351,7 @@ func (a *App) validateParamNamespaceScoped(sc provider.Scope, ns string) (string
 		return ns, nil
 	}
 
-	return aznamespace.Literal(ns)
+	return namespaces.Literal(ns)
 }
 
 // paramStoreForNamespace resolves a param provider.Store scoped to the given App
@@ -549,7 +549,7 @@ type AWSIdentityResult struct {
 
 // GetAWSIdentity returns the current AWS account ID, region, and profile.
 func (a *App) GetAWSIdentity() (*AWSIdentityResult, error) {
-	identity, err := infra.GetAWSIdentity(a.ctx)
+	identity, err := aws.LoadIdentity(a.ctx)
 	if err != nil {
 		return nil, err
 	}

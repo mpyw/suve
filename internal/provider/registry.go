@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Registry maps a Provider to its Factory, replacing direct infra.NewXClient calls.
+// Registry maps a Provider to its Factory.
 type Registry struct{ factories map[Provider]Factory }
 
 // NewRegistry returns an empty Registry.

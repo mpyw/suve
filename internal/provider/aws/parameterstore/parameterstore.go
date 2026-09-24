@@ -1,8 +1,8 @@
-// Package param implements the provider.Store contract for AWS Systems Manager
+// Package parameterstore implements the provider.Store contract for AWS Systems Manager
 // Parameter Store. It confines all SSM SDK types to this package: version
 // resolution (absolute #version and ~shift against history) lives here, while
 // spec PARSING stays generic via awsparamversion.Parse.
-package param
+package parameterstore
 
 import (
 	"context"

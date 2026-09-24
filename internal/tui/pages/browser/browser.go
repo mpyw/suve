@@ -18,7 +18,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/mpyw/suve/internal/capability"
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/tui/components"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/hit"
@@ -239,7 +239,7 @@ func New(
 	if m.svcCap.HasNamespaces {
 		// Seed the namespace filter with the null and all-namespaces options; the
 		// discovered namespaces are inserted between them once loaded.
-		m.namespaces = []string{"", aznamespace.AllNamespacesFilter}
+		m.namespaces = []string{"", namespaces.AllFilter}
 	}
 
 	return m

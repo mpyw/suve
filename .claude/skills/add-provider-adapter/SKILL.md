@@ -15,6 +15,11 @@ same shape.
 - Implement `provider.Store` — the composition of `Reader`, `Writer`, and
   `Tagger` (`internal/provider/provider.go`) — over a **narrow in-package client
   wrapper**. Keep the cloud SDK confined to `internal/provider/<name>/**`.
+- Put each service adapter in a subpackage named after the cloud product
+  (`aws/parameterstore`, `aws/secretsmanager`, `gcloud/secretmanager`,
+  `azure/appconfig`, `azure/keyvault`), not after the service axis: the
+  service axis is already `provider.Kind`. The provider root package holds the
+  `Factory`, the client bootstrap, and any identity lookup (`aws.LoadIdentity`).
 - Hide SDK paginators and iterators behind a `Wrap()` adapter so the seam
   returns neutral `domain` types, never SDK types.
 - Map SDK errors to the neutral sentinels in `internal/provider/errors.go`:
@@ -76,10 +81,11 @@ same shape.
   `.golangci.yaml` to gate the new SDK module so it can only be imported from
   the provider directory. Confinement is enforced across all of `internal/`
   (#488, #502) — keep that breadth.
-- Provider vocabulary that the TUI or GUI imports directly (such as
-  `internal/provider/aws/paramtype`) lives in its own SDK-free package under
-  the provider directory. List it in `TestSDKFreeProviderVocabulary` and in the
-  `aws-sdk-free-vocabulary`-style depguard rule so it stays SDK-free.
+- Provider vocabulary that the CLI, TUI or GUI imports directly (such as
+  `internal/provider/aws/paramtype` and
+  `internal/provider/azure/appconfig/namespaces`) lives in its own SDK-free
+  package under the adapter. List it in `TestSDKFreeProviderVocabulary` and in
+  a `<cloud>-sdk-free-vocabulary` depguard rule so it stays SDK-free.
 
 ## Staging support (separate work)
 

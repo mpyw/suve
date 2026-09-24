@@ -1,20 +1,20 @@
-// Package aws wires the AWS parameter and secret adapters into a
-// provider.Factory / provider.Registry. It builds SSM and Secrets Manager
-// clients from the AWS config (honoring the scope's region) and hands them to
-// the per-service adapters in the param and secret subpackages.
+// Package aws wires the AWS Parameter Store and Secrets Manager adapters into a
+// provider.Factory / provider.Registry. It loads the AWS config (config.go),
+// resolves the caller identity (identity.go), builds SSM and Secrets Manager
+// clients from that config (honoring the scope's region), and hands them to the
+// per-product adapters in the parameterstore and secretsmanager subpackages.
 package aws
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	secretsmanagersdk "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
-	"github.com/mpyw/suve/internal/provider/aws/param"
-	"github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/aws/parameterstore"
+	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
 )
 
 // Factory builds AWS-backed provider.Store values for a scope + kind.
@@ -26,7 +26,7 @@ var _ provider.Factory = Factory{}
 // Store builds a Store for the given scope and kind. It returns
 // provider.ErrUnsupportedKind for kinds AWS does not offer.
 func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Kind) (provider.Store, error) {
-	cfg, err := infra.LoadConfig(ctx)
+	cfg, err := LoadConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -37,9 +37,9 @@ func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Ki
 
 	switch kind {
 	case provider.KindParam:
-		return param.New(ssm.NewFromConfig(cfg)), nil
+		return parameterstore.New(ssm.NewFromConfig(cfg)), nil
 	case provider.KindSecret:
-		return secret.New(secretsmanager.NewFromConfig(cfg)), nil
+		return secretsmanager.New(secretsmanagersdk.NewFromConfig(cfg)), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", provider.ErrUnsupportedKind, kind)
 	}
