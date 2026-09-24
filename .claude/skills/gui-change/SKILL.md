@@ -39,7 +39,7 @@ landed across #273–#282.
   `SCOPE_FIELDS` table maps each field name to the `ScopeSelection` property,
   input id, label and hint. Add a scope field there, not a provider branch in
   `App.svelte` or `Sidebar.svelte`, and the matching entry in the Go
-  `scopeFields` table (`internal/gui/app.go`), which `scopeFromSelection`
+  `scopeFields` table (`internal/gui/scope.go`), which `scopeFromSelection`
   uses to copy and validate the same fields server-side.
 - Go code looks capabilities up with `capability.Service(p, service)`,
   `capability.Provider(p)` and `capability.DisplayName(p)`. The bindings gate

@@ -1,7 +1,7 @@
 //go:build production || dev
 
-// In-package tests of app.go's launch-scope handling.
-//declscope:core
+// In-package tests of scope.go: scope selection, readback and env hydration.
+//declscope:namespace scope
 
 package gui
 
