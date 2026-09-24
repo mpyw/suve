@@ -3,6 +3,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -90,4 +91,53 @@ func TestLaunchService(t *testing.T) {
 	assert.Empty(t, launchService("azure"))
 	assert.Empty(t, launchService(""))
 	assert.Empty(t, launchService("stage"))
+}
+
+// TestRegisterLaunchMode_Launches drives the registered flag end to end: the
+// root flag runs Bare, a group flag runs Launch with the group's provider and
+// scope flags, and an Azure subgroup flag also carries its service.
+//
+//nolint:paralleltest // mutates the process-wide App; must not race other tests
+func TestRegisterLaunchMode_Launches(t *testing.T) {
+	t.Cleanup(func() { App = MakeApp() })
+
+	// Flags may fall back to env; keep the expected scopes independent of it.
+	for _, k := range []string{"GOOGLE_CLOUD_PROJECT", "AZURE_KEYVAULT_NAME", "AZURE_APPCONFIG_NAME", "AZURE_APPCONFIG_NAMESPACE"} {
+		t.Setenv(k, "")
+	}
+
+	errLaunched := errors.New("launched")
+
+	var (
+		bare       bool
+		gotScope   provider.Scope
+		gotService string
+	)
+
+	RegisterLaunchMode(LaunchMode{
+		Flag:       "fake-ui",
+		RootUsage:  "root",
+		GroupUsage: "group",
+		Bare: func(ctx context.Context) (context.Context, error) {
+			bare = true
+
+			return ctx, errLaunched
+		},
+		Launch: func(ctx context.Context, scope provider.Scope, service string) (context.Context, error) {
+			gotScope, gotService = scope, service
+
+			return ctx, errLaunched
+		},
+	})
+
+	require.ErrorIs(t, App.Run(t.Context(), []string{"suve", "--fake-ui"}), errLaunched)
+	assert.True(t, bare)
+
+	require.ErrorIs(t, App.Run(t.Context(), []string{"suve", "gcloud", "--project", "p", "--fake-ui"}), errLaunched)
+	assert.Equal(t, provider.GoogleCloudScope("p"), gotScope)
+	assert.Empty(t, gotService)
+
+	require.ErrorIs(t, App.Run(t.Context(), []string{"suve", "azure", "param", "--store-name", "s", "--fake-ui"}), errLaunched)
+	assert.Equal(t, provider.AzureAppConfigScope("s"), gotScope)
+	assert.Equal(t, "param", gotService)
 }
