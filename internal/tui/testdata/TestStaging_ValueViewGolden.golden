@@ -1,5 +1,5 @@
 suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
- Param Secret Staging(5)
+ Parameter Store Secrets Manager Staging(5)
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  view: diff [value]   A apply-all · R reset-all · ctrl+r refresh
  ⚠ auto-unstaged: /app/web/OLD_FLAG (staged value now equals remote)  esc: dismiss

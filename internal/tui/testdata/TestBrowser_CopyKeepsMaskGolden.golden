@@ -1,5 +1,5 @@
 suve  aws · profile:dev · account:123456789012 · region:ap-northeast-1
- Param Secret Staging
+ Parameter Store Secrets Manager Staging
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 prefix: —   filter: —   values:off  recursive:on  ⟳
 copied (value stays masked)

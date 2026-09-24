@@ -30,7 +30,7 @@ test.describe('Secret-service version diff reveal + hide toggle (#714/#735)', ()
     // distinctive cleartext values.
     await setupWailsMocks(page);
     await page.goto('/');
-    await navigateTo(page, 'Secret');
+    await navigateTo(page, 'Secrets Manager');
     await waitForItemList(page);
   });
 

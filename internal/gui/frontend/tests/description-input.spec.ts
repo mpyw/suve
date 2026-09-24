@@ -62,7 +62,7 @@ test.describe('Description input (#767)', () => {
       });
       await page.goto('/');
       await waitForItemList(page);
-      await navigateTo(page, 'Secret');
+      await navigateTo(page, 'Secrets Manager');
     });
 
     test('shows the Description input on create', async ({ page }) => {
@@ -95,7 +95,7 @@ test.describe('Description input (#767)', () => {
       await setupWailsMocks(page, createGoogleCloudState());
       await page.goto('/');
       await waitForItemList(page);
-      await navigateTo(page, 'Secret');
+      await navigateTo(page, 'Secret Manager');
     });
 
     test('shows the Description input on create', async ({ page }) => {

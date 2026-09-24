@@ -76,7 +76,7 @@ test.describe('Secret Filtering', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page, createFilterTestState());
     await page.goto('/');
-    await navigateTo(page, 'Secret');
+    await navigateTo(page, 'Secrets Manager');
     await waitForItemList(page);
   });
 
@@ -275,7 +275,7 @@ test.describe('Secret View Mode - Show Values Toggle', () => {
   test.beforeEach(async ({ page }) => {
     await setupWailsMocks(page, createFilterTestState());
     await page.goto('/');
-    await navigateTo(page, 'Secret');
+    await navigateTo(page, 'Secrets Manager');
     await waitForViewLoaded(page);
   });
 
@@ -328,11 +328,11 @@ test.describe('Navigation State', () => {
 
   test('should have filter bar available after navigation', async ({ page }) => {
     // Navigate away
-    await navigateTo(page, 'Secret');
+    await navigateTo(page, 'Secrets Manager');
     await waitForViewLoaded(page);
 
     // Navigate back
-    await navigateTo(page, 'Param');
+    await navigateTo(page, 'Parameter Store');
 
     // Filter bar should be present
     await waitForViewLoaded(page);
