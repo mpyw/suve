@@ -64,7 +64,14 @@ Staging is a distinct increment on top of read/write (#247 → #261, #262):
 - Implement the provider `ScopeResolver` (next to the others in
   `internal/cli/commands/internal/client.go`) and set it on every staging
   config; there is no default resolver.
-- Add the provider's staging strategy.
+- Add the provider's staging strategy in `internal/staging/<cloud>_<service>.go`.
+  A versioned service embeds `versionedStrategy[H]` (`internal/staging/versioned.go`)
+  and supplies a zero-size hooks type `H` (traits, `parse` via its version
+  package's `Parse` + `Suffix`, and any delete-option or write differences; a
+  secret service embeds `versionedSecretHooks` for the defaults). The zero value
+  must work as a store-less parser, because the GUI and TUI build parsers as
+  `&staging.XStrategy{}`. An unversioned service writes its own strategy, as
+  `azure_appconfig_param.go` does.
 - Set `ProviderLabel` (e.g. `"Google Cloud"`) and `CommandPath` (the explicit
   stage path, e.g. `"suve gcloud stage"`) on every `stgcli.CommandConfig` and
   `stgcli.GlobalConfig`. The shared staging help, usage errors, and prompts

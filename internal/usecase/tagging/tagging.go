@@ -1,4 +1,6 @@
-package secret
+// Package tagging is the provider-neutral tag/untag use case shared by the
+// param and secret services.
+package tagging
 
 import (
 	"context"
@@ -7,20 +9,20 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 )
 
-// TagInput holds input for the tag use case.
-type TagInput struct {
+// Input holds input for the tag use case.
+type Input struct {
 	Name   string
 	Add    map[string]string // Tags to add or update
 	Remove []string          // Tag keys to remove
 }
 
-// TagUseCase executes tag operations.
-type TagUseCase struct {
+// UseCase executes tag operations. Additions are applied before removals.
+type UseCase struct {
 	Tagger provider.Tagger
 }
 
 // Execute runs the tag use case.
-func (u *TagUseCase) Execute(ctx context.Context, input TagInput) error {
+func (u *UseCase) Execute(ctx context.Context, input Input) error {
 	if len(input.Add) > 0 {
 		if err := u.Tagger.Tag(ctx, input.Name, input.Add); err != nil {
 			return fmt.Errorf("failed to add tags: %w", err)

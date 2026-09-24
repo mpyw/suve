@@ -11,6 +11,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/secret"
+	"github.com/mpyw/suve/internal/usecase/tagging"
 )
 
 // errRestoreUnsupported is returned when the active provider does not support
@@ -340,9 +341,9 @@ func (a *App) SecretAddTag(name, key, value string) error {
 		return err
 	}
 
-	uc := &secret.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	return uc.Execute(a.ctx, secret.TagInput{
+	return uc.Execute(a.ctx, tagging.Input{
 		Name: name,
 		Add:  map[string]string{key: value},
 	})
@@ -355,9 +356,9 @@ func (a *App) SecretRemoveTag(name, key string) error {
 		return err
 	}
 
-	uc := &secret.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	return uc.Execute(a.ctx, secret.TagInput{
+	return uc.Execute(a.ctx, tagging.Input{
 		Name:   name,
 		Remove: []string{key},
 	})

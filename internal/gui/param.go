@@ -16,6 +16,7 @@ import (
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
+	"github.com/mpyw/suve/internal/usecase/tagging"
 )
 
 // appConfigNamespaceLister is the App-Config-specific extension the GUI type-
@@ -426,9 +427,9 @@ func (a *App) ParamAddTag(name, key, value, namespace string) error {
 		return err
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	return uc.Execute(a.ctx, param.TagInput{
+	return uc.Execute(a.ctx, tagging.Input{
 		Name: name,
 		Add:  map[string]string{key: value},
 	})
@@ -443,9 +444,9 @@ func (a *App) ParamRemoveTag(name, key, namespace string) error {
 		return err
 	}
 
-	uc := &param.TagUseCase{Tagger: store}
+	uc := &tagging.UseCase{Tagger: store}
 
-	return uc.Execute(a.ctx, param.TagInput{
+	return uc.Execute(a.ctx, tagging.Input{
 		Name:   name,
 		Remove: []string{key},
 	})
