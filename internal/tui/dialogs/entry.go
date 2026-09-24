@@ -480,7 +480,7 @@ func (d *entryForm) confirmTitle() string {
 		return "Edit " + d.name
 	}
 
-	return "New " + entryNoun(d.svcCap)
+	return "New " + d.svcCap.ItemNoun
 }
 
 // forwardToForm drives the embedded huh form and reacts to its completion.
@@ -740,22 +740,6 @@ func entryNamespaceDisplay(namespace string) string {
 	}
 
 	return namespace
-}
-
-// entryNoun names the created item per service (App Configuration setting vs SSM
-// parameter vs secret).
-// Shared on purpose: the delete dialog words its prompt with the same noun.
-//
-//declscope:package
-func entryNoun(svcCap capability.ServiceCapability) string {
-	switch {
-	case svcCap.Service == serviceParam && svcCap.HasNamespaces:
-		return "setting"
-	case svcCap.Service == serviceParam:
-		return "parameter"
-	default:
-		return serviceSecret
-	}
 }
 
 // entryStatus voices the create/edit outcome (skip/unstage/staged/applied).

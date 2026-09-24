@@ -125,6 +125,7 @@ export interface DetectResult {
 export interface ServiceCapability {
   service: string;
   displayName: string;
+  itemNoun: string;
   hasVersionHistory: boolean;
   hasVersionSpecifiers: boolean;
   hasTags: boolean;
@@ -301,8 +302,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'AWS',
     scopeFields: [],
     services: [
-      { service: 'param', displayName: 'Parameter Store', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: true, hasRecursiveList: true, scopeField: '', nativeTagName: '' },
-      { service: 'secret', displayName: 'Secrets Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true, hasValueType: false, hasRecursiveList: false, scopeField: '', nativeTagName: '' },
+      { service: 'param', displayName: 'Parameter Store', itemNoun: 'parameter', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: true, hasRecursiveList: true, scopeField: '', nativeTagName: '' },
+      { service: 'secret', displayName: 'Secrets Manager', itemNoun: 'secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: true, hasStaging: true, hasForceDelete: true, hasRecoveryWindow: true, hasNamespaces: false, hasDescription: true, hasValueType: false, hasRecursiveList: false, scopeField: '', nativeTagName: '' },
     ],
   },
   {
@@ -310,7 +311,7 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Google Cloud',
     scopeFields: ['project'],
     services: [
-      { service: 'secret', displayName: 'Secret Manager', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: false, hasRecursiveList: false, scopeField: 'project', nativeTagName: 'labels' },
+      { service: 'secret', displayName: 'Secret Manager', itemNoun: 'secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: true, hasValueType: false, hasRecursiveList: false, scopeField: 'project', nativeTagName: 'labels' },
     ],
   },
   {
@@ -318,8 +319,8 @@ export const defaultCapabilities: ProviderCapability[] = [
     displayName: 'Azure',
     scopeFields: ['vault', 'store', 'namespace'],
     services: [
-      { service: 'param', displayName: 'App Configuration', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true, hasDescription: false, hasValueType: false, hasRecursiveList: false, scopeField: 'store', nativeTagName: '' },
-      { service: 'secret', displayName: 'Key Vault', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: false, hasValueType: false, hasRecursiveList: false, scopeField: 'vault', nativeTagName: '' },
+      { service: 'param', displayName: 'App Configuration', itemNoun: 'setting', hasVersionHistory: false, hasVersionSpecifiers: false, hasTags: true, tagsPerVersion: false, hasRestore: false, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: true, hasDescription: false, hasValueType: false, hasRecursiveList: false, scopeField: 'store', nativeTagName: '' },
+      { service: 'secret', displayName: 'Key Vault', itemNoun: 'secret', hasVersionHistory: true, hasVersionSpecifiers: true, hasTags: true, tagsPerVersion: true, hasRestore: true, hasStaging: true, hasForceDelete: false, hasRecoveryWindow: false, hasNamespaces: false, hasDescription: false, hasValueType: false, hasRecursiveList: false, scopeField: 'vault', nativeTagName: '' },
     ],
   },
 ];
@@ -891,11 +892,11 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const p = sel?.provider;
         if (p === 'googlecloud') {
           if (!sel.projectId) {
-            throw new Error('Google Cloud project ID is required');
+            throw new Error('scope is incomplete: Google Cloud requires the project ID');
           }
         } else if (p === 'azure') {
           if (!sel.vaultName && !sel.storeName) {
-            throw new Error('Azure requires a Key Vault name (for secrets) and/or an App Configuration store name (for parameters)');
+            throw new Error('scope is incomplete: Azure requires the App Configuration store name or the Key Vault name');
           }
         } else if (p !== 'aws') {
           throw new Error(`invalid provider: must be 'aws', 'googlecloud', or 'azure': ${JSON.stringify(p)}`);

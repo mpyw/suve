@@ -12,8 +12,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
+	"github.com/samber/lo"
+
+	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/provider/builtin"
@@ -41,18 +45,11 @@ var registry = builtin.NewRegistry()
 //declscope:package // shared with the staging namespace
 var errInvalidProvider = stringError("invalid provider: must be 'aws', 'googlecloud', or 'azure'")
 
-// Scope-validation errors surfaced by SelectScope. The wording is
-// GUI-appropriate (it names the field, not the CLI flag), since the frontend
-// collects these values through form inputs rather than command-line flags.
-var (
-	// errGoogleCloudProjectRequired is returned when a Google Cloud scope omits
-	// the project id.
-	errGoogleCloudProjectRequired = stringError("Google Cloud project ID is required")
-	// errAzureScopeRequired is returned when an Azure scope specifies neither a
-	// Key Vault name nor an App Configuration store name, so no service could be
-	// resolved.
-	errAzureScopeRequired = stringError("Azure requires a Key Vault name (for secrets) and/or an App Configuration store name (for parameters)")
-)
+// errScopeIncomplete is returned by SelectScope when none of the provider's
+// services has its scope field set, so no service could be resolved. The
+// wrapped message names the missing fields by their form labels, since the
+// frontend collects them through form inputs rather than command-line flags.
+var errScopeIncomplete = stringError("scope is incomplete")
 
 // =============================================================================
 // App Struct
@@ -193,34 +190,74 @@ func (a *App) SelectScope(sel ScopeSelection) error {
 	return nil
 }
 
-// scopeFromSelection maps a frontend selection to a provider.Scope, rejecting
-// selections whose required fields are empty. For Azure a single scope carries
-// both VaultName and StoreName, so the registry can build either the Key Vault
-// (secret) or App Configuration (param) store from it; at least one must be set.
+// scopeField binds one capability scope-field name to the ScopeSelection
+// property that carries it and the provider.Scope field it fills. It mirrors
+// SCOPE_FIELDS in frontend/src/lib/scopeFields.ts.
+type scopeField struct {
+	// label names the field in validation errors.
+	label string
+	get   func(ScopeSelection) string
+	set   func(*provider.Scope, string)
+}
+
+// scopeFields maps every capability scope-field name to its binding.
+//
+//nolint:gochecknoglobals // static lookup table
+var scopeFields = map[string]scopeField{
+	"project": {
+		label: "project ID",
+		get:   func(sel ScopeSelection) string { return sel.ProjectID },
+		set:   func(sc *provider.Scope, v string) { sc.ProjectID = v },
+	},
+	"vault": {
+		label: "Key Vault name",
+		get:   func(sel ScopeSelection) string { return sel.VaultName },
+		set:   func(sc *provider.Scope, v string) { sc.VaultName = v },
+	},
+	"store": {
+		label: "App Configuration store name",
+		get:   func(sel ScopeSelection) string { return sel.StoreName },
+		set:   func(sc *provider.Scope, v string) { sc.StoreName = v },
+	},
+	"namespace": {
+		label: "App Configuration namespace",
+		get:   func(sel ScopeSelection) string { return sel.Namespace },
+		set:   func(sc *provider.Scope, v string) { sc.AppConfigNamespace = v },
+	},
+}
+
+// scopeFromSelection maps a frontend selection to a provider.Scope from the
+// provider's capability: it copies only the provider's ScopeFields, and rejects
+// the selection when no service has its ScopeField set. A service with no
+// ScopeField (AWS) is always available, so such a provider needs no field. For
+// Azure a single scope carries both VaultName and StoreName, so the registry can
+// build either the Key Vault (secret) or App Configuration (param) store from
+// it; at least one must be set.
 func scopeFromSelection(sel ScopeSelection) (provider.Scope, error) {
-	switch provider.Provider(sel.Provider) {
-	case provider.ProviderAWS:
-		return provider.Scope{Provider: provider.ProviderAWS}, nil
-	case provider.ProviderGoogleCloud:
-		if sel.ProjectID == "" {
-			return provider.Scope{}, errGoogleCloudProjectRequired
-		}
-
-		return provider.GoogleCloudScope(sel.ProjectID), nil
-	case provider.ProviderAzure:
-		if sel.VaultName == "" && sel.StoreName == "" {
-			return provider.Scope{}, errAzureScopeRequired
-		}
-
-		return provider.Scope{
-			Provider:           provider.ProviderAzure,
-			VaultName:          sel.VaultName,
-			StoreName:          sel.StoreName,
-			AppConfigNamespace: sel.Namespace,
-		}, nil
-	default:
+	pc, ok := capability.Provider(provider.Provider(sel.Provider))
+	if !ok {
 		return provider.Scope{}, fmt.Errorf("%w: %q", errInvalidProvider, sel.Provider)
 	}
+
+	scope := provider.Scope{Provider: provider.Provider(pc.Provider)}
+	for _, name := range pc.ScopeFields {
+		if f, ok := scopeFields[name]; ok {
+			f.set(&scope, f.get(sel))
+		}
+	}
+
+	available := lo.ContainsBy(pc.Services, func(sc capability.ServiceCapability) bool {
+		return sc.ScopeField == "" || scopeFields[sc.ScopeField].get(sel) != ""
+	})
+	if !available {
+		labels := lo.Map(pc.Services, func(sc capability.ServiceCapability, _ int) string {
+			return "the " + scopeFields[sc.ScopeField].label
+		})
+
+		return provider.Scope{}, fmt.Errorf("%w: %s requires %s", errScopeIncomplete, pc.DisplayName, strings.Join(labels, " or "))
+	}
+
+	return scope, nil
 }
 
 // currentScope returns the active read/write scope.

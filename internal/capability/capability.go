@@ -15,6 +15,8 @@ import (
 const (
 	serviceParam  = "param"
 	serviceSecret = "secret"
+	// itemNounSecret names one secret, the item of every secret service.
+	itemNounSecret = "secret"
 )
 
 // ServiceCapability describes one provider service (param or secret) so a
@@ -24,6 +26,10 @@ type ServiceCapability struct {
 	Service string `json:"service"`
 	// DisplayName is the label shown in the UI (e.g. "Key Vault").
 	DisplayName string `json:"displayName"`
+	// ItemNoun names one item of the service in prompts and titles
+	// ("parameter", "setting", "secret"). It matches the staging strategy's
+	// ItemName, so staged and direct wording agree.
+	ItemNoun string `json:"itemNoun"`
 	// HasVersionHistory is true when `log`/history is supported (false for the
 	// unversioned Azure App Configuration).
 	HasVersionHistory bool `json:"hasVersionHistory"`
@@ -114,13 +120,13 @@ func All() []ProviderCapability {
 			ScopeFields: []string{},
 			Services: []ServiceCapability{
 				{
-					Service: serviceParam, DisplayName: "Parameter Store",
+					Service: serviceParam, DisplayName: "Parameter Store", ItemNoun: "parameter",
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
 					HasValueType: true, HasRecursiveList: true,
 				},
 				{
-					Service: serviceSecret, DisplayName: "Secrets Manager",
+					Service: serviceSecret, DisplayName: "Secrets Manager", ItemNoun: itemNounSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: true,
 					HasStaging: true, HasForceDelete: true, HasRecoveryWindow: true, HasDescription: true,
 				},
@@ -132,7 +138,7 @@ func All() []ProviderCapability {
 			ScopeFields: []string{"project"},
 			Services: []ServiceCapability{
 				{
-					Service: serviceSecret, DisplayName: "Secret Manager",
+					Service: serviceSecret, DisplayName: "Secret Manager", ItemNoun: itemNounSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasDescription: true,
 					NativeTagName: "labels", ScopeField: "project",
@@ -147,13 +153,13 @@ func All() []ProviderCapability {
 				// App Configuration is unversioned; tags are writable via
 				// GET-merge-PUT (azappconfig/v2).
 				{
-					Service: serviceParam, DisplayName: "App Configuration",
+					Service: serviceParam, DisplayName: "App Configuration", ItemNoun: "setting",
 					HasVersionHistory: false, HasVersionSpecifiers: false, HasTags: true, HasRestore: false,
 					HasStaging: true, HasForceDelete: false, HasRecoveryWindow: false, HasNamespaces: true,
 					ScopeField: "store",
 				},
 				{
-					Service: serviceSecret, DisplayName: "Key Vault",
+					Service: serviceSecret, DisplayName: "Key Vault", ItemNoun: itemNounSecret,
 					HasVersionHistory: true, HasVersionSpecifiers: true, HasTags: true, TagsPerVersion: true, HasRestore: true,
 					// Force-delete (purge) is unsupported: Key Vault retention is a vault
 					// property (softDeleteRetentionInDays), not a per-delete choice, and

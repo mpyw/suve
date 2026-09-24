@@ -29,14 +29,18 @@ landed across #273–#282.
   provider switch used to hold: `hasValueType` (the param Type dropdown),
   `hasNamespaces` (the namespace axis), `hasRecursiveList` (the Recursive
   toggle, Parameter Store only), `scopeField` (the scope field a service
-  needs, so Azure shows a tab only for the vault or store that is set), and
-  `nativeTagName` (the "(= Google Cloud: labels)" hint).
+  needs, so Azure shows a tab only for the vault or store that is set),
+  `nativeTagName` (the "(= Google Cloud: labels)" hint), and `itemNoun`
+  (the "parameter"/"setting"/"secret" word in titles and prompts; it equals the
+  staging strategy's `ItemName`, pinned by a test in `internal/staging/binding`).
 - The sidebar scope form is built from the provider's `scopeFields`, and a
   scope is complete once at least one service's `scopeField` is set. The
   helpers live in `internal/gui/frontend/src/lib/scopeFields.ts`: its
   `SCOPE_FIELDS` table maps each field name to the `ScopeSelection` property,
   input id, label and hint. Add a scope field there, not a provider branch in
-  `App.svelte` or `Sidebar.svelte`.
+  `App.svelte` or `Sidebar.svelte`, and the matching entry in the Go
+  `scopeFields` table (`internal/gui/app.go`), which `scopeFromSelection`
+  uses to copy and validate the same fields server-side.
 - Go code looks capabilities up with `capability.Service(p, service)`,
   `capability.Provider(p)` and `capability.DisplayName(p)`. The bindings gate
   on `a.serviceCapability(kind)` (`internal/gui/capability.go`) rather than on

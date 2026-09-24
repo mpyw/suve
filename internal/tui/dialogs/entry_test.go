@@ -818,3 +818,21 @@ func TestEntryForm_LongErrorStaysBounded(t *testing.T) {
 		"the wrapped error never overflows the dialog width")
 	assert.Contains(t, flatten(view), "cancel", "the submit/cancel hint stays on-screen under a long error")
 }
+
+// TestEntryForm_TitleUsesItemNoun pins that a create form is titled with the
+// service capability's ItemNoun ("New setting" for App Configuration).
+func TestEntryForm_TitleUsesItemNoun(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		svcCap capability.ServiceCapability
+		want   string
+	}{
+		{awsParamCap(), "New parameter"},
+		{appConfigCap(), "New setting"},
+		{gcloudSecretCap(), "New secret"},
+	} {
+		d, _ := newEntry(t, tt.svcCap, false)
+		assert.Equal(t, tt.want, d.confirmTitle())
+	}
+}
