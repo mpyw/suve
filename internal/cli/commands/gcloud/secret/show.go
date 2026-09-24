@@ -41,7 +41,7 @@ func NewShowPresenter(reader provider.Reader, spec *version.NumericSpec) generic
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.SecretManager.Suffix(p.spec)})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.GoogleCloudSecretManager.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ EXAMPLES:
   suve gcloud secret show --raw my-secret                  Output raw value (for piping)
   suve gcloud secret show --output=json my-secret          Output as JSON`,
 		UsageError: "usage: suve gcloud secret show <name>",
-		ParseSpec:  version.SecretManager.Parse,
+		ParseSpec:  version.GoogleCloudSecretManager.Parse,
 		NewPresenter: func(ctx context.Context, spec *version.NumericSpec) (generic.ShowPresenter, error) {
 			store, err := gcloudinternal.SecretStore(ctx)
 			if err != nil {

@@ -1,5 +1,5 @@
-// White-box tests of shift.go, which is core, so they are core too.
-//declscope:core
+// White-box tests of shift.go, in its namespace.
+//declscope:namespace parse
 
 package version
 
@@ -76,7 +76,7 @@ func TestParseShift(t *testing.T) {
 	}
 }
 
-func TestIsShiftStart(t *testing.T) {
+func TestParsesAsShift(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -126,7 +126,7 @@ func TestIsShiftStart(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := isShiftStart(tt.s, tt.i)
+			got := parsesAsShift(tt.s, tt.i)
 			assert.Equal(t, tt.want, got)
 		})
 	}

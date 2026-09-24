@@ -1,80 +1,31 @@
-// parse.go holds the Spec type and the grammar-neutral Parse engine that every
-// grammar file builds on. It is the package's core: Spec does not have to
-// become ParseSpec.
-//declscope:core
+// parse.go is the grammar-neutral engine that every grammar file builds its
+// Parse on: it splits a specification into the name, the absolute specifiers
+// and the shift clause.
 
-// Package version parses the version specifiers that follow a name
-// (#VERSION, :LABEL, ~SHIFT) for every cloud product.
-//
-// Three grammars cover the products: NumericGrammar (integer versions),
-// OpaqueGrammar (opaque version ids, optionally with staging labels), and
-// BareGrammar (unversioned; the whole argument is the name). products.go binds
-// each product to one of them (ParameterStore, SecretsManager, SecretManager,
-// KeyVault, AppConfiguration). Each versioned grammar's Suffix rebuilds the
-// suffix that callers hand to the use cases.
-//
-// Version specification grammar:
-//
-//	<name><absolute>?<shift>*
-//
-// Where:
-//   - <name>     is the parameter/secret name (required)
-//   - <absolute> is a type-specific absolute version specifier (optional)
-//   - <shift>    is ~ or ~N for relative version shift (optional, repeatable)
-//
-// Examples:
-//   - Numeric: /my/param, /my/param#3, /my/param~1, /my/param#5~2
-//   - Opaque: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1
 package version
 
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
-// Common errors for version parsing.
+// Errors for a specification the engine cannot split.
 var (
-	ErrEmptySpec            = errors.New("empty specification")
-	ErrEmptyName            = errors.New("empty name")
-	ErrAmbiguousTilde       = errors.New("ambiguous tilde")
-	ErrMultipleAbsoluteSpec = errors.New("multiple absolute version specifiers")
+	errParseEmptyName        = errors.New("empty name")
+	errParseAmbiguousTilde   = errors.New("ambiguous tilde")
+	errParseMultipleAbsolute = errors.New("multiple absolute version specifiers")
 )
 
-// Spec represents a parsed version specification.
-// The type parameter A holds grammar-specific absolute version info
-// (NumericAbsolute, OpaqueAbsolute, or BareAbsolute).
-type Spec[A any] struct {
-	Name     string // Parameter/secret name (e.g., "/my/param", "my-secret")
-	Absolute A      // Absolute version specifier (type-specific, zero value if not specified)
-	Shift    int    // Relative shift amount (0 means no shift, positive means go back N versions)
-}
-
-// HasShift returns true if a relative shift is specified (Shift > 0).
-func (s *Spec[A]) HasShift() bool {
-	return s.Shift > 0
-}
-
-// ShiftSuffix renders the shift clause ("~N", or "" without a shift), the tail
-// of the suffix each service's Suffix rebuilds from a parsed spec.
-func (s *Spec[A]) ShiftSuffix() string {
-	if !s.HasShift() {
-		return ""
-	}
-
-	return "~" + strconv.Itoa(s.Shift)
-}
-
-// SpecifierParser defines how to parse a single type of absolute specifier.
-// Each grammar defines its own set of SpecifierParsers.
+// specifierParser defines how to parse a single type of absolute specifier.
+// Each grammar defines its own set of specifierParsers.
 //
 // For example, NumericGrammar has one parser for "#" (version number), while
 // an OpaqueGrammar with labels has two parsers for "#" (version ID) and ":"
 // (label).
-type SpecifierParser[A any] struct {
+//
+//declscope:package // numeric.go and opaque.go build their parsers from it
+type specifierParser[A any] struct {
 	// PrefixChar is the character that starts this specifier (e.g., '#', ':').
 	PrefixChar byte
 
@@ -99,18 +50,20 @@ type SpecifierParser[A any] struct {
 	Apply func(value string, abs A) (A, error)
 }
 
-// AbsoluteParser holds the configuration for parsing absolute specifiers.
-// Each grammar builds its own AbsoluteParser.
-type AbsoluteParser[A any] struct {
+// absoluteParser holds the configuration for parsing absolute specifiers.
+// Each grammar builds its own absoluteParser.
+//
+//declscope:package // numeric.go and opaque.go hand it to parseSpec
+type absoluteParser[A any] struct {
 	// Parsers is the list of specifier parsers to try, in order.
-	Parsers []SpecifierParser[A]
+	Parsers []specifierParser[A]
 
 	// Zero returns the zero/default value of A.
 	// Called when no absolute specifier is present in the input.
 	Zero func() A
 }
 
-// Parse parses a version specification string into a Spec.
+// parseSpec parses a version specification string into a Spec.
 //
 // The parsing proceeds in three steps:
 //  1. Find where the name ends (where specifiers begin)
@@ -122,7 +75,9 @@ type AbsoluteParser[A any] struct {
 //   - Name is empty (specifier at start)
 //   - Invalid specifier syntax (e.g., "#" at end, ambiguous "~")
 //   - Conflicting specifiers (e.g., both #id and :label)
-func Parse[A any](input string, parser AbsoluteParser[A]) (*Spec[A], error) {
+//
+//declscope:package // numeric.go and opaque.go run their Parse through it
+func parseSpec[A any](input string, parser absoluteParser[A]) (*Spec[A], error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return nil, ErrEmptySpec
@@ -130,7 +85,7 @@ func Parse[A any](input string, parser AbsoluteParser[A]) (*Spec[A], error) {
 
 	// Step 1: Find where name ends and specifiers begin.
 	// Example: "/my/param#3~1" -> nameEnd=9 (at '#')
-	nameEnd, err := findNameEnd(input, parser.Parsers)
+	nameEnd, err := parseNameEnd(input, parser.Parsers)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +94,7 @@ func Parse[A any](input string, parser AbsoluteParser[A]) (*Spec[A], error) {
 
 	// Specifier at start means empty name (e.g., "#3" or "~1")
 	if name == "" && nameEnd < len(input) {
-		return nil, ErrEmptyName
+		return nil, errParseEmptyName
 	}
 
 	// No specifier found - entire input is the name
@@ -166,7 +121,7 @@ func Parse[A any](input string, parser AbsoluteParser[A]) (*Spec[A], error) {
 	return &Spec[A]{Name: name, Absolute: abs, Shift: s}, nil
 }
 
-// findNameEnd scans input to find where the name ends (specifier starts).
+// parseNameEnd scans input to find where the name ends (specifier starts).
 //
 // Returns the index of the first specifier character, or len(input) if none found.
 // A specifier starts when we find:
@@ -176,16 +131,16 @@ func Parse[A any](input string, parser AbsoluteParser[A]) (*Spec[A], error) {
 // Returns error for:
 //   - '~' followed by a letter (ambiguous: could be part of the name or a shift typo)
 //   - PrefixChar at end or followed by invalid char, when Error is set
-func findNameEnd[A any](input string, parsers []SpecifierParser[A]) (int, error) {
+func parseNameEnd[A any](input string, parsers []specifierParser[A]) (int, error) {
 	for i := range len(input) {
 		// Check for shift specifier (~)
 		if input[i] == '~' {
-			if isShiftStart(input, i) {
+			if parsesAsShift(input, i) {
 				return i, nil // Found shift start
 			}
 			// "~" followed by letter is ambiguous (e.g., "param~backup")
-			if i+1 < len(input) && internal.IsLetter(input[i+1]) {
-				return 0, fmt.Errorf("%w: use ~N for version shift", ErrAmbiguousTilde)
+			if i+1 < len(input) && isLetterChar(input[i+1]) {
+				return 0, fmt.Errorf("%w: use ~N for version shift", errParseAmbiguousTilde)
 			}
 			// "~" followed by other char - treat as part of name, keep scanning
 			continue
@@ -220,7 +175,7 @@ func findNameEnd[A any](input string, parsers []SpecifierParser[A]) (int, error)
 // Example: "#3~1" -> parses "#3", returns "~1" as remaining
 //
 // Returns error for duplicate/conflicting specifiers or Apply failures.
-func parseAbsolute[A any](s string, parsers []SpecifierParser[A], abs A) (A, string, error) {
+func parseAbsolute[A any](s string, parsers []specifierParser[A], abs A) (A, string, error) {
 	for len(s) > 0 && s[0] != '~' {
 		// Find parser for this prefix character
 		p, ok := matchParser(s[0], parsers)
@@ -236,7 +191,7 @@ func parseAbsolute[A any](s string, parsers []SpecifierParser[A], abs A) (A, str
 
 		// Check for duplicate/conflicting specifiers
 		if p.Duplicated != nil && p.Duplicated(abs) {
-			return abs, "", ErrMultipleAbsoluteSpec
+			return abs, "", errParseMultipleAbsolute
 		}
 
 		// Apply the parsed value
@@ -253,14 +208,14 @@ func parseAbsolute[A any](s string, parsers []SpecifierParser[A], abs A) (A, str
 
 // matchParser finds the parser whose PrefixChar matches ch.
 // Returns (parser, true) if found, (zero, false) if not.
-func matchParser[A any](ch byte, parsers []SpecifierParser[A]) (SpecifierParser[A], bool) {
+func matchParser[A any](ch byte, parsers []specifierParser[A]) (specifierParser[A], bool) {
 	for _, p := range parsers {
 		if ch == p.PrefixChar {
 			return p, true
 		}
 	}
 
-	return SpecifierParser[A]{}, false
+	return specifierParser[A]{}, false
 }
 
 // rejectingLabelParser is a ':' parser that exists only to reject staging-label
@@ -269,8 +224,8 @@ func matchParser[A any](ch byte, parsers []SpecifierParser[A]) (SpecifierParser[
 // after an absolute specifier fails in Apply.
 //
 //declscope:package // numeric.go and opaque.go reject ':' with it
-func rejectingLabelParser[A any](err error) SpecifierParser[A] {
-	return SpecifierParser[A]{
+func rejectingLabelParser[A any](err error) specifierParser[A] {
+	return specifierParser[A]{
 		PrefixChar: ':',
 		IsChar:     func(byte) bool { return false },
 		Error:      err,

@@ -150,7 +150,7 @@ func TestShowPresenter(t *testing.T) {
 		},
 	}
 
-	spec, err := version.KeyVault.Parse("my-secret")
+	spec, err := version.AzureKeyVault.Parse("my-secret")
 	require.NoError(t, err)
 
 	presenter := secret.NewShowPresenter(store, spec)
@@ -267,7 +267,7 @@ func TestShowPresenter_RenderJSON(t *testing.T) {
 		},
 	}
 
-	spec, err := version.KeyVault.Parse("my-secret")
+	spec, err := version.AzureKeyVault.Parse("my-secret")
 	require.NoError(t, err)
 
 	presenter := secret.NewShowPresenter(store, spec)
@@ -316,9 +316,9 @@ func TestDiffPresenter_RenderJSON(t *testing.T) {
 		},
 	}
 
-	spec1, err := version.KeyVault.Parse("my-secret#abc")
+	spec1, err := version.AzureKeyVault.Parse("my-secret#abc")
 	require.NoError(t, err)
-	spec2, err := version.KeyVault.Parse("my-secret#def")
+	spec2, err := version.AzureKeyVault.Parse("my-secret#def")
 	require.NoError(t, err)
 
 	presenter := secret.NewDiffPresenter(store, spec1, spec2)

@@ -42,8 +42,8 @@ func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.NumericSpec)
 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
 	result, err := p.uc.Execute(ctx, secret.DiffInput{
-		Name1: p.spec1.Name, Suffix1: version.SecretManager.Suffix(p.spec1),
-		Name2: p.spec2.Name, Suffix2: version.SecretManager.Suffix(p.spec2),
+		Name1: p.spec1.Name, Suffix1: version.GoogleCloudSecretManager.Suffix(p.spec1),
+		Name2: p.spec2.Name, Suffix2: version.GoogleCloudSecretManager.Suffix(p.spec2),
 	})
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ EXAMPLES:
 func parseDiffArgs(args []string) (*version.NumericSpec, *version.NumericSpec, error) {
 	return generic.ParseDiffArgs(
 		args,
-		version.SecretManager.Parse,
+		version.GoogleCloudSecretManager.Parse,
 		version.NumericAbsolute.IsSet,
 		"#~",
 		"usage: suve gcloud secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",

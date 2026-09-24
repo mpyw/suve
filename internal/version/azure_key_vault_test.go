@@ -182,7 +182,7 @@ func TestKeyVaultParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.KeyVault.Parse(tt.input)
+			spec, err := version.AzureKeyVault.Parse(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 
@@ -200,9 +200,9 @@ func TestKeyVaultParse(t *testing.T) {
 func TestKeyVaultParse_LabelErrorMessage(t *testing.T) {
 	t.Parallel()
 
-	_, err := version.KeyVault.Parse("my-secret:latest")
+	_, err := version.AzureKeyVault.Parse("my-secret:latest")
 	require.Error(t, err)
-	require.ErrorIs(t, err, version.ErrKeyVaultLabelUnsupported)
+	require.ErrorIs(t, err, version.ErrAzureKeyVaultLabelUnsupported)
 }
 
 // TestParse_LabelAfterVersionRejected exercises the ':' reject path reached
@@ -211,9 +211,9 @@ func TestKeyVaultParse_LabelErrorMessage(t *testing.T) {
 func TestKeyVaultParse_LabelAfterVersionRejected(t *testing.T) {
 	t.Parallel()
 
-	_, err := version.KeyVault.Parse("my-secret#abc:latest")
+	_, err := version.AzureKeyVault.Parse("my-secret#abc:latest")
 	require.Error(t, err)
-	require.ErrorIs(t, err, version.ErrKeyVaultLabelUnsupported)
+	require.ErrorIs(t, err, version.ErrAzureKeyVaultLabelUnsupported)
 }
 
 // TestSuffix pins that Suffix rebuilds the part after the name, normalized, and
@@ -235,11 +235,11 @@ func TestKeyVaultSuffix(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.KeyVault.Parse(tt.input)
+			spec, err := version.AzureKeyVault.Parse(tt.input)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, version.KeyVault.Suffix(spec))
+			assert.Equal(t, tt.want, version.AzureKeyVault.Suffix(spec))
 
-			reparsed, err := version.KeyVault.Parse(spec.Name + version.KeyVault.Suffix(spec))
+			reparsed, err := version.AzureKeyVault.Parse(spec.Name + version.AzureKeyVault.Suffix(spec))
 			require.NoError(t, err)
 			assert.Equal(t, spec, reparsed)
 		})

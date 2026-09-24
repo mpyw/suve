@@ -15,7 +15,7 @@ import (
 // AWSParamStrategy implements ServiceStrategy for SSM Parameter Store over a
 // provider.Store. Parameter Store specifics:
 //
-//   - Versions are integers, parsed with version.ParameterStore (#N, ~SHIFT).
+//   - Versions are integers, parsed with version.AWSParameterStore (#N, ~SHIFT).
 //   - Values carry a type (String / SecureString / StringList); a SecureString
 //     is masked in diffs, and an edit keeps the existing type unless it staged
 //     one.
@@ -51,7 +51,7 @@ func (awsParamHooks) traits() versionedTraits {
 }
 
 func (awsParamHooks) parse(input string) (name, suffix string, err error) {
-	return version.ParameterStore.Split(input)
+	return version.AWSParameterStore.Split(input)
 }
 
 func (awsParamHooks) versionLabel(id string) string { return "#" + id }

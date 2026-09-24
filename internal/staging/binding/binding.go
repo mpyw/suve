@@ -109,12 +109,12 @@ var descriptors = map[provider.Provider]descriptor{
 	provider.ProviderAWS: {
 		kinds: map[provider.Kind]Binding{
 			provider.KindParam: {
-				SplitSpec: version.ParameterStore.Split,
+				SplitSpec: version.AWSParameterStore.Split,
 				parser:    staging.AWSParamParserFactory,
 				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewAWSParamStrategy(s) },
 			},
 			provider.KindSecret: {
-				SplitSpec: version.SecretsManager.Split,
+				SplitSpec: version.AWSSecretsManager.Split,
 				parser:    staging.AWSSecretParserFactory,
 				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewAWSSecretStrategy(s) },
 			},
@@ -133,7 +133,7 @@ var descriptors = map[provider.Provider]descriptor{
 	provider.ProviderGoogleCloud: {
 		kinds: map[provider.Kind]Binding{
 			provider.KindSecret: {
-				SplitSpec: version.SecretManager.Split,
+				SplitSpec: version.GoogleCloudSecretManager.Split,
 				parser:    staging.GoogleCloudSecretParserFactory,
 				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewGoogleCloudSecretStrategy(s) },
 			},
@@ -145,13 +145,13 @@ var descriptors = map[provider.Provider]descriptor{
 	provider.ProviderAzure: {
 		kinds: map[provider.Kind]Binding{
 			provider.KindParam: {
-				SplitSpec:  version.AppConfiguration.Split,
+				SplitSpec:  version.AzureAppConfiguration.Split,
 				parser:     staging.AzureAppConfigParamParserFactory,
 				strategy:   func(s provider.Store) staging.FullStrategy { return staging.NewAzureAppConfigParamStrategy(s) },
 				namespaced: true,
 			},
 			provider.KindSecret: {
-				SplitSpec: version.KeyVault.Split,
+				SplitSpec: version.AzureKeyVault.Split,
 				parser:    staging.AzureKeyVaultSecretParserFactory,
 				strategy:  func(s provider.Store) staging.FullStrategy { return staging.NewAzureKeyVaultSecretStrategy(s) },
 			},

@@ -1,13 +1,13 @@
 // Package appconfig implements the provider.Store contract (Reader/Writer/Tagger)
 // for Azure App Configuration, confining all App Configuration SDK types to this
-// package. Spec PARSING stays generic via version.AppConfiguration.Parse.
+// package. Spec PARSING stays generic via version.AzureAppConfiguration.Parse.
 //
 // Azure App Configuration is the abstraction's acid test: it has NO versioning.
 // A key/label pair holds a single current value with no history. Every
 // version-dependent operation therefore degrades cleanly rather than crashing:
 //
 //   - Resolve accepts a bare name only (any #/~/: specifier is rejected by
-//     version.AppConfiguration.Parse before any API call) and always returns the
+//     version.AzureAppConfiguration.Parse before any API call) and always returns the
 //     latest ref.
 //   - History returns ErrVersioningUnsupported so the generic log command
 //     surfaces a clear error instead of iterating a non-existent history.

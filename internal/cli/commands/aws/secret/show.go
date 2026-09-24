@@ -48,7 +48,7 @@ func NewShowPresenter(reader provider.Reader, spec *version.OpaqueSpec) generic.
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.SecretsManager.Suffix(p.spec)})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.AWSSecretsManager.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ EXAMPLES:
   suve aws secret show --output=json my-secret                Output as JSON
   API_KEY=$(suve aws secret show --raw my-secret)             Use in shell variable`,
 		UsageError: "usage: suve aws secret show <name>",
-		ParseSpec:  version.SecretsManager.Parse,
+		ParseSpec:  version.AWSSecretsManager.Parse,
 		NewPresenter: func(ctx context.Context, spec *version.OpaqueSpec) (generic.ShowPresenter, error) {
 			store, err := awsinternal.SecretStore(ctx)
 			if err != nil {

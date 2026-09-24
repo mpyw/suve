@@ -36,9 +36,9 @@ reference produced and consumed by the same provider. Its zero value means
 latest/current; it exposes no id or staging-label semantics to generic callers.
 
 - Syntactic parsing of `#VERSION` / `~SHIFT` / `:LABEL` lives in the flat
-  `internal/version` package: a product grammar value (`version.ParameterStore`,
-  `version.SecretsManager`, `version.SecretManager`, `version.KeyVault`,
-  `version.AppConfiguration`) built from one of three grammars (numeric,
+  `internal/version` package: a product grammar value (`version.AWSParameterStore`,
+  `version.AWSSecretsManager`, `version.GoogleCloudSecretManager`, `version.AzureKeyVault`,
+  `version.AzureAppConfiguration`) built from one of three grammars (numeric,
   opaque, bare). It imports nothing from the CLI.
 - Version *resolution* (mapping a parsed spec plus history onto a concrete
   version) lives behind `Reader.Resolve` (`provider.go:77`), inside the adapter.

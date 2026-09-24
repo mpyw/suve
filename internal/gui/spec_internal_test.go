@@ -124,7 +124,7 @@ func TestApp_parseSpec_Secret(t *testing.T) {
 			// Google Cloud has no staging labels: a colon specifier must be
 			// rejected, not folded into the name (which the AWS grammar accepts).
 			name: "google cloud label rejected", provider: provider.ProviderGoogleCloud,
-			input: "sec:prod", wantErr: version.ErrSecretManagerLabelUnsupported,
+			input: "sec:prod", wantErr: version.ErrGoogleCloudSecretManagerLabelUnsupported,
 		},
 		{
 			name: "azure key vault opaque id", provider: provider.ProviderAzure,

@@ -2,14 +2,14 @@
 // for Azure Key Vault secrets. It confines all Key Vault SDK types to this
 // package: opaque version-id resolution and tag read-modify-write live here, so
 // no Azure type escapes the provider seam. Spec PARSING stays generic via
-// version.KeyVault.Parse.
+// version.AzureKeyVault.Parse.
 //
 // Azure Key Vault differs from AWS Secrets Manager in ways that shape this
 // adapter:
 //
 //   - Versions are opaque strings (32-character hex ids) or the empty "current"
 //     alias; there are no staging labels (a ":LABEL" spec is rejected by
-//     version.KeyVault).
+//     version.AzureKeyVault).
 //   - There is no create-only API: SetSecret always creates a new version. To
 //     honor Create's create-only contract this adapter probes with GetSecret
 //     first and reports provider.ErrAlreadyExists when the secret exists. This
@@ -89,9 +89,9 @@ type secretVersion struct {
 // Resolve parses the version spec (generic) and resolves it to an opaque
 // VersionRef holding the version id (or "" for the current version). A ~shift is
 // applied by walking the versions newest-first; a "#<id>" without a shift needs
-// no listing. A ":LABEL" spec is rejected by version.KeyVault.Parse.
+// no listing. A ":LABEL" spec is rejected by version.AzureKeyVault.Parse.
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
-	parsed, err := version.KeyVault.Parse(name + spec)
+	parsed, err := version.AzureKeyVault.Parse(name + spec)
 	if err != nil {
 		return provider.VersionRef{}, err
 	}

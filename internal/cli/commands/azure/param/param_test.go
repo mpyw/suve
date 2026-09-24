@@ -123,7 +123,7 @@ func TestShowPresenter(t *testing.T) {
 		},
 	}
 
-	spec, err := version.AppConfiguration.Parse("app/timeout")
+	spec, err := version.AzureAppConfiguration.Parse("app/timeout")
 	require.NoError(t, err)
 
 	presenter := param.NewShowPresenter(store, spec)
@@ -387,7 +387,7 @@ func TestShowPresenter_RenderJSON(t *testing.T) {
 		},
 	}
 
-	spec, err := version.AppConfiguration.Parse("app/timeout")
+	spec, err := version.AzureAppConfiguration.Parse("app/timeout")
 	require.NoError(t, err)
 
 	presenter := param.NewShowPresenter(store, spec)
@@ -431,9 +431,9 @@ func TestDiffPresenter_RenderJSON(t *testing.T) {
 		},
 	}
 
-	spec1, err := version.AppConfiguration.Parse("key-a")
+	spec1, err := version.AzureAppConfiguration.Parse("key-a")
 	require.NoError(t, err)
-	spec2, err := version.AppConfiguration.Parse("key-b")
+	spec2, err := version.AzureAppConfiguration.Parse("key-b")
 	require.NoError(t, err)
 
 	presenter := param.NewDiffPresenter(store, spec1, spec2)

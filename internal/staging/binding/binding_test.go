@@ -77,10 +77,13 @@ func TestBinding_SplitSpec(t *testing.T) {
 		{"aws param rejects id", provider.ProviderAWS, provider.KindParam, "/p#abc", "", "", version.ErrInvalidNumericVersion},
 		{"aws secret label", provider.ProviderAWS, provider.KindSecret, "s:AWSPREVIOUS~1", "s", ":AWSPREVIOUS~1", nil},
 		{"google cloud secret numeric", provider.ProviderGoogleCloud, provider.KindSecret, "s#5~", "s", "#5~1", nil},
-		{"google cloud secret rejects label", provider.ProviderGoogleCloud, provider.KindSecret, "s:x", "", "", version.ErrSecretManagerLabelUnsupported},
+		{
+			"google cloud secret rejects label", provider.ProviderGoogleCloud, provider.KindSecret, "s:x", "", "",
+			version.ErrGoogleCloudSecretManagerLabelUnsupported,
+		},
 		{"azure param keeps the whole key", provider.ProviderAzure, provider.KindParam, "k#3~1", "k#3~1", "", nil},
 		{"azure secret opaque id", provider.ProviderAzure, provider.KindSecret, "s#deadbeef", "s", "#deadbeef", nil},
-		{"azure secret rejects label", provider.ProviderAzure, provider.KindSecret, "s:x", "", "", version.ErrKeyVaultLabelUnsupported},
+		{"azure secret rejects label", provider.ProviderAzure, provider.KindSecret, "s:x", "", "", version.ErrAzureKeyVaultLabelUnsupported},
 	}
 
 	for _, tt := range tests {

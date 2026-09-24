@@ -129,7 +129,7 @@ func TestAppConfigurationParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.AppConfiguration.Parse(tt.input)
+			spec, err := version.AzureAppConfiguration.Parse(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 
@@ -148,7 +148,7 @@ func TestAppConfigurationParse_SpecifierLikeKeysAccepted(t *testing.T) {
 	t.Parallel()
 
 	for _, input := range []string{"my-key#3", "my-key~1", "my-key:prod", "Logging:LogLevel:Default"} {
-		spec, err := version.AppConfiguration.Parse(input)
+		spec, err := version.AzureAppConfiguration.Parse(input)
 		require.NoError(t, err, "input=%q", input)
 		assert.Equal(t, input, spec.Name)
 	}
@@ -157,11 +157,11 @@ func TestAppConfigurationParse_SpecifierLikeKeysAccepted(t *testing.T) {
 func TestAppConfigurationSplit(t *testing.T) {
 	t.Parallel()
 
-	name, suffix, err := version.AppConfiguration.Split(" weird#key~1 ")
+	name, suffix, err := version.AzureAppConfiguration.Split(" weird#key~1 ")
 	require.NoError(t, err)
 	assert.Equal(t, "weird#key~1", name)
 	assert.Empty(t, suffix, "an unversioned service has no suffix")
 
-	_, _, err = version.AppConfiguration.Split("  ")
+	_, _, err = version.AzureAppConfiguration.Split("  ")
 	require.ErrorIs(t, err, version.ErrEmptySpec)
 }

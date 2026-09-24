@@ -40,7 +40,7 @@ func NewShowPresenter(reader provider.Reader, spec *version.OpaqueSpec) generic.
 }
 
 func (p *showPresenter) Fetch(ctx context.Context) error {
-	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.KeyVault.Suffix(p.spec)})
+	result, err := p.uc.Execute(ctx, secret.ShowInput{Name: p.spec.Name, Suffix: version.AzureKeyVault.Suffix(p.spec)})
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ EXAMPLES:
   suve azure secret show --raw my-secret                  Output raw value (for piping)
   suve azure secret show --output=json my-secret          Output as JSON`,
 		UsageError: "usage: suve azure secret show <name>",
-		ParseSpec:  version.KeyVault.Parse,
+		ParseSpec:  version.AzureKeyVault.Parse,
 		NewPresenter: func(ctx context.Context, spec *version.OpaqueSpec) (generic.ShowPresenter, error) {
 			store, err := azureinternal.KeyVaultStore(ctx)
 			if err != nil {

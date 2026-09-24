@@ -399,7 +399,7 @@ func TestSecretsManagerParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.SecretsManager.Parse(tt.input)
+			spec, err := version.AWSSecretsManager.Parse(tt.input)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -469,11 +469,11 @@ func TestSecretsManagerSuffix(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
-			spec, err := version.SecretsManager.Parse(tt.input)
+			spec, err := version.AWSSecretsManager.Parse(tt.input)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, version.SecretsManager.Suffix(spec))
+			assert.Equal(t, tt.want, version.AWSSecretsManager.Suffix(spec))
 
-			reparsed, err := version.SecretsManager.Parse(spec.Name + version.SecretsManager.Suffix(spec))
+			reparsed, err := version.AWSSecretsManager.Parse(spec.Name + version.AWSSecretsManager.Suffix(spec))
 			require.NoError(t, err)
 			assert.Equal(t, spec, reparsed)
 		})
@@ -483,11 +483,11 @@ func TestSecretsManagerSuffix(t *testing.T) {
 func TestSecretsManagerSplit(t *testing.T) {
 	t.Parallel()
 
-	name, suffix, err := version.SecretsManager.Split("my-secret:AWSCURRENT~1")
+	name, suffix, err := version.AWSSecretsManager.Split("my-secret:AWSCURRENT~1")
 	require.NoError(t, err)
 	assert.Equal(t, "my-secret", name)
 	assert.Equal(t, ":AWSCURRENT~1", suffix)
 
-	_, _, err = version.SecretsManager.Split("")
+	_, _, err = version.AWSSecretsManager.Split("")
 	require.ErrorIs(t, err, version.ErrEmptySpec)
 }

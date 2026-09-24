@@ -44,8 +44,8 @@ func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.OpaqueSpec) 
 
 func (p *diffPresenter) Fetch(ctx context.Context) error {
 	result, err := p.uc.Execute(ctx, secret.DiffInput{
-		Name1: p.spec1.Name, Suffix1: version.SecretsManager.Suffix(p.spec1),
-		Name2: p.spec2.Name, Suffix2: version.SecretsManager.Suffix(p.spec2),
+		Name1: p.spec1.Name, Suffix1: version.AWSSecretsManager.Suffix(p.spec1),
+		Name2: p.spec2.Name, Suffix2: version.AWSSecretsManager.Suffix(p.spec2),
 	})
 	if err != nil {
 		return err
@@ -124,7 +124,7 @@ For comparing staged values, use: suve aws stage secret diff`,
 func parseDiffArgs(args []string) (*version.OpaqueSpec, *version.OpaqueSpec, error) {
 	return generic.ParseDiffArgs(
 		args,
-		version.SecretsManager.Parse,
+		version.AWSSecretsManager.Parse,
 		version.OpaqueAbsolute.IsSet,
 		"#:~",
 		"usage: suve aws secret diff <spec1> [spec2] | <name> #<version1> [#<version2>]",

@@ -2,8 +2,6 @@ package version
 
 import (
 	"github.com/samber/lo"
-
-	"github.com/mpyw/suve/internal/version/internal"
 )
 
 // OpaqueAbsolute is the absolute specifier of an opaque grammar: an optional
@@ -52,7 +50,7 @@ type OpaqueGrammar struct {
 //   - ~~    go back 2 versions (same as ~1~1)
 //   - ~1~2  cumulative: go back 3 versions
 func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
-	parsers := []SpecifierParser[OpaqueAbsolute]{
+	parsers := []specifierParser[OpaqueAbsolute]{
 		{
 			PrefixChar: '#',
 			IsChar:     g.IsIDChar,
@@ -67,7 +65,7 @@ func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
 	}
 
 	if g.Labels {
-		parsers = append(parsers, SpecifierParser[OpaqueAbsolute]{
+		parsers = append(parsers, specifierParser[OpaqueAbsolute]{
 			PrefixChar: ':',
 			IsChar:     isOpaqueLabelChar,
 			Error:      g.LabelError,
@@ -82,7 +80,7 @@ func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
 		parsers = append(parsers, rejectingLabelParser[OpaqueAbsolute](g.LabelError))
 	}
 
-	return Parse(input, AbsoluteParser[OpaqueAbsolute]{
+	return parseSpec(input, absoluteParser[OpaqueAbsolute]{
 		Parsers: parsers,
 		Zero:    func() OpaqueAbsolute { return OpaqueAbsolute{} },
 	})
@@ -109,7 +107,7 @@ func (OpaqueGrammar) Suffix(spec *OpaqueSpec) string {
 
 // isOpaqueLabelChar reports whether c is valid within a staging label.
 func isOpaqueLabelChar(c byte) bool {
-	return internal.IsLetter(c) || internal.IsDigit(c) || c == '-' || c == '_'
+	return isLetterChar(c) || isDigitChar(c) || c == '-' || c == '_'
 }
 
 // Split parses input and returns its name plus the rebuilt suffix (Suffix), the

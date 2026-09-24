@@ -13,7 +13,7 @@ import (
 // AWSSecretStrategy implements ServiceStrategy for Secrets Manager over a
 // provider.Store. Secrets Manager specifics:
 //
-//   - Versions are ids or staging labels, parsed with version.SecretsManager
+//   - Versions are ids or staging labels, parsed with version.AWSSecretsManager
 //     (#ID, :LABEL, ~SHIFT); ids render truncated.
 //   - Delete takes force / recovery-window options.
 //   - A staged string edit refuses to overwrite a binary secret.
@@ -51,7 +51,7 @@ func (awsSecretHooks) traits() versionedTraits {
 }
 
 func (awsSecretHooks) parse(input string) (name, suffix string, err error) {
-	return version.SecretsManager.Split(input)
+	return version.AWSSecretsManager.Split(input)
 }
 
 func (awsSecretHooks) versionLabel(id string) string {
