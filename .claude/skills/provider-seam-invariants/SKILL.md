@@ -61,6 +61,9 @@ Provider-interpreted options use the sealed marker pattern
 - Consumers (usecases, CLI) build and pass options through **without**
   type-asserting them. The adapter type-switches over the options it understands
   and silently ignores the rest.
+- `provider.ForceDelete` is only honored by AWS Secrets Manager, but it stays in
+  the neutral package. The GUI and TUI set it for any service whose
+  `capability.HasForceDelete` is true, so they never import an adapter package.
 
 This keeps provider-specific options out of the neutral domain model while
 staying strongly typed. Do not add an `any` metadata parameter to widen a signature.
@@ -96,8 +99,18 @@ cloud SDK. Enforcement is twofold:
   `cloud.google.com/go/secretmanager`, `github.com/Azure/azure-sdk-for-go`).
 - depguard (`.golangci.yaml`) enforces the same confinement at lint time.
 
-`internal/provider/aws/infra` is the low-level AWS client bootstrap and is the
-allowed importer for AWS config/client construction.
+Each provider root package (`internal/provider/{aws,gcloud,azure}`) holds its
+`Factory` and client bootstrap; AWS config loading and the STS identity lookup
+are `aws.LoadConfig` and `aws.LoadIdentity`. Service adapters are subpackages
+named after the cloud product (`aws/parameterstore`, `aws/secretsmanager`,
+`gcloud/secretmanager`, `azure/appconfig`, `azure/keyvault`). Where an adapter
+package shares its name with the SDK package it wraps, alias the SDK import
+with an `sdk` suffix (`secretsmanagersdk`) in files that import both.
+
+Vocabulary that the CLI, TUI or GUI imports directly lives in an SDK-free
+package under the adapter: `aws/paramtype` and `azure/appconfig/namespaces`.
+`TestSDKFreeProviderVocabulary` and the `*-sdk-free-vocabulary` depguard rules
+keep them SDK-free.
 
 When adding an adapter, keep every SDK import inside your
 `internal/provider/<cloud>/**` root and run `mise lint` to confirm the guard

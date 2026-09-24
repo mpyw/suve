@@ -1,7 +1,7 @@
-// In-package tests of client.go's profile-parsing internals.
-//declscope:namespace client
+// In-package tests of identity.go's profile-parsing internals.
+//declscope:namespace aws
 
-package infra
+package aws
 
 import (
 	"os"

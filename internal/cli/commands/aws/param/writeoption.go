@@ -9,7 +9,7 @@ import (
 	"slices"
 
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
+	"github.com/mpyw/suve/internal/provider/aws/parameterstore"
 )
 
 // SSM parameter tier names accepted by the --tier flag.
@@ -51,19 +51,19 @@ func buildWriteOptions(v WriteOptionFlags) []provider.WriteOption {
 	var opts []provider.WriteOption
 
 	if v.Tier != "" {
-		opts = append(opts, awsparam.Tier{Value: v.Tier})
+		opts = append(opts, parameterstore.Tier{Value: v.Tier})
 	}
 
 	if v.DataType != "" {
-		opts = append(opts, awsparam.DataType{Value: v.DataType})
+		opts = append(opts, parameterstore.DataType{Value: v.DataType})
 	}
 
 	if v.AllowedPattern != "" {
-		opts = append(opts, awsparam.AllowedPattern{Value: v.AllowedPattern})
+		opts = append(opts, parameterstore.AllowedPattern{Value: v.AllowedPattern})
 	}
 
 	if v.Policies != "" {
-		opts = append(opts, awsparam.Policies{JSON: v.Policies})
+		opts = append(opts, parameterstore.Policies{JSON: v.Policies})
 	}
 
 	return opts

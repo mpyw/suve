@@ -15,7 +15,7 @@
 // Two further constraints shape the adapter:
 //
 //   - The App Configuration label axis is exposed as suve's "namespace" (see
-//     the aznamespace subpackage): List forwards the raw value as a LabelFilter;
+//     the namespaces subpackage): List forwards the raw value as a LabelFilter;
 //     single-key ops decode it to one literal label; empty is the null/default
 //     namespace. A label is never exposed as a version.
 //   - App Configuration's PUT replaces the whole key-value, so tags AND the
@@ -48,7 +48,7 @@ import (
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/version/azureappconfigversion"
 )
 
@@ -109,7 +109,7 @@ func (s *Store) Resolve(_ context.Context, _, spec string) (provider.VersionRef,
 
 	// Resolve precedes every single-item read; reject a namespace value that
 	// names all/multiple namespaces here so the usage error surfaces early.
-	if _, err := aznamespace.Literal(s.namespace); err != nil {
+	if _, err := namespaces.Literal(s.namespace); err != nil {
 		return provider.VersionRef{}, err
 	}
 
@@ -120,7 +120,7 @@ func (s *Store) Resolve(_ context.Context, _, spec string) (provider.VersionRef,
 // is always plaintext; Version is left empty (App Configuration has no
 // versions); the setting's tags become Tags.
 func (s *Store) Get(ctx context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
-	label, err := aznamespace.Literal(s.namespace)
+	label, err := namespaces.Literal(s.namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (s *Store) History(_ context.Context, _ string) ([]domain.Version, error) {
 // honored natively by the service. Ordering is left to the caller: the list
 // use case sorts every provider's names uniformly (#480).
 func (s *Store) List(ctx context.Context) ([]string, error) {
-	settings, err := s.client.ListSettings(ctx, aznamespace.Filter(s.namespace))
+	settings, err := s.client.ListSettings(ctx, namespaces.Filter(s.namespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to list settings: %w", err)
 	}
@@ -200,7 +200,7 @@ type KeyNamespace struct {
 // provider.Reader.List contract untouched. A key that exists under several
 // namespaces yields one entry per (key, namespace) pair.
 func (s *Store) ListWithNamespaces(ctx context.Context) ([]KeyNamespace, error) {
-	return s.listWithNamespaces(ctx, aznamespace.AllNamespacesFilter, "across namespaces")
+	return s.listWithNamespaces(ctx, namespaces.AllFilter, "across namespaces")
 }
 
 // ListWithNamespacesScoped returns per-(key, namespace) rows HONORING the
@@ -212,7 +212,7 @@ func (s *Store) ListWithNamespaces(ctx context.Context) ([]KeyNamespace, error) 
 // "*"` widens to every namespace. Like ListWithNamespaces it is an
 // App-Config-specific extension, not part of the neutral provider seam.
 func (s *Store) ListWithNamespacesScoped(ctx context.Context) ([]KeyNamespace, error) {
-	return s.listWithNamespaces(ctx, aznamespace.Filter(s.namespace), "with namespaces")
+	return s.listWithNamespaces(ctx, namespaces.Filter(s.namespace), "with namespaces")
 }
 
 func (s *Store) listWithNamespaces(ctx context.Context, filter, what string) ([]KeyNamespace, error) {
@@ -249,7 +249,7 @@ func (s *Store) listWithNamespaces(ctx context.Context, filter, what string) ([]
 func (s *Store) Create(
 	ctx context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
 ) (domain.Version, error) {
-	label, err := aznamespace.Literal(s.namespace)
+	label, err := namespaces.Literal(s.namespace)
 	if err != nil {
 		return domain.Version{}, err
 	}
@@ -274,7 +274,7 @@ func (s *Store) Create(
 func (s *Store) Put(
 	ctx context.Context, name, value string, _ domain.ValueType, _ string, _ ...provider.WriteOption,
 ) (domain.Version, error) {
-	label, err := aznamespace.Literal(s.namespace)
+	label, err := namespaces.Literal(s.namespace)
 	if err != nil {
 		return domain.Version{}, err
 	}
@@ -293,7 +293,7 @@ func (s *Store) Put(
 
 // Delete removes a setting. Provider.DeleteOptions (AWS-specific) are ignored.
 func (s *Store) Delete(ctx context.Context, name string, _ ...provider.DeleteOption) error {
-	label, err := aznamespace.Literal(s.namespace)
+	label, err := namespaces.Literal(s.namespace)
 	if err != nil {
 		return err
 	}
@@ -344,7 +344,7 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 // 412; the loop re-GETs and re-merges up to tagWriteMaxAttempts times before
 // surfacing the conflict.
 func (s *Store) mutateTags(ctx context.Context, name string, merge func(map[string]*string)) error {
-	label, err := aznamespace.Literal(s.namespace)
+	label, err := namespaces.Literal(s.namespace)
 	if err != nil {
 		return err
 	}

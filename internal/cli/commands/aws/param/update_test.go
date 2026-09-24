@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
+	"github.com/mpyw/suve/internal/provider/aws/parameterstore"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -106,8 +106,8 @@ func TestUpdateRun_WriteOptions(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, gotOpts, 2)
-		assert.Contains(t, gotOpts, awsparam.Tier{Value: "Intelligent-Tiering"})
-		assert.Contains(t, gotOpts, awsparam.DataType{Value: "text"})
+		assert.Contains(t, gotOpts, parameterstore.Tier{Value: "Intelligent-Tiering"})
+		assert.Contains(t, gotOpts, parameterstore.DataType{Value: "text"})
 	})
 
 	t.Run("unset flags produce no options", func(t *testing.T) {

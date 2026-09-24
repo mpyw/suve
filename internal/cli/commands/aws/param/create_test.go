@@ -12,7 +12,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	awsparam "github.com/mpyw/suve/internal/provider/aws/param"
+	"github.com/mpyw/suve/internal/provider/aws/parameterstore"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -103,10 +103,10 @@ func TestCreateRun_WriteOptions(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, gotOpts, 4)
-		assert.Contains(t, gotOpts, awsparam.Tier{Value: "Advanced"})
-		assert.Contains(t, gotOpts, awsparam.DataType{Value: "text"})
-		assert.Contains(t, gotOpts, awsparam.AllowedPattern{Value: "^a"})
-		assert.Contains(t, gotOpts, awsparam.Policies{JSON: "[]"})
+		assert.Contains(t, gotOpts, parameterstore.Tier{Value: "Advanced"})
+		assert.Contains(t, gotOpts, parameterstore.DataType{Value: "text"})
+		assert.Contains(t, gotOpts, parameterstore.AllowedPattern{Value: "^a"})
+		assert.Contains(t, gotOpts, parameterstore.Policies{JSON: "[]"})
 	})
 
 	t.Run("unset flags produce no options", func(t *testing.T) {

@@ -1,7 +1,7 @@
-// In-package tests of client.go's config-loading internals.
-//declscope:namespace client
+// In-package tests of config.go's config-loading internals.
+//declscope:namespace aws
 
-package infra
+package aws
 
 import (
 	"bytes"

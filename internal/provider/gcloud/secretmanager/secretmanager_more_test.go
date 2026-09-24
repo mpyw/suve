@@ -1,8 +1,8 @@
-// Further tests of secret.go, using the mock client that secret_test.go
+// Further tests of secretmanager.go, using the mock client that secretmanager_test.go
 // declares.
-//declscope:namespace secret
+//declscope:namespace secretmanager
 
-package secret_test
+package secretmanager_test
 
 import (
 	"context"

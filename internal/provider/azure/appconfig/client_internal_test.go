@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 )
 
 // TestListSettingSelector_ForwardsFilter checks that the selector forwards the
 // given LabelFilter verbatim (never a nil filter, which would enumerate every
 // label) and sets no key filter. The store resolves the raw --namespace value
-// into this filter via aznamespace.Filter.
+// into this filter via namespaces.Filter.
 func TestListSettingSelector_ForwardsFilter(t *testing.T) {
 	t.Parallel()
 
@@ -37,7 +37,7 @@ func TestListSettingSelector_ForwardsFilter(t *testing.T) {
 func TestListSettingSelector_NullLabelDefault(t *testing.T) {
 	t.Parallel()
 
-	sel := listSettingSelector(aznamespace.Filter(""))
+	sel := listSettingSelector(namespaces.Filter(""))
 
 	require.NotNil(t, sel.LabelFilter)
 	assert.Equal(t, "\x00", *sel.LabelFilter)

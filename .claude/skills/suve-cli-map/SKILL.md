@@ -62,11 +62,11 @@ options and examples, read the full docs:
 
 ## Where the commands live
 
-| Provider | Service commands | Stage commands |
-|----------|------------------|----------------|
-| AWS | `internal/cli/commands/aws/{param,secret}` | `aws/stage` (`param.go`, `secret.go`, all-service `command.go`) |
-| Google Cloud | `internal/cli/commands/gcloud/secret` | `gcloud/stage.go` |
-| Azure | `internal/cli/commands/azure/{param,secret}` | `azure/stage.go` |
+| Provider | Service commands | Stage commands | Adapters (`internal/provider/...`) |
+|----------|------------------|----------------|------------------------------------|
+| AWS | `internal/cli/commands/aws/{param,secret}` | `aws/stage` (`param.go`, `secret.go`, all-service `command.go`) | `aws/parameterstore`, `aws/secretsmanager` |
+| Google Cloud | `internal/cli/commands/gcloud/secret` | `gcloud/stage.go` | `gcloud/secretmanager` |
+| Azure | `internal/cli/commands/azure/{param,secret}` | `azure/stage.go` | `azure/appconfig`, `azure/keyvault` |
 
 Group-level flags sit in the provider root (`gcloud` owns `--project`); the
 store and staging-scope resolvers sit in `internal/cli/commands/<cloud>/internal`.

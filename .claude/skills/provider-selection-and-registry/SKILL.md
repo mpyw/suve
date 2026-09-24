@@ -149,8 +149,8 @@ provider adapter imports a cloud service SDK directly. depguard
 | `cloud.google.com/go/secretmanager` | `internal/provider/gcloud/**` |
 | `github.com/Azure/azure-sdk-for-go` | `internal/provider/azure/**` |
 
-`internal/provider/aws/infra` is the low-level AWS client bootstrap and is an
-allowed AWS importer. The `internal/gui` tree is guarded too: it constructs
+The AWS config loading and STS identity lookup (`aws.LoadConfig`,
+`aws.LoadIdentity`) sit in the `internal/provider/aws` root package. The `internal/gui` tree is guarded too: it constructs
 stores through the registry rather than a cloud SDK.
 
 ## Adding another cloud

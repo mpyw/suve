@@ -1,4 +1,4 @@
-// Package secret implements the provider.Store contract (Reader/Writer/Tagger)
+// Package secretmanager implements the provider.Store contract (Reader/Writer/Tagger)
 // for Google Cloud Secret Manager. It confines all Secret Manager SDK types to
 // this package: resource-path construction and integer-version resolution live
 // here, so no Google Cloud type escapes the provider seam. Spec PARSING stays
@@ -17,7 +17,7 @@
 //     (secretmanagerpb.Secret.Annotations, distinct from the labels that back
 //     suve's tag axis) are exactly "for client tools to store their own state",
 //     so a description annotation adds description support with no collision.
-package secret
+package secretmanager
 
 import (
 	"context"

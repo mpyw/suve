@@ -11,7 +11,7 @@ import (
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
-	"github.com/mpyw/suve/internal/provider/aws/infra"
+	"github.com/mpyw/suve/internal/provider/aws"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
@@ -66,9 +66,9 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Get AWS identity for confirmation display
-	var identity *infra.AWSIdentity
+	var identity *aws.Identity
 	if !skipConfirm {
-		identity, _ = infra.GetAWSIdentity(ctx)
+		identity, _ = aws.LoadIdentity(ctx)
 	}
 
 	useCase := &param.DeleteUseCase{Store: store}

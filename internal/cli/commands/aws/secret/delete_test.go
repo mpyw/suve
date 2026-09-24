@@ -12,7 +12,7 @@ import (
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
 	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
 	"github.com/mpyw/suve/internal/provider"
-	awssecret "github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
 	"github.com/mpyw/suve/internal/provider/providermock"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
@@ -65,7 +65,7 @@ func TestDeleteRun(t *testing.T) {
 			checkOpts: func(t *testing.T, opts []provider.DeleteOption) {
 				t.Helper()
 				require.Len(t, opts, 1)
-				rw, ok := opts[0].(awssecret.RecoveryWindow)
+				rw, ok := opts[0].(secretsmanager.RecoveryWindow)
 				require.True(t, ok, "expected a RecoveryWindow option")
 				assert.Equal(t, int64(30), rw.Days)
 			},

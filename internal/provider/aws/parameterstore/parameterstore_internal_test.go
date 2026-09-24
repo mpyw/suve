@@ -1,7 +1,7 @@
-// In-package tests of param.go's unexported mapping helpers.
-//declscope:namespace param
+// In-package tests of parameterstore.go's unexported mapping helpers.
+//declscope:namespace parameterstore
 
-package param
+package parameterstore
 
 import (
 	"testing"

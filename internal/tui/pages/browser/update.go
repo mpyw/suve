@@ -14,7 +14,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/nav"
 	"github.com/mpyw/suve/internal/tui/termquirk"
@@ -446,7 +446,7 @@ func (m *Model) selectedIsDeleteStaged() bool {
 // Configuration namespaces is blocked (a write targets one concrete namespace —
 // GUI parity); the browser surfaces the block as an error dialog.
 func (m *Model) openNew() tea.Cmd {
-	if m.svcCap.HasNamespaces && m.currentNamespace() == aznamespace.AllNamespacesFilter {
+	if m.svcCap.HasNamespaces && m.currentNamespace() == namespaces.AllFilter {
 		return func() tea.Msg {
 			return nav.OpenError{
 				Title:   "Cannot create here",

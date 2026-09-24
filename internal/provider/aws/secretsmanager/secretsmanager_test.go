@@ -1,4 +1,4 @@
-package secret_test
+package secretsmanager_test
 
 import (
 	"context"
@@ -6,95 +6,95 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	secretsmanagersdk "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/aws/secret"
+	"github.com/mpyw/suve/internal/provider/aws/secretsmanager"
 )
 
 // mockClient is a configurable mock of the narrow Secrets Manager interface.
 type mockClient struct {
-	getValue    func(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error)
-	listVersion func(*secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error)
-	describe    func(*secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error)
-	create      func(*secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
-	updateSec   func(*secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
-	rotate      func(*secretsmanager.RotateSecretInput) (*secretsmanager.RotateSecretOutput, error)
-	deleteSec   func(*secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
-	restore     func(*secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error)
-	tag         func(*secretsmanager.TagResourceInput) (*secretsmanager.TagResourceOutput, error)
-	untag       func(*secretsmanager.UntagResourceInput) (*secretsmanager.UntagResourceOutput, error)
-	listSecrets func(*secretsmanager.ListSecretsInput) (*secretsmanager.ListSecretsOutput, error)
+	getValue    func(*secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error)
+	listVersion func(*secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error)
+	describe    func(*secretsmanagersdk.DescribeSecretInput) (*secretsmanagersdk.DescribeSecretOutput, error)
+	create      func(*secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error)
+	updateSec   func(*secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error)
+	rotate      func(*secretsmanagersdk.RotateSecretInput) (*secretsmanagersdk.RotateSecretOutput, error)
+	deleteSec   func(*secretsmanagersdk.DeleteSecretInput) (*secretsmanagersdk.DeleteSecretOutput, error)
+	restore     func(*secretsmanagersdk.RestoreSecretInput) (*secretsmanagersdk.RestoreSecretOutput, error)
+	tag         func(*secretsmanagersdk.TagResourceInput) (*secretsmanagersdk.TagResourceOutput, error)
+	untag       func(*secretsmanagersdk.UntagResourceInput) (*secretsmanagersdk.UntagResourceOutput, error)
+	listSecrets func(*secretsmanagersdk.ListSecretsInput) (*secretsmanagersdk.ListSecretsOutput, error)
 }
 
 func (m *mockClient) GetSecretValue(
-	_ context.Context, in *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.GetSecretValueOutput, error) {
+	_ context.Context, in *secretsmanagersdk.GetSecretValueInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.GetSecretValueOutput, error) {
 	return m.getValue(in)
 }
 
 //nolint:revive // Method name matches AWS SDK interface naming convention
 func (m *mockClient) ListSecretVersionIds(
-	_ context.Context, in *secretsmanager.ListSecretVersionIdsInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+	_ context.Context, in *secretsmanagersdk.ListSecretVersionIdsInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
 	return m.listVersion(in)
 }
 
 func (m *mockClient) DescribeSecret(
-	_ context.Context, in *secretsmanager.DescribeSecretInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.DescribeSecretOutput, error) {
+	_ context.Context, in *secretsmanagersdk.DescribeSecretInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.DescribeSecretOutput, error) {
 	return m.describe(in)
 }
 
 func (m *mockClient) CreateSecret(
-	_ context.Context, in *secretsmanager.CreateSecretInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.CreateSecretOutput, error) {
+	_ context.Context, in *secretsmanagersdk.CreateSecretInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.CreateSecretOutput, error) {
 	return m.create(in)
 }
 
 func (m *mockClient) UpdateSecret(
-	_ context.Context, in *secretsmanager.UpdateSecretInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.UpdateSecretOutput, error) {
+	_ context.Context, in *secretsmanagersdk.UpdateSecretInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.UpdateSecretOutput, error) {
 	return m.updateSec(in)
 }
 
 func (m *mockClient) RotateSecret(
-	_ context.Context, in *secretsmanager.RotateSecretInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.RotateSecretOutput, error) {
+	_ context.Context, in *secretsmanagersdk.RotateSecretInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.RotateSecretOutput, error) {
 	return m.rotate(in)
 }
 
 func (m *mockClient) DeleteSecret(
-	_ context.Context, in *secretsmanager.DeleteSecretInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.DeleteSecretOutput, error) {
+	_ context.Context, in *secretsmanagersdk.DeleteSecretInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.DeleteSecretOutput, error) {
 	return m.deleteSec(in)
 }
 
 func (m *mockClient) RestoreSecret(
-	_ context.Context, in *secretsmanager.RestoreSecretInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.RestoreSecretOutput, error) {
+	_ context.Context, in *secretsmanagersdk.RestoreSecretInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.RestoreSecretOutput, error) {
 	return m.restore(in)
 }
 
 func (m *mockClient) TagResource(
-	_ context.Context, in *secretsmanager.TagResourceInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.TagResourceOutput, error) {
+	_ context.Context, in *secretsmanagersdk.TagResourceInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.TagResourceOutput, error) {
 	return m.tag(in)
 }
 
 func (m *mockClient) UntagResource(
-	_ context.Context, in *secretsmanager.UntagResourceInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.UntagResourceOutput, error) {
+	_ context.Context, in *secretsmanagersdk.UntagResourceInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.UntagResourceOutput, error) {
 	return m.untag(in)
 }
 
 func (m *mockClient) ListSecrets(
-	_ context.Context, in *secretsmanager.ListSecretsInput, _ ...func(*secretsmanager.Options),
-) (*secretsmanager.ListSecretsOutput, error) {
+	_ context.Context, in *secretsmanagersdk.ListSecretsInput, _ ...func(*secretsmanagersdk.Options),
+) (*secretsmanagersdk.ListSecretsOutput, error) {
 	return m.listSecrets(in)
 }
 
@@ -112,7 +112,7 @@ func versionsList() []types.SecretVersionsListEntry {
 func TestResolve_Latest(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{})
+	store := secretsmanager.New(&mockClient{})
 
 	ref, err := store.Resolve(t.Context(), "my-secret", "")
 	require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestResolve_VersionID(t *testing.T) {
 	t.Parallel()
 
 	// Explicit id, no shift => no listing needed.
-	store := secret.New(&mockClient{})
+	store := secretsmanager.New(&mockClient{})
 
 	ref, err := store.Resolve(t.Context(), "my-secret", "#abc123")
 	require.NoError(t, err)
@@ -133,9 +133,9 @@ func TestResolve_VersionID(t *testing.T) {
 func TestResolve_Label(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
-			return &secretsmanager.ListSecretVersionIdsOutput{Versions: versionsList()}, nil
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(_ *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{Versions: versionsList()}, nil
 		},
 	})
 
@@ -148,9 +148,9 @@ func TestResolve_Label(t *testing.T) {
 func TestResolve_LabelThenShift(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
-			return &secretsmanager.ListSecretVersionIdsOutput{Versions: versionsList()}, nil
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(_ *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{Versions: versionsList()}, nil
 		},
 	})
 
@@ -163,9 +163,9 @@ func TestResolve_LabelThenShift(t *testing.T) {
 func TestResolve_ShiftOutOfRange(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
-			return &secretsmanager.ListSecretVersionIdsOutput{Versions: versionsList()}, nil
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(_ *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{Versions: versionsList()}, nil
 		},
 	})
 
@@ -178,11 +178,11 @@ func TestGet_MapsEntryWithDescriptionAndTags(t *testing.T) {
 
 	var gotVersionID string
 
-	store := secret.New(&mockClient{
-		getValue: func(in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		getValue: func(in *secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error) {
 			gotVersionID = aws.ToString(in.VersionId)
 
-			return &secretsmanager.GetSecretValueOutput{
+			return &secretsmanagersdk.GetSecretValueOutput{
 				Name:          aws.String("my-secret"),
 				SecretString:  aws.String("s3cr3t"),
 				VersionId:     aws.String("id-3"),
@@ -190,8 +190,8 @@ func TestGet_MapsEntryWithDescriptionAndTags(t *testing.T) {
 				CreatedDate:   aws.Time(time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)),
 			}, nil
 		},
-		describe: func(_ *secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
-			return &secretsmanager.DescribeSecretOutput{
+		describe: func(_ *secretsmanagersdk.DescribeSecretInput) (*secretsmanagersdk.DescribeSecretOutput, error) {
+			return &secretsmanagersdk.DescribeSecretOutput{
 				Description: aws.String("my desc"),
 				Tags:        []types.Tag{{Key: aws.String("env"), Value: aws.String("prod")}},
 			}, nil
@@ -217,14 +217,14 @@ func TestGet_LatestOmitsVersionID(t *testing.T) {
 
 	var hadVersionID bool
 
-	store := secret.New(&mockClient{
-		getValue: func(in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		getValue: func(in *secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error) {
 			hadVersionID = in.VersionId != nil
 
-			return &secretsmanager.GetSecretValueOutput{Name: aws.String("my-secret"), SecretString: aws.String("v")}, nil
+			return &secretsmanagersdk.GetSecretValueOutput{Name: aws.String("my-secret"), SecretString: aws.String("v")}, nil
 		},
-		describe: func(_ *secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
-			return &secretsmanager.DescribeSecretOutput{}, nil
+		describe: func(_ *secretsmanagersdk.DescribeSecretInput) (*secretsmanagersdk.DescribeSecretOutput, error) {
+			return &secretsmanagersdk.DescribeSecretOutput{}, nil
 		},
 	})
 
@@ -239,17 +239,17 @@ func TestGet_LatestOmitsVersionID(t *testing.T) {
 func TestGet_LabelPrefersAWSCURRENTRegardlessOfOrder(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		getValue: func(_ *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+	store := secretsmanager.New(&mockClient{
+		getValue: func(_ *secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error) {
+			return &secretsmanagersdk.GetSecretValueOutput{
 				Name:          aws.String("my-secret"),
 				SecretString:  aws.String("v"),
 				VersionId:     aws.String("id-3"),
 				VersionStages: []string{"my-custom-label", "AWSPREVIOUS", "AWSCURRENT"},
 			}, nil
 		},
-		describe: func(_ *secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
-			return &secretsmanager.DescribeSecretOutput{}, nil
+		describe: func(_ *secretsmanagersdk.DescribeSecretInput) (*secretsmanagersdk.DescribeSecretOutput, error) {
+			return &secretsmanagersdk.DescribeSecretOutput{}, nil
 		},
 	})
 
@@ -265,9 +265,9 @@ func TestHistory_StagingLabels(t *testing.T) {
 	t.Parallel()
 
 	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	store := secret.New(&mockClient{
-		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
-			return &secretsmanager.ListSecretVersionIdsOutput{
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(_ *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{
 				Versions: []types.SecretVersionsListEntry{
 					{
 						VersionId:     aws.String("id-2"),
@@ -304,9 +304,9 @@ func TestHistory_CurrentIsAWSCURRENT(t *testing.T) {
 	t.Parallel()
 
 	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	store := secret.New(&mockClient{
-		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
-			return &secretsmanager.ListSecretVersionIdsOutput{
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(_ *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{
 				Versions: []types.SecretVersionsListEntry{
 					{
 						VersionId:     aws.String("pending"),
@@ -335,9 +335,9 @@ func TestHistory_CurrentIsAWSCURRENT(t *testing.T) {
 func TestHistory_NewestFirst(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
-			return &secretsmanager.ListSecretVersionIdsOutput{Versions: versionsList()}, nil
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(_ *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{Versions: versionsList()}, nil
 		},
 	})
 
@@ -359,14 +359,14 @@ func TestHistory_IncludeDeprecatedAndPaginates(t *testing.T) {
 		calls                int
 	)
 
-	store := secret.New(&mockClient{
-		listVersion: func(in *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(in *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
 			gotIncludeDeprecated = aws.ToBool(in.IncludeDeprecated)
 			calls++
 
 			if aws.ToString(in.NextToken) == "" {
 				// Page 1: the labeled versions.
-				return &secretsmanager.ListSecretVersionIdsOutput{
+				return &secretsmanagersdk.ListSecretVersionIdsOutput{
 					Versions: []types.SecretVersionsListEntry{
 						{VersionId: aws.String("id-3"), CreatedDate: aws.Time(base.Add(2 * time.Hour)), VersionStages: []string{"AWSCURRENT"}},
 						{VersionId: aws.String("id-2"), CreatedDate: aws.Time(base.Add(time.Hour)), VersionStages: []string{"AWSPREVIOUS"}},
@@ -377,7 +377,7 @@ func TestHistory_IncludeDeprecatedAndPaginates(t *testing.T) {
 
 			// Page 2: a deprecated (unlabeled) version, retained but invisible
 			// without IncludeDeprecated.
-			return &secretsmanager.ListSecretVersionIdsOutput{
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{
 				Versions: []types.SecretVersionsListEntry{
 					{VersionId: aws.String("id-1"), CreatedDate: aws.Time(base), VersionStages: []string{}},
 				},
@@ -401,11 +401,11 @@ func TestResolve_ShiftReachesDeprecatedVersion(t *testing.T) {
 
 	var gotIncludeDeprecated bool
 
-	store := secret.New(&mockClient{
-		listVersion: func(in *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(in *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
 			gotIncludeDeprecated = aws.ToBool(in.IncludeDeprecated)
 
-			return &secretsmanager.ListSecretVersionIdsOutput{
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{
 				Versions: []types.SecretVersionsListEntry{
 					{VersionId: aws.String("id-3"), CreatedDate: aws.Time(base.Add(2 * time.Hour)), VersionStages: []string{"AWSCURRENT"}},
 					{VersionId: aws.String("id-2"), CreatedDate: aws.Time(base.Add(time.Hour)), VersionStages: []string{}},
@@ -430,9 +430,9 @@ func TestResolve_BareShiftAnchorsAtAWSCURRENT(t *testing.T) {
 	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// During an in-progress rotation AWSPENDING is the newest-CREATED version.
-	store := secret.New(&mockClient{
-		listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
-			return &secretsmanager.ListSecretVersionIdsOutput{
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(_ *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
+			return &secretsmanagersdk.ListSecretVersionIdsOutput{
 				Versions: []types.SecretVersionsListEntry{
 					{VersionId: aws.String("pending"), CreatedDate: aws.Time(base.Add(3 * time.Hour)), VersionStages: []string{"AWSPENDING"}},
 					{VersionId: aws.String("current"), CreatedDate: aws.Time(base.Add(2 * time.Hour)), VersionStages: []string{"AWSCURRENT"}},
@@ -453,16 +453,16 @@ func TestResolve_BareShiftAnchorsAtAWSCURRENT(t *testing.T) {
 func TestList_Paginated(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		listSecrets: func(in *secretsmanager.ListSecretsInput) (*secretsmanager.ListSecretsOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		listSecrets: func(in *secretsmanagersdk.ListSecretsInput) (*secretsmanagersdk.ListSecretsOutput, error) {
 			if aws.ToString(in.NextToken) == "" {
-				return &secretsmanager.ListSecretsOutput{
+				return &secretsmanagersdk.ListSecretsOutput{
 					SecretList: []types.SecretListEntry{{Name: aws.String("a")}},
 					NextToken:  aws.String("tok"),
 				}, nil
 			}
 
-			return &secretsmanager.ListSecretsOutput{SecretList: []types.SecretListEntry{{Name: aws.String("b")}}}, nil
+			return &secretsmanagersdk.ListSecretsOutput{SecretList: []types.SecretListEntry{{Name: aws.String("b")}}}, nil
 		},
 	})
 
@@ -474,13 +474,13 @@ func TestList_Paginated(t *testing.T) {
 func TestPut_CreateWhenNew(t *testing.T) {
 	t.Parallel()
 
-	var createIn *secretsmanager.CreateSecretInput
+	var createIn *secretsmanagersdk.CreateSecretInput
 
-	store := secret.New(&mockClient{
-		create: func(in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		create: func(in *secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
 			createIn = in
 
-			return &secretsmanager.CreateSecretOutput{VersionId: aws.String("new-id")}, nil
+			return &secretsmanagersdk.CreateSecretOutput{VersionId: aws.String("new-id")}, nil
 		},
 	})
 
@@ -494,16 +494,16 @@ func TestPut_CreateWhenNew(t *testing.T) {
 func TestPut_UpdatesWhenExists(t *testing.T) {
 	t.Parallel()
 
-	var updateIn *secretsmanager.UpdateSecretInput
+	var updateIn *secretsmanagersdk.UpdateSecretInput
 
-	store := secret.New(&mockClient{
-		create: func(_ *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		create: func(_ *secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
 			return nil, &types.ResourceExistsException{Message: aws.String("exists")}
 		},
-		updateSec: func(in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
+		updateSec: func(in *secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error) {
 			updateIn = in
 
-			return &secretsmanager.UpdateSecretOutput{VersionId: aws.String("ver-2")}, nil
+			return &secretsmanagersdk.UpdateSecretOutput{VersionId: aws.String("ver-2")}, nil
 		},
 	})
 
@@ -521,11 +521,11 @@ func TestDelete(t *testing.T) {
 
 	var gotID string
 
-	store := secret.New(&mockClient{
-		deleteSec: func(in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		deleteSec: func(in *secretsmanagersdk.DeleteSecretInput) (*secretsmanagersdk.DeleteSecretOutput, error) {
 			gotID = aws.ToString(in.SecretId)
 
-			return &secretsmanager.DeleteSecretOutput{}, nil
+			return &secretsmanagersdk.DeleteSecretOutput{}, nil
 		},
 	})
 
@@ -536,13 +536,13 @@ func TestDelete(t *testing.T) {
 func TestDelete_ForceDelete(t *testing.T) {
 	t.Parallel()
 
-	var in *secretsmanager.DeleteSecretInput
+	var in *secretsmanagersdk.DeleteSecretInput
 
-	store := secret.New(&mockClient{
-		deleteSec: func(got *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		deleteSec: func(got *secretsmanagersdk.DeleteSecretInput) (*secretsmanagersdk.DeleteSecretOutput, error) {
 			in = got
 
-			return &secretsmanager.DeleteSecretOutput{}, nil
+			return &secretsmanagersdk.DeleteSecretOutput{}, nil
 		},
 	})
 
@@ -555,17 +555,17 @@ func TestDelete_ForceDelete(t *testing.T) {
 func TestDelete_RecoveryWindow(t *testing.T) {
 	t.Parallel()
 
-	var in *secretsmanager.DeleteSecretInput
+	var in *secretsmanagersdk.DeleteSecretInput
 
-	store := secret.New(&mockClient{
-		deleteSec: func(got *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		deleteSec: func(got *secretsmanagersdk.DeleteSecretInput) (*secretsmanagersdk.DeleteSecretOutput, error) {
 			in = got
 
-			return &secretsmanager.DeleteSecretOutput{}, nil
+			return &secretsmanagersdk.DeleteSecretOutput{}, nil
 		},
 	})
 
-	require.NoError(t, store.Delete(t.Context(), "my-secret", secret.RecoveryWindow{Days: 14}))
+	require.NoError(t, store.Delete(t.Context(), "my-secret", secretsmanager.RecoveryWindow{Days: 14}))
 	require.NotNil(t, in)
 	assert.Equal(t, int64(14), aws.ToInt64(in.RecoveryWindowInDays))
 	assert.Nil(t, in.ForceDeleteWithoutRecovery)
@@ -576,8 +576,8 @@ func TestDelete_RecoveryWindow(t *testing.T) {
 func TestDelete_NotFoundMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		deleteSec: func(*secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		deleteSec: func(*secretsmanagersdk.DeleteSecretInput) (*secretsmanagersdk.DeleteSecretOutput, error) {
 			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
 		},
 	})
@@ -593,21 +593,21 @@ func TestDelete_NotFoundMapsSentinel(t *testing.T) {
 func TestPut_UpdatesWhenExistsAppliesKMSKey(t *testing.T) {
 	t.Parallel()
 
-	var updateIn *secretsmanager.UpdateSecretInput
+	var updateIn *secretsmanagersdk.UpdateSecretInput
 
-	store := secret.New(&mockClient{
-		create: func(*secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		create: func(*secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
 			return nil, &types.ResourceExistsException{Message: aws.String("exists")}
 		},
-		updateSec: func(in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
+		updateSec: func(in *secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error) {
 			updateIn = in
 
-			return &secretsmanager.UpdateSecretOutput{VersionId: aws.String("ver-2")}, nil
+			return &secretsmanagersdk.UpdateSecretOutput{VersionId: aws.String("ver-2")}, nil
 		},
 	})
 
 	_, err := store.Put(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "",
-		secret.KMSKeyID{Value: "alias/my-key"},
+		secretsmanager.KMSKeyID{Value: "alias/my-key"},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, updateIn)
@@ -617,17 +617,17 @@ func TestPut_UpdatesWhenExistsAppliesKMSKey(t *testing.T) {
 func TestGet_PopulatesExtraARN(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		getValue: func(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+	store := secretsmanager.New(&mockClient{
+		getValue: func(*secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error) {
+			return &secretsmanagersdk.GetSecretValueOutput{
 				Name:         aws.String("my-secret"),
 				ARN:          aws.String("arn:aws:secretsmanager:us-east-1:123:secret:my-secret-AbCdEf"),
 				SecretString: aws.String("val"),
 				VersionId:    aws.String("id-3"),
 			}, nil
 		},
-		describe: func(*secretsmanager.DescribeSecretInput) (*secretsmanager.DescribeSecretOutput, error) {
-			return &secretsmanager.DescribeSecretOutput{}, nil
+		describe: func(*secretsmanagersdk.DescribeSecretInput) (*secretsmanagersdk.DescribeSecretOutput, error) {
+			return &secretsmanagersdk.DescribeSecretOutput{}, nil
 		},
 	})
 
@@ -642,26 +642,26 @@ func TestCreate_AppliesKMSKeyAndRotation(t *testing.T) {
 	t.Parallel()
 
 	var (
-		createIn *secretsmanager.CreateSecretInput
-		rotateIn *secretsmanager.RotateSecretInput
+		createIn *secretsmanagersdk.CreateSecretInput
+		rotateIn *secretsmanagersdk.RotateSecretInput
 	)
 
-	store := secret.New(&mockClient{
-		create: func(in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		create: func(in *secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
 			createIn = in
 
-			return &secretsmanager.CreateSecretOutput{VersionId: aws.String("new-id")}, nil
+			return &secretsmanagersdk.CreateSecretOutput{VersionId: aws.String("new-id")}, nil
 		},
-		rotate: func(in *secretsmanager.RotateSecretInput) (*secretsmanager.RotateSecretOutput, error) {
+		rotate: func(in *secretsmanagersdk.RotateSecretInput) (*secretsmanagersdk.RotateSecretOutput, error) {
 			rotateIn = in
 
-			return &secretsmanager.RotateSecretOutput{}, nil
+			return &secretsmanagersdk.RotateSecretOutput{}, nil
 		},
 	})
 
 	_, err := store.Create(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "",
-		secret.KMSKeyID{Value: "alias/my-key"},
-		secret.RotationRules{AutomaticallyAfterDays: 30},
+		secretsmanager.KMSKeyID{Value: "alias/my-key"},
+		secretsmanager.RotationRules{AutomaticallyAfterDays: 30},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, createIn)
@@ -676,11 +676,11 @@ func TestRestore(t *testing.T) {
 
 	var gotID string
 
-	store := secret.New(&mockClient{
-		restore: func(in *secretsmanager.RestoreSecretInput) (*secretsmanager.RestoreSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		restore: func(in *secretsmanagersdk.RestoreSecretInput) (*secretsmanagersdk.RestoreSecretOutput, error) {
 			gotID = aws.ToString(in.SecretId)
 
-			return &secretsmanager.RestoreSecretOutput{}, nil
+			return &secretsmanagersdk.RestoreSecretOutput{}, nil
 		},
 	})
 
@@ -692,20 +692,20 @@ func TestTagAndUntag(t *testing.T) {
 	t.Parallel()
 
 	var (
-		tagIn   *secretsmanager.TagResourceInput
-		untagIn *secretsmanager.UntagResourceInput
+		tagIn   *secretsmanagersdk.TagResourceInput
+		untagIn *secretsmanagersdk.UntagResourceInput
 	)
 
-	store := secret.New(&mockClient{
-		tag: func(in *secretsmanager.TagResourceInput) (*secretsmanager.TagResourceOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		tag: func(in *secretsmanagersdk.TagResourceInput) (*secretsmanagersdk.TagResourceOutput, error) {
 			tagIn = in
 
-			return &secretsmanager.TagResourceOutput{}, nil
+			return &secretsmanagersdk.TagResourceOutput{}, nil
 		},
-		untag: func(in *secretsmanager.UntagResourceInput) (*secretsmanager.UntagResourceOutput, error) {
+		untag: func(in *secretsmanagersdk.UntagResourceInput) (*secretsmanagersdk.UntagResourceOutput, error) {
 			untagIn = in
 
-			return &secretsmanager.UntagResourceOutput{}, nil
+			return &secretsmanagersdk.UntagResourceOutput{}, nil
 		},
 	})
 
@@ -721,13 +721,13 @@ func TestTagAndUntag(t *testing.T) {
 func TestCreate_NewReturnsVersion(t *testing.T) {
 	t.Parallel()
 
-	var createIn *secretsmanager.CreateSecretInput
+	var createIn *secretsmanagersdk.CreateSecretInput
 
-	store := secret.New(&mockClient{
-		create: func(in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		create: func(in *secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
 			createIn = in
 
-			return &secretsmanager.CreateSecretOutput{VersionId: aws.String("new-id")}, nil
+			return &secretsmanagersdk.CreateSecretOutput{VersionId: aws.String("new-id")}, nil
 		},
 	})
 
@@ -741,8 +741,8 @@ func TestCreate_NewReturnsVersion(t *testing.T) {
 func TestCreate_AlreadyExistsMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		create: func(*secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		create: func(*secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
 			return nil, &types.ResourceExistsException{Message: aws.String("exists")}
 		},
 	})
@@ -755,8 +755,8 @@ func TestCreate_AlreadyExistsMapsSentinel(t *testing.T) {
 func TestGet_NotFoundMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		getValue: func(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		getValue: func(*secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error) {
 			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
 		},
 	})
@@ -773,9 +773,9 @@ func TestGet_NotFoundMapsSentinel(t *testing.T) {
 func TestGet_BinarySecretRejected(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		getValue: func(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
-			return &secretsmanager.GetSecretValueOutput{
+	store := secretsmanager.New(&mockClient{
+		getValue: func(*secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error) {
+			return &secretsmanagersdk.GetSecretValueOutput{
 				Name:         aws.String("my-secret"),
 				SecretBinary: []byte{0x00, 0x01},
 				SecretString: nil,
@@ -797,8 +797,8 @@ func TestGet_BinarySecretRejected(t *testing.T) {
 func TestResolve_ShiftNotFoundMapsSentinel(t *testing.T) {
 	t.Parallel()
 
-	store := secret.New(&mockClient{
-		listVersion: func(*secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+	store := secretsmanager.New(&mockClient{
+		listVersion: func(*secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
 			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
 		},
 	})
@@ -816,15 +816,15 @@ func TestHistory_DeterministicOnEqualTimestamps(t *testing.T) {
 
 	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	mk := func(order []string) *secret.Store {
-		return secret.New(&mockClient{
-			listVersion: func(_ *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error) {
+	mk := func(order []string) *secretsmanager.Store {
+		return secretsmanager.New(&mockClient{
+			listVersion: func(_ *secretsmanagersdk.ListSecretVersionIdsInput) (*secretsmanagersdk.ListSecretVersionIdsOutput, error) {
 				vs := make([]types.SecretVersionsListEntry, len(order))
 				for i, id := range order {
 					vs[i] = types.SecretVersionsListEntry{VersionId: aws.String(id), CreatedDate: aws.Time(created)}
 				}
 
-				return &secretsmanager.ListSecretVersionIdsOutput{Versions: vs}, nil
+				return &secretsmanagersdk.ListSecretVersionIdsOutput{Versions: vs}, nil
 			},
 		})
 	}

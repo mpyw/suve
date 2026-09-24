@@ -9,7 +9,7 @@ import (
 	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws/paramtype"
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -90,7 +90,7 @@ func (m *paramMutator) literalNamespace(ns string) (string, error) {
 		return ns, nil
 	}
 
-	return aznamespace.Literal(ns)
+	return namespaces.Literal(ns)
 }
 
 func (m *paramMutator) Create(

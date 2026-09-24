@@ -1,6 +1,6 @@
 // Package gcloud wires the Google Cloud Secret Manager adapter into a
 // provider.Factory / provider.Registry. It builds a Secret Manager client from
-// Application Default Credentials and hands it to the secret subpackage.
+// Application Default Credentials and hands it to the secretmanager subpackage.
 //
 // Google Cloud offers no parameter store, so the factory returns
 // provider.ErrUnsupportedKind for KindParam.
@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	secretmanagersdk "cloud.google.com/go/secretmanager/apiv1"
 	"github.com/samber/lo"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -20,7 +20,7 @@ import (
 
 	"github.com/mpyw/suve/internal/debug"
 	"github.com/mpyw/suve/internal/provider"
-	"github.com/mpyw/suve/internal/provider/gcloud/secret"
+	"github.com/mpyw/suve/internal/provider/gcloud/secretmanager"
 )
 
 // EmulatorEnvVar is the environment variable that, when set (e.g. to
@@ -97,10 +97,10 @@ func debugDialOptions(ctx context.Context) []option.ClientOption {
 
 // newSecretManagerClient builds the Secret Manager client, honoring the
 // emulator seam (EmulatorEnvVar) when set.
-func newSecretManagerClient(ctx context.Context) (*secretmanager.Client, error) {
+func newSecretManagerClient(ctx context.Context) (*secretmanagersdk.Client, error) {
 	endpoint := os.Getenv(EmulatorEnvVar)
 	if endpoint == "" {
-		return secretmanager.NewClient(ctx, debugDialOptions(ctx)...)
+		return secretmanagersdk.NewClient(ctx, debugDialOptions(ctx)...)
 	}
 
 	// Emulator: dial plaintext gRPC and skip authentication entirely.
@@ -114,7 +114,7 @@ func newSecretManagerClient(ctx context.Context) (*secretmanager.Client, error) 
 		return nil, fmt.Errorf("failed to dial Google Cloud Secret Manager emulator at %s: %w", endpoint, err)
 	}
 
-	return secretmanager.NewClient(ctx, option.WithGRPCConn(conn), option.WithoutAuthentication())
+	return secretmanagersdk.NewClient(ctx, option.WithGRPCConn(conn), option.WithoutAuthentication())
 }
 
 // Factory builds Google Cloud-backed provider.Store values for a scope + kind.
@@ -134,7 +134,7 @@ func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Ki
 			return nil, fmt.Errorf("failed to create Google Cloud Secret Manager client: %w", err)
 		}
 
-		return secret.New(secret.Wrap(client), scope.ProjectID), nil
+		return secretmanager.New(secretmanager.Wrap(client), scope.ProjectID), nil
 	case provider.KindParam:
 		return nil, fmt.Errorf("%w: %s (Google Cloud has no parameter store)", provider.ErrUnsupportedKind, kind)
 	default:

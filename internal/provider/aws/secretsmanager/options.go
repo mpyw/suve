@@ -1,12 +1,12 @@
-// The functional-option types and the fold helpers that secret.go applies
-// to SDK inputs: secret.go's working parts, split out for readability.
-//declscope:namespace secret
+// The functional-option types and the fold helpers that secretsmanager.go applies
+// to SDK inputs: secretsmanager.go's working parts, split out for readability.
+//declscope:namespace secretsmanager
 
-package secret
+package secretsmanager
 
 import (
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	secretsmanagersdk "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/mpyw/suve/internal/provider"
@@ -46,7 +46,7 @@ var (
 )
 
 // applyCreateOptions folds recognized WriteOptions onto a CreateSecretInput.
-func applyCreateOptions(input *secretsmanager.CreateSecretInput, opts []provider.WriteOption) {
+func applyCreateOptions(input *secretsmanagersdk.CreateSecretInput, opts []provider.WriteOption) {
 	for _, opt := range opts {
 		if k, ok := opt.(KMSKeyID); ok && k.Value != "" {
 			input.KmsKeyId = aws.String(k.Value)
@@ -55,7 +55,7 @@ func applyCreateOptions(input *secretsmanager.CreateSecretInput, opts []provider
 }
 
 // applyUpdateOptions folds recognized WriteOptions onto an UpdateSecretInput.
-func applyUpdateOptions(input *secretsmanager.UpdateSecretInput, opts []provider.WriteOption) {
+func applyUpdateOptions(input *secretsmanagersdk.UpdateSecretInput, opts []provider.WriteOption) {
 	for _, opt := range opts {
 		if k, ok := opt.(KMSKeyID); ok && k.Value != "" {
 			input.KmsKeyId = aws.String(k.Value)
@@ -76,7 +76,7 @@ func rotationOption(opts []provider.WriteOption) (RotationRules, bool) {
 }
 
 // applyDeleteOptions folds recognized DeleteOptions onto a DeleteSecretInput.
-func applyDeleteOptions(input *secretsmanager.DeleteSecretInput, opts []provider.DeleteOption) {
+func applyDeleteOptions(input *secretsmanagersdk.DeleteSecretInput, opts []provider.DeleteOption) {
 	for _, opt := range opts {
 		switch o := opt.(type) {
 		case provider.ForceDelete:
@@ -90,8 +90,8 @@ func applyDeleteOptions(input *secretsmanager.DeleteSecretInput, opts []provider
 }
 
 // rotationInput builds a RotateSecretInput for the given secret and rules.
-func rotationInput(name string, rules RotationRules) *secretsmanager.RotateSecretInput {
-	return &secretsmanager.RotateSecretInput{
+func rotationInput(name string, rules RotationRules) *secretsmanagersdk.RotateSecretInput {
+	return &secretsmanagersdk.RotateSecretInput{
 		SecretId: aws.String(name),
 		RotationRules: &types.RotationRulesType{
 			AutomaticallyAfterDays: aws.Int64(rules.AutomaticallyAfterDays),

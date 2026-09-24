@@ -28,7 +28,7 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/aws/paramtype"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig"
-	"github.com/mpyw/suve/internal/provider/azure/appconfig/aznamespace"
+	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/timeutil"
 	"github.com/mpyw/suve/internal/usecase/param"
@@ -48,7 +48,7 @@ type ListParams struct {
 	Recursive bool
 	WithValue bool
 	// Namespace filters an Azure App Configuration listing. Empty means the null
-	// namespace, aznamespace.AllNamespacesFilter ("*") means every namespace, and
+	// namespace, namespaces.AllFilter ("*") means every namespace, and
 	// any other value is a single concrete namespace. Ignored for other providers.
 	Namespace string
 }
@@ -555,7 +555,7 @@ func compileFilter(pattern string) (*regexp.Regexp, error) {
 // filter: "*" matches every namespace, and an empty/other filter matches an
 // exactly-equal namespace (empty being the null namespace).
 func namespaceMatches(filter, entry string) bool {
-	if filter == aznamespace.AllNamespacesFilter {
+	if filter == namespaces.AllFilter {
 		return true
 	}
 
@@ -563,10 +563,10 @@ func namespaceMatches(filter, entry string) bool {
 }
 
 // namespaceDisplay renders a namespace for the UI, showing the null namespace as
-// aznamespace.NullDisplay ("(NULL)").
+// namespaces.NullDisplay ("(NULL)").
 func namespaceDisplay(namespace string) string {
 	if namespace == "" {
-		return aznamespace.NullDisplay
+		return namespaces.NullDisplay
 	}
 
 	return namespace

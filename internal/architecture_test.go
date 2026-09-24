@@ -108,6 +108,7 @@ func TestSDKFreeProviderVocabulary(t *testing.T) {
 
 	sdkFreeDirs := []string{
 		"provider/aws/paramtype",
+		"provider/azure/appconfig/namespaces",
 	}
 
 	fset := token.NewFileSet()
