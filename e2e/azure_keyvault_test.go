@@ -1,5 +1,8 @@
 //go:build e2e
 
+// One Azure suite split by service; the files share one namespace.
+//declscope:namespace azure
+
 //nolint:paralleltest // E2E subtests share state and run sequentially, not in parallel
 package e2e_test
 
@@ -27,6 +30,8 @@ import (
 // job / make target and read by the provider adapter's emulator seam; the vault
 // name is required by the CLI but ignored by the emulator (a single default
 // vault is served at the endpoint).
+//
+//declscope:package // shared with the TUI suite
 func setupAzureKeyVault(t *testing.T) {
 	t.Helper()
 
@@ -40,6 +45,8 @@ func setupAzureKeyVault(t *testing.T) {
 // runAzureSecret runs `suve azure secret <args...>` in-process through the azure
 // command group (whose Before hooks resolve the vault from AZURE_KEYVAULT_NAME)
 // and returns stdout.
+//
+//declscope:package // shared with the TUI suite
 func runAzureSecret(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
@@ -63,6 +70,8 @@ func runAzureSecret(t *testing.T, args ...string) (string, error) {
 // key from the env instead of the OS keychain (which would block the test on an
 // interactive macOS prompt). Any valid base64-standard 32-byte value works; it
 // only has to be stable within the test.
+//
+//declscope:package // shared with the TUI suite
 func setAzureKeyVaultStagingKey(t *testing.T) {
 	t.Helper()
 	// EnvStagingKey ("SUVE_STAGING_KEY") is defined in an internal keyprovider

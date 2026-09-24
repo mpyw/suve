@@ -27,6 +27,8 @@ import (
 //   - Azure -> App Configuration is unversioned; azureappconfigversion accepts a
 //     bare name only and rejects any specifier, so a key containing '#'/'~' gets
 //     a clean error instead of a mis-split.
+//
+//declscope:package // shared with the param namespace
 func (a *App) parseParamSpec(specStr string) (name, suffix string, err error) {
 	switch a.currentScope().Provider {
 	case provider.ProviderAzure:
@@ -52,6 +54,8 @@ func (a *App) parseParamSpec(specStr string) (name, suffix string, err error) {
 //   - AWS          -> awssecretversion (name#id | :label, plus ~shift).
 //   - Google Cloud -> gcloudversion (integer #N, ~shift; ':' labels rejected).
 //   - Azure        -> azurekvversion (opaque #id, ~shift; ':' labels rejected).
+//
+//declscope:package // shared with the secret namespace
 func (a *App) parseSecretSpec(specStr string) (name, suffix string, err error) {
 	switch a.currentScope().Provider {
 	case provider.ProviderGoogleCloud:

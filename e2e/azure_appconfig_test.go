@@ -1,5 +1,8 @@
 //go:build e2e
 
+// One Azure suite split by service; the files share one namespace.
+//declscope:namespace azure
+
 //nolint:paralleltest // E2E subtests share state and run sequentially, not in parallel
 package e2e_test
 
@@ -25,6 +28,8 @@ import (
 // string is provided by the CI job / make target and read by the provider
 // adapter's emulator seam; the store name is required by the CLI but ignored by
 // the emulator (the endpoint is embedded in the connection string).
+//
+//declscope:package // shared with the TUI suite
 func setupAzureAppConfig(t *testing.T) {
 	t.Helper()
 
@@ -38,6 +43,8 @@ func setupAzureAppConfig(t *testing.T) {
 // runAzureParam runs `suve azure param <args...>` in-process through the azure
 // command group (whose Before hooks resolve the store from AZURE_APPCONFIG_NAME)
 // and returns stdout.
+//
+//declscope:package // shared with the TUI suite
 func runAzureParam(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 

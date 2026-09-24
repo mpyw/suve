@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { InspectImportFile, PickExportPath, PickImportPath, StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
+  import { StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingInspectImportFile, StagingPickExportPath, StagingPickImportPath, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
   import { gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
@@ -83,7 +83,7 @@
   // Import flow
   let importService = $state('');
   let importPath = $state('');
-  let importInfo: gui.EnvelopeInfoResult | null = $state(null);
+  let importInfo: gui.StagingEnvelopeInfoResult | null = $state(null);
   let importPassphrase = $state('');
   let importMode: 'merge' | 'overwrite' = $state('merge');
   let showImportWarnModal = $state(false);
@@ -367,7 +367,7 @@
     exportKeep = false;
     exportService = service;
     try {
-      const path = await PickExportPath(`${service}.json`);
+      const path = await StagingPickExportPath(`${service}.json`);
       if (!path) return; // dialog cancelled
       exportPath = path;
       showExportPassphrase = true;
@@ -409,11 +409,11 @@
     importMode = 'merge';
     importService = service;
     try {
-      const path = await PickImportPath();
+      const path = await StagingPickImportPath();
       if (!path) return; // dialog cancelled
       importPath = path;
 
-      const info = await InspectImportFile(path);
+      const info = await StagingInspectImportFile(path);
       importInfo = info;
 
       if (info.service !== service) {
@@ -438,7 +438,7 @@
     showImportWarnModal = false;
     // Prompt for merge/overwrite only when the working area already holds
     // changes for this service. The signal comes from the import metadata
-    // (InspectImportFile) rather than the loaded view state, which may be stale
+    // (StagingInspectImportFile) rather than the loaded view state, which may be stale
     // or not yet loaded — matching the CLI, which prompts from the working area.
     if (importInfo?.workingHasChanges) {
       importMode = 'merge';

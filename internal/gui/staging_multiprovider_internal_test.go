@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are staging.go's in-package multi-provider tests.
+//declscope:namespace staging
+
 package gui
 
 import (

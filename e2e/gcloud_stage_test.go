@@ -1,5 +1,8 @@
 //go:build e2e
 
+// One Google Cloud suite split by service; the files share one namespace.
+//declscope:namespace gcloud
+
 //nolint:paralleltest // E2E subtests share state and run sequentially, not in parallel
 package e2e_test
 
@@ -23,6 +26,8 @@ import (
 // The project parameter is kept even though every caller currently passes the
 // same "suve-e2e" value: it is what ties the store to a scope, and hardcoding it
 // here would hide that seam from the tests that document it.
+//
+//declscope:package // shared with the TUI suite
 func newGoogleCloudStore(project string) *file.Store { //nolint:unparam // scope seam, see above
 	s, err := file.NewWorkingStore(provider.GoogleCloudScope(project))
 	if err != nil {

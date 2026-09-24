@@ -413,23 +413,39 @@ jobs:
       - name: Run goroutinectx
         run: go run github.com/mpyw/goroutinectx/cmd/goroutinectx@v0.7.5 ./...
 
+  # declscope only reads the files a build configuration selects. The script
+  # runs it with no tags, with production+e2e on the host OS, and with
+  # production+e2e for windows. The Linux and macOS Wails backends use cgo, so
+  # their OS files are type-checked only on their own host: one leg per OS.
   declscope:
-    name: declscope
-    runs-on: ubuntu-latest
+    name: declscope (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: darwin
+            runner: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-
-      - name: Set up mise
+      - name: Set up toolchain (mise)
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          install_args: "go github:mpyw/declscope"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run declscope
-        run: declscope ./...
+      - name: Install Wails dependencies (CGO)
+        if: matrix.os == 'linux'
+        run: |
+          for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
+
+      - name: Run declscope under every build configuration
+        run: mise run declscope
 
   naming:
     name: Naming Convention

@@ -14,9 +14,9 @@ import (
 	"github.com/mpyw/suve/internal/usecase/tagging"
 )
 
-// errRestoreUnsupported is returned when the active provider does not support
+// errSecretRestoreUnsupported is returned when the active provider does not support
 // restoring soft-deleted secrets.
-var errRestoreUnsupported = stringError("restore is not supported by this provider")
+var errSecretRestoreUnsupported = stringError("restore is not supported by this provider")
 
 // =============================================================================
 // Secret Types
@@ -237,7 +237,7 @@ func (a *App) SecretCreate(name, value, description string) (*SecretCreateResult
 		return nil, err
 	}
 
-	if !a.descriptionSupported() {
+	if !a.hasDescriptionCapability() {
 		description = ""
 	}
 
@@ -267,7 +267,7 @@ func (a *App) SecretUpdate(name, value, description string) (*SecretUpdateResult
 		return nil, err
 	}
 
-	if !a.descriptionSupported() {
+	if !a.hasDescriptionCapability() {
 		description = ""
 	}
 
@@ -410,7 +410,7 @@ func (a *App) SecretRestore(name string) (*SecretRestoreResult, error) {
 
 	restorer, ok := store.(provider.Restorer)
 	if !ok {
-		return nil, errRestoreUnsupported
+		return nil, errSecretRestoreUnsupported
 	}
 
 	uc := &secret.RestoreUseCase{Restorer: restorer}

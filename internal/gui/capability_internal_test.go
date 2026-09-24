@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are capability.go's in-package tests.
+//declscope:namespace capability
+
 package gui
 
 import (
@@ -22,11 +25,11 @@ func TestApp_Capabilities_DelegatesToCapabilityPackage(t *testing.T) {
 	assert.Equal(t, capability.All(), (&App{}).Capabilities())
 }
 
-// findService returns the ServiceCapability for (provider, service) from the
+// findServiceCapability returns the ServiceCapability for (provider, service) from the
 // capability descriptor, failing the test when absent. (The capability matrix
 // now lives in internal/capability; this small lookup helper is kept local to
 // the HasDescription gating test below.)
-func findService(t *testing.T, caps []ProviderCapability, prov, service string) ServiceCapability {
+func findServiceCapability(t *testing.T, caps []ProviderCapability, prov, service string) ServiceCapability {
 	t.Helper()
 
 	for _, p := range caps {
@@ -71,7 +74,7 @@ func TestApp_Capabilities_HasDescription(t *testing.T) {
 		t.Run(tt.provider+"/"+tt.service, func(t *testing.T) {
 			t.Parallel()
 
-			svc := findService(t, caps, tt.provider, tt.service)
+			svc := findServiceCapability(t, caps, tt.provider, tt.service)
 			assert.Equal(t, tt.hasDescription, svc.HasDescription, "HasDescription")
 		})
 	}

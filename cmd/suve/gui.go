@@ -34,6 +34,8 @@ func launchGUI(ctx context.Context, initial provider.Scope, service string) (con
 
 // registerGUIFlag registers --gui through commands.RegisterLaunchMode, the
 // registration `suve --tui` shares.
+//
+//declscope:package // called from main.go
 func registerGUIFlag() {
 	commands.RegisterLaunchMode(commands.LaunchMode{
 		Flag:       guiFlagName,
@@ -41,15 +43,18 @@ func registerGUIFlag() {
 		GroupUsage: "Launch GUI mode for this provider",
 		// Bare `suve --gui`: launch with the uniquely-active provider when the
 		// environment resolves one; otherwise (0 or 2+ active)
-		// InitialProviderFromEnv returns "", and the GUI opens at its in-app
+		// DetectInitialProvider returns "", and the GUI opens at its in-app
 		// provider picker rather than erroring. No specific service.
 		Bare: func(ctx context.Context) (context.Context, error) {
-			return launchGUI(ctx, provider.Scope{Provider: gui.InitialProviderFromEnv()}, "")
+			return launchGUI(ctx, provider.Scope{Provider: gui.DetectInitialProvider()}, "")
 		},
 		Launch: launchGUI,
 	})
 }
 
+// registerGUIDescription marks the root usage as CLI/GUI.
+//
+//declscope:package // called from main.go
 func registerGUIDescription() {
 	commands.App.Usage = strings.Replace(commands.App.Usage, "CLI", "CLI/GUI", 1)
 }

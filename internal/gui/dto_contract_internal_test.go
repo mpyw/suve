@@ -1,5 +1,9 @@
 //go:build production || dev
 
+// The DTO contract test checks every Wails-bound result type of the package
+// against the generated models, so it belongs to the package as a whole.
+//declscope:core
+
 package gui
 
 import (
@@ -24,7 +28,7 @@ func dtoContract() []any {
 	return []any{
 		// app.go
 		AWSIdentityResult{}, ScopeSelection{},
-		// providers.go
+		// detect.go, capability.go
 		DetectResult{}, ServiceCapability{}, ProviderCapability{},
 		// param.go
 		ParamListResult{}, ParamListEntry{}, ParamShowTag{}, ParamShowResult{},
@@ -42,7 +46,7 @@ func dtoContract() []any {
 		StagingRemoveTagResult{}, StagingCancelAddTagResult{}, StagingCancelRemoveTagResult{},
 		StagingDiffResult{}, StagingDiffEntry{}, StagingDiffTagEntry{},
 		StagingCheckStatusResult{}, StagingExportResult{}, StagingImportResult{},
-		EnvelopeInfoResult{},
+		StagingEnvelopeInfoResult{},
 	}
 }
 

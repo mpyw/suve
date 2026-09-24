@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are param.go's in-package tests.
+//declscope:namespace param
+
 package gui
 
 import (
@@ -17,23 +20,15 @@ import (
 	"github.com/mpyw/suve/internal/provider/providermock"
 )
 
-// fakeFactory returns a fixed store for any scope/kind, so a test can inject a
-// providermock into the GUI's package-global registry.
-type fakeFactory struct{ store provider.Store }
-
-func (f fakeFactory) Store(context.Context, provider.Scope, provider.Kind) (provider.Store, error) {
-	return f.store, nil
-}
-
-// recordingFactory is a fakeFactory that also captures the scope it was asked to
+// recordingParamFactory is a fakeFactory that also captures the scope it was asked to
 // build a store for, so a test can assert how a binding threaded the App
 // Configuration namespace into the resolved scope (paramStoreForNamespace).
-type recordingFactory struct {
+type recordingParamFactory struct {
 	store    provider.Store
 	gotScope provider.Scope
 }
 
-func (f *recordingFactory) Store(_ context.Context, sc provider.Scope, _ provider.Kind) (provider.Store, error) {
+func (f *recordingParamFactory) Store(_ context.Context, sc provider.Scope, _ provider.Kind) (provider.Store, error) {
 	f.gotScope = sc
 
 	return f.store, nil
@@ -52,14 +47,14 @@ func installParamStore(t *testing.T, p provider.Provider, factory provider.Facto
 	t.Cleanup(func() { registry = orig })
 }
 
-// fakeNamespaceLister is a minimal appConfigNamespaceLister for testing the
+// fakeParamNamespaceLister is a minimal paramNamespaceLister for testing the
 // Azure App Configuration all-namespaces list path without a real client.
-type fakeNamespaceLister struct {
+type fakeParamNamespaceLister struct {
 	items []appconfig.KeyNamespace
 	err   error
 }
 
-func (f *fakeNamespaceLister) ListWithNamespaces(_ context.Context) ([]appconfig.KeyNamespace, error) {
+func (f *fakeParamNamespaceLister) ListWithNamespaces(_ context.Context) ([]appconfig.KeyNamespace, error) {
 	return f.items, f.err
 }
 
@@ -203,7 +198,7 @@ func TestParamSet_DropsDescriptionForAzure(t *testing.T) {
 func TestParamListWithNamespaces_PopulatesSecretAndType(t *testing.T) {
 	t.Parallel()
 
-	lister := &fakeNamespaceLister{
+	lister := &fakeParamNamespaceLister{
 		items: []appconfig.KeyNamespace{{Key: "app/config", Namespace: "dev", Value: "v"}},
 	}
 	app := &App{ctx: t.Context()}
@@ -219,7 +214,7 @@ func TestParamListWithNamespaces_PopulatesSecretAndType(t *testing.T) {
 func TestParamListWithNamespaces_PopulatesNamespace(t *testing.T) {
 	t.Parallel()
 
-	lister := &fakeNamespaceLister{
+	lister := &fakeParamNamespaceLister{
 		items: []appconfig.KeyNamespace{
 			{Key: "app/config", Namespace: "", Value: "n"},
 			{Key: "app/config", Namespace: "dev", Value: "d"},
@@ -248,7 +243,7 @@ func TestParamListWithNamespaces_PopulatesNamespace(t *testing.T) {
 func TestParamListWithNamespaces_FiltersPrefixAndRegex(t *testing.T) {
 	t.Parallel()
 
-	lister := &fakeNamespaceLister{
+	lister := &fakeParamNamespaceLister{
 		items: []appconfig.KeyNamespace{
 			{Key: "app/config", Namespace: "dev"},
 			{Key: "app/db/url", Namespace: "dev"},
@@ -280,12 +275,12 @@ func TestAppConfigNamespaceLister_Gate(t *testing.T) {
 
 	var appConfigStore provider.Store = appconfig.New(nil, "")
 
-	_, isLister := appConfigStore.(appConfigNamespaceLister)
+	_, isLister := appConfigStore.(paramNamespaceLister)
 	assert.True(t, isLister, "App Configuration store must expose ListWithNamespaces")
 
 	var neutralStore provider.Store = &providermock.Store{}
 
-	_, isLister = neutralStore.(appConfigNamespaceLister)
+	_, isLister = neutralStore.(paramNamespaceLister)
 	assert.False(t, isLister, "neutral provider stores must not expose ListWithNamespaces")
 }
 
@@ -585,7 +580,7 @@ func TestParamShow_AppConfigNamespaceThreadsThroughStore(t *testing.T) {
 		},
 	}
 
-	factory := &recordingFactory{store: store}
+	factory := &recordingParamFactory{store: store}
 	installParamStore(t, provider.ProviderAzure, factory)
 
 	app := &App{

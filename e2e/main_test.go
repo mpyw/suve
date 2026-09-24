@@ -1,5 +1,10 @@
 //go:build e2e
 
+// The provider-neutral harness every suite drives is the unit this package is
+// named for, and every suite file drives it.
+//declscope:core
+//declscope:package
+
 // Package e2e contains end-to-end tests for the suve CLI.
 //
 // These tests run against real cloud-compatible emulators and verify the

@@ -34,7 +34,7 @@ func Run(initial provider.Scope, service string) error {
 			app,
 		},
 	}
-	applyPlatformOptions(opts)
+	applyPlatformRunOptions(opts)
 
 	return wails.Run(opts)
 }

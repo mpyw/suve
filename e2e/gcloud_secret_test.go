@@ -1,5 +1,8 @@
 //go:build e2e
 
+// One Google Cloud suite split by service; the files share one namespace.
+//declscope:namespace gcloud
+
 //nolint:paralleltest // E2E subtests share state and run sequentially, not in parallel
 package e2e_test
 
@@ -22,6 +25,8 @@ import (
 // setupGoogleCloud skips the test unless the emulator endpoint is configured, and pins a
 // project id. The endpoint env var itself is provided by the CI job / make
 // target and read by the provider adapter's emulator seam.
+//
+//declscope:package // shared with the TUI suite
 func setupGoogleCloud(t *testing.T) {
 	t.Helper()
 
@@ -35,6 +40,8 @@ func setupGoogleCloud(t *testing.T) {
 // runGcloud runs `suve gcloud <args...>` in-process through the gcloud command
 // group (whose Before hook resolves the project from GOOGLE_CLOUD_PROJECT) and
 // returns stdout.
+//
+//declscope:package // shared with the TUI suite
 func runGcloud(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 

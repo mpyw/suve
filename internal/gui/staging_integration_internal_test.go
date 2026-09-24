@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are staging.go's in-package integration tests.
+//declscope:namespace staging
+
 package gui
 
 import (
@@ -20,8 +23,8 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// setupTestApp creates a test App with a memory-based staging store.
-func setupTestApp(t *testing.T) *App {
+// setupStagingTestApp creates a test App with a memory-based staging store.
+func setupStagingTestApp(t *testing.T) *App {
 	t.Helper()
 
 	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAWS}, "")
@@ -36,7 +39,7 @@ func TestApp_StagingStatus(t *testing.T) {
 
 	t.Run("empty staging", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		result, err := app.StagingStatus()
 		require.NoError(t, err)
@@ -48,7 +51,7 @@ func TestApp_StagingStatus(t *testing.T) {
 
 	t.Run("with staged entries", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage a param entry
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
@@ -67,7 +70,7 @@ func TestApp_StagingStatus(t *testing.T) {
 
 	t.Run("with staged tags", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage tag changes
 		err := app.stagingStore.StageTag(app.ctx, staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.TagEntry{
@@ -89,7 +92,7 @@ func TestApp_StagingUnstage(t *testing.T) {
 
 	t.Run("unstage entry", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage an entry
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
@@ -112,7 +115,7 @@ func TestApp_StagingUnstage(t *testing.T) {
 
 	t.Run("unstage nonexistent - no error", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Should not error even if not staged
 		result, err := app.StagingUnstage("param", "/nonexistent", "")
@@ -126,7 +129,7 @@ func TestApp_StagingCancelAddTag(t *testing.T) {
 
 	t.Run("cancel single tag", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage multiple tags
 		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
@@ -149,7 +152,7 @@ func TestApp_StagingCancelAddTag(t *testing.T) {
 
 	t.Run("cancel last tag removes entry", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage single tag
 		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
@@ -173,7 +176,7 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 
 	t.Run("no staged changes", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		result, err := app.StagingCheckStatus("param", "/app/config", "")
 		require.NoError(t, err)
@@ -183,7 +186,7 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 
 	t.Run("has entry only", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -200,7 +203,7 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 
 	t.Run("has tags only", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add: map[string]string{"env": "prod"},
@@ -216,7 +219,7 @@ func TestApp_StagingCheckStatus(t *testing.T) {
 
 	t.Run("has both entry and tags", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
@@ -272,7 +275,7 @@ func TestApp_StagingCancelRemoveTag(t *testing.T) {
 
 	t.Run("cancel single remove tag", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage multiple remove tags
 		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
@@ -295,7 +298,7 @@ func TestApp_StagingCancelRemoveTag(t *testing.T) {
 
 	t.Run("cancel last remove tag removes entry", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage single remove tag
 		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
@@ -315,7 +318,7 @@ func TestApp_StagingCancelRemoveTag(t *testing.T) {
 
 	t.Run("cancel with both add and remove - preserves add", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage both add and remove
 		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
@@ -342,7 +345,7 @@ func TestApp_StagingStatus_EdgeCases(t *testing.T) {
 
 	t.Run("mixed services entries and tags", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage param entry
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
@@ -384,7 +387,7 @@ func TestApp_StagingStatus_EdgeCases(t *testing.T) {
 
 	t.Run("delete operation", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/to-delete"}, staging.Entry{
 			Operation: staging.OperationDelete,
@@ -401,7 +404,7 @@ func TestApp_StagingStatus_EdgeCases(t *testing.T) {
 
 	t.Run("tag with add and remove", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		err := app.stagingStore.StageTag(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:    map[string]string{"env": "prod", "team": "backend"},
@@ -425,7 +428,7 @@ func TestApp_StagingReset(t *testing.T) {
 
 	t.Run("reset param service", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage entries in both services
 		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
@@ -453,7 +456,7 @@ func TestApp_StagingReset(t *testing.T) {
 
 	t.Run("reset secret service", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage entries in both services
 		_ = app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
@@ -481,7 +484,7 @@ func TestApp_StagingReset(t *testing.T) {
 
 	t.Run("reset nothing staged", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Reset when nothing staged
 		result, err := app.StagingReset("param")
@@ -492,7 +495,7 @@ func TestApp_StagingReset(t *testing.T) {
 
 	t.Run("reset invalid service", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		_, err := app.StagingReset("invalid")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -500,7 +503,7 @@ func TestApp_StagingReset(t *testing.T) {
 
 	t.Run("reset empty service", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		_, err := app.StagingReset("")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -511,7 +514,7 @@ func TestApp_StagingReset(t *testing.T) {
 // Export / Import GUI method tests
 // =============================================================================
 
-// newTransferTestApp builds a test App with an in-memory working store and a
+// newStagingTransferTestApp builds a test App with an in-memory working store and a
 // fully-keyed scope (account+region for AWS, or vault+store for Azure) so the
 // per-service scope resolution runs without an STS round-trip or the keychain.
 //
@@ -522,7 +525,7 @@ func TestApp_StagingReset(t *testing.T) {
 // by scope.Key() are covered end-to-end at the Playwright layer
 // (staging-export-import.spec.ts), which the keychain-gated NewWorkingStore
 // prevents exercising here.
-func newTransferTestApp(t *testing.T, scope provider.Scope) *App {
+func newStagingTransferTestApp(t *testing.T, scope provider.Scope) *App {
 	t.Helper()
 
 	app := newTestApp(t, scope, "")
@@ -540,7 +543,7 @@ func TestApp_ExportImport(t *testing.T) {
 	t.Run("export writes an envelope and import round-trips it back", func(t *testing.T) {
 		t.Parallel()
 
-		app := newTransferTestApp(t, awsScope)
+		app := newStagingTransferTestApp(t, awsScope)
 		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceParam,
 			staging.EntryKey{Name: "/app/config"}, staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v")}))
 
@@ -562,7 +565,7 @@ func TestApp_ExportImport(t *testing.T) {
 		assert.Empty(t, status.Param)
 
 		// Inspect reports a matching scope and no encryption.
-		info, err := app.InspectImportFile(path)
+		info, err := app.StagingInspectImportFile(path)
 		require.NoError(t, err)
 		assert.True(t, info.ScopeMatches)
 		assert.False(t, info.Encrypted)
@@ -581,7 +584,7 @@ func TestApp_ExportImport(t *testing.T) {
 	t.Run("export --keep retains the working area", func(t *testing.T) {
 		t.Parallel()
 
-		app := newTransferTestApp(t, awsScope)
+		app := newStagingTransferTestApp(t, awsScope)
 		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret,
 			staging.EntryKey{Name: "my-secret"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")}))
 
@@ -603,7 +606,7 @@ func TestApp_ExportImport(t *testing.T) {
 	t.Run("export of an empty service is an error", func(t *testing.T) {
 		t.Parallel()
 
-		app := newTransferTestApp(t, awsScope)
+		app := newStagingTransferTestApp(t, awsScope)
 		_, err := app.StagingExport(filepath.Join(t.TempDir(), "param.json"), "param", "", false)
 		assert.ErrorIs(t, err, stagingusecase.ErrNothingToExport)
 	})
@@ -612,7 +615,7 @@ func TestApp_ExportImport(t *testing.T) {
 		t.Parallel()
 
 		// Write a secret envelope, then try to import it as a param.
-		app := newTransferTestApp(t, awsScope)
+		app := newStagingTransferTestApp(t, awsScope)
 		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret,
 			staging.EntryKey{Name: "my-secret"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")}))
 
@@ -629,7 +632,7 @@ func TestApp_ExportImport(t *testing.T) {
 	t.Run("invalid service is rejected", func(t *testing.T) {
 		t.Parallel()
 
-		app := newTransferTestApp(t, awsScope)
+		app := newStagingTransferTestApp(t, awsScope)
 		_, err := app.StagingExport(filepath.Join(t.TempDir(), "x.json"), "bogus", "", false)
 		require.ErrorIs(t, err, errInvalidService)
 
@@ -653,7 +656,7 @@ func TestApp_ExportImport(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "param.json")
 		require.NoError(t, file.WriteEnvelopeFile(path, otherScope, staging.ServiceParam, state, ""))
 
-		app := newTransferTestApp(t, awsScope)
+		app := newStagingTransferTestApp(t, awsScope)
 
 		// force=false: refused.
 		_, err := app.StagingImport(path, "param", "", "merge", false)
@@ -680,7 +683,7 @@ func TestApp_ExportImport(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "param.json")
 		require.NoError(t, file.WriteEnvelopeFile(path, azureScope, staging.ServiceParam, state, ""))
 
-		app := newTransferTestApp(t, awsScope)
+		app := newStagingTransferTestApp(t, awsScope)
 
 		_, err := app.StagingImport(path, "param", "", "merge", true)
 		require.Error(t, err)
@@ -700,7 +703,7 @@ func TestApp_ExportImport(t *testing.T) {
 			VaultName: "my-vault",
 			StoreName: "my-store",
 		}
-		app := newTransferTestApp(t, azureScope)
+		app := newStagingTransferTestApp(t, azureScope)
 		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceParam,
 			staging.EntryKey{Name: "app/flag"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("on")}))
 
@@ -713,7 +716,7 @@ func TestApp_ExportImport(t *testing.T) {
 		assert.Equal(t, "azure/appconfig/my-store", env.Scope)
 		assert.NotContains(t, env.Scope, "keyvault")
 
-		info, err := app.InspectImportFile(path)
+		info, err := app.StagingInspectImportFile(path)
 		require.NoError(t, err)
 		assert.True(t, info.ScopeMatches, "the param resolves under the App Configuration scope")
 	})
@@ -947,7 +950,7 @@ func TestApp_StagingStatus_ErrorPaths(t *testing.T) {
 
 	t.Run("list entries error for param", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 		mockStore.ListEntriesErr = staging.ErrNotStaged
 
@@ -957,7 +960,7 @@ func TestApp_StagingStatus_ErrorPaths(t *testing.T) {
 
 	t.Run("list tags error for param", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 		mockStore.ListTagsErr = staging.ErrNotStaged
 
@@ -971,7 +974,7 @@ func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
 
 	t.Run("invalid service", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		_, err := app.StagingUnstage("invalid", "/test", "")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -979,7 +982,7 @@ func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
 
 	t.Run("unstage entry error (not ErrNotStaged)", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage an entry first
@@ -1000,7 +1003,7 @@ func TestApp_StagingUnstage_ErrorPaths(t *testing.T) {
 
 	t.Run("unstage tag error (not ErrNotStaged)", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage a tag first
@@ -1024,7 +1027,7 @@ func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
 
 	t.Run("invalid service", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		_, err := app.StagingCancelAddTag("invalid", "/test", "key", "")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -1032,7 +1035,7 @@ func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
 
 	t.Run("tag not staged", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		_, err := app.StagingCancelAddTag("param", "/nonexistent", "key", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
@@ -1040,7 +1043,7 @@ func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
 
 	t.Run("stage tag error when updating", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage multiple add tags
@@ -1061,7 +1064,7 @@ func TestApp_StagingCancelAddTag_ErrorPaths(t *testing.T) {
 
 	t.Run("unstage tag error when clearing last tag", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage single add tag
@@ -1086,7 +1089,7 @@ func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
 
 	t.Run("invalid service", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		_, err := app.StagingCancelRemoveTag("invalid", "/test", "key", "")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -1094,7 +1097,7 @@ func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
 
 	t.Run("tag not staged", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		_, err := app.StagingCancelRemoveTag("param", "/nonexistent", "key", "")
 		assert.ErrorIs(t, err, staging.ErrNotStaged)
@@ -1102,7 +1105,7 @@ func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
 
 	t.Run("stage tag error when updating", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage multiple remove tags
@@ -1123,7 +1126,7 @@ func TestApp_StagingCancelRemoveTag_ErrorPaths(t *testing.T) {
 
 	t.Run("unstage tag error when clearing last remove tag", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage single remove tag
@@ -1148,7 +1151,7 @@ func TestApp_StagingCheckStatus_ErrorPaths(t *testing.T) {
 
 	t.Run("invalid service", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		_, err := app.StagingCheckStatus("invalid", "/test", "")
 		assert.ErrorIs(t, err, errInvalidService)
@@ -1160,7 +1163,7 @@ func TestApp_StagingReset_ErrorPaths(t *testing.T) {
 
 	t.Run("unstage all error", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage an entry
@@ -1189,7 +1192,7 @@ func TestApp_StagingStatus_AllOperations(t *testing.T) {
 
 	t.Run("all operations covered", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Create operation
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/create"}, staging.Entry{
@@ -1235,7 +1238,7 @@ func TestApp_StagingCheckStatus_BothEntryAndTags(t *testing.T) {
 
 	t.Run("handles get entry error gracefully", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 		mockStore := app.stagingStore.(*testutil.MockStore) //nolint:forcetypeassert // test helper
 
 		// Stage a tag (no entry)
@@ -1265,7 +1268,7 @@ func TestApp_StagingUnstage_BothEntryAndTag(t *testing.T) {
 
 	t.Run("unstage both entry and tag", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage both entry and tag for the same item
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
@@ -1305,7 +1308,7 @@ func TestApp_StagingReset_ResetBothEntriesAndTags(t *testing.T) {
 
 	t.Run("reset clears both entries and tags", func(t *testing.T) {
 		t.Parallel()
-		app := setupTestApp(t)
+		app := setupStagingTestApp(t)
 
 		// Stage entries
 		err := app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/entry1"}, staging.Entry{
@@ -1348,7 +1351,7 @@ func TestApp_StagingReset_ResetBothEntriesAndTags(t *testing.T) {
 func TestApp_StagingApply_ExecuteError(t *testing.T) {
 	t.Parallel()
 
-	app := setupTestApp(t)
+	app := setupStagingTestApp(t)
 
 	mockStore := testutil.NewMockStore()
 	mockStore.ListEntriesErr = errors.New("list boom")
@@ -1414,7 +1417,7 @@ func TestNewStagingApplyResult_UnstageError(t *testing.T) {
 func TestApp_StagingApply_NoStagedChanges(t *testing.T) {
 	t.Parallel()
 
-	app := setupTestApp(t)
+	app := setupStagingTestApp(t)
 
 	result, err := app.StagingApply(string(staging.ServiceParam), false)
 	require.NoError(t, err)

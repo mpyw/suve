@@ -1,5 +1,8 @@
 //go:build e2e
 
+// One AWS suite split by service; it shares aws_test.go's namespace.
+//declscope:namespace aws
+
 //nolint:paralleltest,dogsled,gosec // E2E tests: sequential execution, cleanup, G101 false positive
 package e2e_test
 

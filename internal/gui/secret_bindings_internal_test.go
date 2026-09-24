@@ -1,5 +1,8 @@
 //go:build production || dev
 
+// These are secret.go's in-package binding tests.
+//declscope:namespace secret
+
 package gui
 
 import (
@@ -19,7 +22,7 @@ import (
 // injectSecretStore overrides the package-global registry so a binding resolves
 // the given store for the given provider, restoring the original on cleanup.
 // It is the shared seam for the secret-binding tests (see fakeFactory in
-// param_internal_test.go).
+// app_internal_test.go).
 func injectSecretStore(t *testing.T, p provider.Provider, store provider.Store) {
 	t.Helper()
 
@@ -30,17 +33,17 @@ func injectSecretStore(t *testing.T, p provider.Provider, store provider.Store) 
 	t.Cleanup(func() { registry = orig })
 }
 
-// storeWithoutRestore is a provider.Store that does NOT implement
+// secretStoreWithoutRestore is a provider.Store that does NOT implement
 // provider.Restorer: it embeds the three Store interfaces (so it satisfies
 // Store) without adding a Restore method, so SecretRestore's type assertion
-// fails and falls back to errRestoreUnsupported.
-type storeWithoutRestore struct {
+// fails and falls back to errSecretRestoreUnsupported.
+type secretStoreWithoutRestore struct {
 	provider.Reader
 	provider.Writer
 	provider.Tagger
 }
 
-var _ provider.Store = storeWithoutRestore{}
+var _ provider.Store = secretStoreWithoutRestore{}
 
 // TestSecretList asserts the SecretList binding lists names (alphabetically, per
 // the use case) and, with withValue, threads each secret's value through.
@@ -389,7 +392,7 @@ func TestSecretDiff(t *testing.T) {
 // TestSecretRestore_RestorerGate asserts the SecretRestore binding's capability
 // gate: a store implementing provider.Restorer restores (and its Restore is
 // called with the name), while a store that does NOT implement Restorer yields
-// errRestoreUnsupported without touching the store (secret.go:410).
+// errSecretRestoreUnsupported without touching the store (secret.go:410).
 //
 //nolint:paralleltest // overrides the package-global registry.
 func TestSecretRestore_RestorerGate(t *testing.T) {
@@ -414,13 +417,13 @@ func TestSecretRestore_RestorerGate(t *testing.T) {
 		assert.Equal(t, "my-secret", gotName)
 	})
 
-	t.Run("non-restorer store falls back to errRestoreUnsupported", func(t *testing.T) {
-		injectSecretStore(t, provider.ProviderAzure, storeWithoutRestore{})
+	t.Run("non-restorer store falls back to errSecretRestoreUnsupported", func(t *testing.T) {
+		injectSecretStore(t, provider.ProviderAzure, secretStoreWithoutRestore{})
 
 		app := &App{ctx: t.Context(), scope: provider.Scope{Provider: provider.ProviderAzure, VaultName: "v"}}
 
 		res, err := app.SecretRestore("my-secret")
-		require.ErrorIs(t, err, errRestoreUnsupported)
+		require.ErrorIs(t, err, errSecretRestoreUnsupported)
 		assert.Nil(t, res)
 	})
 }

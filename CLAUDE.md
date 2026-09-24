@@ -32,7 +32,8 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ```bash
 mise test                  # unit tests
-mise lint                  # golangci-lint (+ deadcode gate)
+mise lint                  # golangci-lint, then declscope under every build configuration
+mise declscope             # declscope only: no tags, production+e2e (host OS), production+e2e (windows)
 mise build-cli             # build bin/suve (CLI)
 mise build-gui             # build bin/suve with the GUI frontend embedded
 mise generate-gui-bindings # regenerate Wails bindings (rebuild GUI afterward)

@@ -38,7 +38,7 @@ export namespace gui {
 	        this.stageActive = source["stageActive"];
 	    }
 	}
-	export class EnvelopeInfoResult {
+	export class StagingEnvelopeInfoResult {
 	    encrypted: boolean;
 	    provider: string;
 	    scope: string;
@@ -47,7 +47,7 @@ export namespace gui {
 	    workingHasChanges: boolean;
 
 	    static createFrom(source: any = {}) {
-	        return new EnvelopeInfoResult(source);
+	        return new StagingEnvelopeInfoResult(source);
 	    }
 
 	    constructor(source: any = {}) {

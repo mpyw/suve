@@ -1,8 +1,12 @@
 //go:build production || dev
 
+// In-package tests of app.go.
+//declscope:core
+
 package gui
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,8 +28,27 @@ func TestErrInvalidService(t *testing.T) {
 	assert.Equal(t, "invalid service: must be 'param' or 'secret'", errInvalidService.Error())
 }
 
+// fakeFactory returns a fixed store for any scope/kind, so a test can inject a
+// providermock into the GUI's package-global registry.
+//
+//declscope:package // shared by the param, secret and staging binding tests
+type fakeFactory struct{ store provider.Store }
+
+func (f fakeFactory) Store(context.Context, provider.Scope, provider.Kind) (provider.Store, error) {
+	return f.store, nil
+}
+
+// appWithProvider builds a bare App whose current scope is provider p.
+//
+//declscope:package // shared by the spec and capability tests
+func appWithProvider(p provider.Provider) *App {
+	return &App{scope: provider.Scope{Provider: p}}
+}
+
 // newTestApp builds an App for a known launch scope, failing the test if NewApp
 // rejects it.
+//
+//declscope:package // shared with the staging binding tests
 func newTestApp(t *testing.T, initial provider.Scope, service string) *App {
 	t.Helper()
 

@@ -19,11 +19,11 @@ import (
 	"github.com/mpyw/suve/internal/usecase/tagging"
 )
 
-// appConfigNamespaceLister is the App-Config-specific extension the GUI type-
+// paramNamespaceLister is the App-Config-specific extension the GUI type-
 // asserts on the resolved param store to load entries across ALL namespaces
 // (#425). Only the Azure App Configuration store implements it; the neutral
 // provider.Reader.List contract is untouched, so other providers never match.
-type appConfigNamespaceLister interface {
+type paramNamespaceLister interface {
 	ListWithNamespaces(ctx context.Context) ([]appconfig.KeyNamespace, error)
 }
 
@@ -131,7 +131,7 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 
 	// Azure App Configuration: if the store exposes the cross-namespace lister,
 	// list every namespace so each entry carries its own namespace.
-	if lister, ok := store.(appConfigNamespaceLister); ok {
+	if lister, ok := store.(paramNamespaceLister); ok {
 		return a.paramListWithNamespaces(lister, prefix, recursive, withValue, filter)
 	}
 
@@ -164,7 +164,7 @@ func (a *App) ParamList(prefix string, recursive bool, withValue bool, filter st
 // prefix/recursive/regex client-side filtering as param.ListUseCase is applied
 // (via param.MatchPrefix); namespace filtering itself is done in the frontend.
 func (a *App) paramListWithNamespaces(
-	lister appConfigNamespaceLister, prefix string, recursive, withValue bool, filter string,
+	lister paramNamespaceLister, prefix string, recursive, withValue bool, filter string,
 ) (*ParamListResult, error) {
 	var filterRegex *regexp.Regexp
 
@@ -347,7 +347,7 @@ func (a *App) ParamSet(name, value, paramType, namespace, description string) (*
 	// Defense in depth: only honor a description where the provider persists it.
 	// The frontend hides the input for Azure, but drop it here too so a stale or
 	// forged call cannot smuggle one past the capability gate.
-	if !a.descriptionSupported() {
+	if !a.hasDescriptionCapability() {
 		description = ""
 	}
 

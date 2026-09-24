@@ -309,6 +309,15 @@ go build ./... && declscope ./...   # never read a bare count without this
 
 **A zero may be the filter, not the code.** A `filter.only` anywhere in the chain can leave a package with nothing to read. A package nothing was read from reports nothing. `declscope` says so only when a nested `only` was cancelled by one above it, so the quiet cases stay quiet. `declscope inspect` lists the files each namespace was built from (`namespaces[].files`); a package whose files are missing from it is one the filter removed.
 
+**A zero may be the build configuration, not the code.** declscope reads only the files the current build configuration selects. A file behind `//go:build` is never read, and a package whose files are all behind one is not listed at all. The `-tags` flag does nothing; pass tags through `GOFLAGS`, and set `GOOS` for OS-specific files:
+
+```bash
+GOFLAGS=-tags=production,e2e declscope ./...
+GOOS=windows GOFLAGS=-tags=production,e2e declscope ./...
+```
+
+In this repository, `mise run declscope` (also part of `mise lint`) runs every configuration the host can type-check. It runs `.github/scripts/check-declscope.sh`: no tags, `production,e2e` on the host OS, and `production,e2e` for `windows`. The Linux and macOS Wails backends use cgo, so CI runs the script on both a Linux and a macOS runner.
+
 **A zero from `boundary` may be the switch, not the code.** `rules.boundary: off` silences the rule entirely, and the run looks like a clean repository. Read every config before reporting a count, the same way you would for `qualify`.
 
 **`-fix` widens; it does not draw boundaries.** On a codebase with boundary findings, `declscope -fix ./...` inserts `//declscope:package` above every crossed declaration — the wholesale widening step 2 of the order of work exists to avoid. Run `-fix -diff` first and read it. Its place in an adoption is renaming, after the structure is settled, and only where `names[].fixable` is true.

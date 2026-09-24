@@ -1,5 +1,8 @@
 //go:build e2e
 
+// One TUI suite split by provider; the files share the TUI driving helpers.
+//declscope:namespace tui
+
 //nolint:paralleltest,dogsled,gosec // E2E tests: sequential execution, ignored cleanup output, G101 false positive
 package e2e_test
 

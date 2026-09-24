@@ -105,7 +105,7 @@ export interface ScopeSelection {
   namespace: string;
 }
 
-// DetectResult mirrors the Go binding DTO (internal/gui/providers.go).
+// DetectResult mirrors the Go binding DTO (internal/gui/detect.go).
 export interface DetectResult {
   param: string;
   secret: string;
@@ -116,7 +116,7 @@ export interface DetectResult {
 }
 
 // ServiceCapability / ProviderCapability mirror the Go binding DTOs
-// (internal/gui/providers.go). The default values in defaultCapabilities MUST
+// (internal/gui/capability.go). The default values in defaultCapabilities MUST
 // stay in lockstep with App.Capabilities() there.
 export interface ServiceCapability {
   service: string;
@@ -173,10 +173,10 @@ export interface MockState {
   // Virtual file system for export/import, keyed by path. Import tests seed
   // entries here; export writes to state.savePath.
   files: Record<string, ExportFile>;
-  // savePath is what PickExportPath returns (a chosen destination path); ''
+  // savePath is what StagingPickExportPath returns (a chosen destination path); ''
   // simulates the user cancelling the native Save dialog.
   savePath: string;
-  // openPath is what PickImportPath returns (a chosen source path); ''
+  // openPath is what StagingPickImportPath returns (a chosen source path); ''
   // simulates the user cancelling the native Open dialog.
   openPath: string;
   // Provider selection (multi-cloud). Defaults describe an AWS-only environment
@@ -286,7 +286,7 @@ export const awsOnlyDetectResult: DetectResult = {
 
 /**
  * Static capability descriptor. This MUST stay a verbatim copy of
- * App.Capabilities() in internal/gui/providers.go — dto_contract guards the
+ * App.Capabilities() in internal/gui/capability.go — dto_contract guards the
  * DTO shape, not these values, so drift here silently diverges the mock from
  * the backend.
  */
@@ -804,7 +804,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
 
     // expectedScopeKey mirrors provider.Scope.Key() PER SERVICE (the #445 fix):
     // Azure param resolves to the App Configuration bucket and Azure secret to
-    // the Key Vault bucket — never the combined scope. Used by InspectImportFile
+    // the Key Vault bucket — never the combined scope. Used by StagingInspectImportFile
     // (scopeMatches) and StagingExport (the header scope it writes).
     function expectedScopeKey(service: Service): string {
       const s = state.currentScope || {};
@@ -1376,15 +1376,15 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         return { name };
       },
       // Native Save dialog: returns the chosen path, or '' when cancelled.
-      PickExportPath: async (_defaultName: string) => {
-        if (state.simulateError?.operation === 'PickExportPath') {
+      StagingPickExportPath: async (_defaultName: string) => {
+        if (state.simulateError?.operation === 'StagingPickExportPath') {
           throw new Error(state.simulateError.message);
         }
         return state.savePath;
       },
       // Native Open dialog: returns the chosen path, or '' when cancelled.
-      PickImportPath: async () => {
-        if (state.simulateError?.operation === 'PickImportPath') {
+      StagingPickImportPath: async () => {
+        if (state.simulateError?.operation === 'StagingPickImportPath') {
           throw new Error(state.simulateError.message);
         }
         return state.openPath;
@@ -1432,8 +1432,8 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       // Inspect the plaintext envelope header WITHOUT decoding the payload, so
       // the frontend prompts for a passphrase only when encrypted and warns on a
       // scope/service mismatch.
-      InspectImportFile: async (path: string) => {
-        if (state.simulateError?.operation === 'InspectImportFile') {
+      StagingInspectImportFile: async (path: string) => {
+        if (state.simulateError?.operation === 'StagingInspectImportFile') {
           throw new Error(state.simulateError.message);
         }
         const file = state.files[path];

@@ -29,6 +29,8 @@ func getEndpoint() string {
 }
 
 // setupEnv sets up environment variables for localstack.
+//
+//declscope:package // shared with the TUI suite
 func setupEnv(t *testing.T) {
 	t.Helper()
 
@@ -50,6 +52,8 @@ func setupEnv(t *testing.T) {
 // SUVE_STAGING_KEY, so the working store is encrypted and this must decrypt with
 // the same key. (A keychain-less runner with no key would otherwise fall back to
 // plaintext, which is now refused for non-interactive writes without consent.)
+//
+//declscope:package // shared with the TUI suite
 func newStore() *file.Store {
 	s, err := file.NewWorkingStore(provider.AWSScope("000000000000", "us-east-1"))
 	if err != nil {
