@@ -2,6 +2,8 @@ package commands
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
@@ -86,8 +88,44 @@ const launchStageCommand = "stage"
 func attachLaunchFlag(m LaunchMode, cmd *cli.Command, p provider.Provider, service string) {
 	cmd.Flags = append(cmd.Flags, &cli.BoolFlag{Name: m.Flag, Usage: m.GroupUsage})
 	wrapLaunchBefore(cmd, m.Flag, func(ctx context.Context, c *cli.Command) (context.Context, error) {
+		if err := pinLaunchScopeEnv(c); err != nil {
+			return ctx, err
+		}
+
 		return m.Launch(ctx, launchScope(c, p), service)
 	})
+}
+
+// launchScopeEnv maps each launch scope flag to the environment variable that
+// is its fallback source.
+//
+//nolint:gochecknoglobals // static flag-to-env table
+var launchScopeEnv = map[string]string{
+	"project":    "GOOGLE_CLOUD_PROJECT",
+	"vault-name": "AZURE_KEYVAULT_NAME",
+	"store-name": "AZURE_APPCONFIG_NAME",
+	"namespace":  "AZURE_APPCONFIG_NAMESPACE",
+}
+
+// pinLaunchScopeEnv sets each scope flag's environment variable to the value
+// the command resolved for it (given on the command line, or read from that
+// variable). The TUI and GUI fill empty scope fields from the environment
+// (detect.HydrateScope), so without this an explicit empty flag, such as
+// --namespace "" for the null namespace, would be refilled from
+// AZURE_APPCONFIG_NAMESPACE. The launch runs the UI and exits, so the change
+// only lasts for that UI session, where the flag should win anyway.
+func pinLaunchScopeEnv(cmd *cli.Command) error {
+	for flag, env := range launchScopeEnv {
+		if !cmd.IsSet(flag) {
+			continue
+		}
+
+		if err := os.Setenv(env, cmd.String(flag)); err != nil {
+			return fmt.Errorf("failed to apply --%s: %w", flag, err)
+		}
+	}
+
+	return nil
 }
 
 // wrapLaunchBefore wraps cmd's Before hook so a set launch flag runs launch,
@@ -116,7 +154,8 @@ func wrapLaunchBefore(
 // flags: --project for Google Cloud, and --vault-name / --store-name /
 // --namespace for Azure. AWS has no scope flag (the region comes from the
 // ambient AWS config). Absent flags stay empty, so detect.HydrateScope fills
-// them from the environment and a given flag wins over env.
+// them from the environment and a given flag wins over env (pinLaunchScopeEnv
+// keeps an explicit empty flag empty).
 func launchScope(cmd *cli.Command, p provider.Provider) provider.Scope {
 	s := provider.Scope{Provider: p}
 
