@@ -21,6 +21,7 @@ import (
 	"github.com/mpyw/suve/internal/capability"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/hit"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // fakeMutator records the last routed write so a dialog's routing can be
@@ -184,6 +185,10 @@ type stubStaging struct {
 
 	applied []bool
 
+	// useCase is what ApplyUseCase returns, for a multi-target apply (which
+	// joins every target's use case instead of calling Apply).
+	useCase *stagingusecase.ApplyUseCase
+
 	// resetResult is returned by Reset; resets counts how many times Reset ran
 	// (so a fan-out test can assert every target was reset).
 	resetResult data.StagingResetResult
@@ -206,6 +211,11 @@ func (s *stubStaging) Apply(_ context.Context, ignoreConflicts bool) (data.Stagi
 	}
 
 	return s.result, nil
+}
+
+// ApplyUseCase returns the preset use case an all-service apply joins.
+func (s *stubStaging) ApplyUseCase(context.Context) (*stagingusecase.ApplyUseCase, error) {
+	return s.useCase, nil
 }
 
 func (s *stubStaging) Review(context.Context) (data.StagingReview, error) {

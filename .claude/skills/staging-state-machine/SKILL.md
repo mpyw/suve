@@ -42,7 +42,8 @@ The state machine lives in `internal/staging/transition/`:
 
 Conflict detection is `CheckEntryAndTagConflicts` in `internal/staging/conflict.go`,
 called from `usecase/staging.ApplyUseCase` and, for the all-service apply,
-`GlobalApplyUseCase` (every service is checked before any is applied).
+`GlobalApplyUseCase` (every service is checked before any is applied). The CLI's
+all-service `stage apply` and the TUI's apply-all (`internal/tui/data.StagingApplyAll`) both use it.
 
 Reducers are pure and deterministic; keep new behavior in the reducer and let
 the executor stay a thin persistence step. When you change a transition, update

@@ -142,8 +142,13 @@ type StagingService interface {
 	Review(ctx context.Context) (StagingReview, error)
 	// Apply applies the service's staged changes. A conflict rejection or a
 	// per-entry failure returns a POPULATED result (the detail is in its fields),
-	// not an error; only a hard store failure returns a non-nil error.
+	// not an error; only a hard store failure returns a non-nil error. Applying
+	// several services goes through StagingApplyAll instead.
 	Apply(ctx context.Context, ignoreConflicts bool) (StagingApplyResult, error)
+	// ApplyUseCase builds the service's apply use case over its resolved store
+	// and strategy, so StagingApplyAll can join several services into one
+	// all-service apply.
+	ApplyUseCase(ctx context.Context) (*stagingusecase.ApplyUseCase, error)
 	// Reset unstages every staged change for the service.
 	Reset(ctx context.Context) (StagingResetResult, error)
 	// Unstage removes one item's staged entry and its staged tags.
@@ -257,10 +262,10 @@ func compareStagedKeys(aName, aNS, bName, bNS string) int {
 	return strings.Compare(aNS, bNS)
 }
 
-func (s *stagingService) Apply(ctx context.Context, ignoreConflicts bool) (StagingApplyResult, error) {
+func (s *stagingService) ApplyUseCase(ctx context.Context) (*stagingusecase.ApplyUseCase, error) {
 	res, err := s.resolve(ctx)
 	if err != nil {
-		return StagingApplyResult{}, err
+		return nil, err
 	}
 
 	uc := &stagingusecase.ApplyUseCase{Strategy: res.Strategy, Store: res.Store}
@@ -270,6 +275,15 @@ func (s *stagingService) Apply(ctx context.Context, ignoreConflicts bool) (Stagi
 		}
 	}
 
+	return uc, nil
+}
+
+func (s *stagingService) Apply(ctx context.Context, ignoreConflicts bool) (StagingApplyResult, error) {
+	uc, err := s.ApplyUseCase(ctx)
+	if err != nil {
+		return StagingApplyResult{}, err
+	}
+
 	// A conflict/partial-failure returns a populated output with an error; only a
 	// nil output (a store read failure) is a hard error with nothing to show.
 	out, err := uc.Execute(ctx, stagingusecase.ApplyInput{IgnoreConflicts: ignoreConflicts})
@@ -277,12 +291,79 @@ func (s *stagingService) Apply(ctx context.Context, ignoreConflicts bool) (Stagi
 		return StagingApplyResult{}, err
 	}
 
-	return s.newApplyResult(out), nil
+	return newStagingApplyResult(s.label, out), nil
 }
 
-func (s *stagingService) newApplyResult(out *stagingusecase.ApplyOutput) StagingApplyResult {
+// StagingApplyAll applies the staged changes of every target as one operation,
+// the same contract as the CLI's all-service `stage apply`: with conflict
+// detection on, every target is conflict-checked before any is applied, so a
+// conflict in one service rejects the whole apply and nothing is written. Then
+// every target's value changes are applied, followed by every target's tag
+// changes. One target is applied through its own Apply.
+//
+// The results follow the targets' order and list only the targets that had
+// staged changes. A rejection returns one result per conflicting target, holding
+// only its conflicts. As with Apply, a conflict or a per-entry failure is
+// reported in the results, and only a hard failure returns an error.
+func StagingApplyAll(ctx context.Context, targets []StagingService, ignoreConflicts bool) ([]StagingApplyResult, error) {
+	if len(targets) == 1 {
+		res, err := targets[0].Apply(ctx, ignoreConflicts)
+		if err != nil {
+			return nil, err
+		}
+
+		return []StagingApplyResult{res}, nil
+	}
+
+	global := &stagingusecase.GlobalApplyUseCase{}
+	// The use case reports each service by its strategy's ServiceName; the
+	// results header shows the target's own label.
+	labels := map[string]string{}
+
+	for _, target := range targets {
+		uc, err := target.ApplyUseCase(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		global.Services = append(global.Services, uc)
+		labels[uc.Strategy.ServiceName()] = target.Label()
+	}
+
+	out, err := global.Execute(ctx, stagingusecase.GlobalApplyInput{IgnoreConflicts: ignoreConflicts})
+	if out == nil {
+		return nil, err
+	}
+
+	if len(out.Conflicts) > 0 {
+		return stagingConflictResults(global.Services, labels, out.Conflicts), nil
+	}
+
+	return lo.Map(out.Services, func(svc *stagingusecase.ApplyOutput, _ int) StagingApplyResult {
+		return newStagingApplyResult(labels[svc.ServiceName], svc)
+	}), nil
+}
+
+// stagingConflictResults groups a rejected all-service apply's conflicts into one
+// result per conflicting service, in the use cases' service order.
+func stagingConflictResults(
+	useCases []*stagingusecase.ApplyUseCase, labels map[string]string, conflicts []stagingusecase.GlobalApplyConflict,
+) []StagingApplyResult {
+	return lo.FilterMap(useCases, func(uc *stagingusecase.ApplyUseCase, _ int) (StagingApplyResult, bool) {
+		name := uc.Strategy.ServiceName()
+		keys := lo.FilterMap(conflicts, func(c stagingusecase.GlobalApplyConflict, _ int) (string, bool) {
+			return c.Key.Label(), c.ServiceName == name
+		})
+
+		return StagingApplyResult{ServiceLabel: labels[name], Conflicts: keys}, len(keys) > 0
+	})
+}
+
+// newStagingApplyResult converts one service's apply output into the neutral
+// result the apply dialog renders under label.
+func newStagingApplyResult(label string, out *stagingusecase.ApplyOutput) StagingApplyResult {
 	return StagingApplyResult{
-		ServiceLabel: s.label,
+		ServiceLabel: label,
 		Conflicts: lo.Map(out.Conflicts, func(k staging.EntryKey, _ int) string {
 			return k.Label()
 		}),

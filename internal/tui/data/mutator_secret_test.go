@@ -25,6 +25,8 @@ import (
 // awsSecretCap returns the AWS secret capability from the neutral matrix. AWS
 // Secrets Manager is the service that carries force-delete, recovery-window,
 // and restore, so it exercises every secret-mutator branch.
+//
+//declscope:package // capability fixture shared with stage_test.go
 func awsSecretCap(t *testing.T) capability.ServiceCapability {
 	t.Helper()
 

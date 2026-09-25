@@ -269,6 +269,82 @@ func TestTUIAWS_StageApply(t *testing.T) {
 	assert.Equal(t, stagedVal, stdout, "the TUI apply wrote the staged value to the emulator")
 }
 
+// TestTUIAWS_StageApplyAllRejectsOnConflict pins #982 against localstack: a
+// staged param update whose remote changed after staging and a conflict-free
+// staged secret update. The Staging tab's apply-all ("A") with Ignore conflicts
+// off must reject the whole apply, like the CLI's all-service `stage apply`:
+// the secret is neither written nor unstaged.
+func TestTUIAWS_StageApplyAllRejectsOnConflict(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	const (
+		paramName   = "/suve-e2e-tui-apply-all/param"
+		secretName  = "suve-e2e-tui-apply-all/secret"
+		originalVal = "original-value"
+		stagedVal   = "must-not-be-applied"
+	)
+
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+		_, _, _ = runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--force", secretName)
+	})
+
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, originalVal)
+	require.NoError(t, err)
+	_, _, err = runCommand(t, cmdsecret.CreateCommand(), secretName, originalVal)
+	require.NoError(t, err)
+
+	// The param's staged base predates its creation, so its remote "changed
+	// after staging" (a conflict). The secret update carries no base, so it is
+	// never a conflict.
+	base := time.Now().Add(-time.Hour)
+	store := newStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam,
+		staging.EntryKey{Name: paramName}, staging.Entry{
+			Operation:      staging.OperationUpdate,
+			Value:          lo.ToPtr(stagedVal),
+			StagedAt:       time.Now(),
+			BaseModifiedAt: &base,
+		}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret,
+		staging.EntryKey{Name: secretName}, staging.Entry{
+			Operation: staging.OperationUpdate,
+			Value:     lo.ToPtr(stagedVal),
+			StagedAt:  time.Now(),
+		}))
+
+	tm := teatest.NewTestModel(t, newTUIModel(t, string(staging.ServiceParam)),
+		teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
+
+	tm.Send(keyRune('3'))
+	waitForScreen(t, tm, secretName)
+
+	tm.Send(keyRune('A'))
+	waitForScreen(t, tm, "Ignore conflicts")
+
+	tm.Send(tea.KeyPressMsg{Code: tea.KeyDown})
+	tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	waitForScreen(t, tm, "conflict: "+paramName)
+
+	require.NoError(t, tm.Quit())
+	tm.WaitFinished(t, teatest.WithFinalTimeout(5*time.Second))
+
+	stdout, _, err := runCommand(t, cmdsecret.ShowCommand(), "--raw", secretName)
+	require.NoError(t, err)
+	assert.Equal(t, originalVal, stdout, "the conflict-free secret is not applied")
+
+	stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
+	require.NoError(t, err)
+	assert.Equal(t, originalVal, stdout, "the conflicting param is not applied")
+
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: secretName})
+	require.NoError(t, err, "the secret update stays staged")
+}
+
 // NOTE: the entry-form Ctrl+E / Ctrl+A key fix is covered at the unit layer
 // (internal/tui/dialogs: TestFormKeyMap_MultilineBindings and
 // TestEntryForm_ValueReadlineMotions), where the huh form's Update is synchronous.
