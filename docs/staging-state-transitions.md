@@ -105,7 +105,7 @@ remote value: "foo"
 ```
 
 #### Kept Staged Options
-When `add` or `edit` re-stages an entry that is already staged, a value type (`--secure`/`--type`) or `--description` the command does not give keeps its staged value. Only an option given again replaces it. The same holds for a GUI re-edit (which never passes these options) and a TUI re-edit that leaves them empty.
+When `add` or `edit` re-stages an entry that is already staged, a value type (`--secure`/`--type`) or `--description` the command does not give keeps its staged value. Only an option given again replaces it, so an empty description cannot clear a staged one; reset the entry instead. A GUI re-edit never passes these options, so it keeps them. An entry that is unstaged (by `reset`, or by an `edit` back to the remote value) loses them.
 
 ```
 -> edit /app/config v1 --description "new desc" -> Update staged (description="new desc")
