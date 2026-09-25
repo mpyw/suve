@@ -116,7 +116,10 @@ func TestResolve_Shift(t *testing.T) {
 	t.Parallel()
 
 	store := parameterstore.New(&mockClient{
-		getHistory: func(_ *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
+		getHistory: func(in *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
+			// #1013: resolving a shift needs no decrypted values.
+			assert.False(t, aws.ToBool(in.WithDecryption))
+
 			return &ssm.GetParameterHistoryOutput{Parameters: historyOldestFirst()}, nil
 		},
 	})
@@ -273,7 +276,11 @@ func TestHistory_NewestFirst(t *testing.T) {
 	t.Parallel()
 
 	store := parameterstore.New(&mockClient{
-		getHistory: func(_ *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
+		getHistory: func(in *ssm.GetParameterHistoryInput) (*ssm.GetParameterHistoryOutput, error) {
+			// #1013: history reads only metadata, so it must not ask SSM to
+			// decrypt (which needs kms:Decrypt on every historical key).
+			assert.False(t, aws.ToBool(in.WithDecryption))
+
 			return &ssm.GetParameterHistoryOutput{Parameters: historyOldestFirst()}, nil
 		},
 	})
