@@ -41,7 +41,7 @@ func TestResolve_EnvVar_Valid(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString(want)
 
 		lookupEnvFunc = func(key string) (string, bool) {
-			if key == EnvStagingKey {
+			if key == envStagingKey {
 				return encoded, true
 			}
 

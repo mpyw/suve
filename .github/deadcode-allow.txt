@@ -54,8 +54,8 @@ internal/cli/commands/internal/apptest/apptest.go: unreachable func: AWSApp
 # a deterministic RNG or cipher and restore the production default afterwards.
 internal/staging/store/file/internal/crypt/crypt.go: unreachable func: SetRandReader
 internal/staging/store/file/internal/crypt/crypt.go: unreachable func: ResetRandReader
-internal/staging/store/file/internal/crypt/crypt.go: unreachable func: SetCipherFuncs
-internal/staging/store/file/internal/crypt/crypt.go: unreachable func: ResetCipherFuncs
+internal/staging/store/file/internal/crypt/crypt.go: unreachable func: setCipherFuncs
+internal/staging/store/file/internal/crypt/crypt.go: unreachable func: resetCipherFuncs
 
 # file store test seams: constructors that build a file-backed store at an
 # explicit path / passphrase for tests, bypassing the OS keychain resolution the
