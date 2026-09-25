@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -55,7 +54,7 @@ func (w *concurrentStager) WriteEnvelope(ctx context.Context, _ staging.Service,
 
 	return w.working.StageEntry(ctx, w.svc, w.key, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("concurrent"),
+		Value:     new("concurrent"),
 		StagedAt:  time.Now(),
 	})
 }

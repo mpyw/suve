@@ -3,7 +3,6 @@ package version_test
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,7 +29,7 @@ func TestKeyVaultParse(t *testing.T) {
 			name:     "with opaque version id",
 			input:    "my-secret#a1b2c3d4",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("a1b2c3d4"),
+			wantID:   new("a1b2c3d4"),
 		},
 		{
 			name:     "with single shift",
@@ -54,7 +53,7 @@ func TestKeyVaultParse(t *testing.T) {
 			name:     "version id with shift",
 			input:    "my-secret#abc123~2",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("abc123"),
+			wantID:   new("abc123"),
 			wantShif: 2,
 		},
 		{
@@ -112,7 +111,7 @@ func TestKeyVaultParse(t *testing.T) {
 			name:     "version id with dashes and uppercase",
 			input:    "my-secret#ABC-123",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("ABC-123"),
+			wantID:   new("ABC-123"),
 		},
 		{
 			name:     "name with @ allowed",
@@ -123,13 +122,13 @@ func TestKeyVaultParse(t *testing.T) {
 			name:     "name with slashes and id",
 			input:    "a/b/c#abc",
 			wantName: "a/b/c",
-			wantID:   lo.ToPtr("abc"),
+			wantID:   new("abc"),
 		},
 		{
 			name:     "id with cumulative shifts",
 			input:    "my-secret#abc~1~2",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("abc"),
+			wantID:   new("abc"),
 			wantShif: 3,
 		},
 		{

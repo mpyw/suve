@@ -6,7 +6,6 @@ package secret
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +27,7 @@ func TestParseDiffArgs(t *testing.T) {
 			args: []string{"my-secret:AWSPREVIOUS"},
 			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: version.OpaqueAbsolute{Label: new("AWSPREVIOUS")},
 			},
 			wantSpec2: &version.OpaqueSpec{
 				Name: "my-secret",
@@ -39,11 +38,11 @@ func TestParseDiffArgs(t *testing.T) {
 			args: []string{"my-secret#abc123", "#def456"},
 			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{ID: lo.ToPtr("abc123")},
+				Absolute: version.OpaqueAbsolute{ID: new("abc123")},
 			},
 			wantSpec2: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{ID: lo.ToPtr("def456")},
+				Absolute: version.OpaqueAbsolute{ID: new("def456")},
 			},
 		},
 		{
@@ -51,11 +50,11 @@ func TestParseDiffArgs(t *testing.T) {
 			args: []string{"my-secret", ":AWSPREVIOUS", ":AWSCURRENT"},
 			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: version.OpaqueAbsolute{Label: new("AWSPREVIOUS")},
 			},
 			wantSpec2: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")},
+				Absolute: version.OpaqueAbsolute{Label: new("AWSCURRENT")},
 			},
 		},
 		{

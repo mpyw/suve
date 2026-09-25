@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -57,9 +56,9 @@ func TestListNamespacesUseCase(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, []param.ListNamespacesEntry{
-			{Namespace: "", Name: "app/a", Value: lo.ToPtr("a-null")},
-			{Namespace: "dev", Name: "app/a", Value: lo.ToPtr("a-dev")},
-			{Namespace: "prd", Name: "app/b", Value: lo.ToPtr("b-prd")},
+			{Namespace: "", Name: "app/a", Value: new("a-null")},
+			{Namespace: "dev", Name: "app/a", Value: new("a-dev")},
+			{Namespace: "prd", Name: "app/b", Value: new("b-prd")},
 		}, out.Entries)
 	})
 

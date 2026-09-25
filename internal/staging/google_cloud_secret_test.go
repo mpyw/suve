@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -49,7 +48,7 @@ func TestGoogleCloudSecretStrategy_Apply(t *testing.T) {
 		}
 		s := staging.NewGoogleCloudSecretStrategy(store)
 
-		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v1")})
+		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationCreate, Value: new("v1")})
 		require.NoError(t, err)
 		assert.Equal(t, "sec", created)
 	})
@@ -71,7 +70,7 @@ func TestGoogleCloudSecretStrategy_Apply(t *testing.T) {
 		}
 		s := staging.NewGoogleCloudSecretStrategy(store)
 
-		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v2")})
+		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationUpdate, Value: new("v2")})
 		require.NoError(t, err)
 		assert.True(t, putCalled)
 	})
@@ -98,13 +97,13 @@ func TestGoogleCloudSecretStrategy_Apply(t *testing.T) {
 		// A staged create carries the description to Create (#666: previously the
 		// value was accepted, shown in status/diff, then dropped on apply).
 		require.NoError(t, s.Apply(t.Context(), "sec", staging.Entry{
-			Operation: staging.OperationCreate, Value: lo.ToPtr("v1"), Description: lo.ToPtr("app credentials"),
+			Operation: staging.OperationCreate, Value: new("v1"), Description: new("app credentials"),
 		}))
 		assert.Equal(t, "app credentials", createDesc)
 
 		// A staged edit carries it to Put.
 		require.NoError(t, s.Apply(t.Context(), "sec", staging.Entry{
-			Operation: staging.OperationUpdate, Value: lo.ToPtr("v2"), Description: lo.ToPtr("rotated key"),
+			Operation: staging.OperationUpdate, Value: new("v2"), Description: new("rotated key"),
 		}))
 		assert.Equal(t, "rotated key", putDesc)
 	})
@@ -306,7 +305,7 @@ func TestGoogleCloudSecretStrategy_ErrorPaths(t *testing.T) {
 				return domain.Version{}, boom
 			},
 		}
-		err := staging.NewGoogleCloudSecretStrategy(store).Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")})
+		err := staging.NewGoogleCloudSecretStrategy(store).Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationCreate, Value: new("v")})
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -325,7 +324,7 @@ func TestGoogleCloudSecretStrategy_ErrorPaths(t *testing.T) {
 				return domain.Version{}, boom
 			},
 		}
-		err := staging.NewGoogleCloudSecretStrategy(store).Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v")})
+		err := staging.NewGoogleCloudSecretStrategy(store).Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationUpdate, Value: new("v")})
 		require.ErrorIs(t, err, boom)
 	})
 

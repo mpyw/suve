@@ -234,7 +234,7 @@ func TestLogRunParam(t *testing.T) {
 			name: "show history",
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "v1", modified: new(now.Add(-time.Hour))},
 				{ver: 2, value: "v2", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -274,7 +274,7 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10},
 			opts: generic.LogOptions{ShowPatch: true},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "old-value", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "old-value", modified: new(now.Add(-time.Hour))},
 				{ver: 2, value: "new-value", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -317,7 +317,7 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Reverse: true},
 			opts: generic.LogOptions{Reverse: true},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "v1", modified: new(now.Add(-time.Hour))},
 				{ver: 2, value: "v2", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -339,7 +339,7 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Reverse: true},
 			opts: generic.LogOptions{ShowPatch: true, Reverse: true},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "old-value", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "old-value", modified: new(now.Add(-time.Hour))},
 				{ver: 2, value: "new-value", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -355,8 +355,8 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Reverse: true},
 			opts: generic.LogOptions{ShowPatch: true, Reverse: true},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "a", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{ver: 2, value: "b", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "a", modified: new(now.Add(-2 * time.Hour))},
+				{ver: 2, value: "b", modified: new(now.Add(-time.Hour))},
 				{ver: 3, value: "c", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -385,8 +385,8 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 2},
 			opts: generic.LogOptions{ShowPatch: true},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "a", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{ver: 2, value: "b", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "a", modified: new(now.Add(-2 * time.Hour))},
+				{ver: 2, value: "b", modified: new(now.Add(-time.Hour))},
 				{ver: 3, value: "c", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -415,7 +415,7 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10},
 			opts: generic.LogOptions{Oneline: true},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "v1", modified: new(now.Add(-time.Hour))},
 				{ver: 2, value: "v2", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -441,10 +441,10 @@ func TestLogRunParam(t *testing.T) {
 		},
 		{
 			name: "filter by since date",
-			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-90 * time.Minute))},
+			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Since: new(now.Add(-90 * time.Minute))},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "v1", modified: new(now.Add(-2 * time.Hour))},
+				{ver: 2, value: "v2", modified: new(now.Add(-time.Hour))},
 				{ver: 3, value: "v3", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -456,10 +456,10 @@ func TestLogRunParam(t *testing.T) {
 		},
 		{
 			name: "filter by until date",
-			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Until: lo.ToPtr(now.Add(-30 * time.Minute))},
+			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Until: new(now.Add(-30 * time.Minute))},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "v1", modified: new(now.Add(-2 * time.Hour))},
+				{ver: 2, value: "v2", modified: new(now.Add(-time.Hour))},
 				{ver: 3, value: "v3", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -473,12 +473,12 @@ func TestLogRunParam(t *testing.T) {
 			name: "filter by since and until date range",
 			req: generic.LogRequest{
 				Name: "/app/param", MaxResults: 10,
-				Since: lo.ToPtr(now.Add(-150 * time.Minute)), Until: lo.ToPtr(now.Add(-30 * time.Minute)),
+				Since: new(now.Add(-150 * time.Minute)), Until: new(now.Add(-30 * time.Minute)),
 			},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-3 * time.Hour))},
-				{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-				{ver: 3, value: "v3", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "v1", modified: new(now.Add(-3 * time.Hour))},
+				{ver: 2, value: "v2", modified: new(now.Add(-2 * time.Hour))},
+				{ver: 3, value: "v3", modified: new(now.Add(-time.Hour))},
 				{ver: 4, value: "v4", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -493,7 +493,7 @@ func TestLogRunParam(t *testing.T) {
 			name: "filter with no matching dates returns empty",
 			req: generic.LogRequest{
 				Name: "/app/param", MaxResults: 10,
-				Since: lo.ToPtr(now.Add(time.Hour)), Until: lo.ToPtr(now.Add(2 * time.Hour)),
+				Since: new(now.Add(time.Hour)), Until: new(now.Add(2 * time.Hour)),
 			},
 			store: paramLogStore([]paramLogVer{
 				{ver: 1, value: "v1", modified: &now},
@@ -505,7 +505,7 @@ func TestLogRunParam(t *testing.T) {
 		},
 		{
 			name: "filter skips versions without LastModifiedDate",
-			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Since: lo.ToPtr(now.Add(-30 * time.Minute))},
+			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10, Since: new(now.Add(-30 * time.Minute))},
 			store: paramLogStore([]paramLogVer{
 				{ver: 1, value: "v1", modified: nil},
 				{ver: 2, value: "v2", modified: &now},
@@ -521,7 +521,7 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10},
 			opts: generic.LogOptions{Output: output.FormatJSON},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "value1", typ: domain.ValueTypePlaintext, modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "value1", typ: domain.ValueTypePlaintext, modified: new(now.Add(-time.Hour))},
 				{ver: 2, value: "value2", typ: domain.ValueTypeSecret, modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -550,7 +550,7 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10},
 			opts: generic.LogOptions{ShowPatch: true, ParseJSON: true},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: `{"key":"old"}`, modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: `{"key":"old"}`, modified: new(now.Add(-time.Hour))},
 				{ver: 2, value: `{"key":"new"}`, modified: &now},
 			}),
 			check: func(t *testing.T, output string) {
@@ -587,7 +587,7 @@ func TestLogRunParam(t *testing.T) {
 			req:  generic.LogRequest{Name: "/app/param", MaxResults: 10},
 			opts: generic.LogOptions{ShowPatch: true},
 			store: paramLogStore([]paramLogVer{
-				{ver: 1, value: "same-value", modified: lo.ToPtr(now.Add(-time.Hour))},
+				{ver: 1, value: "same-value", modified: new(now.Add(-time.Hour))},
 				{ver: 2, value: "same-value", modified: &now},
 			}),
 			check: func(t *testing.T, output string) {

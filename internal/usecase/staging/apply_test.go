@@ -40,7 +40,7 @@ func TestApplyUseCase_Execute_SingleCreate(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -69,12 +69,12 @@ func TestApplyUseCase_Execute_MultipleOperations(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/create"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("create"),
+		Value:     new("create"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/update"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("update"),
+		Value:     new("update"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/delete"}, staging.Entry{
@@ -103,7 +103,7 @@ func TestApplyUseCase_Execute_ResultsSorted(t *testing.T) {
 	for _, name := range []string{"/app/charlie", "/app/alpha", "/app/bravo"} {
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("v"),
+			Value:     new("v"),
 			StagedAt:  time.Now(),
 		}))
 	}
@@ -146,12 +146,12 @@ func TestApplyUseCase_Execute_FilterByName(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/one"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("one"),
+		Value:     new("one"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/two"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("two"),
+		Value:     new("two"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -196,12 +196,12 @@ func TestApplyUseCase_Execute_PartialFailure(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/success"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("success"),
+		Value:     new("success"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/fail"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("fail"),
+		Value:     new("fail"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -239,7 +239,7 @@ func TestApplyUseCase_Execute_ConflictDetection(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/conflict"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("staged"),
+		Value:          new("staged"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	}))
@@ -384,7 +384,7 @@ func TestApplyUseCase_Execute_EntriesAndTags(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
@@ -634,10 +634,10 @@ func TestApplyUseCase_Execute_PerNamespaceResolver(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "app/k", Namespace: "dev"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("dev-val"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("dev-val"), StagedAt: time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "app/k", Namespace: "prd"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("prd-val"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("prd-val"), StagedAt: time.Now(),
 	}))
 
 	var mu sync.Mutex
@@ -682,7 +682,7 @@ func TestApplyUseCase_Execute_ResultOrder(t *testing.T) {
 	keys := []staging.EntryKey{{Name: "b"}, {Name: "a", Namespace: "z"}, {Name: "a"}}
 	for _, key := range keys {
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
-			Operation: staging.OperationCreate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+			Operation: staging.OperationCreate, Value: new("v"), StagedAt: time.Now(),
 		}))
 		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
 			Add: map[string]string{"env": "prod"}, StagedAt: time.Now(),
@@ -720,7 +720,7 @@ func TestApplyUseCase_Execute_ProbeErrorFailsClosed(t *testing.T) {
 			store := testutil.NewMockStore()
 			entry := staging.Entry{Operation: op, StagedAt: time.Now()}
 			if op != staging.OperationDelete {
-				entry.Value = lo.ToPtr("staged")
+				entry.Value = new("staged")
 			}
 			if op != staging.OperationCreate {
 				entry.BaseModifiedAt = &base

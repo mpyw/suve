@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -83,7 +82,7 @@ func TestOutputDiff(t *testing.T) {
 			Operation:   staging.OperationUpdate,
 			RemoteValue: `{"a":1,"b":2}`,
 			StagedValue: `{"b":2,"a":1}`,
-			Description: lo.ToPtr("kept"),
+			Description: new("kept"),
 		}
 
 		r.OutputDiff(cli.DiffOptions{ParseJSON: true}, entry)
@@ -156,7 +155,7 @@ func TestOutputMetadata(t *testing.T) {
 		}
 
 		entry := stagingusecase.DiffEntry{
-			Description: lo.ToPtr("Test description"),
+			Description: new("Test description"),
 		}
 
 		r.OutputMetadata(entry)
@@ -195,7 +194,7 @@ func TestOutputMetadata(t *testing.T) {
 		}
 
 		entry := stagingusecase.DiffEntry{
-			Description: lo.ToPtr(""),
+			Description: new(""),
 		}
 
 		r.OutputMetadata(entry)

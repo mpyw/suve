@@ -24,7 +24,7 @@ func newTempStore(t *testing.T) *file.Store {
 func sampleEntry(value string) staging.Entry {
 	return staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(value),
+		Value:     new(value),
 		StagedAt:  time.Now(),
 	}
 }

@@ -3,8 +3,6 @@ package version
 import (
 	"errors"
 	"strconv"
-
-	"github.com/samber/lo"
 )
 
 // ErrInvalidNumericVersion is returned when # is not followed by a version number.
@@ -59,7 +57,7 @@ func (g NumericGrammar) Parse(input string) (*NumericSpec, error) {
 					return abs, err
 				}
 
-				abs.Version = lo.ToPtr(v)
+				abs.Version = new(v)
 
 				return abs, nil
 			},

@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -64,12 +63,12 @@ func globalSplitStores(t *testing.T) (specs []GlobalServiceSpec, resolve globalS
 
 	paramStore = testutil.NewMockStore()
 	require.NoError(t, paramStore.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "app/cfg"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("pv"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("pv"), StagedAt: time.Now(),
 	}))
 
 	secretStore = testutil.NewMockStore()
 	require.NoError(t, secretStore.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "kv-secret"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("sv"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("sv"), StagedAt: time.Now(),
 	}))
 
 	specs = []GlobalServiceSpec{
@@ -163,10 +162,10 @@ func TestGlobalApplyUseCase_SharedScope(t *testing.T) {
 
 	st := testutil.NewMockStore()
 	require.NoError(t, st.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/p"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("pv"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("pv"), StagedAt: time.Now(),
 	}))
 	require.NoError(t, st.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "s"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("sv"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("sv"), StagedAt: time.Now(),
 	}))
 
 	calls := 0

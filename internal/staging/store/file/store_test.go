@@ -354,7 +354,7 @@ func TestStore_Persist(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("test-value"),
+			Value:     new("test-value"),
 		}
 
 		err := store.WriteState(t.Context(), "", state)
@@ -381,7 +381,7 @@ func TestStore_Persist(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("test"),
+			Value:     new("test"),
 		}
 		err := store.WriteState(t.Context(), "", state)
 		require.NoError(t, err)
@@ -407,7 +407,7 @@ func TestStore_Persist(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("encrypted-value"),
+			Value:     new("encrypted-value"),
 		}
 
 		err := store.WriteState(t.Context(), "", state)
@@ -434,11 +434,11 @@ func TestStore_Persist(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("param-value"),
+			Value:     new("param-value"),
 		}
 		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 		}
 
 		// Persist only param service
@@ -462,7 +462,7 @@ func TestStore_Persist(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("test"),
+			Value:     new("test"),
 		}
 
 		err := store.WriteState(t.Context(), "", state)
@@ -489,7 +489,7 @@ func TestStore_Persist(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("test"),
+			Value:     new("test"),
 		}
 
 		err = store.WriteState(t.Context(), "", state)
@@ -526,7 +526,7 @@ func TestStore_Persist(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("test"),
+			Value:     new("test"),
 		}
 
 		err = store.WriteState(t.Context(), "", state)
@@ -588,7 +588,7 @@ func TestStore_Delete(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 		}
 		err := storeWithPass.WriteState(t.Context(), "", state)
 		require.NoError(t, err)

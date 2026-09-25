@@ -41,7 +41,7 @@ func sourceState(svc staging.Service, name, value string) *staging.State {
 	s := staging.NewEmptyState()
 	s.Entries[svc][staging.EntryKey{Name: name}] = staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(value),
+		Value:     new(value),
 		StagedAt:  time.Now(),
 	}
 
@@ -55,14 +55,14 @@ func reAnchorSourceState(name string, foreignBase time.Time) *staging.State {
 	s := staging.NewEmptyState()
 	s.Entries[staging.ServiceParam][staging.EntryKey{Name: name}] = staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("v"),
+		Value:          new("v"),
 		StagedAt:       time.Now(),
-		BaseModifiedAt: lo.ToPtr(foreignBase),
+		BaseModifiedAt: new(foreignBase),
 	}
 	s.Tags[staging.ServiceParam][staging.EntryKey{Name: name}] = staging.TagEntry{
 		Add:            map[string]string{"env": "prod"},
 		StagedAt:       time.Now(),
-		BaseModifiedAt: lo.ToPtr(foreignBase),
+		BaseModifiedAt: new(foreignBase),
 	}
 
 	return s

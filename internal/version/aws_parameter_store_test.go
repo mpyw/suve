@@ -3,7 +3,6 @@ package version_test
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -39,25 +38,25 @@ func TestParameterStoreParse(t *testing.T) {
 			name:        "with version",
 			input:       "/my/param#3",
 			wantName:    "/my/param",
-			wantVersion: lo.ToPtr(int64(3)),
+			wantVersion: new(int64(3)),
 		},
 		{
 			name:        "with version 0",
 			input:       "/my/param#0",
 			wantName:    "/my/param",
-			wantVersion: lo.ToPtr(int64(0)),
+			wantVersion: new(int64(0)),
 		},
 		{
 			name:        "with version 1",
 			input:       "/my/param#1",
 			wantName:    "/my/param",
-			wantVersion: lo.ToPtr(int64(1)),
+			wantVersion: new(int64(1)),
 		},
 		{
 			name:        "with large version",
 			input:       "/my/param#999999",
 			wantName:    "/my/param",
-			wantVersion: lo.ToPtr(int64(999999)),
+			wantVersion: new(int64(999999)),
 		},
 
 		// Shift specifier
@@ -109,21 +108,21 @@ func TestParameterStoreParse(t *testing.T) {
 			name:        "version and shift",
 			input:       "/my/param#5~2",
 			wantName:    "/my/param",
-			wantVersion: lo.ToPtr(int64(5)),
+			wantVersion: new(int64(5)),
 			wantShift:   2,
 		},
 		{
 			name:        "version and bare tilde",
 			input:       "/my/param#3~",
 			wantName:    "/my/param",
-			wantVersion: lo.ToPtr(int64(3)),
+			wantVersion: new(int64(3)),
 			wantShift:   1,
 		},
 		{
 			name:        "version and double tilde",
 			input:       "/my/param#10~~",
 			wantName:    "/my/param",
-			wantVersion: lo.ToPtr(int64(10)),
+			wantVersion: new(int64(10)),
 			wantShift:   2,
 		},
 
@@ -132,7 +131,7 @@ func TestParameterStoreParse(t *testing.T) {
 			name:        "tilde followed by special char then version",
 			input:       "/my/param~@test#3",
 			wantName:    "/my/param~@test",
-			wantVersion: lo.ToPtr(int64(3)),
+			wantVersion: new(int64(3)),
 		},
 
 		// Dots in names
@@ -145,7 +144,7 @@ func TestParameterStoreParse(t *testing.T) {
 			name:        "name with dots and version",
 			input:       "/app.config/db.url#3",
 			wantName:    "/app.config/db.url",
-			wantVersion: lo.ToPtr(int64(3)),
+			wantVersion: new(int64(3)),
 		},
 		{
 			name:      "name with dots and shift",
@@ -174,7 +173,7 @@ func TestParameterStoreParse(t *testing.T) {
 			name:        "name with dashes and version",
 			input:       "/app-config/db-url#5",
 			wantName:    "/app-config/db-url",
-			wantVersion: lo.ToPtr(int64(5)),
+			wantVersion: new(int64(5)),
 		},
 		{
 			name:     "mixed special chars in name",
@@ -192,7 +191,7 @@ func TestParameterStoreParse(t *testing.T) {
 			name:        "whitespace with version",
 			input:       "  /my/param#3  ",
 			wantName:    "/my/param",
-			wantVersion: lo.ToPtr(int64(3)),
+			wantVersion: new(int64(3)),
 		},
 
 		// Error cases

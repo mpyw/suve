@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -71,7 +70,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 		})
 		require.NoError(t, err)
 	})
@@ -90,7 +89,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create secret")
@@ -114,7 +113,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("updated-value"),
+			Value:     new("updated-value"),
 		})
 		require.NoError(t, err)
 	})
@@ -133,7 +132,7 @@ func TestSecretStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("updated-value"),
+			Value:     new("updated-value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update secret")
@@ -260,7 +259,7 @@ func TestSecretStrategy_Apply_RefusesBinaryOverwrite(t *testing.T) {
 	s := staging.NewAWSSecretStrategy(mock)
 	err := s.Apply(t.Context(), "my-secret", staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("string-value"),
+		Value:     new("string-value"),
 	})
 	require.Error(t, err)
 	require.ErrorIs(t, err, provider.ErrBinaryValue)
@@ -636,8 +635,8 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation:   staging.OperationCreate,
-			Value:       lo.ToPtr("secret-value"),
-			Description: lo.ToPtr("Test description"),
+			Value:       new("secret-value"),
+			Description: new("Test description"),
 		})
 		require.NoError(t, err)
 	})
@@ -663,8 +662,8 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation:   staging.OperationUpdate,
-			Value:       lo.ToPtr("updated-value"),
-			Description: lo.ToPtr("Updated description"),
+			Value:       new("updated-value"),
+			Description: new("Updated description"),
 		})
 		require.NoError(t, err)
 		assert.True(t, putCalled)
@@ -684,8 +683,8 @@ func TestSecretStrategy_Apply_WithOptions(t *testing.T) {
 		s := staging.NewAWSSecretStrategy(mock)
 		err := s.Apply(t.Context(), "my-secret", staging.Entry{
 			Operation:   staging.OperationUpdate,
-			Value:       lo.ToPtr("updated-value"),
-			Description: lo.ToPtr("Updated description"),
+			Value:       new("updated-value"),
+			Description: new("Updated description"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update secret")

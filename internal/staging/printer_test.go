@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mpyw/suve/internal/staging"
@@ -35,7 +34,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,
-				Value:     lo.ToPtr("test-value"),
+				Value:     new("test-value"),
 				StagedAt:  fixedTime,
 			},
 			verbose:      false,
@@ -56,7 +55,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,
-				Value:     lo.ToPtr("test-value"),
+				Value:     new("test-value"),
 				StagedAt:  fixedTime,
 			},
 			verbose:      true,
@@ -67,7 +66,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			entryName: "/app/config",
 			entry: staging.Entry{
 				Operation: staging.OperationUpdate,
-				Value:     lo.ToPtr(strings.Repeat("x", 150)),
+				Value:     new(strings.Repeat("x", 150)),
 				StagedAt:  fixedTime,
 			},
 			verbose:      true,
@@ -127,7 +126,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			entryName: "/app/new-config",
 			entry: staging.Entry{
 				Operation: staging.OperationCreate,
-				Value:     lo.ToPtr("new-value"),
+				Value:     new("new-value"),
 				StagedAt:  fixedTime,
 			},
 			verbose:      false,
@@ -138,7 +137,7 @@ func TestEntryPrinter_PrintEntry(t *testing.T) {
 			entryName: "/app/new-config",
 			entry: staging.Entry{
 				Operation: staging.OperationCreate,
-				Value:     lo.ToPtr("new-value"),
+				Value:     new("new-value"),
 				StagedAt:  fixedTime,
 			},
 			verbose:      true,

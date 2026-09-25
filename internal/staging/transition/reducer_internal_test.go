@@ -7,7 +7,6 @@ package transition
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mpyw/suve/internal/maputil"
@@ -68,7 +67,7 @@ func TestReduceEntry_Add(t *testing.T) {
 		{
 			name: "ERROR when resource already exists on AWS",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateNotStaged{},
 			},
 			action:    EntryActionAdd{Value: "new-value"},
@@ -80,7 +79,7 @@ func TestReduceEntry_Add(t *testing.T) {
 			// delete-specific remedy (reset first), not "already exists, use edit".
 			name: "Delete with remote present -> ERROR (reset first, not use edit)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateDelete{},
 			},
 			action:    EntryActionAdd{Value: "new-value"},
@@ -115,7 +114,7 @@ func TestReduceEntry_Edit(t *testing.T) {
 		{
 			name: "NotStaged -> Update (value != AWS)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateNotStaged{},
 			},
 			action:    EntryActionEdit{Value: "new-value"},
@@ -124,7 +123,7 @@ func TestReduceEntry_Edit(t *testing.T) {
 		{
 			name: "NotStaged -> NotStaged (value == AWS, auto-skip)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("same-value"),
+				CurrentValue: new("same-value"),
 				StagedState:  EntryStagedStateNotStaged{},
 			},
 			action:    EntryActionEdit{Value: "same-value"},
@@ -151,7 +150,7 @@ func TestReduceEntry_Edit(t *testing.T) {
 		{
 			name: "Update -> Update (value != AWS)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateUpdate{DraftValue: "old"},
 			},
 			action:    EntryActionEdit{Value: "new"},
@@ -160,7 +159,7 @@ func TestReduceEntry_Edit(t *testing.T) {
 		{
 			name: "Update -> NotStaged (value == AWS, auto-unstage)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateUpdate{DraftValue: "something"},
 			},
 			action:    EntryActionEdit{Value: "current"},
@@ -169,7 +168,7 @@ func TestReduceEntry_Edit(t *testing.T) {
 		{
 			name: "Delete -> ERROR",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateDelete{},
 			},
 			action:    EntryActionEdit{Value: "new"},
@@ -202,7 +201,7 @@ func TestReduceEntry_Delete(t *testing.T) {
 		{
 			name: "NotStaged -> Delete (also unstage tags)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateNotStaged{},
 			},
 			wantState:       EntryStagedStateDelete{},
@@ -220,7 +219,7 @@ func TestReduceEntry_Delete(t *testing.T) {
 		{
 			name: "Update -> Delete (also unstage tags)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateUpdate{DraftValue: "updated"},
 			},
 			wantState:       EntryStagedStateDelete{},
@@ -229,7 +228,7 @@ func TestReduceEntry_Delete(t *testing.T) {
 		{
 			name: "Delete -> Delete (no-op)",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateDelete{},
 			},
 			wantState: EntryStagedStateDelete{},
@@ -277,7 +276,7 @@ func TestReduceEntry_Reset(t *testing.T) {
 		{
 			name: "Update -> NotStaged",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateUpdate{DraftValue: "updated"},
 			},
 			wantState: EntryStagedStateNotStaged{},
@@ -285,7 +284,7 @@ func TestReduceEntry_Reset(t *testing.T) {
 		{
 			name: "Delete -> NotStaged",
 			state: EntryState{
-				CurrentValue: lo.ToPtr("current"),
+				CurrentValue: new("current"),
 				StagedState:  EntryStagedStateDelete{},
 			},
 			wantState: EntryStagedStateNotStaged{},

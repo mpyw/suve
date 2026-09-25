@@ -9,7 +9,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -56,7 +55,7 @@ func applyAllStub(
 	}
 
 	require.NoError(t, mem.StageEntry(t.Context(), svc, staging.EntryKey{Name: name}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("staged"), StagedAt: time.Now(), BaseModifiedAt: &base,
+		Operation: staging.OperationUpdate, Value: new("staged"), StagedAt: time.Now(), BaseModifiedAt: &base,
 	}))
 
 	return &stubStaging{

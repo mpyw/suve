@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -186,7 +185,7 @@ func TestDeleteUseCase_Execute_StagedUpdate_RemoteVanished(t *testing.T) {
 	// A value was staged as an Update, then the remote was deleted out-of-band.
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/gone"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("v2"),
+		Value:     new("v2"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -248,7 +247,7 @@ func TestDeleteUseCase_Execute_ZeroLastModified_StagedCreate(t *testing.T) {
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -316,7 +315,7 @@ func TestDeleteUseCase_Execute_UnstageError(t *testing.T) {
 	// Simulate existing CREATE entry by staging it
 	store.AddEntry(staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 	})
 
 	store.UnstageEntryErr = errors.New("unstage error")
@@ -340,7 +339,7 @@ func TestDeleteUseCase_Execute_UnstagesCreate(t *testing.T) {
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -368,7 +367,7 @@ func TestDeleteUseCase_Execute_DeleteOnUpdate(t *testing.T) {
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("updated-value"),
+		Value:     new("updated-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -428,7 +427,7 @@ func TestDeleteUseCase_Execute_UnstageTagError(t *testing.T) {
 	// Simulate existing CREATE entry
 	store.AddEntry(staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 	})
 
 	// Simulate existing tag entry
@@ -469,7 +468,7 @@ func TestDeleteUseCase_Execute_KeepsStagedBase(t *testing.T) {
 			name: "update to delete",
 			existing: staging.Entry{
 				Operation:      staging.OperationUpdate,
-				Value:          lo.ToPtr("updated-value"),
+				Value:          new("updated-value"),
 				StagedAt:       base,
 				BaseModifiedAt: &base,
 			},

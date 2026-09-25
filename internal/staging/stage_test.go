@@ -37,7 +37,7 @@ func TestState_IsEmpty(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 			StagedAt:  time.Now(),
 		}
 		assert.False(t, state.IsEmpty())
@@ -64,14 +64,14 @@ func TestState_Merge(t *testing.T) {
 		state1 := staging.NewEmptyState()
 		state1.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config1"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value1"),
+			Value:     new("value1"),
 			StagedAt:  time.Now(),
 		}
 
 		state2 := staging.NewEmptyState()
 		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config2"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value2"),
+			Value:     new("value2"),
 			StagedAt:  time.Now(),
 		}
 
@@ -88,14 +88,14 @@ func TestState_Merge(t *testing.T) {
 		state1 := staging.NewEmptyState()
 		state1.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("old-value"),
+			Value:     new("old-value"),
 			StagedAt:  time.Now(),
 		}
 
 		state2 := staging.NewEmptyState()
 		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		}
 
@@ -130,7 +130,7 @@ func TestState_Merge(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 			StagedAt:  time.Now(),
 		}
 
@@ -151,7 +151,7 @@ func TestState_Merge(t *testing.T) {
 		state2 := staging.NewEmptyState()
 		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		}
 		state2.Tags[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.TagEntry{
@@ -178,7 +178,7 @@ func TestState_Merge(t *testing.T) {
 		state2 := staging.NewEmptyState()
 		state2.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 			StagedAt:  time.Now(),
 		}
 
@@ -364,7 +364,7 @@ func TestState_UnmarshalJSON_ValueType(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][key] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("v"),
+			Value:     new("v"),
 			ValueType: domain.ValueTypeSecret,
 			StagedAt:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		}
@@ -384,7 +384,7 @@ func TestState_UnmarshalJSON_ValueType(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][key] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("v"),
+			Value:     new("v"),
 			StagedAt:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		}
 
@@ -413,12 +413,12 @@ func TestState_ExtractService(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("param-value"),
+			Value:     new("param-value"),
 			StagedAt:  time.Now(),
 		}
 		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 			StagedAt:  time.Now(),
 		}
 
@@ -434,7 +434,7 @@ func TestState_ExtractService(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("param-value"),
+			Value:     new("param-value"),
 			StagedAt:  time.Now(),
 		}
 
@@ -461,12 +461,12 @@ func TestState_RemoveService(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("param-value"),
+			Value:     new("param-value"),
 			StagedAt:  time.Now(),
 		}
 		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 			StagedAt:  time.Now(),
 		}
 		state.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.TagEntry{
@@ -488,12 +488,12 @@ func TestState_RemoveService(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("param-value"),
+			Value:     new("param-value"),
 			StagedAt:  time.Now(),
 		}
 		state.Entries[staging.ServiceSecret][staging.EntryKey{Name: "my-secret"}] = staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 			StagedAt:  time.Now(),
 		}
 		state.Tags[staging.ServiceParam][staging.EntryKey{Name: "/app/param"}] = staging.TagEntry{
@@ -570,11 +570,11 @@ func TestEntryKey_NamespaceIdentity(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("default-ns"),
+			Value:     new("default-ns"),
 		}
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config", Namespace: "dev"}] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("dev-ns"),
+			Value:     new("dev-ns"),
 		}
 
 		assert.Len(t, state.Entries[staging.ServiceParam], 2)
@@ -590,11 +590,11 @@ func TestEntryKey_NamespaceIdentity(t *testing.T) {
 		state := staging.NewEmptyState()
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config"}] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("default-ns"),
+			Value:     new("default-ns"),
 		}
 		state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/config", Namespace: "dev"}] = staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("dev-ns"),
+			Value:     new("dev-ns"),
 		}
 
 		data, err := json.Marshal(state)

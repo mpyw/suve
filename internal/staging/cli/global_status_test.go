@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -48,7 +47,7 @@ func TestGlobalStatus_ShowParamChangesOnly(t *testing.T) {
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("value1"),
+		Value:     new("value1"),
 		StagedAt:  now,
 	})
 
@@ -78,7 +77,7 @@ func TestGlobalStatus_ShowSecretChangesOnly(t *testing.T) {
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("secret-value"),
+		Value:     new("secret-value"),
 		StagedAt:  now,
 	})
 
@@ -108,7 +107,7 @@ func TestGlobalStatus_ShowBothParamAndSecretChanges(t *testing.T) {
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("param-value"),
+		Value:     new("param-value"),
 		StagedAt:  now,
 	})
 
@@ -146,13 +145,13 @@ func TestGlobalStatus_VerboseOutput(t *testing.T) {
 	now := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("test-value"),
+		Value:     new("test-value"),
 		StagedAt:  now,
 	})
 
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("secret-value"),
+		Value:     new("secret-value"),
 		StagedAt:  now,
 	})
 
@@ -213,7 +212,7 @@ func TestGlobalStatus_VerboseTruncatesLongValue(t *testing.T) {
 	longValue := "this is a very long value that exceeds one hundred characters and should be truncated in verbose mode output display"
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(longValue),
+		Value:     new(longValue),
 		StagedAt:  now,
 	})
 
@@ -335,7 +334,7 @@ func TestGlobalStatus_ShowMixedEntryAndTagChanges(t *testing.T) {
 	// Entry change
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  now,
 	})
 

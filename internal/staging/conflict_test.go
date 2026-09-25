@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -96,7 +95,7 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 			},
 		}
 		entries := map[staging.EntryKey]staging.Entry{
-			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: new("value")},
 		}
 		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		require.NoError(t, err)
@@ -113,7 +112,7 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 		}
 
 		entries := map[staging.EntryKey]staging.Entry{
-			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: new("value")},
 		}
 		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		require.NoError(t, err)
@@ -131,7 +130,7 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "existing-item"}: {
 				Operation:      staging.OperationUpdate,
-				Value:          lo.ToPtr("value"),
+				Value:          new("value"),
 				BaseModifiedAt: &baseTime,
 			},
 		}
@@ -151,7 +150,7 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "existing-item"}: {
 				Operation:      staging.OperationUpdate,
-				Value:          lo.ToPtr("value"),
+				Value:          new("value"),
 				BaseModifiedAt: &baseTime,
 			},
 		}
@@ -218,10 +217,10 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 			},
 		}
 		entries := map[staging.EntryKey]staging.Entry{
-			{Name: "create-item"}:        {Operation: staging.OperationCreate, Value: lo.ToPtr("v")},
-			{Name: "update-item"}:        {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
+			{Name: "create-item"}:        {Operation: staging.OperationCreate, Value: new("v")},
+			{Name: "update-item"}:        {Operation: staging.OperationUpdate, Value: new("v"), BaseModifiedAt: &baseTime},
 			{Name: "delete-item"}:        {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
-			{Name: "update-no-conflict"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
+			{Name: "update-no-conflict"}: {Operation: staging.OperationUpdate, Value: new("v"), BaseModifiedAt: &baseTime},
 		}
 		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		require.NoError(t, err)
@@ -250,7 +249,7 @@ func TestCheckEntryAndTagConflicts_ProbeErrors(t *testing.T) {
 			},
 		}
 		entries := map[staging.EntryKey]staging.Entry{
-			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: new("value")},
 		}
 		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		require.ErrorIs(t, err, probeErr)
@@ -266,7 +265,7 @@ func TestCheckEntryAndTagConflicts_ProbeErrors(t *testing.T) {
 			},
 		}
 		entries := map[staging.EntryKey]staging.Entry{
-			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: new("value")},
 		}
 		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		require.NoError(t, err)
@@ -283,7 +282,7 @@ func TestCheckEntryAndTagConflicts_ProbeErrors(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "existing-item"}: {
 				Operation:      staging.OperationUpdate,
-				Value:          lo.ToPtr("value"),
+				Value:          new("value"),
 				BaseModifiedAt: &baseTime,
 			},
 		}
@@ -305,7 +304,7 @@ func TestCheckEntryAndTagConflicts_ProbeErrors(t *testing.T) {
 		}
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "delete-item"}: {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
-			{Name: "update-item"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
+			{Name: "update-item"}: {Operation: staging.OperationUpdate, Value: new("v"), BaseModifiedAt: &baseTime},
 		}
 		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
 		require.EqualError(t, err, "cannot check delete-item for conflicts: access denied")
@@ -490,7 +489,7 @@ func TestCheckEntryAndTagConflicts_SingleFetch(t *testing.T) {
 	}
 
 	entries := map[staging.EntryKey]staging.Entry{
-		{Name: "item"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
+		{Name: "item"}: {Operation: staging.OperationUpdate, Value: new("v"), BaseModifiedAt: &baseTime},
 	}
 	tags := map[staging.EntryKey]staging.TagEntry{
 		{Name: "item"}: {Add: map[string]string{"env": "prod"}, BaseModifiedAt: &baseTime},
@@ -522,10 +521,10 @@ func TestCheckEntryAndTagConflicts_ResolverError(t *testing.T) {
 		return nil, errors.New("cannot resolve strategy")
 	}
 	entries := map[staging.EntryKey]staging.Entry{
-		{Name: "create-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+		{Name: "create-item"}: {Operation: staging.OperationCreate, Value: new("value")},
 		{Name: "update-item"}: {
 			Operation:      staging.OperationUpdate,
-			Value:          lo.ToPtr("value"),
+			Value:          new("value"),
 			BaseModifiedAt: &baseTime,
 		},
 	}
@@ -573,12 +572,12 @@ func TestCheckEntryAndTagConflicts_PerNamespace(t *testing.T) {
 	entries := map[staging.EntryKey]staging.Entry{
 		{Name: "k", Namespace: ""}: {
 			Operation:      staging.OperationUpdate,
-			Value:          lo.ToPtr("v"),
+			Value:          new("v"),
 			BaseModifiedAt: &baseTime,
 		},
 		{Name: "k", Namespace: "dev"}: {
 			Operation:      staging.OperationUpdate,
-			Value:          lo.ToPtr("v"),
+			Value:          new("v"),
 			BaseModifiedAt: &baseTime,
 		},
 	}

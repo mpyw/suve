@@ -6,7 +6,6 @@ package param
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +27,7 @@ func TestParseDiffArgs(t *testing.T) {
 			args: []string{"/app/param#3"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
+				Absolute: version.NumericAbsolute{Version: new(int64(3))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name: "/app/param",
@@ -39,11 +38,11 @@ func TestParseDiffArgs(t *testing.T) {
 			args: []string{"/app/param#1", "#2"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: new(int64(1))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: new(int64(2))},
 			},
 		},
 		{
@@ -51,11 +50,11 @@ func TestParseDiffArgs(t *testing.T) {
 			args: []string{"/app/param", "#1", "#2"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: new(int64(1))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: new(int64(2))},
 			},
 		},
 		{

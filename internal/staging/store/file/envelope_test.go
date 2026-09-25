@@ -22,7 +22,7 @@ func paramState(name, value string) *staging.State {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: name}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr(value),
+		Value:     new(value),
 	}
 
 	return state
@@ -33,7 +33,7 @@ func secretState(name, value string) *staging.State {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceSecret][staging.EntryKey{Name: name}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr(value),
+		Value:     new(value),
 	}
 
 	return state
@@ -102,7 +102,7 @@ func TestWriteAndReadEnvelope_TagsAndNamespace(t *testing.T) {
 	key := staging.EntryKey{Name: "k", Namespace: "dev"}
 	state.Entries[staging.ServiceParam][key] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v"),
+		Value:     new("v"),
 	}
 	state.Tags[staging.ServiceParam][key] = staging.TagEntry{
 		Add: map[string]string{"env": "dev"},
@@ -159,10 +159,10 @@ func TestDecodeState_ServiceMismatchDropsForeignData(t *testing.T) {
 	// declares only "param": DecodeState must return only param entries.
 	full := staging.NewEmptyState()
 	full.Entries[staging.ServiceParam][staging.EntryKey{Name: "/p"}] = staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("pv"),
+		Operation: staging.OperationCreate, Value: new("pv"),
 	}
 	full.Entries[staging.ServiceSecret][staging.EntryKey{Name: "s"}] = staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("sv"),
+		Operation: staging.OperationCreate, Value: new("sv"),
 	}
 
 	raw, err := json.Marshal(full) //nolint:errchkjson // State has a custom MarshalJSON
@@ -189,7 +189,7 @@ func TestDecodeState_RejectsNamespaceForAgnosticProvider(t *testing.T) {
 	// namespace-bearing param entry must be rejected, not silently kept.
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/p", Namespace: "prod"}] = staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("v"),
+		Operation: staging.OperationCreate, Value: new("v"),
 	}
 
 	raw, err := json.Marshal(state) //nolint:errchkjson // State has a custom MarshalJSON
@@ -243,10 +243,10 @@ func TestWriteEnvelope_ScopesToService(t *testing.T) {
 	// A multi-service state written as "param" must not leak secret entries.
 	full := staging.NewEmptyState()
 	full.Entries[staging.ServiceParam][staging.EntryKey{Name: "/p"}] = staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("pv"),
+		Operation: staging.OperationCreate, Value: new("pv"),
 	}
 	full.Entries[staging.ServiceSecret][staging.EntryKey{Name: "s"}] = staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("super-secret"),
+		Operation: staging.OperationCreate, Value: new("super-secret"),
 	}
 
 	path := filepath.Join(t.TempDir(), "param.json")

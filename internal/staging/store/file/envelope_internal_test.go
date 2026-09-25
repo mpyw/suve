@@ -21,7 +21,7 @@ func singleParamEnvelopeState(name, value string) *staging.State {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: name}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr(value),
+		Value:     new(value),
 	}
 
 	return state

@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +25,7 @@ import (
 func updateTestEntry(value string) staging.Entry {
 	return staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(value),
+		Value:     new(value),
 		StagedAt:  time.Now(),
 	}
 }
@@ -331,7 +330,7 @@ func TestWriteState_EncryptionError(t *testing.T) {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/test"}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     strPtr("value"),
+		Value:     new("value"),
 	}
 
 	err := store.WriteState(t.Context(), "", state)
@@ -393,7 +392,3 @@ func (r *errorReader) Read(_ []byte) (n int, err error) {
 }
 
 var _ io.Reader = (*errorReader)(nil)
-
-func strPtr(s string) *string {
-	return &s
-}

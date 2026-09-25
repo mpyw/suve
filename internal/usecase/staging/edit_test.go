@@ -68,7 +68,7 @@ func TestEditUseCase_Execute_PreservesStagedTypeWhenUnset(t *testing.T) {
 	// A create was previously staged as SecureString.
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secure"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v1"),
+		Value:     new("v1"),
 		ValueType: domain.ValueTypeSecret,
 		StagedAt:  time.Now(),
 	}))
@@ -142,7 +142,7 @@ func TestEditUseCase_Execute_PreservesBaseModifiedAt(t *testing.T) {
 	// Pre-stage an entry
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("old-value"),
+		Value:          new("old-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	}))
@@ -190,7 +190,7 @@ func TestEditUseCase_Baseline_FromStaging(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("staged-value"),
+		Value:     new("staged-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -210,7 +210,7 @@ func TestEditUseCase_Baseline_FromStagingCreate(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("create-value"),
+		Value:     new("create-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -267,7 +267,7 @@ func TestEditUseCase_Execute_WithStagedCreate(t *testing.T) {
 	// Pre-stage a create operation (no BaseModifiedAt)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("initial"),
+		Value:     new("initial"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -435,7 +435,7 @@ func TestEditUseCase_Execute_PreservesUpdateOperation(t *testing.T) {
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("old-value"),
+		Value:          new("old-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	}))
@@ -496,7 +496,7 @@ func TestEditUseCase_Execute_Unstaged_RevertedToAWS(t *testing.T) {
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("staged-value"),
+		Value:     new("staged-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -534,7 +534,7 @@ func TestEditUseCase_Execute_UnstageError(t *testing.T) {
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("staged-value"),
+		Value:     new("staged-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -689,7 +689,7 @@ func TestEditUseCase_Baseline_Staged(t *testing.T) {
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("staged-value"),
+		Value:     new("staged-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -780,7 +780,7 @@ func TestEditUseCase_Execute_StagedCreate_SkipsAWSFetch(t *testing.T) {
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("initial-value"),
+		Value:     new("initial-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -871,13 +871,13 @@ func TestEditUseCase_Execute_PreservesStagedDescriptionWhenUnset(t *testing.T) {
 
 	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{Key: key, Value: "v1", Description: "new desc"})
 	require.NoError(t, err)
-	assert.Equal(t, lo.ToPtr("new desc"), description())
+	assert.Equal(t, new("new desc"), description())
 
 	_, err = uc.Execute(t.Context(), usecasestaging.EditInput{Key: key, Value: "v2"})
 	require.NoError(t, err)
-	assert.Equal(t, lo.ToPtr("new desc"), description(), "a re-edit without a description keeps the staged one")
+	assert.Equal(t, new("new desc"), description(), "a re-edit without a description keeps the staged one")
 
 	_, err = uc.Execute(t.Context(), usecasestaging.EditInput{Key: key, Value: "v3", Description: "newer desc"})
 	require.NoError(t, err)
-	assert.Equal(t, lo.ToPtr("newer desc"), description())
+	assert.Equal(t, new("newer desc"), description())
 }

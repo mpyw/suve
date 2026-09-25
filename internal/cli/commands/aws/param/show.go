@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
@@ -120,7 +119,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 	}
 	// Show json_parsed only when --parse-json was used and succeeded
 	if p.jsonParsed {
-		jsonOut.JSONParsed = lo.ToPtr(true)
+		jsonOut.JSONParsed = new(true)
 	}
 
 	if result.LastModified != nil {

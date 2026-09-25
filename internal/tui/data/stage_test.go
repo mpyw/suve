@@ -113,9 +113,9 @@ func TestStagingService_Review(t *testing.T) {
 
 	svc, st := newStagingService(t, awsParamCap(t), provStore, false)
 
-	stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/UPDATE"}, staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("new")})
-	stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/CREATE"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("created")})
-	stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/SAME"}, staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("identical")})
+	stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/UPDATE"}, staging.Entry{Operation: staging.OperationUpdate, Value: new("new")})
+	stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/CREATE"}, staging.Entry{Operation: staging.OperationCreate, Value: new("created")})
+	stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/SAME"}, staging.Entry{Operation: staging.OperationUpdate, Value: new("identical")})
 	stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/DELETE"}, staging.Entry{Operation: staging.OperationDelete})
 	require.NoError(t, st.StageTag(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/TAGGED"}, staging.TagEntry{
 		Add:    map[string]string{"team": "core", "owner": "alice"},
@@ -173,7 +173,7 @@ func TestStagingService_Review_StrategyForNamespace(t *testing.T) {
 	svc, st := newStagingService(t, azureParamCap(t), provStore, true)
 
 	update := func(v string) staging.Entry {
-		return staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr(v)}
+		return staging.Entry{Operation: staging.OperationUpdate, Value: new(v)}
 	}
 	stageEntry(ctx, t, st, staging.EntryKey{Name: "/cfg/X", Namespace: "prod"}, update("staged-p"))
 	stageEntry(ctx, t, st, staging.EntryKey{Name: "/cfg/X", Namespace: "dev"}, update("staged-d"))
@@ -207,7 +207,7 @@ func TestStagingService_Apply_KeepsEachNamespace(t *testing.T) {
 	svc, st := newStagingService(t, azureParamCap(t), provStore, true)
 
 	update := func(v string) staging.Entry {
-		return staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr(v)}
+		return staging.Entry{Operation: staging.OperationUpdate, Value: new(v)}
 	}
 	stageEntry(ctx, t, st, staging.EntryKey{Name: "/cfg/X", Namespace: "prod"}, update("staged-p"))
 	stageEntry(ctx, t, st, staging.EntryKey{Name: "/cfg/X"}, update("staged-null"))
@@ -232,8 +232,8 @@ func TestStagingService_Reset(t *testing.T) {
 	t.Run("unstages everything staged", func(t *testing.T) {
 		svc, st := newStagingService(t, awsParamCap(t), &providermock.Store{}, false)
 
-		stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/A"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("a")})
-		stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/B"}, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("b")})
+		stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/A"}, staging.Entry{Operation: staging.OperationCreate, Value: new("a")})
+		stageEntry(ctx, t, st, staging.EntryKey{Name: "/app/B"}, staging.Entry{Operation: staging.OperationCreate, Value: new("b")})
 		require.NoError(t, st.StageTag(ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/C"}, staging.TagEntry{
 			Add: map[string]string{"k": "v"},
 		}))
@@ -269,7 +269,7 @@ func TestStagingService_Unstage(t *testing.T) {
 		svc, st := newStagingService(t, awsParamCap(t), &providermock.Store{}, false)
 
 		key := staging.EntryKey{Name: "/app/BOTH"}
-		stageEntry(ctx, t, st, key, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")})
+		stageEntry(ctx, t, st, key, staging.Entry{Operation: staging.OperationCreate, Value: new("v")})
 		require.NoError(t, st.StageTag(ctx, staging.ServiceParam, key, staging.TagEntry{Add: map[string]string{"k": "v"}}))
 
 		require.NoError(t, svc.Unstage(ctx, data.StagedKey{Name: "/app/BOTH"}))
@@ -284,7 +284,7 @@ func TestStagingService_Unstage(t *testing.T) {
 		svc, st := newStagingService(t, awsParamCap(t), &providermock.Store{}, false)
 
 		key := staging.EntryKey{Name: "/app/ENTRY"}
-		stageEntry(ctx, t, st, key, staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")})
+		stageEntry(ctx, t, st, key, staging.Entry{Operation: staging.OperationCreate, Value: new("v")})
 
 		require.NoError(t, svc.Unstage(ctx, data.StagedKey{Name: "/app/ENTRY"}))
 
@@ -420,7 +420,7 @@ func applyAllServices(
 
 	stage := func(svc staging.Service, name string) {
 		require.NoError(t, mem.StageEntry(t.Context(), svc, staging.EntryKey{Name: name}, staging.Entry{
-			Operation: staging.OperationUpdate, Value: lo.ToPtr("staged"), StagedAt: time.Now(), BaseModifiedAt: &base,
+			Operation: staging.OperationUpdate, Value: new("staged"), StagedAt: time.Now(), BaseModifiedAt: &base,
 		}))
 	}
 	stage(staging.ServiceParam, "/app/p")

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -243,7 +242,7 @@ func TestTagUseCase_Tag_StagedForCreate_ResourceNotFound(t *testing.T) {
 	// First, stage an entry for CREATE (new resource that doesn't exist in AWS)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -530,7 +529,7 @@ func TestTagUseCase_Untag_StagedForCreate_WithExistingTags(t *testing.T) {
 	// Stage an entry for CREATE
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -573,7 +572,7 @@ func TestTagUseCase_Untag_StagedForCreate_AutoSkip(t *testing.T) {
 	// Stage an entry for CREATE without any pre-staged tags
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 

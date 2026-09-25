@@ -5,7 +5,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig/v2"
-	"github.com/samber/lo"
 )
 
 // apiClient adapts the concrete *azappconfig.Client to the narrow Client
@@ -35,7 +34,7 @@ var _ Client = (*apiClient)(nil)
 func (a *apiClient) GetSetting(ctx context.Context, key, label string) (azappconfig.GetSettingResponse, error) {
 	var opts *azappconfig.GetSettingOptions
 	if label != "" {
-		opts = &azappconfig.GetSettingOptions{Label: lo.ToPtr(label)}
+		opts = &azappconfig.GetSettingOptions{Label: new(label)}
 	}
 
 	return a.c.GetSetting(ctx, key, opts)
@@ -55,25 +54,25 @@ func (a *apiClient) SetSetting(
 		OnlyIfUnchanged: etag,
 	}
 	if label != "" {
-		opts.Label = lo.ToPtr(label)
+		opts.Label = new(label)
 	}
 
-	return a.c.SetSetting(ctx, key, lo.ToPtr(value), opts)
+	return a.c.SetSetting(ctx, key, new(value), opts)
 }
 
 func (a *apiClient) AddSetting(ctx context.Context, key, value, label string) (azappconfig.AddSettingResponse, error) {
 	var opts *azappconfig.AddSettingOptions
 	if label != "" {
-		opts = &azappconfig.AddSettingOptions{Label: lo.ToPtr(label)}
+		opts = &azappconfig.AddSettingOptions{Label: new(label)}
 	}
 
-	return a.c.AddSetting(ctx, key, lo.ToPtr(value), opts)
+	return a.c.AddSetting(ctx, key, new(value), opts)
 }
 
 func (a *apiClient) DeleteSetting(ctx context.Context, key, label string) (azappconfig.DeleteSettingResponse, error) {
 	var opts *azappconfig.DeleteSettingOptions
 	if label != "" {
-		opts = &azappconfig.DeleteSettingOptions{Label: lo.ToPtr(label)}
+		opts = &azappconfig.DeleteSettingOptions{Label: new(label)}
 	}
 
 	return a.c.DeleteSetting(ctx, key, opts)
@@ -85,7 +84,7 @@ func (a *apiClient) DeleteSetting(ctx context.Context, key, label string) (azapp
 // A nil LabelFilter (SettingSelector{}) would enumerate every label.
 func clientSettingSelector(filter string) azappconfig.SettingSelector {
 	return azappconfig.SettingSelector{
-		LabelFilter: lo.ToPtr(filter),
+		LabelFilter: new(filter),
 	}
 }
 

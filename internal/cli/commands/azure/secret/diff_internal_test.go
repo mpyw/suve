@@ -6,7 +6,6 @@ package secret
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +18,7 @@ func TestParseDiffArgs(t *testing.T) {
 
 		spec1, spec2, err := parseDiffArgs([]string{"my-secret#abc"})
 		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
+		assert.Equal(t, new("abc"), spec1.Absolute.ID)
 		assert.Nil(t, spec2.Absolute.ID)
 	})
 
@@ -28,8 +27,8 @@ func TestParseDiffArgs(t *testing.T) {
 
 		spec1, spec2, err := parseDiffArgs([]string{"my-secret#abc", "my-secret#def"})
 		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
-		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
+		assert.Equal(t, new("abc"), spec1.Absolute.ID)
+		assert.Equal(t, new("def"), spec2.Absolute.ID)
 	})
 
 	t.Run("mixed format: full spec plus specifier-only", func(t *testing.T) {
@@ -37,8 +36,8 @@ func TestParseDiffArgs(t *testing.T) {
 
 		spec1, spec2, err := parseDiffArgs([]string{"my-secret#abc", "#def"})
 		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
-		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
+		assert.Equal(t, new("abc"), spec1.Absolute.ID)
+		assert.Equal(t, new("def"), spec2.Absolute.ID)
 	})
 
 	t.Run("partial spec: name plus specifier-only is swapped", func(t *testing.T) {
@@ -46,7 +45,7 @@ func TestParseDiffArgs(t *testing.T) {
 
 		spec1, spec2, err := parseDiffArgs([]string{"my-secret", "#abc"})
 		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
+		assert.Equal(t, new("abc"), spec1.Absolute.ID)
 		assert.Nil(t, spec2.Absolute.ID)
 	})
 
@@ -55,8 +54,8 @@ func TestParseDiffArgs(t *testing.T) {
 
 		spec1, spec2, err := parseDiffArgs([]string{"my-secret", "#abc", "#def"})
 		require.NoError(t, err)
-		assert.Equal(t, lo.ToPtr("abc"), spec1.Absolute.ID)
-		assert.Equal(t, lo.ToPtr("def"), spec2.Absolute.ID)
+		assert.Equal(t, new("abc"), spec1.Absolute.ID)
+		assert.Equal(t, new("def"), spec2.Absolute.ID)
 	})
 
 	t.Run("no args rejected", func(t *testing.T) {

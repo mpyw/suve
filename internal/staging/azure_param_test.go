@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -49,7 +48,7 @@ func TestAzureParamStrategy_Apply(t *testing.T) {
 		}
 		s := staging.NewAzureParamStrategy(store)
 
-		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v1")})
+		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationCreate, Value: new("v1")})
 		require.NoError(t, err)
 		assert.Equal(t, "cfg", created)
 	})
@@ -71,7 +70,7 @@ func TestAzureParamStrategy_Apply(t *testing.T) {
 		}
 		s := staging.NewAzureParamStrategy(store)
 
-		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v2")})
+		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationUpdate, Value: new("v2")})
 		require.NoError(t, err)
 		assert.True(t, putCalled)
 	})
@@ -131,7 +130,7 @@ func TestAzureParamStrategy_ErrorWrapping(t *testing.T) {
 			},
 		}
 		s := staging.NewAzureParamStrategy(store)
-		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")})
+		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationCreate, Value: new("v")})
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -151,7 +150,7 @@ func TestAzureParamStrategy_ErrorWrapping(t *testing.T) {
 			},
 		}
 		s := staging.NewAzureParamStrategy(store)
-		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v")})
+		err := s.Apply(t.Context(), "cfg", staging.Entry{Operation: staging.OperationUpdate, Value: new("v")})
 		require.ErrorIs(t, err, boom)
 	})
 

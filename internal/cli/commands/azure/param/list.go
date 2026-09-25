@@ -192,7 +192,7 @@ func collapseToKeyOnlyList(rows []param.ListNamespacesEntry) []generic.ListEntry
 			return generic.ListEntry{Name: name, Error: errAmbiguousListValue}
 		}
 
-		return generic.ListEntry{Name: name, Value: lo.ToPtr(c.value)}
+		return generic.ListEntry{Name: name, Value: new(c.value)}
 	})
 }
 
