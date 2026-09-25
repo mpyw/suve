@@ -300,7 +300,8 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 	switch entry.Operation {
 	case staging.OperationDelete:
 		if notFound {
-			if uerr := u.unstageGone(ctx, service, key, gone); uerr != nil {
+			note, uerr := u.unstageGone(ctx, service, key, gone)
+			if uerr != nil {
 				return DiffEntry{}, uerr
 			}
 
@@ -308,7 +309,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
-				Warning:   "already deleted in " + u.remoteLabel(),
+				Warning:   "already deleted in " + u.remoteLabel() + note,
 			}, nil
 		}
 
@@ -328,7 +329,8 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 
 	case staging.OperationUpdate:
 		if notFound {
-			if uerr := u.unstageGone(ctx, service, key, gone); uerr != nil {
+			note, uerr := u.unstageGone(ctx, service, key, gone)
+			if uerr != nil {
 				return DiffEntry{}, uerr
 			}
 
@@ -336,7 +338,7 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
-				Warning:   "item no longer exists in " + u.remoteLabel(),
+				Warning:   "item no longer exists in " + u.remoteLabel() + note,
 			}, nil
 		}
 	}
@@ -353,16 +355,22 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 // remote no longer exists, and records the key in gone. The tags must go too:
 // left behind, they would fail the tag apply on the missing resource on every
 // later apply until a manual reset (the reducer drops them for the same reason).
-func (u *DiffUseCase) unstageGone(ctx context.Context, service staging.Service, key staging.EntryKey, gone map[staging.EntryKey]struct{}) error {
+// It returns a note for the warning when staged tag changes were discarded.
+//
+//nolint:lll // function parameters are descriptive for clarity
+func (u *DiffUseCase) unstageGone(ctx context.Context, service staging.Service, key staging.EntryKey, gone map[staging.EntryKey]struct{}) (string, error) {
 	if err := u.Store.UnstageEntry(ctx, service, key); err != nil {
-		return fmt.Errorf("failed to unstage %s: %w", key.Name, err)
-	}
-
-	if err := u.Store.UnstageTag(ctx, service, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
-		return fmt.Errorf("failed to unstage tags of %s: %w", key.Name, err)
+		return "", fmt.Errorf("failed to unstage %s: %w", key.Name, err)
 	}
 
 	gone[key] = struct{}{}
 
-	return nil
+	switch err := u.Store.UnstageTag(ctx, service, key); {
+	case errors.Is(err, staging.ErrNotStaged):
+		return "", nil
+	case err != nil:
+		return "", fmt.Errorf("failed to unstage tags of %s: %w", key.Name, err)
+	default:
+		return "; its staged tag changes were discarded", nil
+	}
 }

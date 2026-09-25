@@ -726,6 +726,7 @@ func TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteDiscardsTags(t *testing.T
 			require.NoError(t, err)
 			require.Len(t, output.Entries, 1)
 			assert.Equal(t, usecasestaging.DiffEntryAutoUnstaged, output.Entries[0].Type)
+			assert.Contains(t, output.Entries[0].Warning, "; its staged tag changes were discarded")
 
 			// Only the surviving resource's tags are shown and still staged.
 			require.Len(t, output.TagEntries, 1)
@@ -738,4 +739,50 @@ func TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteDiscardsTags(t *testing.T
 			require.NoError(t, err)
 		})
 	}
+}
+
+// TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteKeepsOtherNamespaceTags:
+// discarding the tags of a vanished App Configuration setting leaves the tags
+// of the same name staged under another namespace.
+func TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteKeepsOtherNamespaceTags(t *testing.T) {
+	t.Parallel()
+
+	gone := staging.EntryKey{Name: "app/db", Namespace: "dev"}
+	kept := staging.EntryKey{Name: "app/db", Namespace: "prd"}
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, gone, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+	}))
+
+	for _, key := range []staging.EntryKey{gone, kept} {
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+			Add: map[string]string{"env": key.Namespace}, StagedAt: time.Now(),
+		}))
+	}
+
+	devStrategy := newMockDiffStrategy()
+	devStrategy.fetchErrors[gone.Name] = fmt.Errorf("%w: not found", provider.ErrNotFound)
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+		StrategyFor: func(namespace string) (staging.DiffStrategy, error) {
+			if namespace == gone.Namespace {
+				return devStrategy, nil
+			}
+
+			return newMockDiffStrategy(), nil
+		},
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.TagEntries, 1)
+	assert.Equal(t, kept.Namespace, output.TagEntries[0].Namespace)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, gone)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, kept)
+	require.NoError(t, err)
 }
