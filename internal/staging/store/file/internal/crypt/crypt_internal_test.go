@@ -211,7 +211,7 @@ func TestEncryptWithKey_CipherError(t *testing.T) {
 		return nil, errors.New("cipher creation failed")
 	}
 
-	_, err := EncryptWithKey([]byte("test data"), make([]byte, RawKeyLen))
+	_, err := EncryptWithKey([]byte("test data"), make([]byte, RawKeyLen), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create cipher")
 }
@@ -230,7 +230,7 @@ func TestEncryptWithKey_NonceError(t *testing.T) {
 		err:         errors.New("random source unavailable"),
 	}
 
-	_, err := EncryptWithKey([]byte("test data"), make([]byte, RawKeyLen))
+	_, err := EncryptWithKey([]byte("test data"), make([]byte, RawKeyLen), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to generate nonce")
 }
@@ -240,7 +240,7 @@ func TestDecryptWithKey_CipherError(t *testing.T) {
 	// First encrypt some data normally with a valid key.
 	key := make([]byte, RawKeyLen)
 
-	encrypted, err := EncryptWithKey([]byte("test data"), key)
+	encrypted, err := EncryptWithKey([]byte("test data"), key, nil)
 	require.NoError(t, err)
 
 	// Save original and restore after test
@@ -253,7 +253,7 @@ func TestDecryptWithKey_CipherError(t *testing.T) {
 		return nil, errors.New("cipher creation failed")
 	}
 
-	_, err = DecryptWithKey(encrypted, key)
+	_, err = DecryptWithKey(encrypted, key, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create cipher")
 }
@@ -310,4 +310,57 @@ func TestSetRandReader_AndReset(t *testing.T) {
 	result, err := Encrypt([]byte("test"), "pass")
 	require.NoError(t, err)
 	assert.True(t, IsEncrypted(result))
+}
+
+// TestDecryptWithKey_AAD covers #1007: a v3 ciphertext only decrypts with the
+// associated data it was written with, and its version byte cannot be
+// downgraded to the legacy v2 format (which binds no associated data).
+func TestDecryptWithKey_AAD(t *testing.T) {
+	t.Parallel()
+
+	key := make([]byte, RawKeyLen)
+	aad := []byte("suve-staging\x00aws/123456789012/ap-northeast-1\x00param.json")
+
+	encrypted, err := EncryptWithKey([]byte("secret"), key, aad)
+	require.NoError(t, err)
+
+	got, err := DecryptWithKey(encrypted, key, aad)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("secret"), got)
+
+	for name, other := range map[string][]byte{
+		"other scope":   []byte("suve-staging\x00googlecloud/my-project\x00param.json"),
+		"other service": []byte("suve-staging\x00aws/123456789012/ap-northeast-1\x00secret.json"),
+		"no aad":        nil,
+	} {
+		_, err := DecryptWithKey(encrypted, key, other)
+		require.ErrorIs(t, err, ErrKeyMismatch, name)
+	}
+
+	downgraded := append([]byte(nil), encrypted...)
+	downgraded[len(MagicHeader)] = VersionRawKey
+
+	_, err = DecryptWithKey(downgraded, key, aad)
+	require.ErrorIs(t, err, ErrKeyMismatch)
+}
+
+// TestDecryptWithKey_LegacyV2 verifies files written in the legacy v2 format
+// (no associated data) still decrypt, whatever aad the reader supplies, so an
+// existing working store keeps working; the next write upgrades it to v3.
+func TestDecryptWithKey_LegacyV2(t *testing.T) {
+	t.Parallel()
+
+	key := make([]byte, RawKeyLen)
+	nonce := make([]byte, nonceLen)
+
+	gcm, err := newGCM(key)
+	require.NoError(t, err)
+
+	v2 := append([]byte(MagicHeader), VersionRawKey)
+	v2 = append(v2, nonce...)
+	v2 = gcm.Seal(v2, nonce, []byte("legacy"), nil)
+
+	got, err := DecryptWithKey(v2, key, []byte("any binding"))
+	require.NoError(t, err)
+	assert.Equal(t, []byte("legacy"), got)
 }

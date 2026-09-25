@@ -268,19 +268,19 @@ func TestEncryptDecryptWithKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			encrypted, err := crypt.EncryptWithKey(tt.data, key)
+			encrypted, err := crypt.EncryptWithKey(tt.data, key, nil)
 			require.NoError(t, err)
 
-			// v2 must still be recognized as encrypted.
+			// v3 must still be recognized as encrypted.
 			assert.True(t, crypt.IsEncrypted(encrypted))
 			// Version byte must be the raw-key version.
-			assert.Equal(t, crypt.VersionRawKey, encrypted[len(crypt.MagicHeader)])
+			assert.Equal(t, crypt.VersionRawKeyAAD, encrypted[len(crypt.MagicHeader)])
 
 			if len(tt.data) > 0 {
 				assert.False(t, bytes.Contains(encrypted, tt.data))
 			}
 
-			decrypted, err := crypt.DecryptWithKey(encrypted, key)
+			decrypted, err := crypt.DecryptWithKey(encrypted, key, nil)
 			require.NoError(t, err)
 
 			if len(tt.data) != 0 || len(decrypted) != 0 {
@@ -293,14 +293,14 @@ func TestEncryptDecryptWithKey(t *testing.T) {
 func TestEncryptWithKey_InvalidKeyLength(t *testing.T) {
 	t.Parallel()
 
-	_, err := crypt.EncryptWithKey([]byte("data"), make([]byte, 16))
+	_, err := crypt.EncryptWithKey([]byte("data"), make([]byte, 16), nil)
 	assert.ErrorIs(t, err, crypt.ErrInvalidKeyLength)
 }
 
 func TestDecryptWithKey_InvalidKeyLength(t *testing.T) {
 	t.Parallel()
 
-	_, err := crypt.DecryptWithKey([]byte("data"), make([]byte, 16))
+	_, err := crypt.DecryptWithKey([]byte("data"), make([]byte, 16), nil)
 	assert.ErrorIs(t, err, crypt.ErrInvalidKeyLength)
 }
 
@@ -313,7 +313,7 @@ func TestDecryptWithKey_TruncatedData(t *testing.T) {
 	data := append([]byte(crypt.MagicHeader), crypt.VersionRawKey)
 	data = append(data, make([]byte, 5)...) // far below header + nonce + tag
 
-	_, err := crypt.DecryptWithKey(data, make([]byte, crypt.RawKeyLen))
+	_, err := crypt.DecryptWithKey(data, make([]byte, crypt.RawKeyLen), nil)
 	assert.ErrorIs(t, err, crypt.ErrInvalidFormat)
 }
 
@@ -324,10 +324,10 @@ func TestDecryptWithKey_WrongKey(t *testing.T) {
 	wrongKey := make([]byte, crypt.RawKeyLen)
 	wrongKey[0] = 0xff
 
-	encrypted, err := crypt.EncryptWithKey([]byte("secret"), key)
+	encrypted, err := crypt.EncryptWithKey([]byte("secret"), key, nil)
 	require.NoError(t, err)
 
-	_, err = crypt.DecryptWithKey(encrypted, wrongKey)
+	_, err = crypt.DecryptWithKey(encrypted, wrongKey, nil)
 	assert.ErrorIs(t, err, crypt.ErrKeyMismatch)
 }
 
@@ -340,7 +340,7 @@ func TestCrossReject(t *testing.T) {
 	t.Run("Decrypt (passphrase) rejects v2 data", func(t *testing.T) {
 		t.Parallel()
 
-		v2, err := crypt.EncryptWithKey([]byte("data"), key)
+		v2, err := crypt.EncryptWithKey([]byte("data"), key, nil)
 		require.NoError(t, err)
 
 		_, err = crypt.Decrypt(v2, "any-passphrase")
@@ -354,7 +354,7 @@ func TestCrossReject(t *testing.T) {
 		v1, err := crypt.Encrypt([]byte("data"), "passphrase")
 		require.NoError(t, err)
 
-		_, err = crypt.DecryptWithKey(v1, key)
+		_, err = crypt.DecryptWithKey(v1, key, nil)
 		require.ErrorIs(t, err, crypt.ErrInvalidFormat)
 		assert.Contains(t, err.Error(), "version 1")
 	})
@@ -363,7 +363,7 @@ func TestCrossReject(t *testing.T) {
 func TestDecryptWithKey_NotEncrypted(t *testing.T) {
 	t.Parallel()
 
-	_, err := crypt.DecryptWithKey([]byte(`{"plain":true}`), make([]byte, crypt.RawKeyLen))
+	_, err := crypt.DecryptWithKey([]byte(`{"plain":true}`), make([]byte, crypt.RawKeyLen), nil)
 	assert.ErrorIs(t, err, crypt.ErrNotEncrypted)
 }
 

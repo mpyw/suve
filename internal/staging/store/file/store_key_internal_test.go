@@ -4,9 +4,11 @@
 package file
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,11 +49,11 @@ func TestStore_KeyRoundTrip(t *testing.T) {
 
 	require.NoError(t, store.WriteState(t.Context(), "", state))
 
-	// File must be encrypted using the raw-key (v2) format.
+	// File must be encrypted using the raw-key (v3) format.
 	raw, err := os.ReadFile(path) //nolint:gosec // test temp path
 	require.NoError(t, err)
 	require.True(t, crypt.IsEncrypted(raw))
-	assert.Equal(t, crypt.VersionRawKey, raw[len(crypt.MagicHeader)])
+	assert.Equal(t, crypt.VersionRawKeyAAD, raw[len(crypt.MagicHeader)])
 
 	// Read back with the same key.
 	got, err := store.Drain(t.Context(), "", true)
@@ -489,4 +491,85 @@ func TestNewWorkingStore_KeyResolutionUsesGlobalLock(t *testing.T) {
 	}
 
 	require.NoError(t, <-done)
+}
+
+// TestStore_KeyBindsScopeAndService covers #1007: a working file encrypted with
+// the data key is bound to its scope and service, so the same key cannot read
+// it after it is copied into another scope's directory or swapped with the
+// other service's file.
+//
+//nolint:paralleltest // newSplitStore overrides package-level userHomeDirFunc.
+func TestStore_KeyBindsScopeAndService(t *testing.T) {
+	src := newSplitStore(t)
+	key := staging.EntryKey{Name: "/app/secret"}
+
+	require.NoError(t, src.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"),
+	}))
+
+	// Same scope, same key: readable.
+	_, err := src.GetEntry(t.Context(), staging.ServiceParam, key)
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(src.servicePath(staging.ServiceParam))
+	require.NoError(t, err)
+
+	t.Run("copied to another scope", func(t *testing.T) {
+		dst, err := NewStore(provider.AWSScope("210987654321", "ap-northeast-1"))
+		require.NoError(t, err)
+
+		dst.key = src.key
+
+		require.NoError(t, os.MkdirAll(dst.stateDir, 0o700))
+		require.NoError(t, os.WriteFile(dst.servicePath(staging.ServiceParam), raw, 0o600)) //nolint:gosec // test temp path
+
+		_, err = dst.GetEntry(t.Context(), staging.ServiceParam, key)
+		require.ErrorIs(t, err, crypt.ErrKeyMismatch)
+	})
+
+	t.Run("swapped with the other service", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(src.servicePath(staging.ServiceSecret), raw, 0o600)) //nolint:gosec // test temp path
+
+		_, err := src.GetEntry(t.Context(), staging.ServiceSecret, key)
+		require.ErrorIs(t, err, crypt.ErrKeyMismatch)
+	})
+}
+
+// TestStore_KeyWarnsOnPlaintextFile covers #1007: an unencrypted working file
+// read while a data key is configured is still read (and re-encrypted on the
+// next write) but reported once, since suve never writes it that way itself.
+//
+//nolint:paralleltest // overrides package-level userHomeDirFunc and the warn sink.
+func TestStore_KeyWarnsOnPlaintextFile(t *testing.T) {
+	s := newSplitStore(t)
+	key := staging.EntryKey{Name: "/app/planted"}
+
+	var buf bytes.Buffer
+
+	prev := SetWarnWriter(&buf)
+	t.Cleanup(func() { SetWarnWriter(prev) })
+
+	plain := NewStoreWithPath(s.servicePath(staging.ServiceParam))
+	require.NoError(t, plain.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("injected"),
+	}))
+
+	for range 2 {
+		entry, err := s.GetEntry(t.Context(), staging.ServiceParam, key)
+		require.NoError(t, err)
+		assert.Equal(t, "injected", lo.FromPtr(entry.Value))
+	}
+
+	assert.Equal(t, 1, strings.Count(buf.String(), "is not encrypted although an encryption key is configured"),
+		"warned once per file: %q", buf.String())
+	assert.Contains(t, buf.String(), s.servicePath(staging.ServiceParam))
+
+	// The next write encrypts it.
+	require.NoError(t, s.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/other"}, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"),
+	}))
+
+	raw, err := os.ReadFile(s.servicePath(staging.ServiceParam))
+	require.NoError(t, err)
+	assert.True(t, crypt.IsEncrypted(raw))
 }
