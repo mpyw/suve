@@ -15,6 +15,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/pager"
+	"github.com/mpyw/suve/internal/cli/valueinput"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -309,18 +310,17 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 		// The --description flag is gated on HasDescription (#666: unsupported
 		// providers reject it rather than silently drop it); value-type flags are
 		// appended for providers with a value-type axis (AWS Parameter Store, #664).
-		Flags: append(cfg.descriptionFlags(), cfg.ValueTypeFlags...),
+		Flags: append(append(cfg.descriptionFlags(), valueinput.ValueStdinFlag()), cfg.ValueTypeFlags...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
 				return fmt.Errorf("usage: %s add <name> [value]", cfg.CommandPath)
 			}
 
 			name := cmd.Args().First()
-
-			var value string
-			if cmd.Args().Len() >= 2 { //nolint:mnd // check for optional value argument
-				value = cmd.Args().Get(1)
-			}
+			// Count the arguments rather than test the value, so an explicit ""
+			// is a value and not a request for the editor.
+			hasValue := cmd.Args().Len() >= 2 //nolint:mnd // optional value argument
+			value := cmd.Args().Get(1)
 
 			valueType, err := cfg.valueTypeFor(cmd)
 			if err != nil {
@@ -344,14 +344,17 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 				},
 				Stdout: cmd.Root().Writer,
 				Stderr: cmd.Root().ErrWriter,
+				Stdin:  valueinput.ValueStdin(cmd),
 			}
 
 			return r.Run(ctx, AddOptions{
-				Name:        name,
-				Value:       value,
-				Description: cfg.description(cmd),
-				Namespace:   cfg.namespaceFor(ctx),
-				ValueType:   valueType,
+				Name:           name,
+				Value:          value,
+				HasValue:       hasValue,
+				ValueFromStdin: cmd.Bool(valueinput.FlagValueStdin),
+				Description:    cfg.description(cmd),
+				Namespace:      cfg.namespaceFor(ctx),
+				ValueType:      valueType,
 			})
 		},
 	}
@@ -367,18 +370,17 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 		// The --description flag is gated on HasDescription (#666: unsupported
 		// providers reject it rather than silently drop it); value-type flags are
 		// appended for providers with a value-type axis (AWS Parameter Store, #664).
-		Flags: append(cfg.descriptionFlags(), cfg.ValueTypeFlags...),
+		Flags: append(append(cfg.descriptionFlags(), valueinput.ValueStdinFlag()), cfg.ValueTypeFlags...),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			if cmd.Args().Len() < 1 {
 				return fmt.Errorf("usage: %s edit <name> [value]", cfg.CommandPath)
 			}
 
 			name := cmd.Args().First()
-
-			var value string
-			if cmd.Args().Len() >= 2 { //nolint:mnd // check for optional value argument
-				value = cmd.Args().Get(1)
-			}
+			// Count the arguments rather than test the value, so an explicit ""
+			// is a value and not a request for the editor.
+			hasValue := cmd.Args().Len() >= 2 //nolint:mnd // optional value argument
+			value := cmd.Args().Get(1)
 
 			valueType, err := cfg.valueTypeFor(cmd)
 			if err != nil {
@@ -403,14 +405,17 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 				ProviderLabel: cfg.ProviderLabel,
 				Stdout:        cmd.Root().Writer,
 				Stderr:        cmd.Root().ErrWriter,
+				Stdin:         valueinput.ValueStdin(cmd),
 			}
 
 			return r.Run(ctx, EditOptions{
-				Name:        name,
-				Value:       value,
-				Description: cfg.description(cmd),
-				Namespace:   cfg.namespaceFor(ctx),
-				ValueType:   valueType,
+				Name:           name,
+				Value:          value,
+				HasValue:       hasValue,
+				ValueFromStdin: cmd.Bool(valueinput.FlagValueStdin),
+				Description:    cfg.description(cmd),
+				Namespace:      cfg.namespaceFor(ctx),
+				ValueType:      valueType,
 			})
 		},
 	}

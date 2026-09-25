@@ -2,11 +2,11 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/cli/valueinput"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -20,14 +20,22 @@ type EditRunner struct {
 	ProviderLabel string
 	Stdout        io.Writer
 	Stderr        io.Writer
-	OpenEditor    editor.OpenFunc // Optional: defaults to editor.Open if nil
+	// Stdin is read for --value-stdin and decides whether the $EDITOR fallback
+	// may run (only on a terminal). Nil is treated as a non-interactive stdin.
+	Stdin      io.Reader
+	OpenEditor editor.OpenFunc // Optional: defaults to editor.Open (TTY only) if nil
 }
 
 // EditOptions holds options for the edit command.
 type EditOptions struct {
-	Name        string
-	Value       string // Optional: if set, skip editor and use this value
-	Description string
+	Name string
+	// Value is the explicit value; it is used only when HasValue is set.
+	Value string
+	// HasValue reports that a value argument was given, even an empty one.
+	HasValue bool
+	// ValueFromStdin reads the value from Stdin (--value-stdin).
+	ValueFromStdin bool
+	Description    string
 	// Namespace is the App Configuration namespace of the setting (empty for the
 	// null/default namespace and every other provider).
 	Namespace string
@@ -38,34 +46,42 @@ type EditOptions struct {
 
 // Run executes the edit command.
 func (r *EditRunner) Run(ctx context.Context, opts EditOptions) error {
+	src := valueinput.ValueSource{
+		FromStdin:  opts.ValueFromStdin,
+		HasArg:     opts.HasValue,
+		Arg:        opts.Value,
+		Stdin:      r.Stdin,
+		OpenEditor: r.OpenEditor,
+	}
+
+	// Fail before fetching the remote baseline when there is no value and no
+	// editor can run.
+	if err := valueinput.CheckEditorFallback(src); err != nil {
+		return err
+	}
+
 	// Get baseline value (staged value if exists, otherwise from the remote store)
 	baseline, err := r.UseCase.Baseline(ctx, stagingusecase.BaselineInput{Key: staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace}})
 	if err != nil {
 		return err
 	}
 
-	var newValue string
-	if opts.Value != "" {
-		// Use provided value, skip editor
-		newValue = opts.Value
-	} else {
-		// Open editor
-		editorFn := r.OpenEditor
-		if editorFn == nil {
-			editorFn = editor.Open
-		}
+	// The editor's proceed flag is ignored: clearing the value in the editor
+	// stages an empty value, as before.
+	src.EditorInitial = baseline.Value
 
-		newValue, err = editorFn(ctx, baseline.Value)
-		if err != nil {
-			return fmt.Errorf("failed to edit: %w", err)
-		}
+	newValue, _, err := valueinput.ResolveValue(ctx, src)
+	if err != nil {
+		return err
+	}
 
-		// Check if changed
-		if newValue == baseline.Value {
-			output.Info(r.Stdout, "No changes made.")
+	// An explicit value (argument or stdin) goes to the use case as given; it
+	// reports a value equal to the remote one as skipped. Only an unchanged
+	// editor result is a no-op here.
+	if !opts.ValueFromStdin && !opts.HasValue && newValue == baseline.Value {
+		output.Info(r.Stdout, "No changes made.")
 
-			return nil
-		}
+		return nil
 	}
 
 	// Execute the edit use case

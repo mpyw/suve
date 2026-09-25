@@ -550,7 +550,7 @@ Output will look like:
 > [!TIP]
 > Staged values live in encrypted files under `~/.suve/staging/`. Use `suve stage export` to write them to portable snapshot files and `suve stage import` to restore them later. See [Export / Import Commands](#export--import-commands) for the forms each backend supports.
 
-**1. Stage changes** (opens editor or accepts value directly):
+**1. Stage changes** (takes the value as an argument or from stdin with `--value-stdin`, or opens an editor in a terminal):
 
 > [!TIP]
 > To use VSCode or Cursor as your editor, set `export VISUAL='code --wait'` or `export VISUAL='cursor --wait'` in your shell profile.
@@ -1001,8 +1001,8 @@ Every backend shares one staging workflow, invoked as `suve <provider> stage <se
 
 | Command | Options | Description |
 |---------|---------|-------------|
-| `add` | `--description=<TEXT>`¹ | Stage a new entry |
-| `edit` | `--description=<TEXT>`¹ | Stage a modification (a new version where the backend versions) |
+| `add` | `--value-stdin`⁴<br>`--description=<TEXT>`¹ | Stage a new entry |
+| `edit` | `--value-stdin`⁴<br>`--description=<TEXT>`¹ | Stage a modification (a new version where the backend versions) |
 | `delete` | AWS Secrets Manager: `--force`<br>`--recovery-window=<DAYS>` | Stage a deletion |
 | `status` | `--verbose` (`-v`) | Show staged changes |
 | `diff` | `--parse-json` (`-j`)<br>`--no-pager` | Compare staged vs the live backend |
@@ -1016,6 +1016,8 @@ Every backend shares one staging workflow, invoked as `suve <provider> stage <se
 ² `--ignore-conflicts` is ignored by Azure App Configuration, which is unversioned (last-write-wins) and has no modified-after conflict to skip.
 
 ³ Restoring a version needs a versioned backend; on unversioned Azure App Configuration `reset` only unstages.
+
+⁴ `add` / `edit` take the value as a positional argument (an explicit `""` is an empty value), from stdin with `--value-stdin`, or from `$EDITOR` when both are omitted. Without a terminal, a missing value is an error instead of an editor launch.
 
 ### Aggregate Stage Commands
 

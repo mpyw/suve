@@ -67,8 +67,9 @@ EXAMPLES:
 func addHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Create a new {item} value and stage the change.
 
-If value is provided as an argument, uses that value directly.
-Otherwise, opens an editor to create the value.
+If value is provided as an argument (or piped in with --value-stdin), uses
+that value directly, even when it is empty. Otherwise, opens an editor to
+create the value; without a terminal it fails instead of opening one.
 
 If the {item} is already staged for creation, edits the staged value.
 The new {item} will be created in {provider} when you run '{path} apply'.
@@ -77,16 +78,18 @@ Use '{path} edit' to modify an existing {item}.
 Use '{path} status' to view staged changes.
 
 EXAMPLES:
-   {path} add <name>              Open editor to create new {item}
-   {path} add <name> <value>      Create new {item} with given value`)
+   {path} add <name>                Open editor to create new {item}
+   {path} add <name> <value>        Create new {item} with given value
+   {path} add <name> --value-stdin  Create new {item} with the value read from stdin`)
 }
 
 // editHelp returns the Description text for the edit command.
 func editHelp(cfg CommandConfig) string {
 	return renderHelp(cfg, `Modify a {item} value and stage the change.
 
-If value is provided as an argument, uses that value directly.
-Otherwise, opens an editor to modify the value.
+If value is provided as an argument (or piped in with --value-stdin), uses
+that value directly, even when it is empty. Otherwise, opens an editor to
+modify the value; without a terminal it fails instead of opening one.
 
 If the {item} is already staged, edits the staged value.
 Otherwise, fetches the current value from {provider} and opens it for editing.
@@ -97,8 +100,9 @@ Use '{path} apply' to apply staged changes to {provider}.
 Use '{path} status' to view staged changes.
 
 EXAMPLES:
-   {path} edit <name>              Open editor to modify {item}
-   {path} edit <name> <value>      Set {item} to given value`)
+   {path} edit <name>                Open editor to modify {item}
+   {path} edit <name> <value>        Set {item} to given value
+   {path} edit <name> --value-stdin  Set {item} to the value read from stdin`)
 }
 
 // applyHelp returns the Description text for the apply command.

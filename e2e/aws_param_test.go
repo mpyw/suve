@@ -2434,3 +2434,55 @@ func TestAWSParam_ValueStdin(t *testing.T) {
 		assert.Equal(t, "stdin-updated-value", strings.TrimSpace(stdout))
 	})
 }
+
+// TestAWSParam_StageValueInput proves stage add/edit never launch $EDITOR on a
+// non-TTY stdin, read --value-stdin, and apply the stdin value end to end
+// (#985).
+func TestAWSParam_StageValueInput(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-test/stage-value-stdin/param"
+
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	})
+
+	t.Run("add without value on a non-TTY stdin fails", func(t *testing.T) {
+		_, _, err := runSubCommandWithStdin(t, aws.StageParamCommand(), strings.NewReader(""), "add", paramName)
+		require.ErrorContains(t, err, "value is required")
+	})
+
+	t.Run("add via --value-stdin", func(t *testing.T) {
+		stdout, stderr, err := runSubCommandWithStdin(
+			t, aws.StageParamCommand(), strings.NewReader("stdin-staged-value\n"), "add", paramName, "--value-stdin",
+		)
+		require.NoError(t, err, "add failed: stdout=%s stderr=%s", stdout, stderr)
+		assert.Contains(t, stdout, "Staged for creation")
+
+		_, _, err = runSubCommand(t, aws.StageParamCommand(), "apply", "--yes")
+		require.NoError(t, err)
+
+		stdout, _, err = runCommand(t, cmdparam.ShowCommand(), "--raw", paramName)
+		require.NoError(t, err)
+		assert.Equal(t, "stdin-staged-value", strings.TrimSpace(stdout))
+	})
+
+	t.Run("edit without value on a non-TTY stdin fails", func(t *testing.T) {
+		_, _, err := runSubCommandWithStdin(t, aws.StageParamCommand(), strings.NewReader(""), "edit", paramName)
+		require.ErrorContains(t, err, "value is required")
+	})
+
+	t.Run("edit via --value-stdin", func(t *testing.T) {
+		stdout, stderr, err := runSubCommandWithStdin(
+			t, aws.StageParamCommand(), strings.NewReader("stdin-edited-value\n"), "edit", paramName, "--value-stdin",
+		)
+		require.NoError(t, err, "edit failed: stdout=%s stderr=%s", stdout, stderr)
+		assert.Contains(t, stdout, "Staged")
+
+		stdout, _, err = runSubCommand(t, aws.StageParamCommand(), "diff")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "+stdin-edited-value")
+	})
+}

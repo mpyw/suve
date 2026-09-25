@@ -2,11 +2,11 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/mpyw/suve/internal/cli/editor"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/cli/valueinput"
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
@@ -14,17 +14,25 @@ import (
 
 // AddRunner executes add operations using a usecase.
 type AddRunner struct {
-	UseCase    *stagingusecase.AddUseCase
-	Stdout     io.Writer
-	Stderr     io.Writer
-	OpenEditor editor.OpenFunc // Optional: defaults to editor.Open if nil
+	UseCase *stagingusecase.AddUseCase
+	Stdout  io.Writer
+	Stderr  io.Writer
+	// Stdin is read for --value-stdin and decides whether the $EDITOR fallback
+	// may run (only on a terminal). Nil is treated as a non-interactive stdin.
+	Stdin      io.Reader
+	OpenEditor editor.OpenFunc // Optional: defaults to editor.Open (TTY only) if nil
 }
 
 // AddOptions holds options for the add command.
 type AddOptions struct {
-	Name        string
-	Value       string // Optional: if set, skip editor and use this value
-	Description string
+	Name string
+	// Value is the explicit value; it is used only when HasValue is set.
+	Value string
+	// HasValue reports that a value argument was given, even an empty one.
+	HasValue bool
+	// ValueFromStdin reads the value from Stdin (--value-stdin).
+	ValueFromStdin bool
+	Description    string
 	// Namespace is the App Configuration namespace to stage under (empty for the
 	// null/default namespace and every other provider).
 	Namespace string
@@ -41,24 +49,23 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 		return err
 	}
 
-	var newValue string
-	if opts.Value != "" {
-		// Use provided value, skip editor
-		newValue = opts.Value
-	} else {
-		// Open editor with current draft value
-		editorFn := r.OpenEditor
-		if editorFn == nil {
-			editorFn = editor.Open
-		}
+	newValue, proceed, err := valueinput.ResolveValue(ctx, valueinput.ValueSource{
+		FromStdin:     opts.ValueFromStdin,
+		HasArg:        opts.HasValue,
+		Arg:           opts.Value,
+		Stdin:         r.Stdin,
+		OpenEditor:    r.OpenEditor,
+		EditorInitial: draft.Value,
+	})
+	if err != nil {
+		return err
+	}
 
-		newValue, err = editorFn(ctx, draft.Value)
-		if err != nil {
-			return fmt.Errorf("failed to edit: %w", err)
-		}
-
+	// An explicit value (argument or stdin) is staged as given. Only the
+	// editor result is checked for a cancel or a no-op.
+	if !opts.ValueFromStdin && !opts.HasValue {
 		// Check if value is empty (canceled)
-		if newValue == "" {
+		if !proceed {
 			output.Info(r.Stdout, "Empty value, not staged.")
 
 			return nil
