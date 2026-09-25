@@ -269,6 +269,44 @@ func TestCreate_NewSecret(t *testing.T) {
 	assert.Equal(t, "v1", version.ID)
 }
 
+// TestSoftDeletedNameMapsSentinel is the #1012 regression: a soft-deleted
+// secret is not readable (the Create probe gets 404) but holds its name, so
+// SetSecret returns 409 ObjectIsDeletedButRecoverable. Create and Put map it to
+// provider.ErrPendingDeletion with a restore hint.
+func TestSoftDeletedNameMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := keyvault.New(&mockClient{
+		getFunc: func(context.Context, string, string) (azsecrets.GetSecretResponse, error) {
+			return azsecrets.GetSecretResponse{}, notFound()
+		},
+		setFunc: func(context.Context, string, azsecrets.SetSecretParameters) (azsecrets.SetSecretResponse, error) {
+			// Azure's shape: top-level code "Conflict", inner code
+			// ObjectIsDeletedButRecoverable.
+			return azsecrets.SetSecretResponse{}, &azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "Conflict"}
+		},
+	})
+
+	_, createErr := store.Create(t.Context(), "db", "v", domain.ValueTypeSecret, "")
+	_, putErr := store.Put(t.Context(), "db", "v", domain.ValueTypeSecret, "")
+
+	for op, err := range map[string]error{"create": createErr, "put": putErr} {
+		require.ErrorIs(t, err, provider.ErrPendingDeletion, op)
+		assert.Contains(t, err.Error(), "scheduled for deletion: db (run `secret restore` to recover it)", op)
+	}
+
+	// Any other failure stays a plain set failure.
+	other := keyvault.New(&mockClient{
+		setFunc: func(context.Context, string, azsecrets.SetSecretParameters) (azsecrets.SetSecretResponse, error) {
+			return azsecrets.SetSecretResponse{}, &azcore.ResponseError{StatusCode: http.StatusForbidden, ErrorCode: "Forbidden"}
+		},
+	})
+
+	_, err := other.Put(t.Context(), "db", "v", domain.ValueTypeSecret, "")
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, provider.ErrPendingDeletion)
+}
+
 func TestPut(t *testing.T) {
 	t.Parallel()
 

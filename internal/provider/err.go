@@ -15,6 +15,12 @@ var (
 	// represent as text (e.g. an AWS Secrets Manager SecretBinary secret).
 	// Callers must not treat such an entry as an empty-string value.
 	ErrBinaryValue = errors.New("binary value is not supported")
+	// ErrPendingDeletion indicates the entry is deleted but still recoverable
+	// (AWS Secrets Manager: scheduled for deletion; Azure Key Vault:
+	// soft-deleted), so it can be neither read nor re-created until it is
+	// restored or the deletion completes. It is distinct from ErrNotFound and
+	// ErrAlreadyExists so callers do not treat the name as free or as live.
+	ErrPendingDeletion = errors.New("scheduled for deletion")
 	// ErrUnsupportedKind indicates the provider does not offer the requested
 	// store kind (e.g. GoogleCloud has no param store).
 	ErrUnsupportedKind = errors.New("provider: unsupported store kind")
