@@ -121,7 +121,7 @@ When a `Create`-staged resource is deleted (unstaged), any associated tag change
 -> delete /app/new -> Both entry and tags unstaged
 ```
 
-The same rule applies when `stage diff` (or the GUI/TUI review) finds that the remote of a staged Update or Delete no longer exists: the entry is auto-unstaged together with its tag changes.
+The same rule applies when `stage diff` (or the GUI/TUI review) finds that the remote of a staged Update or Delete no longer exists: the entry is auto-unstaged together with its tag changes. A key with only staged tag changes (no entry) whose remote no longer exists has its tag changes discarded the same way.
 
 #### Resource Existence Checks
 Before staging operations, suve validates that the resource state on the remote is compatible with the requested action:

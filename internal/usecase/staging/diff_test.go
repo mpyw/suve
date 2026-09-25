@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/maputil"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
@@ -777,6 +778,98 @@ func TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteKeepsOtherNamespaceTags(t
 
 	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
 	require.NoError(t, err)
+	require.Len(t, output.TagEntries, 1)
+	assert.Equal(t, kept.Namespace, output.TagEntries[0].Namespace)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, gone)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, kept)
+	require.NoError(t, err)
+}
+
+// TestDiffUseCase_Execute_TagOnlyVanishedRemoteDiscardsTags pins #1055: a key
+// with only staged tag changes (no entry) whose remote is not found has its
+// tag changes discarded and shows an auto-unstaged row. A remote that exists,
+// or a probe that fails for another reason, keeps the tags staged and shown.
+func TestDiffUseCase_Execute_TagOnlyVanishedRemoteDiscardsTags(t *testing.T) {
+	t.Parallel()
+
+	gone := staging.EntryKey{Name: "/app/gone"}
+	kept := staging.EntryKey{Name: "/app/kept"}
+	flaky := staging.EntryKey{Name: "/app/flaky"}
+	store := testutil.NewMockStore()
+
+	for _, key := range []staging.EntryKey{gone, kept, flaky} {
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+			Add:      map[string]string{"env": "prod"},
+			Remove:   maputil.NewSet("old"),
+			StagedAt: time.Now(),
+		}))
+	}
+
+	strategy := newMockDiffStrategy()
+	strategy.fetchErrors[gone.Name] = fmt.Errorf("%w: not found", provider.ErrNotFound)
+	strategy.fetchErrors[flaky.Name] = errors.New("throttled")
+
+	uc := &usecasestaging.DiffUseCase{Strategy: strategy, Store: store}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+
+	require.Len(t, output.Entries, 1)
+	assert.Equal(t, gone.Name, output.Entries[0].Name)
+	assert.Equal(t, usecasestaging.DiffEntryAutoUnstaged, output.Entries[0].Type)
+	assert.Contains(t, output.Entries[0].Warning, "no longer exists")
+	assert.Contains(t, output.Entries[0].Warning, "; its staged tag changes were discarded")
+
+	names := lo.Map(output.TagEntries, func(e usecasestaging.DiffTagEntry, _ int) string { return e.Name })
+	assert.ElementsMatch(t, []string{kept.Name, flaky.Name}, names)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, gone)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	for _, key := range []staging.EntryKey{kept, flaky} {
+		_, err = store.GetTag(t.Context(), staging.ServiceParam, key)
+		require.NoError(t, err, key.Name)
+	}
+}
+
+// TestDiffUseCase_Execute_TagOnlyVanishedRemoteKeepsOtherNamespaceTags: for App
+// Configuration the probe runs under the key's own namespace, so a setting gone
+// under one namespace leaves the same name's tags under another staged.
+func TestDiffUseCase_Execute_TagOnlyVanishedRemoteKeepsOtherNamespaceTags(t *testing.T) {
+	t.Parallel()
+
+	gone := staging.EntryKey{Name: "app/db", Namespace: "dev"}
+	kept := staging.EntryKey{Name: "app/db", Namespace: "prd"}
+	store := testutil.NewMockStore()
+
+	for _, key := range []staging.EntryKey{gone, kept} {
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+			Add: map[string]string{"env": key.Namespace}, StagedAt: time.Now(),
+		}))
+	}
+
+	devStrategy := newMockDiffStrategy()
+	devStrategy.fetchErrors[gone.Name] = fmt.Errorf("%w: not found", provider.ErrNotFound)
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+		StrategyFor: func(namespace string) (staging.DiffStrategy, error) {
+			if namespace == gone.Namespace {
+				return devStrategy, nil
+			}
+
+			return newMockDiffStrategy(), nil
+		},
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.Entries, 1)
+	assert.Equal(t, gone.Namespace, output.Entries[0].Namespace)
 	require.Len(t, output.TagEntries, 1)
 	assert.Equal(t, kept.Namespace, output.TagEntries[0].Namespace)
 

@@ -195,6 +195,21 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 			continue
 		}
 
+		// A key with only tag changes had no entry probe above, so check here
+		// that its remote still exists (see discardVanishedTags).
+		if _, hasEntry := entries[key]; !hasEntry {
+			diffEntry, discarded, err := u.discardVanishedTags(ctx, key)
+			if err != nil {
+				return nil, err
+			}
+
+			if discarded {
+				output.Entries = append(output.Entries, diffEntry)
+
+				continue
+			}
+		}
+
 		diffTagEntry := DiffTagEntry{
 			Name:      key.Name,
 			Namespace: key.Namespace,
@@ -373,4 +388,31 @@ func (u *DiffUseCase) unstageGone(ctx context.Context, service staging.Service, 
 	default:
 		return "; its staged tag changes were discarded", nil
 	}
+}
+
+// discardVanishedTags probes the remote of a key that has staged tag changes but
+// no staged entry. Only a genuine not-found unstages the tag changes (the same
+// rule as unstageGone: left behind, they would fail every later apply) and
+// returns an auto-unstaged row. Any other probe error keeps the tags staged; the
+// tag row is shown as usual.
+func (u *DiffUseCase) discardVanishedTags(ctx context.Context, key staging.EntryKey) (DiffEntry, bool, error) {
+	strategy, err := u.strategyForNamespace(key.Namespace)
+	if err != nil {
+		return DiffEntry{}, false, err
+	}
+
+	if _, err := strategy.FetchCurrent(ctx, key.Name); !errors.Is(err, provider.ErrNotFound) {
+		return DiffEntry{}, false, nil
+	}
+
+	if err := u.Store.UnstageTag(ctx, u.Strategy.Service(), key); err != nil {
+		return DiffEntry{}, false, fmt.Errorf("failed to unstage tags of %s: %w", key.Name, err)
+	}
+
+	return DiffEntry{
+		Name:      key.Name,
+		Namespace: key.Namespace,
+		Type:      DiffEntryAutoUnstaged,
+		Warning:   "item no longer exists in " + u.remoteLabel() + "; its staged tag changes were discarded",
+	}, true, nil
 }
