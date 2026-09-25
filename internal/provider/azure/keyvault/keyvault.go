@@ -156,7 +156,48 @@ func (s *Store) versionsNewestFirst(ctx context.Context, name string) ([]secretV
 
 	sortNewestFirst(versions)
 
-	return versions, nil
+	return s.servedFirst(ctx, name, versions), nil
+}
+
+// servedFirst moves the version Key Vault serves as current to index 0 when the
+// newest versions share a creation time. Timestamps have only 1-second
+// resolution, so sortNewestFirst's id tie-break is deterministic but may put a
+// version first that the service does not serve. Only then does this ask the
+// service (an unversioned GetSecret) which one it serves. If that call fails
+// (for example 403 when the served version is disabled), the sort order stays.
+// Ties deeper in the history stay ordered by id: the API gives no order there.
+func (s *Store) servedFirst(ctx context.Context, name string, versions []secretVersion) []secretVersion {
+	if len(versions) < 2 || !sameCreated(versions[0].created, versions[1].created) {
+		return versions
+	}
+
+	resp, err := s.client.GetSecret(ctx, name, "")
+	if err != nil {
+		debug.From(ctx).Logf("azure keyvault: GetSecret %s for the tie-break failed, keeping id order: %v\n", name, err)
+
+		return versions
+	}
+
+	served := versionID(resp.ID)
+
+	_, idx, found := lo.FindIndexOf(versions, func(v secretVersion) bool {
+		return v.id == served && sameCreated(v.created, versions[0].created)
+	})
+	if !found || idx == 0 {
+		return versions
+	}
+
+	return slices.Concat([]secretVersion{versions[idx]}, versions[:idx], versions[idx+1:])
+}
+
+// sameCreated reports whether two creation times are equal (both nil counts as
+// equal, since sortNewestFirst orders those by id too).
+func sameCreated(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+
+	return a.Equal(*b)
 }
 
 // Get retrieves the secret value at the given ref (current when ref is latest)
@@ -189,7 +230,8 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 
 // History returns the secret's version history, newest first. The per-version
 // enabled/disabled state is surfaced in the neutral Version.State for display.
-// The newest version is the current one (what an unversioned Get serves).
+// The first version is the current one: the newest, and on a same-second tie
+// the one an unversioned Get serves (see servedFirst).
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
 	versions, err := s.versionsNewestFirst(ctx, name)
 	if err != nil {
@@ -376,7 +418,8 @@ func sortNewestFirst(versions []secretVersion) {
 	// timestamps have only 1-second resolution and the list-versions API returns
 	// versions unordered, so two SetSecret calls within the same second would
 	// otherwise keep their arbitrary API order — making ~N and log ordering
-	// non-deterministic.
+	// non-deterministic. The id order need not match the service's; servedFirst
+	// corrects the top of the list.
 	sort.SliceStable(versions, func(i, j int) bool {
 		ci, cj := versions[i].created, versions[j].created
 
