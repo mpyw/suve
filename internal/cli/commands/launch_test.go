@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/detect"
 )
 
 // runLaunchScope drives a throwaway cli.Command carrying the given flags/args
@@ -177,4 +178,57 @@ func TestRegisterLaunchMode_Launches(t *testing.T) {
 		assert.Equal(t, tt.scope, gotScope, "%v", tt.args)
 		assert.Equal(t, tt.service, gotService, "%v", tt.args)
 	}
+}
+
+// TestRegisterLaunchMode_ExplicitEmptyNamespace verifies an explicit
+// --namespace "" (the null namespace) survives the UI's env hydration instead
+// of being refilled from AZURE_APPCONFIG_NAMESPACE, as the CLI already honors
+// it (#1002). It mutates the process-wide App and env, so it is not parallel.
+func TestRegisterLaunchMode_ExplicitEmptyNamespace(t *testing.T) {
+	t.Cleanup(func() { App = MakeApp() })
+
+	t.Setenv("AZURE_APPCONFIG_NAME", "env-store")
+	t.Setenv("AZURE_APPCONFIG_NAMESPACE", "dev")
+	t.Setenv("AZURE_KEYVAULT_NAME", "")
+
+	errLaunched := errors.New("launched")
+
+	var hydrated provider.Scope
+
+	// A fresh App per run: urfave/cli keeps flag state between runs of one
+	// command tree, and the real CLI runs its tree once.
+	run := func(args ...string) provider.Scope {
+		t.Helper()
+
+		App = MakeApp()
+		RegisterLaunchMode(LaunchMode{
+			Flag: "fake-ui",
+			Bare: func(ctx context.Context) (context.Context, error) { return ctx, errLaunched },
+			Launch: func(ctx context.Context, scope provider.Scope, _ string) (context.Context, error) {
+				var err error
+
+				hydrated, err = detect.HydrateScope(detect.OSEnvironment(), scope)
+				require.NoError(t, err)
+
+				return ctx, errLaunched
+			},
+		})
+
+		hydrated = provider.Scope{}
+		require.ErrorIs(t, App.Run(t.Context(), append([]string{"suve"}, args...)), errLaunched)
+
+		return hydrated
+	}
+
+	got := run("azure", "param", "--fake-ui")
+	assert.Equal(t, "env-store", got.StoreName)
+	assert.Equal(t, "dev", got.AppConfigNamespace, "without the flag the env namespace applies")
+
+	got = run("azure", "param", "--namespace", "", "--fake-ui")
+	assert.Equal(t, "env-store", got.StoreName)
+	assert.Empty(t, got.AppConfigNamespace, `--namespace "" must select the null namespace`)
+
+	got = run("azure", "param", "--store-name", "flag-store", "--namespace", "prod", "--fake-ui")
+	assert.Equal(t, "flag-store", got.StoreName)
+	assert.Equal(t, "prod", got.AppConfigNamespace)
 }
