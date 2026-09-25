@@ -274,7 +274,10 @@
     modalLoading = true;
     modalError = '';
     try {
-      const isEdit = paramDetail && selectedParam === setForm.name;
+      // Edit vs create comes from how the modal was opened, never from the typed
+      // name: "+ New" with the selected row's name in another namespace is a
+      // create (#980).
+      const isEdit = isEditMode;
       // App Config: create targets the form's namespace; edit targets the
       // existing entry's namespace. Other providers ignore this argument.
       const targetNamespace = isEdit ? selectedEntryNamespace : setForm.namespace;
@@ -644,7 +647,7 @@
         class="form-input"
         bind:value={setForm.name}
         placeholder="/path/to/parameter"
-        disabled={!!paramDetail && selectedParam === setForm.name}
+        disabled={isEditMode}
       />
     </div>
     {#if hasNamespaces}

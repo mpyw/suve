@@ -763,6 +763,34 @@ export async function getSelectScopeCalls(page: Page): Promise<ScopeSelection[]>
   return page.evaluate(() => ((window as any).__selectScopeCalls as ScopeSelection[]) ?? []);
 }
 
+/**
+ * Record the arguments of the named bindings. Call after setupWailsMocks and
+ * before page.goto: the wrapper init script runs after the mock's, so it wraps
+ * the mock methods in place. Read the calls back with getBindingArgs.
+ */
+export async function recordBindingArgs(page: Page, names: string[]) {
+  await page.addInitScript((bindingNames: string[]) => {
+    const app = (window as any).go.gui.App;
+    const record: Record<string, unknown[][]> = {};
+    (window as any).__bindingArgs = record;
+    for (const name of bindingNames) {
+      const original = app[name];
+      record[name] = [];
+      app[name] = (...args: unknown[]) => {
+        record[name].push(JSON.parse(JSON.stringify(args)));
+        return original(...args);
+      };
+    }
+  }, names);
+}
+
+/**
+ * Read the argument lists recorded for one binding (see recordBindingArgs).
+ */
+export async function getBindingArgs(page: Page, name: string): Promise<unknown[][]> {
+  return page.evaluate((n) => ((window as any).__bindingArgs?.[n] as unknown[][]) ?? [], name);
+}
+
 // ============================================================================
 // Main Mock Setup Function
 // ============================================================================
