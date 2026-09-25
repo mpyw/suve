@@ -4,7 +4,6 @@
   import { capability, gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
-  import { withRetry } from './retry';
   import StagingSection from './StagingSection.svelte';
   import { parseError } from './viewUtils';
   import './common.css';
@@ -105,9 +104,12 @@
     loading = true;
     error = '';
     try {
+      // No retry: App mounts this view only once the Wails runtime is ready, and
+      // StagingDiff makes network calls, so a real failure (expired
+      // credentials) must surface at once instead of being retried (#1009).
       const [paramResult, secretResult] = await Promise.all([
-        paramSvc ? withRetry(() => StagingDiff('param', '')) : Promise.resolve(null),
-        secretSvc ? withRetry(() => StagingDiff('secret', '')) : Promise.resolve(null),
+        paramSvc ? StagingDiff('param', '') : Promise.resolve(null),
+        secretSvc ? StagingDiff('secret', '') : Promise.resolve(null),
       ]);
       if (seq !== loadSeq) return; // superseded by a newer reload
       const paramAll = paramResult?.entries || [];
