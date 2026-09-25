@@ -3,14 +3,14 @@ name: declscope-adoption
 description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when clearing a declscope baseline, or when a declscope diagnostic is hard to act on. Covers reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence.
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.12.0
-x-embedded-at: "2026-09-24T07:05:04Z"
-x-embedded-digest: "sha256:3ff360b2bf9880e00a36ba22f0de09062eb5545f8fccf2a48874b717712d6f58"
+x-embedded-version: 0.13.0
+x-embedded-at: "2026-09-25T04:14:25Z"
+x-embedded-digest: "sha256:f344c4e28af4379d944b3b6563f74727999fae4218804bb2bf0b57fa31d53093"
 ---
 
 # Adopting declscope
 
-Written against **declscope 0.12.0**. Check the version first: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.13.0**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
@@ -102,6 +102,60 @@ done
 
 Every count in the rest of this skill assumes `qualify: ondemand` with `exported: true`. That is what the numbers were taken under, not a recommendation.
 
+## Shrink the exported surface first
+
+**`declscope shrink` reports the exported declarations of `internal/` packages that nothing outside their package uses.** With `-fix` it unexports them. The analyzer cannot answer this: it reads one package, and any importer might use an exported name. Inside `internal/`, Go limits the importers to one directory tree, so `shrink` loads the whole module and sees every one of them.
+
+An exported name inside `internal/` claims that another package depends on it. Where nothing does, the claim is false, and it hides the declaration from the rest of declscope. An exported declaration takes package scope by default, so no boundary is ever reported on it. Unexported, it takes `private`, and the analyzer checks who reaches it.
+
+**It is a subcommand, not a rule the analyzer runs.** `go vet` and golangci-lint never report it, and it has no config key. A clean `declscope ./...` says nothing about it.
+
+### Run it before the analyzer
+
+**Run `shrink`, and apply its fixes, before you work on the analyzer's reports.** A declaration it unexports becomes private to its namespace. Wherever another file of the package uses it, the analyzer then reports a boundary crossing that was not there before. Fixing in the other order means a second round.
+
+This happened when declscope held itself to `shrink`. The fix unexported twelve declarations, and nine of them were used from other files of their package. The analyzer then needed nine `//declscope:package` directives to state those crossings.
+
+| Step | Command |
+| --- | --- |
+| 1. Read what `shrink` reports | `declscope shrink ./...` |
+| 2. Unexport, once the owner agrees | `declscope shrink -fix ./...` |
+| 3. Confirm the build | `go vet ./...` and `go test ./...` |
+| 4. Read what the analyzer now reports | `declscope ./...` |
+| 5. State or move each new crossing | See [What each shape means](#what-each-shape-means) |
+
+Ask before step 2, the same as any other change. The fix renames every identifier naming the declaration, all inside its own package, and the doc comment that opens with the name.
+
+### Reading what it reports
+
+| Report | What to do |
+| --- | --- |
+| `... uses it` and nothing more | The fix is offered. Apply it with `-fix` |
+| `... (no fix: <reason>)` | A use may exist that `shrink` cannot prove, or the rename is unsafe. **Do not unexport it by hand.** Read the reason first |
+| `... only the external tests of <pkg> use it` | Keep it exported. Add `//declscope:ignore overexported // <why>` when the tests use it on purpose |
+| `declscope shrink: not judged: <pkg>: <reason>` on stderr | That package was not checked. It is not clean |
+
+**A package not judged is not a package with nothing to report.**
+
+`shrink` stands down wherever an importer could be unseen. That is outside `internal/`, in `package main`, and beside assembly or cgo. It is also under an `internal/` that a nested module's path extends. The stderr line names each such package, and the exit status ignores it.
+
+Silence a report with `//declscope:ignore overexported` and a reason. A bare `//declscope:ignore` does not reach this rule. `shrink` reports an ignore that silenced nothing, as the analyzer does for its own.
+
+**Deleting unused code is not `shrink`'s job.** Once a declaration is unexported, staticcheck's `unused` and gopls' `unusedfunc` report it when nothing uses it. Run them after `shrink`, not before.
+
+### Keep it in CI
+
+Run it before the analyzer there too, so that a failure reads in the order it is fixed. It exits 3 when it reports anything.
+
+```yaml
+- run: declscope shrink ./...
+- run: declscope ./...
+```
+
+**Names written as strings are outside what `shrink` can see.**
+
+A template can name a field, and a constant can go to `reflect.Value.MethodByName`. A script can read the symbol table. Each uses a declaration by name. When the value reaches them through an interface, `shrink` already treats it as used. When it does not, add the ignore with the reason.
+
 ## The two kinds of report
 
 declscope reports two things. **Read them separately.**
@@ -110,6 +164,7 @@ declscope reports two things. **Read them separately.**
 | --- | --- |
 | `boundary` | A file reaches a declaration another file holds. A property of the code |
 | `qualify` | A name does not carry its file's namespace. A convention |
+| `overexported` | An exported name inside `internal/` that nothing outside its package uses. Only `declscope shrink` reports it, and it goes [first](#shrink-the-exported-surface-first) |
 
 Boundary first. It is the one that points at structure.
 
@@ -309,6 +364,8 @@ go build ./... && declscope ./...   # never read a bare count without this
 
 **A zero may be the filter, not the code.** A `filter.only` anywhere in the chain can leave a package with nothing to read. A package nothing was read from reports nothing. `declscope` says so only when a nested `only` was cancelled by one above it, so the quiet cases stay quiet. `declscope inspect` lists the files each namespace was built from (`namespaces[].files`); a package whose files are missing from it is one the filter removed.
 
+**A clean analyzer says nothing about `shrink`.** The analyzer never reports `overexported`, and `shrink` never reports what the analyzer does. Run both, `shrink` first.
+
 **A zero from `boundary` may be the switch, not the code.** `rules.boundary: off` silences the rule entirely, and the run looks like a clean repository. Read every config before reporting a count, the same way you would for `qualify`.
 
 **`-fix` widens; it does not draw boundaries.** On a codebase with boundary findings, `declscope -fix ./...` inserts `//declscope:package` above every crossed declaration — the wholesale widening step 2 of the order of work exists to avoid. Run `-fix -diff` first and read it. Its place in an adoption is renaming, after the structure is settled, and only where `names[].fixable` is true.
@@ -332,9 +389,10 @@ cp -r repo /tmp/try-a   # and measure there
 ## Order of work
 
 1. `declscope survey ./...`, and read Checks in force before any count
-2. Clear `boundary` by moving the boundary, not by widening everything
-3. Re-measure with `survey`. Naming often falls with it, since merging two namespaces into one takes `ondemand` out of force
-4. Fix the file names that do not match their contents
-5. Rename what is left, in natural word order
-6. Delete the baseline
-7. Check the core count, and `go build`, `go test` and `declscope` in that order
+2. If the repository has `internal/` packages, run `declscope shrink ./...` and settle it before anything else. Its fixes add boundary reports, and nothing that follows adds reports back
+3. Clear `boundary` by moving the boundary, not by widening everything
+4. Re-measure with `survey`. Naming often falls with it, since merging two namespaces into one takes `ondemand` out of force
+5. Fix the file names that do not match their contents
+6. Rename what is left, in natural word order
+7. Delete the baseline
+8. Check the core count, and `go build`, `go test`, `declscope shrink` and `declscope` in that order
