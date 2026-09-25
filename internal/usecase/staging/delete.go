@@ -76,10 +76,21 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 
 	key := input.Key
 
-	// Load current state with CurrentValue for existence check
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
+	// Load current state with CurrentValue for existence check, keeping any
+	// existing staged base so conflict detection is preserved when an Update is
+	// turned into a Delete (or a Delete is re-staged). Re-basing to the fresh
+	// remote time would hide an out-of-band write made since the first staging.
+	entryState, existingBaseModifiedAt, err := transition.LoadEntryStateWithMetadata(ctx, u.Store, service, key, currentValue)
 	if err != nil {
 		return nil, err
+	}
+
+	// Anchor the conflict base: reuse an existing staged base when present,
+	// otherwise fall back to the current remote last-modified time (zero-time
+	// means none), mirroring the edit and reset use cases.
+	baseModifiedAt := existingBaseModifiedAt
+	if baseModifiedAt == nil && !lastModified.IsZero() {
+		baseModifiedAt = &lastModified
 	}
 
 	// Use reducer to determine transition - existence check is done in reducer
@@ -101,7 +112,7 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 	} else {
 		// Stage delete with options (single persist)
 		if err := u.stageDeleteWithOptions(
-			ctx, service, key, lastModified, hasDeleteOptions, input.Force, input.RecoveryWindow,
+			ctx, service, key, baseModifiedAt, hasDeleteOptions, input.Force, input.RecoveryWindow,
 		); err != nil {
 			return nil, err
 		}
@@ -136,13 +147,11 @@ func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*Delete
 // stageDeleteWithOptions stages a delete entry with optional delete options.
 //
 //nolint:lll // function parameters are descriptive for clarity
-func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, key staging.EntryKey, lastModified time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
+func (u *DeleteUseCase) stageDeleteWithOptions(ctx context.Context, service staging.Service, key staging.EntryKey, baseModifiedAt *time.Time, hasDeleteOptions, force bool, recoveryWindow int) error {
 	entry := staging.Entry{
-		Operation: staging.OperationDelete,
-		StagedAt:  time.Now(),
-	}
-	if !lastModified.IsZero() {
-		entry.BaseModifiedAt = &lastModified
+		Operation:      staging.OperationDelete,
+		StagedAt:       time.Now(),
+		BaseModifiedAt: baseModifiedAt,
 	}
 
 	if hasDeleteOptions {
