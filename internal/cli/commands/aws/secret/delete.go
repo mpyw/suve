@@ -157,7 +157,14 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		Target: target,
 	}
 
-	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)
+	var confirmed bool
+	if force {
+		confirmed, err = prompter.ConfirmDelete(name, skipConfirm)
+	} else {
+		confirmed, err = prompter.ConfirmRecoverableDelete(
+			name, fmt.Sprintf("recoverable for %d days with 'suve aws secret restore'", recoveryWindow), skipConfirm,
+		)
+	}
 	if err != nil {
 		return err
 	}

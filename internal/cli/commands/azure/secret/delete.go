@@ -81,9 +81,12 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		Stdin:  os.Stdin,
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
+		Target: azureinternal.KeyVaultConfirmTarget(ctx),
 	}
 
-	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)
+	confirmed, err := prompter.ConfirmRecoverableDelete(
+		name, "recoverable with 'suve azure secret restore' while the vault keeps soft-deleted secrets", skipConfirm,
+	)
 	if err != nil {
 		return err
 	}

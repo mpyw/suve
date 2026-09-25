@@ -93,6 +93,21 @@ func (p *Prompter) ConfirmDelete(target string, skipConfirm bool) (bool, error) 
 	return p.readYesNo()
 }
 
+// ConfirmRecoverableDelete confirms a delete that the backend keeps
+// recoverable (Key Vault soft-delete, a Secrets Manager recovery window).
+// recovery says how it can be recovered and is shown after the target.
+func (p *Prompter) ConfirmRecoverableDelete(target, recovery string, skipConfirm bool) (bool, error) {
+	if skipConfirm {
+		return true, nil
+	}
+
+	p.printTargetInfo()
+	output.Printf(p.Stderr, "%s This will delete: %s (%s)\n", colors.For(p.Stderr).Warning("!"), target, recovery)
+	output.Printf(p.Stderr, "%s Continue? [y/N]: ", colors.For(p.Stderr).Warning("?"))
+
+	return p.readYesNo()
+}
+
 // Choice represents an option in a multiple choice prompt.
 type Choice struct {
 	Label       string

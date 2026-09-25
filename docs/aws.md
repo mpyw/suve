@@ -1172,7 +1172,7 @@ user@host:~$ suve aws secret delete my-old-secret
 
   {"username":"admin","password":"oldpassword"}
 
-! This will permanently delete: my-old-secret
+! This will delete: my-old-secret (recoverable for 30 days with 'suve aws secret restore')
 ? Continue? [y/N] y
 ! Scheduled deletion of secret my-old-secret (deletion date: 2024-02-14)
 ```

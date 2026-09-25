@@ -106,6 +106,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 			Stdin:  valueinput.ValueStdin(cmd),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
+			Target: azureinternal.KeyVaultConfirmTarget(ctx),
 		}
 
 		confirmed, cerr := prompter.ConfirmAction("Update secret", name, false)

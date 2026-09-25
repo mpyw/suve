@@ -20,3 +20,10 @@ func TestStagingScopeResolver(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, staging.ResolvedScope{Scope: provider.GoogleCloudScope("proj"), Target: provider.GoogleCloudScope("proj").Target()}, got)
 }
+
+func TestConfirmTarget(t *testing.T) {
+	t.Parallel()
+
+	assert.Empty(t, ConfirmTarget(t.Context()))
+	assert.Equal(t, "project proj", ConfirmTarget(WithProject(t.Context(), "proj")))
+}

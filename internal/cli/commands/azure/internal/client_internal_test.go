@@ -38,3 +38,14 @@ func TestAppConfigStagingScopeResolver(t *testing.T) {
 	assert.Equal(t, staging.ResolvedScope{Scope: want, Target: want.Target()}, got)
 	assert.Equal(t, "dev", AppConfigNamespace(ctx))
 }
+
+func TestConfirmTargets(t *testing.T) {
+	t.Parallel()
+
+	assert.Empty(t, KeyVaultConfirmTarget(t.Context()))
+	assert.Empty(t, AppConfigConfirmTarget(t.Context()))
+
+	ctx := WithAppConfigNamespace(WithStoreName(WithVaultName(t.Context(), "my-vault"), "my-store"), "dev")
+	assert.Equal(t, "vault my-vault", KeyVaultConfirmTarget(ctx))
+	assert.Equal(t, "store my-store · namespace dev", AppConfigConfirmTarget(ctx))
+}

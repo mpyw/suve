@@ -195,3 +195,37 @@ func TestGoogleCloudSecret_Description(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+// TestGoogleCloudSecret_DeleteConfirmTarget verifies the delete confirmation
+// names the Google Cloud project it applies to (#1006). It aborts with "n".
+func TestGoogleCloudSecret_DeleteConfirmTarget(t *testing.T) {
+	setupGoogleCloud(t)
+
+	const name = "suve-e2e-gcloud-confirm-target"
+
+	_, _ = runGcloud(t, "secret", "delete", "--yes", name)
+	t.Cleanup(func() { _, _ = runGcloud(t, "secret", "delete", "--yes", name) })
+
+	_, err := runGcloud(t, "secret", "create", name, "keep-me")
+	require.NoError(t, err)
+
+	var errBuf bytes.Buffer
+
+	app := &cli.Command{
+		Name:      "suve",
+		Writer:    &bytes.Buffer{},
+		ErrWriter: &errBuf,
+		Commands:  []*cli.Command{gcloud.Command()},
+	}
+
+	withOSStdin(t, "n\n", func() {
+		err = app.Run(testContext(t), []string{"suve", "gcloud", "secret", "delete", name})
+	})
+	require.NoError(t, err)
+	assert.Contains(t, errBuf.String(), "Target: project suve-e2e")
+	assert.Contains(t, errBuf.String(), "permanently delete")
+
+	stdout, err := runGcloud(t, "secret", "show", "--raw", name)
+	require.NoError(t, err)
+	assert.Equal(t, "keep-me", stdout)
+}

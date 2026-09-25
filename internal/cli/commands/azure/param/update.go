@@ -107,6 +107,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 			Stdin:  valueinput.ValueStdin(cmd),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
+			Target: azureinternal.AppConfigConfirmTarget(ctx),
 		}
 
 		confirmed, cerr := prompter.ConfirmAction("Update setting", name, false)
