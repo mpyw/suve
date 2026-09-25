@@ -69,7 +69,7 @@ func TestAddUseCase_Execute_PreservesStagedTypeOnReAddWithoutType(t *testing.T) 
 	// A create was previously staged as SecureString.
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secure"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v1"),
+		Value:     new("v1"),
 		ValueType: domain.ValueTypeSecret,
 		StagedAt:  time.Now(),
 	}))
@@ -172,7 +172,7 @@ func TestAddUseCase_Draft_StagedCreate(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/draft"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("draft-value"),
+		Value:     new("draft-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -194,7 +194,7 @@ func TestAddUseCase_Draft_StagedUpdate(t *testing.T) {
 	// Update operation should not be returned as draft
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/update"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("update-value"),
+		Value:     new("update-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -305,7 +305,7 @@ func TestAddUseCase_Execute_RejectsWhenUpdateStaged(t *testing.T) {
 	// Pre-stage an UPDATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/existing"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("update-value"),
+		Value:     new("update-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -352,7 +352,7 @@ func TestAddUseCase_Execute_AllowsReEditOfCreate(t *testing.T) {
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("initial-value"),
+		Value:     new("initial-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -404,7 +404,7 @@ func TestAddUseCase_Draft_StagedCreate_Found(t *testing.T) {
 	// Pre-stage a CREATE operation
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/draft"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("draft-value"),
+		Value:     new("draft-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -472,5 +472,5 @@ func TestAddUseCase_Execute_PreservesStagedDescriptionWhenUnset(t *testing.T) {
 	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, key)
 	require.NoError(t, err)
 	assert.Equal(t, "v2", lo.FromPtr(entry.Value))
-	assert.Equal(t, lo.ToPtr("new desc"), entry.Description)
+	assert.Equal(t, new("new desc"), entry.Description)
 }

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -70,7 +69,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 		})
 		require.NoError(t, err)
 	})
@@ -95,7 +94,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("updated-value"),
+			Value:     new("updated-value"),
 		})
 		require.NoError(t, err)
 	})
@@ -141,7 +140,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get existing parameter")
@@ -159,7 +158,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "parameter not found")
@@ -179,7 +178,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create parameter")
@@ -202,7 +201,7 @@ func TestParamStrategy_Apply(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update parameter")
@@ -252,7 +251,7 @@ func TestParamStrategy_Apply_ValueType(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/secure", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 			ValueType: domain.ValueTypeSecret,
 		})
 		require.NoError(t, err)
@@ -278,7 +277,7 @@ func TestParamStrategy_Apply_ValueType(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/list", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("a,b,c"),
+			Value:     new("a,b,c"),
 			ValueType: domain.ValueTypeList,
 		})
 		require.NoError(t, err)
@@ -303,7 +302,7 @@ func TestParamStrategy_Apply_ValueType(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/plain", staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("plain"),
+			Value:     new("plain"),
 			// ValueType intentionally unset (mirrors an entry staged before #664).
 		})
 		require.NoError(t, err)
@@ -331,7 +330,7 @@ func TestParamStrategy_Apply_ValueType(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("updated"),
+			Value:     new("updated"),
 			ValueType: domain.ValueTypeSecret,
 		})
 		require.NoError(t, err)
@@ -694,8 +693,8 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation:   staging.OperationCreate,
-			Value:       lo.ToPtr("value"),
-			Description: lo.ToPtr("Test description"),
+			Value:       new("value"),
+			Description: new("Test description"),
 		})
 		require.NoError(t, err)
 	})
@@ -719,8 +718,8 @@ func TestParamStrategy_Apply_WithDescription(t *testing.T) {
 		s := staging.NewAWSParamStrategy(mock)
 		err := s.Apply(t.Context(), "/app/param", staging.Entry{
 			Operation:   staging.OperationUpdate,
-			Value:       lo.ToPtr("value"),
-			Description: lo.ToPtr("Test description"),
+			Value:       new("value"),
+			Description: new("Test description"),
 		})
 		require.NoError(t, err)
 	})

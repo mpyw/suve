@@ -215,7 +215,7 @@ func TestExecuteEntry_DeleteCreate_UnstagesTags(t *testing.T) {
 	// Pre-stage CREATE and tags
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("draft"),
+		Value:     new("draft"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.TagEntry{
@@ -253,7 +253,7 @@ func TestExecuteEntry_DeleteCreate_NoTags(t *testing.T) {
 	// Pre-stage CREATE but no tags
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("draft"),
+		Value:     new("draft"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -284,14 +284,14 @@ func TestExecuteEntry_Reset(t *testing.T) {
 	// Pre-stage an entry
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("updated"),
+		Value:     new("updated"),
 		StagedAt:  time.Now(),
 	}))
 
 	executor := NewExecutor(store)
 
 	state := EntryState{
-		CurrentValue: lo.ToPtr(executorTestCurrentValue),
+		CurrentValue: new(executorTestCurrentValue),
 		StagedState:  EntryStagedStateUpdate{DraftValue: "updated"},
 	}
 
@@ -314,7 +314,7 @@ func TestExecuteEntry_Error(t *testing.T) {
 	executor := NewExecutor(store)
 
 	state := EntryState{
-		CurrentValue: lo.ToPtr(executorTestCurrentValue),
+		CurrentValue: new(executorTestCurrentValue),
 		StagedState:  EntryStagedStateDelete{},
 	}
 
@@ -547,7 +547,7 @@ func TestExecuteEntry_UnstageTagError(t *testing.T) {
 	// Pre-stage entry so UnstageEntry succeeds
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("draft"),
+		Value:     new("draft"),
 		StagedAt:  time.Now(),
 	}))
 

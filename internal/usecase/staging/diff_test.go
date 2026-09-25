@@ -77,7 +77,7 @@ func TestDiffUseCase_Execute_UpdateDiff(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -114,7 +114,7 @@ func TestDiffUseCase_Execute_SecretFlagFromFetch(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/token"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-secret"),
+		Value:     new("new-secret"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -139,8 +139,8 @@ func TestDiffUseCase_Execute_CreateDiff(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation:   staging.OperationCreate,
-		Value:       lo.ToPtr("new-value"),
-		Description: lo.ToPtr("new param"),
+		Value:       new("new-value"),
+		Description: new("new param"),
 		StagedAt:    time.Now(),
 	}))
 
@@ -173,7 +173,7 @@ func TestDiffUseCase_Execute_CreateDiff_SecretFromValueType(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/secret"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-secret"),
+		Value:     new("new-secret"),
 		ValueType: domain.ValueTypeSecret,
 		StagedAt:  time.Now(),
 	}))
@@ -230,7 +230,7 @@ func TestDiffUseCase_Execute_AutoUnstage_Identical(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/same"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("same-value"),
+		Value:     new("same-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -327,7 +327,7 @@ func TestDiffUseCase_Execute_UnstageError(t *testing.T) {
 		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/same"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("same-value"),
+			Value:     new("same-value"),
 			StagedAt:  time.Now(),
 		}))
 		store.UnstageEntryErr = errors.New("keychain locked")
@@ -349,7 +349,7 @@ func TestDiffUseCase_Execute_UnstageError(t *testing.T) {
 		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/gone"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("v"),
+			Value:     new("v"),
 			StagedAt:  time.Now(),
 		}))
 		store.UnstageEntryErr = errors.New("disk full")
@@ -372,12 +372,12 @@ func TestDiffUseCase_Execute_FilterByName(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/one"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("one"),
+		Value:     new("one"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/two"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("two"),
+		Value:     new("two"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -415,7 +415,7 @@ func TestDiffUseCase_Execute_AutoUnstage_UpdateNoLongerExists(t *testing.T) {
 	// Stage an update for something that no longer exists
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/gone"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("update-value"),
+		Value:     new("update-value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -453,7 +453,7 @@ func TestDiffUseCase_Execute_KeepStagedOnTransientError(t *testing.T) {
 
 			entry := staging.Entry{Operation: op, StagedAt: time.Now()}
 			if op == staging.OperationUpdate {
-				entry.Value = lo.ToPtr("v")
+				entry.Value = new("v")
 			}
 
 			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/x"}, entry))
@@ -549,7 +549,7 @@ func TestDiffUseCase_Execute_UnknownOperation(t *testing.T) {
 	// Stage an entry with an unknown operation (edge case)
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/unknown"}, staging.Entry{
 		Operation: staging.Operation("unknown"),
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -575,7 +575,7 @@ func TestDiffUseCase_Execute_FilterByName_EntryExistsTagNil(t *testing.T) {
 	// Stage only an entry, no tag
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/entry-only"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -650,10 +650,10 @@ func TestDiffUseCase_Execute_PerNamespaceResolver(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "app/k", Namespace: "dev"}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("dev-staged"), StagedAt: time.Now(),
+		Operation: staging.OperationUpdate, Value: new("dev-staged"), StagedAt: time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "app/k", Namespace: "prd"}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("prd-staged"), StagedAt: time.Now(),
+		Operation: staging.OperationUpdate, Value: new("prd-staged"), StagedAt: time.Now(),
 	}))
 
 	// A distinct strategy per namespace, each returning a namespace-specific
@@ -707,7 +707,7 @@ func TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteDiscardsTags(t *testing.T
 
 			entry := staging.Entry{Operation: op, StagedAt: time.Now()}
 			if op == staging.OperationUpdate {
-				entry.Value = lo.ToPtr("update-value")
+				entry.Value = new("update-value")
 			}
 			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, gone, entry))
 
@@ -752,7 +752,7 @@ func TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteKeepsOtherNamespaceTags(t
 	kept := staging.EntryKey{Name: "app/db", Namespace: "prd"}
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, gone, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+		Operation: staging.OperationUpdate, Value: new("v"), StagedAt: time.Now(),
 	}))
 
 	for _, key := range []staging.EntryKey{gone, kept} {

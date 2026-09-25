@@ -154,10 +154,8 @@ func keyVaultStore(ctx context.Context, scope provider.Scope) (provider.Store, e
 			},
 		}
 		opts := &azsecrets.ClientOptions{
-			ClientOptions: azcore.ClientOptions{
-				Transport: httpClient,
-				Logging:   debugLogOptions(ctx),
-			},
+			Transport:                            httpClient,
+			Logging:                              debugLogOptions(ctx),
 			DisableChallengeResourceVerification: true,
 		}
 
@@ -177,7 +175,7 @@ func keyVaultStore(ctx context.Context, scope provider.Scope) (provider.Store, e
 	vaultURL := fmt.Sprintf("https://%s.vault.azure.net", scope.VaultName)
 
 	opts := &azsecrets.ClientOptions{
-		ClientOptions: azcore.ClientOptions{Logging: debugLogOptions(ctx)},
+		Logging: debugLogOptions(ctx),
 	}
 
 	client, err := azsecrets.NewClient(vaultURL, cred, opts)
@@ -198,10 +196,8 @@ func appConfigStore(ctx context.Context, scope provider.Scope) (provider.Store, 
 	// endpoint + DefaultAzureCredential and allows HMAC auth over plain HTTP.
 	if connStr := os.Getenv(AppConfigConnStringEnvVar); connStr != "" {
 		opts := &azappconfig.ClientOptions{
-			ClientOptions: azcore.ClientOptions{
-				InsecureAllowCredentialWithHTTP: true,
-				Logging:                         debugLogOptions(ctx),
-			},
+			InsecureAllowCredentialWithHTTP: true,
+			Logging:                         debugLogOptions(ctx),
 		}
 
 		client, err := azappconfig.NewClientFromConnectionString(connStr, opts)
@@ -220,7 +216,7 @@ func appConfigStore(ctx context.Context, scope provider.Scope) (provider.Store, 
 	endpoint := fmt.Sprintf("https://%s.azconfig.io", scope.StoreName)
 
 	opts := &azappconfig.ClientOptions{
-		ClientOptions: azcore.ClientOptions{Logging: debugLogOptions(ctx)},
+		Logging: debugLogOptions(ctx),
 	}
 
 	client, err := azappconfig.NewClient(endpoint, cred, opts)

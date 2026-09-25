@@ -5,8 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/samber/lo"
-
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -105,7 +103,7 @@ func (e *Executor) persistEntryState(
 	case EntryStagedStateCreate:
 		entry := staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr(s.DraftValue),
+			Value:     new(s.DraftValue),
 			StagedAt:  time.Now(),
 		}
 		if opts != nil {
@@ -120,7 +118,7 @@ func (e *Executor) persistEntryState(
 	case EntryStagedStateUpdate:
 		entry := staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr(s.DraftValue),
+			Value:     new(s.DraftValue),
 			StagedAt:  time.Now(),
 		}
 		if opts != nil {

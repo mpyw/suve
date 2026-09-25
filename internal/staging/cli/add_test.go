@@ -57,7 +57,7 @@ func TestAddRunner_Run(t *testing.T) {
 		// Pre-stage as create
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("original-value"),
+			Value:     new("original-value"),
 		})
 
 		var buf bytes.Buffer
@@ -121,7 +121,7 @@ func TestAddRunner_Run(t *testing.T) {
 		// Pre-stage as create
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("same-value"),
+			Value:     new("same-value"),
 		})
 
 		var buf bytes.Buffer

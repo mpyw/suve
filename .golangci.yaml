@@ -95,14 +95,7 @@ linters:
   settings:
     modernize:
       disable:
-        # embedlit rewrites Outer{Embedded: Embedded{F: v}} into Outer{F: v},
-        # using go1.27's "a struct literal key may be any field selector" rule.
-        # The resulting promoted-field keys crash the SSA builder in
-        # x/tools/go/ssa v0.40.0 ("panic: unexpected expr: *ast.KeyValueExpr"),
-        # which is what goroutinectx v0.7.5 — a required CI step — is built
-        # against, and v0.7.5 is its newest release. golangci-lint 2.13.1
-        # (x/tools v0.49.0) handles the same code fine, so this can be re-enabled
-        # once goroutinectx ships with a newer x/tools.
+        # Keep promoted-field literal rewrites for a separate change.
         - embedlit
         # newexpr rewrites lo.ToPtr(x) into go1.26's new(x). This repo
         # standardizes on samber/lo for pointer helpers, and the analyzer fires

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,10 +32,10 @@ func TestGlobalApplyUseCase_ConflictBlocksEveryService(t *testing.T) {
 	base := time.Now().Add(-time.Hour)
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+		Operation: staging.OperationUpdate, Value: new("v"), StagedAt: time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("s"), StagedAt: time.Now(), BaseModifiedAt: &base,
+		Operation: staging.OperationUpdate, Value: new("s"), StagedAt: time.Now(), BaseModifiedAt: &base,
 	}))
 
 	uc := &usecasestaging.GlobalApplyUseCase{Services: []*usecasestaging.ApplyUseCase{
@@ -64,10 +63,10 @@ func TestGlobalApplyUseCase_SkipsEmptyServicesAndCounts(t *testing.T) {
 
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/ok"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("v"), StagedAt: time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/bad"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("v"), StagedAt: time.Now(),
 	}))
 
 	param := newMockApplyStrategy()
@@ -97,7 +96,7 @@ func TestGlobalApplyUseCase_ProbeErrorBlocksEveryService(t *testing.T) {
 	base := time.Now().Add(-time.Hour)
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), StagedAt: time.Now(), BaseModifiedAt: &base,
+		Operation: staging.OperationUpdate, Value: new("v"), StagedAt: time.Now(), BaseModifiedAt: &base,
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationDelete, StagedAt: time.Now(), BaseModifiedAt: &base,

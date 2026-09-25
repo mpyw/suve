@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -382,7 +381,7 @@ func TestLogPresenter_Patch(t *testing.T) {
 
 // diffVersionSpec builds a Google Cloud diff spec pinned to an integer version.
 func diffVersionSpec(v int64) *version.NumericSpec {
-	return &version.NumericSpec{Name: "my-secret", Absolute: version.NumericAbsolute{Version: lo.ToPtr(v)}}
+	return &version.NumericSpec{Name: "my-secret", Absolute: version.NumericAbsolute{Version: new(v)}}
 }
 
 // diffStore resolves each spec suffix ("#N") to a ref and returns the mapped

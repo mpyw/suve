@@ -322,7 +322,7 @@ func (s *Store) Tag(ctx context.Context, name string, add map[string]string) err
 
 	return s.mutateTags(ctx, name, func(tags map[string]*string) {
 		for k, v := range add {
-			tags[k] = lo.ToPtr(v)
+			tags[k] = new(v)
 		}
 	})
 }

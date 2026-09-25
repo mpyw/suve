@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -84,7 +83,7 @@ func TestParseDiffArgsParam(t *testing.T) {
 		{
 			name:      "1 arg: version specified",
 			args:      []string{"/app/config#3"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(3)), shift: 0},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(3)), shift: 0},
 			wantSpec2: &paramWantSpec{name: "/app/config", version: nil, shift: 0},
 		},
 		{
@@ -96,7 +95,7 @@ func TestParseDiffArgsParam(t *testing.T) {
 		{
 			name:      "1 arg: version and shift",
 			args:      []string{"/app/config#5~2"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(5)), shift: 2},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(5)), shift: 2},
 			wantSpec2: &paramWantSpec{name: "/app/config", version: nil, shift: 0},
 		},
 		{
@@ -108,20 +107,20 @@ func TestParseDiffArgsParam(t *testing.T) {
 		{
 			name:      "2 args: name + version spec (partial spec)",
 			args:      []string{"/app/config", "#3"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(3)), shift: 0},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(3)), shift: 0},
 			wantSpec2: &paramWantSpec{name: "/app/config", version: nil, shift: 0},
 		},
 		{
 			name:      "2 args: full spec + version spec (mixed)",
 			args:      []string{"/app/config#1", "#2"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(1)), shift: 0},
-			wantSpec2: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(2)), shift: 0},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(1)), shift: 0},
+			wantSpec2: &paramWantSpec{name: "/app/config", version: new(int64(2)), shift: 0},
 		},
 		{
 			name:      "2 args: full spec with shift + version spec",
 			args:      []string{"/app/config~1", "#2"},
 			wantSpec1: &paramWantSpec{name: "/app/config", version: nil, shift: 1},
-			wantSpec2: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(2)), shift: 0},
+			wantSpec2: &paramWantSpec{name: "/app/config", version: new(int64(2)), shift: 0},
 		},
 		{
 			name:      "2 args: name + shift spec",
@@ -138,32 +137,32 @@ func TestParseDiffArgsParam(t *testing.T) {
 		{
 			name:      "2 args: full spec x2 same key",
 			args:      []string{"/app/config#1", "/app/config#2"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(1)), shift: 0},
-			wantSpec2: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(2)), shift: 0},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(1)), shift: 0},
+			wantSpec2: &paramWantSpec{name: "/app/config", version: new(int64(2)), shift: 0},
 		},
 		{
 			name:      "2 args: full spec x2 different keys",
 			args:      []string{"/app/config#1", "/other/key#2"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(1)), shift: 0},
-			wantSpec2: &paramWantSpec{name: "/other/key", version: lo.ToPtr(int64(2)), shift: 0},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(1)), shift: 0},
+			wantSpec2: &paramWantSpec{name: "/other/key", version: new(int64(2)), shift: 0},
 		},
 		{
 			name:      "2 args: first latest, second versioned",
 			args:      []string{"/app/config", "/app/config#2"},
 			wantSpec1: &paramWantSpec{name: "/app/config", version: nil, shift: 0},
-			wantSpec2: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(2)), shift: 0},
+			wantSpec2: &paramWantSpec{name: "/app/config", version: new(int64(2)), shift: 0},
 		},
 		{
 			name:      "2 args: first versioned, second latest",
 			args:      []string{"/app/config#1", "/app/config"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(1)), shift: 0},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(1)), shift: 0},
 			wantSpec2: &paramWantSpec{name: "/app/config", version: nil, shift: 0},
 		},
 		{
 			name:      "3 args: partial spec format",
 			args:      []string{"/app/config", "#1", "#2"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(1)), shift: 0},
-			wantSpec2: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(2)), shift: 0},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(1)), shift: 0},
+			wantSpec2: &paramWantSpec{name: "/app/config", version: new(int64(2)), shift: 0},
 		},
 		{
 			name:      "3 args: partial spec with shifts",
@@ -174,7 +173,7 @@ func TestParseDiffArgsParam(t *testing.T) {
 		{
 			name:      "3 args: partial spec mixed version and shift",
 			args:      []string{"/app/config", "#3", "~"},
-			wantSpec1: &paramWantSpec{name: "/app/config", version: lo.ToPtr(int64(3)), shift: 0},
+			wantSpec1: &paramWantSpec{name: "/app/config", version: new(int64(3)), shift: 0},
 			wantSpec2: &paramWantSpec{name: "/app/config", version: nil, shift: 1},
 		},
 		{name: "0 args: error", args: []string{}, wantErrMsg: "usage:"},
@@ -247,13 +246,13 @@ func TestParseDiffArgsSecret(t *testing.T) {
 		{
 			name:      "1 arg: label specified",
 			args:      []string{"my-secret:AWSPREVIOUS"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSPREVIOUS"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", label: new("AWSPREVIOUS"), shift: 0},
 			wantSpec2: &secretWantSpec{secretName: "my-secret", shift: 0},
 		},
 		{
 			name:      "1 arg: version ID specified",
 			args:      []string{"my-secret#abc123"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("abc123"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", id: new("abc123"), shift: 0},
 			wantSpec2: &secretWantSpec{secretName: "my-secret", shift: 0},
 		},
 		{
@@ -271,26 +270,26 @@ func TestParseDiffArgsSecret(t *testing.T) {
 		{
 			name:      "2 args: name + label spec (partial spec)",
 			args:      []string{"my-secret", ":AWSPREVIOUS"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSPREVIOUS"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", label: new("AWSPREVIOUS"), shift: 0},
 			wantSpec2: &secretWantSpec{secretName: "my-secret", shift: 0},
 		},
 		{
 			name:      "2 args: name + version ID spec",
 			args:      []string{"my-secret", "#abc123"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("abc123"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", id: new("abc123"), shift: 0},
 			wantSpec2: &secretWantSpec{secretName: "my-secret", shift: 0},
 		},
 		{
 			name:      "2 args: full spec + label spec (mixed)",
 			args:      []string{"my-secret:AWSPREVIOUS", ":AWSCURRENT"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSPREVIOUS"), shift: 0},
-			wantSpec2: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSCURRENT"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", label: new("AWSPREVIOUS"), shift: 0},
+			wantSpec2: &secretWantSpec{secretName: "my-secret", label: new("AWSCURRENT"), shift: 0},
 		},
 		{
 			name:      "2 args: full spec#id + #id spec (mixed)",
 			args:      []string{"my-secret#abc123", "#def456"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("abc123"), shift: 0},
-			wantSpec2: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("def456"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", id: new("abc123"), shift: 0},
+			wantSpec2: &secretWantSpec{secretName: "my-secret", id: new("def456"), shift: 0},
 		},
 		{
 			name:      "2 args: name + shift spec",
@@ -301,43 +300,43 @@ func TestParseDiffArgsSecret(t *testing.T) {
 		{
 			name:      "2 args: full spec x2 same key with labels",
 			args:      []string{"my-secret:AWSPREVIOUS", "my-secret:AWSCURRENT"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSPREVIOUS"), shift: 0},
-			wantSpec2: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSCURRENT"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", label: new("AWSPREVIOUS"), shift: 0},
+			wantSpec2: &secretWantSpec{secretName: "my-secret", label: new("AWSCURRENT"), shift: 0},
 		},
 		{
 			name:      "2 args: full spec x2 same key with IDs",
 			args:      []string{"my-secret#abc123", "my-secret#def456"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("abc123"), shift: 0},
-			wantSpec2: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("def456"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", id: new("abc123"), shift: 0},
+			wantSpec2: &secretWantSpec{secretName: "my-secret", id: new("def456"), shift: 0},
 		},
 		{
 			name:      "2 args: full spec x2 different keys",
 			args:      []string{"my-secret#abc123", "other-secret#def456"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("abc123"), shift: 0},
-			wantSpec2: &secretWantSpec{secretName: "other-secret", id: lo.ToPtr("def456"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", id: new("abc123"), shift: 0},
+			wantSpec2: &secretWantSpec{secretName: "other-secret", id: new("def456"), shift: 0},
 		},
 		{
 			name:      "2 args: first latest, second versioned",
 			args:      []string{"my-secret", "my-secret#abc123"},
 			wantSpec1: &secretWantSpec{secretName: "my-secret", shift: 0},
-			wantSpec2: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("abc123"), shift: 0},
+			wantSpec2: &secretWantSpec{secretName: "my-secret", id: new("abc123"), shift: 0},
 		},
 		{
 			name:      "3 args: partial spec format with labels",
 			args:      []string{"my-secret", ":AWSPREVIOUS", ":AWSCURRENT"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSPREVIOUS"), shift: 0},
-			wantSpec2: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSCURRENT"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", label: new("AWSPREVIOUS"), shift: 0},
+			wantSpec2: &secretWantSpec{secretName: "my-secret", label: new("AWSCURRENT"), shift: 0},
 		},
 		{
 			name:      "3 args: partial spec format with IDs",
 			args:      []string{"my-secret", "#abc123", "#def456"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("abc123"), shift: 0},
-			wantSpec2: &secretWantSpec{secretName: "my-secret", id: lo.ToPtr("def456"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", id: new("abc123"), shift: 0},
+			wantSpec2: &secretWantSpec{secretName: "my-secret", id: new("def456"), shift: 0},
 		},
 		{
 			name:      "3 args: partial spec mixed label and shift",
 			args:      []string{"my-secret", ":AWSPREVIOUS", "~"},
-			wantSpec1: &secretWantSpec{secretName: "my-secret", label: lo.ToPtr("AWSPREVIOUS"), shift: 0},
+			wantSpec1: &secretWantSpec{secretName: "my-secret", label: new("AWSPREVIOUS"), shift: 0},
 			wantSpec2: &secretWantSpec{secretName: "my-secret", shift: 1},
 		},
 		{name: "0 args: error", args: []string{}, wantErrMsg: "usage:"},
@@ -410,7 +409,7 @@ func paramDiffStore(byRef map[string]*domain.Entry) *providermock.Store {
 }
 
 func paramVersionSpec(v int64) *version.NumericSpec {
-	return &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(v)}}
+	return &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: new(v)}}
 }
 
 func TestDiffRunParam(t *testing.T) {
@@ -551,8 +550,8 @@ func TestDiff_DistinctVersionsSameContent(t *testing.T) {
 		"3": {Name: "/app/param", Value: "same-value", Version: domain.Version{ID: "3"}},
 	})
 
-	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))}}
-	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))}}
+	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: new(int64(1))}}
+	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: new(int64(3))}}
 
 	stdout, stderr, err := runDiff(t, cmdparam.NewDiffPresenter(store, spec1, spec3), generic.DiffOptions{})
 	require.NoError(t, err)
@@ -575,8 +574,8 @@ func TestDiff_FormattingOnlyDifference(t *testing.T) {
 		"3": {Name: "/app/param", Value: `{"b":2,"a":1}`, Version: domain.Version{ID: "3"}},
 	})
 
-	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))}}
-	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))}}
+	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: new(int64(1))}}
+	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: new(int64(3))}}
 
 	stdout, stderr, err := runDiff(t, cmdparam.NewDiffPresenter(store, spec1, spec3), generic.DiffOptions{ParseJSON: true})
 	require.NoError(t, err)
@@ -597,8 +596,8 @@ func TestDiff_JSONOutputIdenticalOnRawValues(t *testing.T) {
 		"3": {Name: "/app/param", Value: `{"b":2,"a":1}`, Version: domain.Version{ID: "3"}},
 	})
 
-	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))}}
-	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))}}
+	spec1 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: new(int64(1))}}
+	spec3 := &version.NumericSpec{Name: "/app/param", Absolute: version.NumericAbsolute{Version: new(int64(3))}}
 
 	stdout, _, err := runDiff(t, cmdparam.NewDiffPresenter(store, spec1, spec3),
 		generic.DiffOptions{ParseJSON: true, Output: output.FormatJSON})
@@ -628,8 +627,8 @@ func secretDiffStore(entries map[string]*domain.Entry, errs map[string]error) *p
 }
 
 func prevCurrSpecs() (*version.OpaqueSpec, *version.OpaqueSpec) {
-	return &version.OpaqueSpec{Name: "my-secret", Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")}},
-		&version.OpaqueSpec{Name: "my-secret", Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")}}
+	return &version.OpaqueSpec{Name: "my-secret", Absolute: version.OpaqueAbsolute{Label: new("AWSPREVIOUS")}},
+		&version.OpaqueSpec{Name: "my-secret", Absolute: version.OpaqueAbsolute{Label: new("AWSCURRENT")}}
 }
 
 func TestDiffRunSecret(t *testing.T) {
@@ -836,7 +835,7 @@ func TestParseDiffArgs_Param(t *testing.T) {
 			args: []string{"/app/param#3"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
+				Absolute: version.NumericAbsolute{Version: new(int64(3))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name: "/app/param",
@@ -865,11 +864,11 @@ func TestParseDiffArgs_Param(t *testing.T) {
 			args: []string{"/app/param#1", "/app/param#2"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: new(int64(1))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: new(int64(2))},
 			},
 		},
 		{
@@ -877,11 +876,11 @@ func TestParseDiffArgs_Param(t *testing.T) {
 			args: []string{"/app/config#1", "/app/secrets#2"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/config",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: new(int64(1))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name:     "/app/secrets",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: new(int64(2))},
 			},
 		},
 
@@ -891,11 +890,11 @@ func TestParseDiffArgs_Param(t *testing.T) {
 			args: []string{"/app/param#1", "#2"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: new(int64(1))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: new(int64(2))},
 			},
 		},
 		{
@@ -917,7 +916,7 @@ func TestParseDiffArgs_Param(t *testing.T) {
 			args: []string{"/app/param", "#3"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
+				Absolute: version.NumericAbsolute{Version: new(int64(3))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name: "/app/param",
@@ -956,11 +955,11 @@ func TestParseDiffArgs_Param(t *testing.T) {
 			args: []string{"/app/param", "#1", "#2"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: new(int64(1))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name:     "/app/param",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(2))},
+				Absolute: version.NumericAbsolute{Version: new(int64(2))},
 			},
 		},
 		{
@@ -1040,11 +1039,11 @@ func TestParseDiffArgs_ThreeArgRequiresSpecifier(t *testing.T) {
 			args: []string{"/p", "#3", "#1"},
 			wantSpec1: &version.NumericSpec{
 				Name:     "/p",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(3))},
+				Absolute: version.NumericAbsolute{Version: new(int64(3))},
 			},
 			wantSpec2: &version.NumericSpec{
 				Name:     "/p",
-				Absolute: version.NumericAbsolute{Version: lo.ToPtr(int64(1))},
+				Absolute: version.NumericAbsolute{Version: new(int64(1))},
 			},
 		},
 	}
@@ -1090,7 +1089,7 @@ func TestParseDiffArgs_Secret(t *testing.T) {
 			args: []string{"my-secret:AWSPREVIOUS"},
 			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: version.OpaqueAbsolute{Label: new("AWSPREVIOUS")},
 			},
 			wantSpec2: &version.OpaqueSpec{
 				Name: "my-secret",
@@ -1103,11 +1102,11 @@ func TestParseDiffArgs_Secret(t *testing.T) {
 			args: []string{"my-secret:AWSPREVIOUS", ":AWSCURRENT"},
 			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: version.OpaqueAbsolute{Label: new("AWSPREVIOUS")},
 			},
 			wantSpec2: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")},
+				Absolute: version.OpaqueAbsolute{Label: new("AWSCURRENT")},
 			},
 		},
 
@@ -1117,11 +1116,11 @@ func TestParseDiffArgs_Secret(t *testing.T) {
 			args: []string{"my-secret#abc123", "#def456"},
 			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{ID: lo.ToPtr("abc123")},
+				Absolute: version.OpaqueAbsolute{ID: new("abc123")},
 			},
 			wantSpec2: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{ID: lo.ToPtr("def456")},
+				Absolute: version.OpaqueAbsolute{ID: new("def456")},
 			},
 		},
 
@@ -1131,11 +1130,11 @@ func TestParseDiffArgs_Secret(t *testing.T) {
 			args: []string{"my-secret", ":AWSPREVIOUS", ":AWSCURRENT"},
 			wantSpec1: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSPREVIOUS")},
+				Absolute: version.OpaqueAbsolute{Label: new("AWSPREVIOUS")},
 			},
 			wantSpec2: &version.OpaqueSpec{
 				Name:     "my-secret",
-				Absolute: version.OpaqueAbsolute{Label: lo.ToPtr("AWSCURRENT")},
+				Absolute: version.OpaqueAbsolute{Label: new("AWSCURRENT")},
 			},
 		},
 	}

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -49,7 +48,7 @@ func TestAzureSecretStrategy_Apply(t *testing.T) {
 		}
 		s := staging.NewAzureSecretStrategy(store)
 
-		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v1")})
+		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationCreate, Value: new("v1")})
 		require.NoError(t, err)
 		assert.Equal(t, "sec", created)
 	})
@@ -71,7 +70,7 @@ func TestAzureSecretStrategy_Apply(t *testing.T) {
 		}
 		s := staging.NewAzureSecretStrategy(store)
 
-		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v2")})
+		err := s.Apply(t.Context(), "sec", staging.Entry{Operation: staging.OperationUpdate, Value: new("v2")})
 		require.NoError(t, err)
 		assert.True(t, putCalled)
 	})
@@ -311,7 +310,7 @@ func TestAzureSecretStrategy_ErrorPaths(t *testing.T) {
 			},
 		}
 		s := staging.NewAzureSecretStrategy(store)
-		err := s.Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationCreate, Value: lo.ToPtr("v")})
+		err := s.Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationCreate, Value: new("v")})
 		require.ErrorIs(t, err, boom)
 	})
 
@@ -331,7 +330,7 @@ func TestAzureSecretStrategy_ErrorPaths(t *testing.T) {
 			},
 		}
 		s := staging.NewAzureSecretStrategy(store)
-		err := s.Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr("v")})
+		err := s.Apply(t.Context(), "s", staging.Entry{Operation: staging.OperationUpdate, Value: new("v")})
 		require.ErrorIs(t, err, boom)
 	})
 

@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -122,7 +121,7 @@ func TestGlobalDiff_ParamOnly(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -154,7 +153,7 @@ func TestGlobalDiff_SecretOnly(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-secret"),
+		Value:     new("new-secret"),
 		StagedAt:  time.Now(),
 	})
 
@@ -186,7 +185,7 @@ func TestGlobalDiff_BothServices(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("param-new"),
+		Value:     new("param-new"),
 		StagedAt:  time.Now(),
 	})
 
@@ -194,7 +193,7 @@ func TestGlobalDiff_BothServices(t *testing.T) {
 
 	err = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("secret-new"),
+		Value:     new("secret-new"),
 		StagedAt:  time.Now(),
 	})
 
@@ -271,7 +270,7 @@ func TestGlobalDiff_IdenticalValues(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("same-value"),
+		Value:     new("same-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -306,7 +305,7 @@ func TestGlobalDiff_ParseJSON(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(`{"key":"new"}`),
+		Value:     new(`{"key":"new"}`),
 		StagedAt:  time.Now(),
 	})
 
@@ -338,7 +337,7 @@ func TestGlobalDiff_ParamUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -372,7 +371,7 @@ func TestGlobalDiff_SecretUpdateAutoUnstageWhenDeleted(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -406,7 +405,7 @@ func TestGlobalDiff_SecretIdenticalValues(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("same-value"),
+		Value:     new("same-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -441,7 +440,7 @@ func TestGlobalDiff_SecretParseJSON(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(`{"key":"new"}`),
+		Value:     new(`{"key":"new"}`),
 		StagedAt:  time.Now(),
 	})
 
@@ -473,7 +472,7 @@ func TestGlobalDiff_SecretParseJSONMixed(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("not-json"),
+		Value:     new("not-json"),
 		StagedAt:  time.Now(),
 	})
 
@@ -503,8 +502,8 @@ func TestGlobalDiff_ParamCreateOperation(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation:   staging.OperationCreate,
-		Value:       lo.ToPtr("new-value"),
-		Description: lo.ToPtr("New parameter"),
+		Value:       new("new-value"),
+		Description: new("New parameter"),
 		StagedAt:    time.Now(),
 	})
 
@@ -546,8 +545,8 @@ func TestGlobalDiff_SecretCreateOperation(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "new-secret"}, staging.Entry{
 		Operation:   staging.OperationCreate,
-		Value:       lo.ToPtr("secret-value"),
-		Description: lo.ToPtr("New secret"),
+		Value:       new("secret-value"),
+		Description: new("New secret"),
 		StagedAt:    time.Now(),
 	})
 
@@ -589,7 +588,7 @@ func TestGlobalDiff_CreateWithParseJSON(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr(`{"key":"value","nested":{"a":1}}`),
+		Value:     new(`{"key":"value","nested":{"a":1}}`),
 		StagedAt:  time.Now(),
 	})
 
@@ -662,7 +661,7 @@ func TestGlobalDiff_KeptStagedOnTransientFetchError(t *testing.T) {
 
 			entry := staging.Entry{Operation: op, StagedAt: time.Now()}
 			if op == staging.OperationUpdate {
-				entry.Value = lo.ToPtr("new-value")
+				entry.Value = new("new-value")
 			}
 
 			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entry))
@@ -729,7 +728,7 @@ func TestGlobalDiff_ParseJSONReformatOnlyUpdateKeptStaged(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(`{"b":2,"a":1}`),
+		Value:     new(`{"b":2,"a":1}`),
 		StagedAt:  time.Now(),
 	}))
 
@@ -793,8 +792,8 @@ func TestGlobalDiff_MetadataWithDescription(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:   staging.OperationUpdate,
-		Value:       lo.ToPtr("new-value"),
-		Description: lo.ToPtr("Updated config"),
+		Value:       new("new-value"),
+		Description: new("Updated config"),
 		StagedAt:    time.Now(),
 	})
 
@@ -824,7 +823,7 @@ func TestGlobalDiff_MetadataWithTags(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -973,7 +972,7 @@ func TestGlobalDiff_SecretCreateWithParseJSON(t *testing.T) {
 
 	err := store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "new-secret"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr(`{"key":"value","nested":{"a":1}}`),
+		Value:     new(`{"key":"value","nested":{"a":1}}`),
 		StagedAt:  time.Now(),
 	})
 
@@ -1007,7 +1006,7 @@ func TestGlobalDiff_BothEntriesAndTags(t *testing.T) {
 	// Stage entry change
 	err := store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -1239,10 +1238,10 @@ func TestGlobalDiff_DiffsEntriesUnderTheirNamespace(t *testing.T) {
 	ctx := t.Context()
 	st := testutil.NewMockStore()
 	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "k"}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("new-a"), StagedAt: time.Now(),
+		Operation: staging.OperationUpdate, Value: new("new-a"), StagedAt: time.Now(),
 	}))
 	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "k", Namespace: "dev"}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("new-b"), StagedAt: time.Now(),
+		Operation: staging.OperationUpdate, Value: new("new-b"), StagedAt: time.Now(),
 	}))
 
 	// Current value differs per namespace, so a mis-routed fetch is observable.

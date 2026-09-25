@@ -44,7 +44,7 @@ func TestStore_KeyRoundTrip(t *testing.T) {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("raw-key-value"),
+		Value:     new("raw-key-value"),
 	}
 
 	require.NoError(t, store.WriteState(t.Context(), "", state))
@@ -92,7 +92,7 @@ func TestStore_KeyWrongKeyFails(t *testing.T) {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v"),
+		Value:     new("v"),
 	}
 	require.NoError(t, store.WriteState(t.Context(), "", state))
 
@@ -183,7 +183,7 @@ func TestNewWorkingStore_Plaintext_EncryptedStateExists_Fatal(t *testing.T) {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v"),
+		Value:     new("v"),
 	}
 	require.NoError(t, seed.WriteState(t.Context(), "", state))
 
@@ -271,7 +271,7 @@ func TestNewWorkingStore_KeychainError_EncryptedStateExists_Fatal(t *testing.T) 
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v"),
+		Value:     new("v"),
 	}
 	require.NoError(t, seed.WriteState(t.Context(), "", state))
 
@@ -352,7 +352,7 @@ func TestNewWorkingStore_NeedsMint_EncryptedStateExists_Fatal(t *testing.T) {
 	state := staging.NewEmptyState()
 	state.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v"),
+		Value:     new("v"),
 	}
 	require.NoError(t, seed.WriteState(t.Context(), "", state))
 
@@ -423,7 +423,7 @@ func TestLock_CreatesLockfileAndOperationsWork(t *testing.T) {
 
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/a"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v"),
+		Value:     new("v"),
 	}))
 
 	// The advisory lockfile was created in the state file's directory.
@@ -504,7 +504,7 @@ func TestStore_KeyBindsScopeAndService(t *testing.T) {
 	key := staging.EntryKey{Name: "/app/secret"}
 
 	require.NoError(t, src.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"),
+		Operation: staging.OperationUpdate, Value: new("v"),
 	}))
 
 	// Same scope, same key: readable.
@@ -551,7 +551,7 @@ func TestStore_KeyWarnsOnPlaintextFile(t *testing.T) {
 
 	plain := NewStoreWithPath(s.servicePath(staging.ServiceParam))
 	require.NoError(t, plain.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("injected"),
+		Operation: staging.OperationUpdate, Value: new("injected"),
 	}))
 
 	for range 2 {
@@ -566,7 +566,7 @@ func TestStore_KeyWarnsOnPlaintextFile(t *testing.T) {
 
 	// The next write encrypts it.
 	require.NoError(t, s.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/other"}, staging.Entry{
-		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"),
+		Operation: staging.OperationUpdate, Value: new("v"),
 	}))
 
 	raw, err := os.ReadFile(s.servicePath(staging.ServiceParam))

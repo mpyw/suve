@@ -119,14 +119,14 @@ func TestGlobalApply_ApplyBothServices(t *testing.T) {
 	// Stage Parameter Store parameter
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("param-value"),
+		Value:     new("param-value"),
 		StagedAt:  time.Now(),
 	})
 
 	// Stage Secrets Manager secret
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("secret-value"),
+		Value:     new("secret-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -184,7 +184,7 @@ func TestGlobalApply_ApplyParamOnly(t *testing.T) {
 	// Stage only Parameter Store parameter
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("param-value"),
+		Value:     new("param-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -220,7 +220,7 @@ func TestGlobalApply_ApplySecretOnly(t *testing.T) {
 	// Stage only Secrets Manager secret
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("secret-value"),
+		Value:     new("secret-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -306,13 +306,13 @@ func TestGlobalApply_PartialFailure(t *testing.T) {
 	// Stage both
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("param-value"),
+		Value:     new("param-value"),
 		StagedAt:  time.Now(),
 	})
 
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("secret-value"),
+		Value:     new("secret-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -461,7 +461,7 @@ func TestGlobalApply_SecretSetError(t *testing.T) {
 
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -520,7 +520,7 @@ func TestGlobalApply_ParamSetError(t *testing.T) {
 
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -551,7 +551,7 @@ func TestGlobalApply_ConflictDetection_CreateConflict(t *testing.T) {
 	// Stage a create operation
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -583,7 +583,7 @@ func TestGlobalApply_ConflictDetection_UpdateConflict(t *testing.T) {
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("updated-value"),
+		Value:          new("updated-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -689,7 +689,7 @@ func TestGlobalApply_ConflictDetection_IgnoreConflicts(t *testing.T) {
 	baseTime := time.Now().Add(-1 * time.Hour)
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("updated-value"),
+		Value:          new("updated-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -727,7 +727,7 @@ func TestGlobalApply_ConflictDetection_NoConflict(t *testing.T) {
 	baseTime := time.Now()
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("updated-value"),
+		Value:          new("updated-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -767,7 +767,7 @@ func TestGlobalApply_ConflictDetection_BothServices(t *testing.T) {
 	// Stage param with conflict
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("param-value"),
+		Value:          new("param-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -775,7 +775,7 @@ func TestGlobalApply_ConflictDetection_BothServices(t *testing.T) {
 	// Stage secret with conflict
 	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("secret-value"),
+		Value:          new("secret-value"),
 		StagedAt:       time.Now(),
 		BaseModifiedAt: &baseTime,
 	})
@@ -856,7 +856,7 @@ func TestGlobalApply_ApplyCreate(t *testing.T) {
 	// Stage create operation
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -1006,7 +1006,7 @@ func TestGlobalApply_ApplyBothEntriesAndTags(t *testing.T) {
 	// Stage entry change
 	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("updated-value"),
+		Value:     new("updated-value"),
 		StagedAt:  time.Now(),
 	})
 
@@ -1164,10 +1164,10 @@ func TestGlobalApply_AppliesEntriesUnderTheirNamespace(t *testing.T) {
 	ctx := t.Context()
 	st := testutil.NewMockStore()
 	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "k"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("va"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("va"), StagedAt: time.Now(),
 	}))
 	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, staging.EntryKey{Name: "k", Namespace: "dev"}, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("vb"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("vb"), StagedAt: time.Now(),
 	}))
 
 	var mu sync.Mutex
@@ -1230,7 +1230,7 @@ func TestGlobalApply_NamespacedFailureAndUnstageWarnings(t *testing.T) {
 	key := staging.EntryKey{Name: "k", Namespace: "dev"}
 	st := testutil.NewMockStore()
 	require.NoError(t, st.StageEntry(ctx, staging.ServiceParam, key, staging.Entry{
-		Operation: staging.OperationCreate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+		Operation: staging.OperationCreate, Value: new("v"), StagedAt: time.Now(),
 	}))
 	require.NoError(t, st.StageTag(ctx, staging.ServiceParam, key, staging.TagEntry{
 		Add: map[string]string{"env": "dev"}, StagedAt: time.Now(),

@@ -3,7 +3,6 @@ package version_test
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,13 +34,13 @@ func TestSecretManagerParse(t *testing.T) {
 			name:        "with version",
 			input:       "my-secret#3",
 			wantName:    "my-secret",
-			wantVersion: lo.ToPtr(int64(3)),
+			wantVersion: new(int64(3)),
 		},
 		{
 			name:        "with large version",
 			input:       "my-secret#128",
 			wantName:    "my-secret",
-			wantVersion: lo.ToPtr(int64(128)),
+			wantVersion: new(int64(128)),
 		},
 		{
 			name:      "with single shift",
@@ -65,7 +64,7 @@ func TestSecretManagerParse(t *testing.T) {
 			name:        "version with shift",
 			input:       "my-secret#5~2",
 			wantName:    "my-secret",
-			wantVersion: lo.ToPtr(int64(5)),
+			wantVersion: new(int64(5)),
 			wantShift:   2,
 		},
 		{
@@ -128,7 +127,7 @@ func TestSecretManagerParse(t *testing.T) {
 			name:        "version zero accepted (positivity not enforced at parse time)",
 			input:       "my-secret#0",
 			wantName:    "my-secret",
-			wantVersion: lo.ToPtr(int64(0)),
+			wantVersion: new(int64(0)),
 		},
 		{
 			name:     "name with @ allowed",
@@ -145,7 +144,7 @@ func TestSecretManagerParse(t *testing.T) {
 			name:        "name with slashes and version",
 			input:       "a/b/c#3",
 			wantName:    "a/b/c",
-			wantVersion: lo.ToPtr(int64(3)),
+			wantVersion: new(int64(3)),
 		},
 		{
 			name:     "name with dots and mixed case",
@@ -156,7 +155,7 @@ func TestSecretManagerParse(t *testing.T) {
 			name:        "version with cumulative shifts",
 			input:       "my-secret#5~1~2",
 			wantName:    "my-secret",
-			wantVersion: lo.ToPtr(int64(5)),
+			wantVersion: new(int64(5)),
 			wantShift:   3,
 		},
 		{

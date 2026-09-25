@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,7 +43,7 @@ func TestLoadEntryState(t *testing.T) {
 		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("draft"),
+			Value:     new("draft"),
 			StagedAt:  time.Now(),
 		}))
 
@@ -62,7 +61,7 @@ func TestLoadEntryState(t *testing.T) {
 		store := testutil.NewMockStore()
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("updated"),
+			Value:     new("updated"),
 			StagedAt:  time.Now(),
 		}))
 

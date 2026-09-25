@@ -105,11 +105,11 @@ func TestGet(t *testing.T) {
 
 	m := &mockClient{
 		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:   lo.ToPtr(key),
-				Value: lo.ToPtr("30"),
-				Tags:  map[string]*string{"env": lo.ToPtr("prod")},
-			}}, nil
+			return azappconfig.GetSettingResponse{
+				Key:   new(key),
+				Value: new("30"),
+				Tags:  map[string]*string{"env": new("prod")},
+			}, nil
 		},
 	}
 	store := appconfig.New(m, "")
@@ -147,10 +147,10 @@ func TestGet_AppliesNamespaceLabel(t *testing.T) {
 				getFunc: func(_ context.Context, key, label string) (azappconfig.GetSettingResponse, error) {
 					gotLabel = label
 
-					return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-						Key:   lo.ToPtr(key),
-						Value: lo.ToPtr("v"),
-					}}, nil
+					return azappconfig.GetSettingResponse{
+						Key:   new(key),
+						Value: new("v"),
+					}, nil
 				},
 			}
 			store := appconfig.New(m, tt.namespace)
@@ -202,10 +202,10 @@ func TestGet_NoTags(t *testing.T) {
 
 	m := &mockClient{
 		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:   lo.ToPtr(key),
-				Value: lo.ToPtr("v"),
-			}}, nil
+			return azappconfig.GetSettingResponse{
+				Key:   new(key),
+				Value: new("v"),
+			}, nil
 		},
 	}
 	store := appconfig.New(m, "")
@@ -248,9 +248,9 @@ func TestList(t *testing.T) {
 	m := &mockClient{
 		listFunc: func(_ context.Context, _ string) ([]azappconfig.Setting, error) {
 			return []azappconfig.Setting{
-				{Key: lo.ToPtr("beta")},
-				{Key: lo.ToPtr("alpha")},
-				{Key: lo.ToPtr("beta")}, // duplicate across labels
+				{Key: new("beta")},
+				{Key: new("alpha")},
+				{Key: new("beta")}, // duplicate across labels
 			}, nil
 		},
 	}
@@ -327,10 +327,10 @@ func TestListWithNamespaces(t *testing.T) {
 			// Settings span the null (unlabeled) namespace and "dev"/"prd", in
 			// an unsorted order to exercise the sort.
 			return []azappconfig.Setting{
-				{Key: lo.ToPtr("beta"), Label: lo.ToPtr("prd"), Value: lo.ToPtr("bp")},
-				{Key: lo.ToPtr("alpha"), Value: lo.ToPtr("a-null")},
-				{Key: lo.ToPtr("alpha"), Label: lo.ToPtr("dev"), Value: lo.ToPtr("ad")},
-				{Key: lo.ToPtr("beta"), Value: lo.ToPtr("b-null")},
+				{Key: new("beta"), Label: new("prd"), Value: new("bp")},
+				{Key: new("alpha"), Value: new("a-null")},
+				{Key: new("alpha"), Label: new("dev"), Value: new("ad")},
+				{Key: new("beta"), Value: new("b-null")},
 			}, nil
 		},
 	}
@@ -369,10 +369,10 @@ func TestListWithNamespacesScoped(t *testing.T) {
 	t.Parallel()
 
 	settings := []azappconfig.Setting{
-		{Key: lo.ToPtr("beta"), Label: lo.ToPtr("prd"), Value: lo.ToPtr("bp")},
-		{Key: lo.ToPtr("alpha"), Value: lo.ToPtr("a-null")},
-		{Key: lo.ToPtr("alpha"), Label: lo.ToPtr("dev"), Value: lo.ToPtr("ad")},
-		{Key: lo.ToPtr("beta"), Value: lo.ToPtr("b-null")},
+		{Key: new("beta"), Label: new("prd"), Value: new("bp")},
+		{Key: new("alpha"), Value: new("a-null")},
+		{Key: new("alpha"), Label: new("dev"), Value: new("ad")},
+		{Key: new("beta"), Value: new("b-null")},
 	}
 
 	// The store namespace becomes the label filter verbatim, EXCEPT empty, which
@@ -551,11 +551,11 @@ func TestPut_PreservesExistingTags(t *testing.T) {
 
 	m := &mockClient{
 		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:   lo.ToPtr(key),
-				Value: lo.ToPtr("old"),
-				Tags:  map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("core")},
-			}}, nil
+			return azappconfig.GetSettingResponse{
+				Key:   new(key),
+				Value: new("old"),
+				Tags:  map[string]*string{"env": new("prod"), "team": new("core")},
+			}, nil
 		},
 		setFunc: func(
 			_ context.Context, _, value, _ string, tags map[string]*string, _ *string, _ *azcore.ETag,
@@ -571,7 +571,7 @@ func TestPut_PreservesExistingTags(t *testing.T) {
 
 	_, err := store.Put(t.Context(), "app/timeout", "new", domain.ValueTypePlaintext, "")
 	require.NoError(t, err)
-	assert.Equal(t, map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("core")}, sentTags)
+	assert.Equal(t, map[string]*string{"env": new("prod"), "team": new("core")}, sentTags)
 }
 
 // TestPut_PreservesContentType asserts a value edit re-sends the setting's
@@ -586,11 +586,11 @@ func TestPut_PreservesContentType(t *testing.T) {
 
 	m := &mockClient{
 		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:         lo.ToPtr(key),
-				Value:       lo.ToPtr("old"),
+			return azappconfig.GetSettingResponse{
+				Key:         new(key),
+				Value:       new("old"),
 				ContentType: lo.ToPtr(kvRef),
-			}}, nil
+			}, nil
 		},
 		setFunc: func(
 			_ context.Context, _, _, _ string, _ map[string]*string, contentType *string, _ *azcore.ETag,
@@ -757,12 +757,12 @@ func TestTag_MergesAndPreservesValue(t *testing.T) {
 		getFunc: func(_ context.Context, key, label string) (azappconfig.GetSettingResponse, error) {
 			assert.Equal(t, "dev", label)
 
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:   lo.ToPtr(key),
-				Value: lo.ToPtr("keep-me"),
-				Tags:  map[string]*string{"env": lo.ToPtr("dev"), "keep": lo.ToPtr("yes")},
-				ETag:  lo.ToPtr(etag),
-			}}, nil
+			return azappconfig.GetSettingResponse{
+				Key:   new(key),
+				Value: new("keep-me"),
+				Tags:  map[string]*string{"env": new("dev"), "keep": new("yes")},
+				ETag:  new(etag),
+			}, nil
 		},
 		setFunc: func(
 			_ context.Context, _, value, label string, tags map[string]*string, _ *string, e *azcore.ETag,
@@ -794,11 +794,11 @@ func TestTag_PreservesContentType(t *testing.T) {
 
 	m := &mockClient{
 		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:         lo.ToPtr(key),
-				Value:       lo.ToPtr("keep-me"),
+			return azappconfig.GetSettingResponse{
+				Key:         new(key),
+				Value:       new("keep-me"),
 				ContentType: lo.ToPtr(kvRef),
-			}}, nil
+			}, nil
 		},
 		setFunc: func(
 			_ context.Context, _, _, _ string, _ map[string]*string, contentType *string, _ *azcore.ETag,
@@ -823,11 +823,11 @@ func TestUntag_RemovesKeys(t *testing.T) {
 
 	m := &mockClient{
 		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:   lo.ToPtr(key),
-				Value: lo.ToPtr("v"),
-				Tags:  map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("core")},
-			}}, nil
+			return azappconfig.GetSettingResponse{
+				Key:   new(key),
+				Value: new("v"),
+				Tags:  map[string]*string{"env": new("prod"), "team": new("core")},
+			}, nil
 		},
 		setFunc: func(
 			_ context.Context, _, _, _ string, tags map[string]*string, _ *string, _ *azcore.ETag,
@@ -855,10 +855,10 @@ func TestTag_RetriesOn412ThenSucceeds(t *testing.T) {
 		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
 			gets++
 
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:   lo.ToPtr(key),
-				Value: lo.ToPtr("v"),
-			}}, nil
+			return azappconfig.GetSettingResponse{
+				Key:   new(key),
+				Value: new("v"),
+			}, nil
 		},
 		setFunc: func(
 			_ context.Context, _, _, _ string, _ map[string]*string, _ *string, _ *azcore.ETag,
@@ -887,10 +887,10 @@ func TestTag_SurfacesPersistentConflict(t *testing.T) {
 
 	m := &mockClient{
 		getFunc: func(_ context.Context, key, _ string) (azappconfig.GetSettingResponse, error) {
-			return azappconfig.GetSettingResponse{Setting: azappconfig.Setting{
-				Key:   lo.ToPtr(key),
-				Value: lo.ToPtr("v"),
-			}}, nil
+			return azappconfig.GetSettingResponse{
+				Key:   new(key),
+				Value: new("v"),
+			}, nil
 		},
 		setFunc: func(
 			_ context.Context, _, _, _ string, _ map[string]*string, _ *string, _ *azcore.ETag,

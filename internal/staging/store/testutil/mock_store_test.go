@@ -27,7 +27,7 @@ func assertListCopyOnRead(t *testing.T, rw store.ReadWriteOperator) {
 
 	require.NoError(t, rw.StageEntry(ctx, staging.ServiceParam, key, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("v1"),
+		Value:     new("v1"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, rw.StageTag(ctx, staging.ServiceParam, key, staging.TagEntry{
@@ -83,8 +83,8 @@ func assertDeepCloneOnRead(t *testing.T, rw store.ReadWriteOperator) {
 
 	require.NoError(t, rw.StageEntry(ctx, staging.ServiceParam, key, staging.Entry{
 		Operation:   staging.OperationUpdate,
-		Value:       lo.ToPtr("v1"),
-		Description: lo.ToPtr("d1"),
+		Value:       new("v1"),
+		Description: new("d1"),
 		StagedAt:    time.Now(),
 	}))
 	require.NoError(t, rw.StageTag(ctx, staging.ServiceParam, key, staging.TagEntry{
@@ -142,7 +142,7 @@ func TestServiceScopedClear(t *testing.T) {
 	secretKey := staging.EntryKey{Name: "/s"}
 
 	entry := func(v string) staging.Entry {
-		return staging.Entry{Operation: staging.OperationUpdate, Value: lo.ToPtr(v), StagedAt: time.Now()}
+		return staging.Entry{Operation: staging.OperationUpdate, Value: new(v), StagedAt: time.Now()}
 	}
 
 	t.Run("drain", func(t *testing.T) {

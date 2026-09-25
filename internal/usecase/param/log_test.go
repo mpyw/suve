@@ -74,9 +74,9 @@ func TestLogUseCase_Execute(t *testing.T) {
 
 	now := time.Now()
 	store := newLogStore([]logVer{
-		{ver: 1, value: "v1", typ: domain.ValueTypePlaintext, modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-		{ver: 2, value: "v2", typ: domain.ValueTypePlaintext, modified: lo.ToPtr(now.Add(-1 * time.Hour))},
-		{ver: 3, value: "v3", typ: domain.ValueTypePlaintext, modified: lo.ToPtr(now)},
+		{ver: 1, value: "v1", typ: domain.ValueTypePlaintext, modified: new(now.Add(-2 * time.Hour))},
+		{ver: 2, value: "v2", typ: domain.ValueTypePlaintext, modified: new(now.Add(-1 * time.Hour))},
+		{ver: 3, value: "v3", typ: domain.ValueTypePlaintext, modified: new(now)},
 	})
 
 	uc := &param.LogUseCase{Reader: store}
@@ -132,8 +132,8 @@ func TestLogUseCase_Execute_PartialFetchError(t *testing.T) {
 
 	now := time.Now()
 	store := newLogStore([]logVer{
-		{ver: 1, value: "v1", getErr: errAccessDenied, modified: lo.ToPtr(now.Add(-1 * time.Hour))},
-		{ver: 2, value: "v2", modified: lo.ToPtr(now)},
+		{ver: 1, value: "v1", getErr: errAccessDenied, modified: new(now.Add(-1 * time.Hour))},
+		{ver: 2, value: "v2", modified: new(now)},
 	})
 
 	uc := &param.LogUseCase{Reader: store}
@@ -157,9 +157,9 @@ func TestLogUseCase_Execute_Reverse(t *testing.T) {
 
 	now := time.Now()
 	store := newLogStore([]logVer{
-		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-1 * time.Hour))},
-		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+		{ver: 1, value: "v1", modified: new(now.Add(-2 * time.Hour))},
+		{ver: 2, value: "v2", modified: new(now.Add(-1 * time.Hour))},
+		{ver: 3, value: "v3", modified: new(now)},
 	})
 
 	uc := &param.LogUseCase{Reader: store}
@@ -178,9 +178,9 @@ func TestLogUseCase_Execute_SinceFilter(t *testing.T) {
 
 	now := time.Now()
 	store := newLogStore([]logVer{
-		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-3 * time.Hour))},
-		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-1 * time.Hour))},
-		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+		{ver: 1, value: "v1", modified: new(now.Add(-3 * time.Hour))},
+		{ver: 2, value: "v2", modified: new(now.Add(-1 * time.Hour))},
+		{ver: 3, value: "v3", modified: new(now)},
 	})
 
 	uc := &param.LogUseCase{Reader: store}
@@ -199,9 +199,9 @@ func TestLogUseCase_Execute_UntilFilter(t *testing.T) {
 
 	now := time.Now()
 	store := newLogStore([]logVer{
-		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-3 * time.Hour))},
-		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-1 * time.Hour))},
-		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+		{ver: 1, value: "v1", modified: new(now.Add(-3 * time.Hour))},
+		{ver: 2, value: "v2", modified: new(now.Add(-1 * time.Hour))},
+		{ver: 3, value: "v3", modified: new(now)},
 	})
 
 	uc := &param.LogUseCase{Reader: store}
@@ -220,9 +220,9 @@ func TestLogUseCase_Execute_DateRangeFilter(t *testing.T) {
 
 	now := time.Now()
 	store := newLogStore([]logVer{
-		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-4 * time.Hour))},
-		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+		{ver: 1, value: "v1", modified: new(now.Add(-4 * time.Hour))},
+		{ver: 2, value: "v2", modified: new(now.Add(-2 * time.Hour))},
+		{ver: 3, value: "v3", modified: new(now)},
 	})
 
 	uc := &param.LogUseCase{Reader: store}
@@ -245,9 +245,9 @@ func TestLogUseCase_Execute_FilterBeforeCount(t *testing.T) {
 
 	now := time.Now()
 	store := newLogStore([]logVer{
-		{ver: 1, value: "v1", modified: lo.ToPtr(now.Add(-3 * time.Hour))},
-		{ver: 2, value: "v2", modified: lo.ToPtr(now.Add(-2 * time.Hour))},
-		{ver: 3, value: "v3", modified: lo.ToPtr(now)},
+		{ver: 1, value: "v1", modified: new(now.Add(-3 * time.Hour))},
+		{ver: 2, value: "v2", modified: new(now.Add(-2 * time.Hour))},
+		{ver: 3, value: "v3", modified: new(now)},
 	})
 
 	uc := &param.LogUseCase{Reader: store}
@@ -283,7 +283,7 @@ func TestLogUseCase_Execute_FilterWithNilLastModifiedDate(t *testing.T) {
 	now := time.Now()
 	store := newLogStore([]logVer{
 		{ver: 1, value: "v1", modified: nil},
-		{ver: 2, value: "v2", modified: lo.ToPtr(now)},
+		{ver: 2, value: "v2", modified: new(now)},
 	})
 
 	uc := &param.LogUseCase{Reader: store}

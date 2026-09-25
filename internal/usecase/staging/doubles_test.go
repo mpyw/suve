@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
@@ -159,7 +158,7 @@ func stageEntry(t *testing.T, s *testutil.MockStore, svc staging.Service, name, 
 
 	require.NoError(t, s.StageEntry(t.Context(), svc, staging.EntryKey{Name: name}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(value),
+		Value:     new(value),
 		StagedAt:  time.Now(),
 	}))
 }

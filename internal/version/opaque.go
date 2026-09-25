@@ -1,9 +1,5 @@
 package version
 
-import (
-	"github.com/samber/lo"
-)
-
 // OpaqueAbsolute is the absolute specifier of an opaque grammar: an optional
 // version id (#VERSION) or, where the grammar allows labels, a staging label
 // (:LABEL). At most one of them is set.
@@ -57,7 +53,7 @@ func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
 			Error:      g.InvalidIDError,
 			Duplicated: OpaqueAbsolute.IsSet,
 			Apply: func(value string, abs OpaqueAbsolute) (OpaqueAbsolute, error) {
-				abs.ID = lo.ToPtr(value)
+				abs.ID = new(value)
 
 				return abs, nil
 			},
@@ -71,7 +67,7 @@ func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
 			Error:      g.LabelError,
 			Duplicated: OpaqueAbsolute.IsSet,
 			Apply: func(value string, abs OpaqueAbsolute) (OpaqueAbsolute, error) {
-				abs.Label = lo.ToPtr(value)
+				abs.Label = new(value)
 
 				return abs, nil
 			},

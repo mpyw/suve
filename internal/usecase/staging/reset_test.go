@@ -59,7 +59,7 @@ func TestResetUseCase_Execute_Unstage(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -135,7 +135,7 @@ func TestResetUseCase_Execute_UnstageCreate_DiscardsTags(t *testing.T) {
 	// A CREATE was staged for a not-yet-existing resource, then tagged.
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.TagEntry{
@@ -169,12 +169,12 @@ func TestResetUseCase_Execute_UnstageAll(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/one"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("one"),
+		Value:     new("one"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/two"}, staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("two"),
+		Value:     new("two"),
 		StagedAt:  time.Now(),
 	}))
 
@@ -519,7 +519,7 @@ func TestResetUseCase_Execute_UnstageAll_WithTags(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("value"),
+		Value:     new("value"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
@@ -630,9 +630,9 @@ func TestResetUseCase_Execute_Restore_PreservesExistingBase(t *testing.T) {
 	key := staging.EntryKey{Name: "/app/config#3"}
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
 		Operation:      staging.OperationUpdate,
-		Value:          lo.ToPtr("prior-edit"),
+		Value:          new("prior-edit"),
 		StagedAt:       time.Now(),
-		BaseModifiedAt: lo.ToPtr(priorBase),
+		BaseModifiedAt: new(priorBase),
 	}))
 
 	parser := &mockParserWithVersion{

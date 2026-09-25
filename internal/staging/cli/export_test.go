@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
@@ -104,7 +103,7 @@ func stageEntry(t *testing.T, scope provider.Scope, svc staging.Service, name, v
 	require.NoError(t, err)
 	require.NoError(t, store.StageEntry(t.Context(), svc, staging.EntryKey{Name: name}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr(value),
+		Value:     new(value),
 		StagedAt:  time.Now(),
 	}))
 }

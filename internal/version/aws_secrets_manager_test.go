@@ -3,7 +3,6 @@ package version_test
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -45,32 +44,32 @@ func TestSecretsManagerParse(t *testing.T) {
 			name:     "with ID",
 			input:    "my-secret#abc123",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("abc123"),
+			wantID:   new("abc123"),
 		},
 		{
 			name:     "with UUID-like ID",
 			input:    "my-secret#550e8400-e29b-41d4-a716-446655440000",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("550e8400-e29b-41d4-a716-446655440000"),
+			wantID:   new("550e8400-e29b-41d4-a716-446655440000"),
 		},
 		{
 			name:     "with short ID",
 			input:    "my-secret#a",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("a"),
+			wantID:   new("a"),
 		},
 		{
 			name:     "with numeric ID",
 			input:    "my-secret#12345",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("12345"),
+			wantID:   new("12345"),
 		},
 		{
 			// ClientRequestToken-style version id with '_' and '.' (#319).
 			name:     "with token ID containing underscore and dot",
 			input:    "my-secret#my_token_0123456789.012345678901234567890",
 			wantName: "my-secret",
-			wantID:   lo.ToPtr("my_token_0123456789.012345678901234567890"),
+			wantID:   new("my_token_0123456789.012345678901234567890"),
 		},
 
 		// Label specifier (:LABEL)
@@ -78,49 +77,49 @@ func TestSecretsManagerParse(t *testing.T) {
 			name:      "with AWSCURRENT label",
 			input:     "my-secret:AWSCURRENT",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("AWSCURRENT"),
+			wantLabel: new("AWSCURRENT"),
 		},
 		{
 			name:      "with AWSPREVIOUS label",
 			input:     "my-secret:AWSPREVIOUS",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("AWSPREVIOUS"),
+			wantLabel: new("AWSPREVIOUS"),
 		},
 		{
 			name:      "with AWSPENDING label",
 			input:     "my-secret:AWSPENDING",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("AWSPENDING"),
+			wantLabel: new("AWSPENDING"),
 		},
 		{
 			name:      "with custom label",
 			input:     "my-secret:STAGING",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("STAGING"),
+			wantLabel: new("STAGING"),
 		},
 		{
 			name:      "with lowercase label",
 			input:     "my-secret:production",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("production"),
+			wantLabel: new("production"),
 		},
 		{
 			name:      "with label containing dash",
 			input:     "my-secret:my-label",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("my-label"),
+			wantLabel: new("my-label"),
 		},
 		{
 			name:      "with label containing underscore",
 			input:     "my-secret:my_label",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("my_label"),
+			wantLabel: new("my_label"),
 		},
 		{
 			name:      "with label containing digits",
 			input:     "my-secret:v2",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("v2"),
+			wantLabel: new("v2"),
 		},
 
 		// Shift specifier
@@ -160,14 +159,14 @@ func TestSecretsManagerParse(t *testing.T) {
 			name:      "ID and shift",
 			input:     "my-secret#abc123~1",
 			wantName:  "my-secret",
-			wantID:    lo.ToPtr("abc123"),
+			wantID:    new("abc123"),
 			wantShift: 1,
 		},
 		{
 			name:      "ID and bare tilde",
 			input:     "my-secret#abc~",
 			wantName:  "my-secret",
-			wantID:    lo.ToPtr("abc"),
+			wantID:    new("abc"),
 			wantShift: 1,
 		},
 
@@ -176,21 +175,21 @@ func TestSecretsManagerParse(t *testing.T) {
 			name:      "label and shift",
 			input:     "my-secret:AWSPREVIOUS~1",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("AWSPREVIOUS"),
+			wantLabel: new("AWSPREVIOUS"),
 			wantShift: 1,
 		},
 		{
 			name:      "label and bare tilde",
 			input:     "my-secret:STAGING~",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("STAGING"),
+			wantLabel: new("STAGING"),
 			wantShift: 1,
 		},
 		{
 			name:      "label and double tilde",
 			input:     "my-secret:AWSCURRENT~~",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("AWSCURRENT"),
+			wantLabel: new("AWSCURRENT"),
 			wantShift: 2,
 		},
 
@@ -204,13 +203,13 @@ func TestSecretsManagerParse(t *testing.T) {
 			name:     "name with dots and ID",
 			input:    "app.config.db#abc123",
 			wantName: "app.config.db",
-			wantID:   lo.ToPtr("abc123"),
+			wantID:   new("abc123"),
 		},
 		{
 			name:      "name with dots and label",
 			input:     "app.config.db:AWSCURRENT",
 			wantName:  "app.config.db",
-			wantLabel: lo.ToPtr("AWSCURRENT"),
+			wantLabel: new("AWSCURRENT"),
 		},
 		{
 			name:      "name with dots and shift",
@@ -251,7 +250,7 @@ func TestSecretsManagerParse(t *testing.T) {
 			name:      "whitespace with label",
 			input:     "  my-secret:AWSCURRENT  ",
 			wantName:  "my-secret",
-			wantLabel: lo.ToPtr("AWSCURRENT"),
+			wantLabel: new("AWSCURRENT"),
 		},
 
 		// @ in name (allowed in Secrets Manager secret names)
@@ -274,13 +273,13 @@ func TestSecretsManagerParse(t *testing.T) {
 			name:     "email-like name with ID",
 			input:    "user@example.com#abc123",
 			wantName: "user@example.com",
-			wantID:   lo.ToPtr("abc123"),
+			wantID:   new("abc123"),
 		},
 		{
 			name:      "email-like name with label",
 			input:     "user@example.com:AWSCURRENT",
 			wantName:  "user@example.com",
-			wantLabel: lo.ToPtr("AWSCURRENT"),
+			wantLabel: new("AWSCURRENT"),
 		},
 
 		// # in name (not an ID specifier - not followed by valid ID char)
@@ -391,7 +390,7 @@ func TestSecretsManagerParse(t *testing.T) {
 			name:     "at signs in name with ID",
 			input:    "user@host@domain#abc123",
 			wantName: "user@host@domain",
-			wantID:   lo.ToPtr("abc123"),
+			wantID:   new("abc123"),
 		},
 	}
 

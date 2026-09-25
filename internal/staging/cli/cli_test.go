@@ -134,7 +134,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("staged-value"),
+			Value:     new("staged-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -182,7 +182,7 @@ func TestStatusRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("staged-value"),
+			Value:     new("staged-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -229,13 +229,13 @@ func TestStatusRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value1"),
+			Value:     new("value1"),
 			StagedAt:  time.Now(),
 		})
 
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("value2"),
+			Value:     new("value2"),
 			StagedAt:  time.Now(),
 		})
 
@@ -307,7 +307,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -336,13 +336,13 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new1"),
+			Value:     new("new1"),
 			StagedAt:  time.Now(),
 		})
 
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new2"),
+			Value:     new("new2"),
 			StagedAt:  time.Now(),
 		})
 
@@ -413,7 +413,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr(`{"b":2,"a":1}`),
+			Value:     new(`{"b":2,"a":1}`),
 			StagedAt:  time.Now(),
 		})
 
@@ -442,7 +442,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("not-json"),
+			Value:     new("not-json"),
 			StagedAt:  time.Now(),
 		})
 
@@ -468,7 +468,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("same-value"),
+			Value:     new("same-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -527,7 +527,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -562,7 +562,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("brand-new-value"),
+			Value:     new("brand-new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -600,7 +600,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-json"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr(`{"b":2,"a":1}`),
+			Value:     new(`{"b":2,"a":1}`),
 			StagedAt:  time.Now(),
 		})
 
@@ -630,7 +630,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("same-value"),
+			Value:     new("same-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -662,7 +662,7 @@ func TestDiffRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -800,7 +800,7 @@ func TestEditRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("staged-value"),
+			Value:     new("staged-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -834,7 +834,7 @@ func TestEditRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("create-value"),
+			Value:     new("create-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -945,13 +945,13 @@ func TestApplyRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("value1"),
+			Value:     new("value1"),
 			StagedAt:  time.Now(),
 		})
 
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value2"),
+			Value:     new("value2"),
 			StagedAt:  time.Now(),
 		})
 
@@ -994,13 +994,13 @@ func TestApplyRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value1"),
+			Value:     new("value1"),
 			StagedAt:  time.Now(),
 		})
 
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value2"),
+			Value:     new("value2"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1032,7 +1032,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		// Stage a different item so we can test "specific item not staged"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/other"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1079,7 +1079,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1106,7 +1106,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-config"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1135,7 +1135,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		baseTime := time.Now().Add(-time.Hour)
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:      staging.OperationUpdate,
-			Value:          lo.ToPtr("updated-value"),
+			Value:          new("updated-value"),
 			StagedAt:       time.Now(),
 			BaseModifiedAt: &baseTime,
 		})
@@ -1192,7 +1192,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		baseTime := time.Now()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:      staging.OperationUpdate,
-			Value:          lo.ToPtr("updated-value"),
+			Value:          new("updated-value"),
 			StagedAt:       time.Now(),
 			BaseModifiedAt: &baseTime,
 		})
@@ -1221,7 +1221,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		baseTime := time.Now().Add(-time.Hour)
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:      staging.OperationUpdate,
-			Value:          lo.ToPtr("updated-value"),
+			Value:          new("updated-value"),
 			StagedAt:       time.Now(),
 			BaseModifiedAt: &baseTime,
 		})
@@ -1249,7 +1249,7 @@ func TestApplyRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-config"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1285,13 +1285,13 @@ func TestResetRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config1"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value1"),
+			Value:     new("value1"),
 			StagedAt:  time.Now(),
 		})
 
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config2"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value2"),
+			Value:     new("value2"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1343,7 +1343,7 @@ func TestResetRunner_Run(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("value"),
+			Value:     new("value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1507,7 +1507,7 @@ func TestRunners_SecretService(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1533,7 +1533,7 @@ func TestRunners_SecretService(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("secret-value"),
+			Value:     new("secret-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1596,7 +1596,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		desc := "Updated config description"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation:   staging.OperationUpdate,
-			Value:       lo.ToPtr("new-value"),
+			Value:       new("new-value"),
 			Description: &desc,
 			StagedAt:    time.Now(),
 		})
@@ -1626,7 +1626,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1662,7 +1662,7 @@ func TestDiffRunner_OutputMetadata(t *testing.T) {
 		desc := "New parameter"
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-param"}, staging.Entry{
 			Operation:   staging.OperationCreate,
-			Value:       lo.ToPtr("brand-new"),
+			Value:       new("brand-new"),
 			Description: &desc,
 			StagedAt:    time.Now(),
 		})
@@ -1815,7 +1815,7 @@ func TestApplyRunner_UnstageFailureWarns(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("v"),
+			Value:     new("v"),
 			StagedAt:  time.Now(),
 		})
 
@@ -1936,7 +1936,7 @@ func TestApplyRunner_WithTags(t *testing.T) {
 		removeKeys["deprecated"] = struct{}{}
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -2075,7 +2075,7 @@ func TestApplyRunner_RunInteractive_ProviderLabel(t *testing.T) {
 			store := testutil.NewMockStore()
 			_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 				Operation: staging.OperationUpdate,
-				Value:     lo.ToPtr("v"),
+				Value:     new("v"),
 				StagedAt:  time.Now(),
 			})
 
@@ -2307,7 +2307,7 @@ func TestStatusRunner_WithTagEntries(t *testing.T) {
 		store := testutil.NewMockStore()
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/value"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -2510,7 +2510,7 @@ func TestDeleteRunner_Run(t *testing.T) {
 		// Pre-stage a CREATE operation
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/new-config"}, staging.Entry{
 			Operation: staging.OperationCreate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -2581,7 +2581,7 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 		// Pre-stage an UPDATE operation
 		_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("staged-value"),
+			Value:     new("staged-value"),
 			StagedAt:  time.Now(),
 		})
 
@@ -2926,7 +2926,7 @@ func TestApplyRunner_Namespaces(t *testing.T) {
 		key := staging.EntryKey{Name: "/app/config", Namespace: ns}
 		require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
 			Operation: staging.OperationUpdate,
-			Value:     lo.ToPtr("new-value"),
+			Value:     new("new-value"),
 			StagedAt:  time.Now(),
 		}))
 		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
@@ -2966,7 +2966,7 @@ func TestApplyRunner_NamespacedFailure(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("new-value"),
+		Value:     new("new-value"),
 		StagedAt:  time.Now(),
 	}))
 	require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
@@ -2999,7 +2999,7 @@ func TestDiffRunner_NamespacedAutoUnstage(t *testing.T) {
 	store := testutil.NewMockStore()
 	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: "prod"}, staging.Entry{
 		Operation: staging.OperationUpdate,
-		Value:     lo.ToPtr("same-value"),
+		Value:     new("same-value"),
 		StagedAt:  time.Now(),
 	}))
 

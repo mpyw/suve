@@ -22,7 +22,7 @@ func nonEmptyState() *staging.State {
 	s := staging.NewEmptyState()
 	s.Entries[staging.ServiceParam][staging.EntryKey{Name: "/app/secret"}] = staging.Entry{
 		Operation: staging.OperationCreate,
-		Value:     lo.ToPtr("v"),
+		Value:     new("v"),
 	}
 
 	return s
