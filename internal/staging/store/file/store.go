@@ -335,6 +335,32 @@ func warnPlaintextOnce(cause error) {
 	})
 }
 
+// plaintextWithKeyWarned records the working-store files already reported by
+// warnPlaintextWithKey, so each is reported once per process.
+//
+//nolint:gochecknoglobals // process-wide one-time warning guard.
+var plaintextWithKeyWarned sync.Map
+
+// warnPlaintextWithKey reports, once per file and process, an unencrypted
+// working-store file read while an encryption key is configured. The file is
+// still read (a store that ran without a key before stays usable, and the next
+// write encrypts it), but suve did not write it that way itself since the key
+// was configured, so it may have been planted: the user should check it.
+func warnPlaintextWithKey(path string) {
+	if _, loaded := plaintextWithKeyWarned.LoadOrStore(path, struct{}{}); loaded {
+		return
+	}
+
+	warnWriterMu.Lock()
+	w := warnWriter
+	warnWriterMu.Unlock()
+
+	//nolint:forbidigo // low-level store writes to its own sink, not cli/output
+	_, _ = fmt.Fprintf(w, "warning: staging file %s is not encrypted although an encryption key is configured; "+
+		"it is encrypted on the next write. If you did not stage these changes, check them with `stage status` "+
+		"and discard them with `stage reset`\n", path)
+}
+
 // plaintextConsentGranted reports whether EnvAllowPlaintext opts the caller in
 // to unencrypted staging writes. Parsed leniently: unset/empty is false, a
 // parseable bool is honored (so "0"/"false" stay off), and any other non-empty
@@ -508,11 +534,16 @@ func (s *Store) readFile(path string) (*staging.State, error) {
 	}
 
 	// Decrypt if encrypted. Reading an unencrypted (plaintext/legacy) file is
-	// always allowed so migration from an older/plaintext state works.
+	// always allowed so migration from an older/plaintext state works, but with
+	// a key configured it is reported (see warnPlaintextWithKey).
+	if !crypt.IsEncrypted(data) && s.key != nil {
+		warnPlaintextWithKey(path)
+	}
+
 	if crypt.IsEncrypted(data) {
 		switch {
 		case s.key != nil:
-			data, err = crypt.DecryptWithKey(data, s.key)
+			data, err = crypt.DecryptWithKey(data, s.key, s.rawKeyAAD(path))
 		case s.passphrase != "":
 			data, err = crypt.Decrypt(data, s.passphrase)
 		default:
@@ -540,6 +571,15 @@ func (s *Store) readFile(path string) (*staging.State, error) {
 	initializeStateMaps(&state)
 
 	return &state, nil
+}
+
+// rawKeyAAD is the associated data a raw-key (keychain / SUVE_STAGING_KEY)
+// ciphertext is bound to: the scope key and the file name (param.json or
+// secret.json, i.e. the service). A working file copied to another scope
+// directory, or swapped with the other service's file, then fails to decrypt
+// instead of being read as that scope's or service's staged changes.
+func (s *Store) rawKeyAAD(path string) []byte {
+	return []byte("suve-staging\x00" + s.scope.Key() + "\x00" + filepath.Base(path))
 }
 
 // writeFile writes the state to the given file path.
@@ -570,11 +610,11 @@ func (s *Store) writeFile(path string, state *staging.State) error {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	// Encrypt: prefer the raw key (v2) when configured, else fall back to the
+	// Encrypt: prefer the raw key (v3) when configured, else fall back to the
 	// passphrase (v1); otherwise write plaintext.
 	switch {
 	case s.key != nil:
-		data, err = crypt.EncryptWithKey(data, s.key)
+		data, err = crypt.EncryptWithKey(data, s.key, s.rawKeyAAD(path))
 		if err != nil {
 			return fmt.Errorf("failed to encrypt state: %w", err)
 		}

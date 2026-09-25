@@ -6,6 +6,12 @@
 //	                 key derived from the passphrase via Argon2id.
 //	v2 (raw key):    magic(8) + version(1)=2 + nonce(12) + ciphertext
 //	                 the supplied 32-byte key is used directly as the AES-256-GCM key.
+//	                 Legacy: read-only, no associated data.
+//	v3 (raw key):    magic(8) + version(1)=3 + nonce(12) + ciphertext
+//	                 like v2, but the header and caller-supplied associated data
+//	                 (the working store binds the scope and service) are
+//	                 authenticated, so a file moved to another scope or service
+//	                 fails to decrypt.
 package crypt
 
 import (
@@ -57,10 +63,15 @@ const (
 	MagicHeader = "SUVE_ENC"
 	// Version is the passphrase-based (Argon2id) encryption format version.
 	Version = byte(1)
-	// VersionRawKey is the raw-key encryption format version.
+	// VersionRawKey is the legacy raw-key encryption format version.
 	// It stores no salt and performs no KDF; the supplied 32-byte key is used
-	// directly as the AES-256-GCM key.
+	// directly as the AES-256-GCM key. It binds no associated data. It is only
+	// read (DecryptWithKey), never written.
 	VersionRawKey = byte(2)
+	// VersionRawKeyAAD is the raw-key encryption format version that EncryptWithKey
+	// writes: the v2 layout, with the header and the caller's associated data
+	// authenticated by AES-GCM.
+	VersionRawKeyAAD = byte(3)
 
 	saltLen  = 32
 	nonceLen = 12 // AES-GCM standard nonce size
@@ -203,8 +214,8 @@ func DecryptWithAAD(data []byte, passphrase string, aad []byte) ([]byte, error) 
 
 	version := data[len(MagicHeader)]
 
-	if version == VersionRawKey {
-		return nil, fmt.Errorf("%w: data uses raw-key format (v2); a passphrase cannot decrypt it", ErrInvalidFormat)
+	if version == VersionRawKey || version == VersionRawKeyAAD {
+		return nil, fmt.Errorf("%w: data uses raw-key format (v%d); a passphrase cannot decrypt it", ErrInvalidFormat, version)
 	}
 
 	params, ok := kdfParamsByVersion[version]
@@ -242,9 +253,10 @@ func DecryptWithAAD(data []byte, passphrase string, aad []byte) ([]byte, error) 
 }
 
 // EncryptWithKey encrypts data using AES-256-GCM with the supplied 32-byte key
-// used directly as the key (no KDF). Returns raw-key (v2) format:
-// magic header + version(1)=2 + nonce + ciphertext.
-func EncryptWithKey(data, key []byte) ([]byte, error) {
+// used directly as the key (no KDF). Returns raw-key (v3) format:
+// magic header + version(1)=3 + nonce + ciphertext. The header and aad are
+// authenticated (not encrypted); DecryptWithKey must be given the same aad.
+func EncryptWithKey(data, key, aad []byte) ([]byte, error) {
 	if len(key) != RawKeyLen {
 		return nil, ErrInvalidKeyLength
 	}
@@ -260,23 +272,27 @@ func EncryptWithKey(data, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
-	ciphertext := gcm.Seal(nil, nonce, data, nil)
+	header := append([]byte(MagicHeader), VersionRawKeyAAD)
+
+	ciphertext := gcm.Seal(nil, nonce, data, rawKeyAAD(header, aad))
 
 	// Build output: header + nonce + ciphertext (no salt)
 	result := make([]byte, 0, headerLen+nonceLen+len(ciphertext))
-	result = append(result, []byte(MagicHeader)...)
-	result = append(result, VersionRawKey)
+	result = append(result, header...)
 	result = append(result, nonce...)
 	result = append(result, ciphertext...)
 
 	return result, nil
 }
 
-// DecryptWithKey decrypts raw-key (v2) data using the supplied 32-byte key.
+// DecryptWithKey decrypts raw-key data using the supplied 32-byte key. It reads
+// the v3 format, authenticating the header and aad (which must match the aad
+// given to EncryptWithKey), and the legacy v2 format, which binds no associated
+// data (aad is then ignored).
 // Returns ErrNotEncrypted if data doesn't have the encryption header.
-// Returns ErrInvalidFormat if the data is not raw-key (v2) format.
-// Returns ErrKeyMismatch if the key is wrong or data is corrupted.
-func DecryptWithKey(data, key []byte) ([]byte, error) {
+// Returns ErrInvalidFormat if the data is not a raw-key format.
+// Returns ErrKeyMismatch if the key or aad is wrong or data is corrupted.
+func DecryptWithKey(data, key, aad []byte) ([]byte, error) {
 	if len(key) != RawKeyLen {
 		return nil, ErrInvalidKeyLength
 	}
@@ -289,9 +305,15 @@ func DecryptWithKey(data, key []byte) ([]byte, error) {
 		return nil, ErrInvalidFormat
 	}
 
-	version := data[len(MagicHeader)]
-	if version != VersionRawKey {
-		return nil, fmt.Errorf("%w: expected raw-key format (v2), got version %d", ErrInvalidFormat, version)
+	var boundAAD []byte
+
+	switch version := data[len(MagicHeader)]; version {
+	case VersionRawKeyAAD:
+		boundAAD = rawKeyAAD(data[:headerLen], aad)
+	case VersionRawKey:
+		// Legacy: written before associated data was bound.
+	default:
+		return nil, fmt.Errorf("%w: expected raw-key format (v2 or v3), got version %d", ErrInvalidFormat, version)
 	}
 
 	minLen := headerLen + nonceLen + gcmAuthTagLen
@@ -309,12 +331,19 @@ func DecryptWithKey(data, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, boundAAD)
 	if err != nil {
 		return nil, ErrKeyMismatch
 	}
 
 	return plaintext, nil
+}
+
+// rawKeyAAD is the associated data a v3 raw-key ciphertext authenticates: its
+// header followed by the caller's aad, so neither the format version nor the
+// caller's binding can be swapped.
+func rawKeyAAD(header, aad []byte) []byte {
+	return append(append(make([]byte, 0, len(header)+len(aad)), header...), aad...)
 }
 
 // IsEncrypted checks if data has the encryption magic header.
