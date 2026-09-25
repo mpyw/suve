@@ -42,3 +42,51 @@ func openScopedWorkingStore(ctx context.Context, resolver staging.ScopeResolver)
 
 	return store, resolved, nil
 }
+
+// sharedScopeID tells the resolvers built by SharedScopeResolver apart. It is
+// not zero-sized, so each one gets its own address.
+type sharedScopeID struct{ _ byte }
+
+// sharedScopeResult is one memoized SharedScopeResolver run.
+type sharedScopeResult struct {
+	resolved staging.ResolvedScope
+	err      error
+}
+
+// sharedScopeMemoKey is the context key of the per-command memo that
+// withSharedScopeMemo installs.
+type sharedScopeMemoKey struct{}
+
+// SharedScopeResolver wraps a resolver that several services of one provider
+// share (AWS Parameter Store and Secrets Manager resolve one account scope from
+// the STS caller identity). Within one all-service command it runs once, and
+// the other services reuse its result (or error). Outside those commands it
+// just calls resolver.
+func SharedScopeResolver(resolver staging.ScopeResolver) staging.ScopeResolver {
+	id := &sharedScopeID{}
+
+	return func(ctx context.Context) (staging.ResolvedScope, error) {
+		memo, ok := ctx.Value(sharedScopeMemoKey{}).(map[*sharedScopeID]sharedScopeResult)
+		if !ok {
+			return resolver(ctx)
+		}
+
+		if r, ok := memo[id]; ok {
+			return r.resolved, r.err
+		}
+
+		resolved, err := resolver(ctx)
+		memo[id] = sharedScopeResult{resolved: resolved, err: err}
+
+		return resolved, err
+	}
+}
+
+// withSharedScopeMemo returns ctx carrying a fresh memo for the
+// SharedScopeResolver resolvers, so each one runs once in that context. The
+// memo is not safe for concurrent use: the services are resolved in turn.
+//
+//declscope:package // global.go resolves every service of an all-service command under one memo
+func withSharedScopeMemo(ctx context.Context) context.Context {
+	return context.WithValue(ctx, sharedScopeMemoKey{}, map[*sharedScopeID]sharedScopeResult{})
+}

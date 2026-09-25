@@ -157,23 +157,25 @@ Use 'suve aws stage secret reset' to unstage or restore from a version.`,
 // include export and import.
 func StageGlobalConfig() stgcli.GlobalConfig {
 	paramCfg, secretCfg := parameterStoreStageConfig(), secretsManagerStageConfig()
+	// Both services resolve the same STS identity: resolve it once per command.
+	shared := stgcli.SharedScopeResolver(awsinternal.StagingScopeResolver)
 
 	return stgcli.GlobalConfig{
 		ProviderLabel: stageProviderLabel,
 		CommandPath:   "suve aws stage",
-		ScopeResolver: awsinternal.StagingScopeResolver,
+		ScopeResolver: shared,
 		Services: []stgcli.GlobalServiceSpec{
 			{
 				Service:       staging.ServiceParam,
 				ParserFactory: paramCfg.ParserFactory,
 				Factory:       paramCfg.Factory,
-				ScopeResolver: paramCfg.ScopeResolver,
+				ScopeResolver: shared,
 			},
 			{
 				Service:       staging.ServiceSecret,
 				ParserFactory: secretCfg.ParserFactory,
 				Factory:       secretCfg.Factory,
-				ScopeResolver: secretCfg.ScopeResolver,
+				ScopeResolver: shared,
 			},
 		},
 	}

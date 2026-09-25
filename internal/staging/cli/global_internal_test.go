@@ -155,6 +155,72 @@ func TestGlobalApplyUseCase_PerServiceStores(t *testing.T) {
 	assert.Same(t, secretStore, useCase.Services[1].Store)
 }
 
+// TestGlobalApplyUseCase_SharedScope is the #1004 regression: AWS param and
+// secret share one scope resolver, so the all-service apply resolves it once
+// (one STS call) and lists the shared target once in the confirmation.
+func TestGlobalApplyUseCase_SharedScope(t *testing.T) {
+	t.Parallel()
+
+	st := testutil.NewMockStore()
+	require.NoError(t, st.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/p"}, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("pv"), StagedAt: time.Now(),
+	}))
+	require.NoError(t, st.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "s"}, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("sv"), StagedAt: time.Now(),
+	}))
+
+	calls := 0
+	shared := SharedScopeResolver(func(ctx context.Context) (staging.ResolvedScope, error) {
+		calls++
+
+		return globalTarget("profile p · account 1 · region r")(ctx)
+	})
+	specs := []GlobalServiceSpec{
+		{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: shared, Factory: globalNilFactory},
+		{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: shared, Factory: globalNilFactory},
+	}
+	resolve := globalResolveFrom(map[string]store.ReadWriteOperator{"profile p · account 1 · region r": st})
+
+	useCase, targets, total, err := globalApplyUseCase(t.Context(), GlobalConfig{Services: specs}, resolve)
+	require.NoError(t, err)
+	require.Len(t, useCase.Services, 2)
+	assert.Equal(t, 2, total)
+	assert.Equal(t, []string{"at profile p · account 1 · region r"}, targets)
+	assert.Equal(t, 1, calls, "the shared resolver must run once per command")
+
+	// Each command gets a fresh memo, and outside one the resolver calls through.
+	_, err = gatherGlobalServices(t.Context(), specs, resolve)
+	require.NoError(t, err)
+	assert.Equal(t, 2, calls)
+
+	_, err = shared(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, 3, calls)
+}
+
+// TestSharedScopeResolver_MemoizesError verifies a failed shared resolution is
+// reused too, so the second service does not retry the lookup.
+func TestSharedScopeResolver_MemoizesError(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("sts boom")
+	calls := 0
+	shared := SharedScopeResolver(func(context.Context) (staging.ResolvedScope, error) {
+		calls++
+
+		return staging.ResolvedScope{}, wantErr
+	})
+
+	ctx := withSharedScopeMemo(t.Context())
+
+	_, err := shared(ctx)
+	require.ErrorIs(t, err, wantErr)
+
+	_, err = shared(ctx)
+	require.ErrorIs(t, err, wantErr)
+	assert.Equal(t, 1, calls)
+}
+
 // TestGlobalDiffUseCases_PerServiceStores proves each service is diffed from
 // its OWN store, labelled with the provider.
 func TestGlobalDiffUseCases_PerServiceStores(t *testing.T) {

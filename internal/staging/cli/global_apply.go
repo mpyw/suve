@@ -10,6 +10,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/urfave/cli/v3"
 
 	"github.com/mpyw/suve/internal/cli/confirm"
@@ -70,8 +71,8 @@ EXAMPLES:
 }
 
 // globalApplyUseCase builds the all-service apply over every configured service
-// that has staged changes, plus the confirmation targets and the total staged
-// count. A provider client is initialized only for those services.
+// that has staged changes, plus the distinct confirmation targets and the total
+// staged count. A provider client is initialized only for those services.
 func globalApplyUseCase(
 	ctx context.Context, gcfg GlobalConfig, resolve globalStoreResolver,
 ) (useCase *stagingusecase.GlobalApplyUseCase, targets []string, totalStaged int, err error) {
@@ -97,7 +98,8 @@ func globalApplyUseCase(
 		})
 	}
 
-	return useCase, targets, totalStaged, nil
+	// Services sharing one scope (AWS) have the same target: list it once.
+	return useCase, lo.Uniq(targets), totalStaged, nil
 }
 
 func globalApplyAction(ctx context.Context, cmd *cli.Command, gcfg GlobalConfig, resolve globalStoreResolver) error {
