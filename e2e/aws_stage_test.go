@@ -92,6 +92,15 @@ func TestAWSGlobal_StageWorkflow(t *testing.T) {
 		t.Logf("global diff output: %s", stdout)
 	})
 
+	// #1004: param and secret share one AWS scope, so the confirmation shows
+	// the target once. Answering "n" aborts without applying.
+	t.Run("global-apply-target-once", func(t *testing.T) {
+		_, stderr, err := runCommandWithStdin(t, stgcli.NewGlobalApplyCommand(awsStageGlobalConfig()), strings.NewReader("n\n"))
+		require.NoError(t, err)
+		assert.Contains(t, stderr, "Target: ")
+		assert.Equal(t, 1, strings.Count(stderr, "account "), "target repeated: %s", stderr)
+	})
+
 	// 3. Global apply applies both
 	t.Run("global-apply", func(t *testing.T) {
 		stdout, _, err := runCommand(t, stgcli.NewGlobalApplyCommand(awsStageGlobalConfig()), "--yes")

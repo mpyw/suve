@@ -143,7 +143,11 @@ Every staging command config (`stgcli.CommandConfig`, `stgcli.GlobalConfig`,
 `azureinternal.AppConfigStagingScopeResolver`) check the flag/env value and
 then call `binding.StagingScope`. Stage configs get `Factory` from
 `cliinternal.StrategyFactory(p, kind, store)` and `ParserFactory` from
-`cliinternal.ParserFactory(p, kind)`. A nil resolver fails the command. Each
+`cliinternal.ParserFactory(p, kind)`. A nil resolver fails the command. When
+several services share one resolver (AWS param and secret: one STS identity),
+the provider's global config wraps it in `stgcli.SharedScopeResolver`, so an
+all-service command resolves it once and the apply prompt lists each distinct
+target once. Each
 scope keys its on-disk staging state (`provider.Scope.Key`), partitioning staged
 changes per scope under `~/.suve/staging/<scope key>/`.
 

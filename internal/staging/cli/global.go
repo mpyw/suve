@@ -25,7 +25,8 @@ type GlobalServiceSpec struct {
 	// because a provider's services may live in independent resources with
 	// separate staging buckets: Azure App Configuration (param) is keyed by
 	// store name, Key Vault (secret) by vault name. AWS keeps one account scope
-	// for both. Required.
+	// for both; wrap such a shared resolver in SharedScopeResolver so the
+	// all-service commands resolve it once. Required.
 	ScopeResolver staging.ScopeResolver
 	// StrategyForNamespace, when set, builds a strategy scoped to a given
 	// namespace so apply/diff act on each staged entry under its own namespace
@@ -98,6 +99,9 @@ func gatherGlobalServices(
 	ctx context.Context, specs []GlobalServiceSpec, resolve globalStoreResolver,
 ) ([]globalService, error) {
 	var services []globalService
+
+	// Services that share one scope resolver (SharedScopeResolver) resolve it once.
+	ctx = withSharedScopeMemo(ctx)
 
 	for _, spec := range specs {
 		st, resolved, err := resolve(ctx, spec.ScopeResolver)
