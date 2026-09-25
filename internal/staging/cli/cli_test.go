@@ -1722,6 +1722,7 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		err := r.Run(t.Context(), cli.EditOptions{
 			Name:        "/app/config",
 			Value:       "new-value",
+			HasValue:    true,
 			Description: "Updated description",
 		})
 		require.NoError(t, err)
@@ -1753,8 +1754,9 @@ func TestEditRunner_WithMetadata(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.EditOptions{
-			Name:  "/app/config",
-			Value: "new-value",
+			Name:     "/app/config",
+			Value:    "new-value",
+			HasValue: true,
 		})
 		require.NoError(t, err)
 
@@ -2559,8 +2561,9 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 
 		// Edit with value that matches AWS - should be skipped
 		err := r.Run(t.Context(), cli.EditOptions{
-			Name:  "/app/config",
-			Value: "aws-value", // Same as current AWS value
+			Name:     "/app/config",
+			Value:    "aws-value", // Same as current AWS value
+			HasValue: true,
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Skipped /app/config (same as AWS)")
@@ -2596,8 +2599,9 @@ func TestEditRunner_Skipped_Unstaged(t *testing.T) {
 
 		// Edit back to AWS value - should auto-unstage
 		err := r.Run(t.Context(), cli.EditOptions{
-			Name:  "/app/config",
-			Value: "aws-value", // Reverted to AWS value
+			Name:     "/app/config",
+			Value:    "aws-value", // Reverted to AWS value
+			HasValue: true,
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Unstaged /app/config (reverted to AWS)")

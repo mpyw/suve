@@ -8,8 +8,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	gcloudinternal "github.com/mpyw/suve/internal/cli/commands/gcloud/internal"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/cli/valueinput"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -55,7 +55,7 @@ EXAMPLES:
    printf '%s' "$V" | suve gcloud secret create my-key --value-stdin  Read value from stdin
    suve gcloud secret create my-key                            Type value into $EDITOR`,
 		Flags: []cli.Flag{
-			cliinternal.ValueStdinFlag(),
+			valueinput.ValueStdinFlag(),
 			&cli.StringFlag{
 				Name:  "description",
 				Usage: "Description for the secret (stored as the \"description\" annotation)",
@@ -71,11 +71,11 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 		return errors.New("usage: suve gcloud secret create <name> [<value>]")
 	}
 
-	value, proceed, err := cliinternal.ResolveValue(ctx, cliinternal.ValueSource{
-		FromStdin: cmd.Bool(cliinternal.FlagValueStdin),
+	value, proceed, err := valueinput.ResolveValue(ctx, valueinput.ValueSource{
+		FromStdin: cmd.Bool(valueinput.FlagValueStdin),
 		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
 		Arg:       args.Get(1),
-		Stdin:     cliinternal.ValueStdin(cmd),
+		Stdin:     valueinput.ValueStdin(cmd),
 	})
 	if err != nil {
 		return err

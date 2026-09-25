@@ -1,4 +1,4 @@
-package internal_test
+package valueinput_test
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/cli/valueinput"
 )
 
 // errReader fails on the first Read, standing in for a stdin whose read errors.
@@ -28,22 +28,22 @@ func TestStdin(t *testing.T) {
 
 		r := strings.NewReader("injected")
 		cmd := &cli.Command{Reader: r}
-		assert.Same(t, r, cliinternal.ValueStdin(cmd))
+		assert.Same(t, r, valueinput.ValueStdin(cmd))
 	})
 
 	t.Run("falls back to os.Stdin when no reader is set", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Same(t, os.Stdin, cliinternal.ValueStdin(&cli.Command{}))
+		assert.Same(t, os.Stdin, valueinput.ValueStdin(&cli.Command{}))
 	})
 }
 
 func TestValueStdinFlag(t *testing.T) {
 	t.Parallel()
 
-	f, ok := cliinternal.ValueStdinFlag().(*cli.BoolFlag)
+	f, ok := valueinput.ValueStdinFlag().(*cli.BoolFlag)
 	require.True(t, ok)
-	assert.Equal(t, cliinternal.FlagValueStdin, f.Name)
+	assert.Equal(t, valueinput.FlagValueStdin, f.Name)
 	assert.NotEmpty(t, f.Usage)
 }
 
@@ -53,7 +53,7 @@ func TestResolveValue_FromStdin(t *testing.T) {
 	t.Run("reads stdin and trims a single trailing newline", func(t *testing.T) {
 		t.Parallel()
 
-		value, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		value, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			FromStdin: true,
 			Stdin:     strings.NewReader("sk-12345\n"),
 		})
@@ -65,7 +65,7 @@ func TestResolveValue_FromStdin(t *testing.T) {
 	t.Run("preserves interior newlines and CRLF trailing", func(t *testing.T) {
 		t.Parallel()
 
-		value, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		value, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			FromStdin: true,
 			Stdin:     strings.NewReader("{\n  \"a\": 1\n}\r\n"),
 		})
@@ -77,7 +77,7 @@ func TestResolveValue_FromStdin(t *testing.T) {
 	t.Run("empty stdin still proceeds with an empty value", func(t *testing.T) {
 		t.Parallel()
 
-		value, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		value, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			FromStdin: true,
 			Stdin:     strings.NewReader(""),
 		})
@@ -89,7 +89,7 @@ func TestResolveValue_FromStdin(t *testing.T) {
 	t.Run("combining a positional value with --value-stdin is an error", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		_, _, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			FromStdin: true,
 			HasArg:    true,
 			Arg:       "positional",
@@ -104,12 +104,12 @@ func TestResolveValue_FromStdin(t *testing.T) {
 
 		reader := strings.NewReader("sk-12345\n")
 
-		_, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		_, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			FromStdin:       true,
 			ConfirmRequired: true,
 			Stdin:           reader,
 		})
-		require.ErrorIs(t, err, cliinternal.ErrValueStdinNeedsYes)
+		require.ErrorIs(t, err, valueinput.ErrValueStdinNeedsYes)
 		assert.False(t, proceed)
 		// Stdin must be left untouched so the value is never silently consumed.
 		rest, rerr := io.ReadAll(reader)
@@ -122,7 +122,7 @@ func TestResolveValue_FromStdin(t *testing.T) {
 
 		sentinel := errors.New("read boom")
 
-		_, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		_, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			FromStdin: true,
 			Stdin:     errReader{err: sentinel},
 		})
@@ -134,7 +134,7 @@ func TestResolveValue_FromStdin(t *testing.T) {
 	t.Run("reads stdin when confirmation is skipped via --yes", func(t *testing.T) {
 		t.Parallel()
 
-		value, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		value, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			FromStdin:       true,
 			ConfirmRequired: false,
 			Stdin:           strings.NewReader("sk-12345\n"),
@@ -148,7 +148,7 @@ func TestResolveValue_FromStdin(t *testing.T) {
 func TestResolveValue_FromArg(t *testing.T) {
 	t.Parallel()
 
-	value, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+	value, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 		HasArg: true,
 		Arg:    "hunter2",
 	})
@@ -165,7 +165,7 @@ func TestResolveValue_EditorFallback(t *testing.T) {
 
 		var gotInitial string
 
-		value, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		value, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			OpenEditor: func(_ context.Context, content string) (string, error) {
 				gotInitial = content
 
@@ -181,7 +181,7 @@ func TestResolveValue_EditorFallback(t *testing.T) {
 	t.Run("an empty editor result cancels (proceed=false)", func(t *testing.T) {
 		t.Parallel()
 
-		value, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		value, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			OpenEditor: func(_ context.Context, _ string) (string, error) {
 				return "", nil
 			},
@@ -197,12 +197,12 @@ func TestResolveValue_EditorFallback(t *testing.T) {
 		// No OpenEditor override: the real editor.Open would be selected, but a
 		// non-TTY stdin (here strings.Reader) must short-circuit to an error
 		// rather than block waiting on an interactive editor.
-		_, proceed, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		_, proceed, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			Stdin: strings.NewReader(""),
 		})
 		require.Error(t, err)
 		assert.False(t, proceed)
-		assert.ErrorIs(t, err, cliinternal.ErrValueRequired)
+		assert.ErrorIs(t, err, valueinput.ErrValueRequired)
 	})
 
 	t.Run("editor errors are surfaced", func(t *testing.T) {
@@ -210,7 +210,7 @@ func TestResolveValue_EditorFallback(t *testing.T) {
 
 		sentinel := errors.New("editor exploded")
 
-		_, _, err := cliinternal.ResolveValue(t.Context(), cliinternal.ValueSource{
+		_, _, err := valueinput.ResolveValue(t.Context(), valueinput.ValueSource{
 			OpenEditor: func(_ context.Context, _ string) (string, error) {
 				return "", sentinel
 			},

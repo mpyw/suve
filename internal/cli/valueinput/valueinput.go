@@ -1,4 +1,8 @@
-package internal
+// Package valueinput resolves the value a write command takes: from stdin
+// (--value-stdin), from a positional argument, or from $EDITOR when the session
+// is interactive. The direct create/update commands and the stage add/edit
+// commands share it, so a non-interactive session never waits on an editor.
+package valueinput
 
 import (
 	"context"
@@ -40,7 +44,7 @@ var ErrValueStdinNeedsYes = errors.New(
 const FlagValueStdin = "value-stdin"
 
 // ValueStdinFlag returns the shared --value-stdin flag used by the direct
-// create/update commands across every provider.
+// create/update and stage add/edit commands across every provider.
 func ValueStdinFlag() cli.Flag {
 	return &cli.BoolFlag{
 		Name:  FlagValueStdin,
@@ -82,6 +86,9 @@ type ValueSource struct {
 	Stdin io.Reader
 	// OpenEditor is the editor seam used for the fallback path (nil -> editor.Open).
 	OpenEditor editor.OpenFunc
+	// EditorInitial is the text the editor fallback opens with (e.g. the staged
+	// draft or the current value); empty opens a blank buffer.
+	EditorInitial string
 	// ConfirmRequired is true when the command would prompt for confirmation on
 	// the same stdin after resolving the value (i.e. an update without --yes).
 	// Combined with FromStdin this is the double-consume case, so ResolveValue
@@ -90,11 +97,12 @@ type ValueSource struct {
 	ConfirmRequired bool
 }
 
-// ResolveValue determines the value for a create/update command. Precedence:
+// ResolveValue determines the value for a create/update or stage add/edit command. Precedence:
 //
 //  1. --value-stdin: read the whole of stdin (one trailing newline trimmed).
 //  2. the positional value argument, when supplied.
-//  3. $EDITOR fallback: open an empty buffer and use whatever is saved.
+//  3. $EDITOR fallback: open EditorInitial (usually empty) and use whatever is
+//     saved. A non-interactive stdin fails with ErrValueRequired instead.
 //
 // proceed reports whether the command should continue. It is false only when
 // the editor fallback returns an empty value, which is treated as a
@@ -132,26 +140,40 @@ func ResolveValue(ctx context.Context, src ValueSource) (value string, proceed b
 		return src.Arg, true, nil
 
 	default:
+		if err := CheckEditorFallback(src); err != nil {
+			return "", false, err
+		}
+
 		openEditor := src.OpenEditor
 		if openEditor == nil {
-			// The real $EDITOR is a blocking, interactive program: launching it
-			// under a pipe or in CI would hang forever. Only fall back to it when
-			// stdin is a TTY; otherwise fail with an actionable error. Tests inject
-			// a non-blocking OpenEditor and are therefore exempt from this guard.
-			if !interactiveValueReader(src.Stdin) {
-				return "", false, ErrValueRequired
-			}
-
 			openEditor = editor.Open
 		}
 
-		edited, eerr := openEditor(ctx, "")
+		edited, eerr := openEditor(ctx, src.EditorInitial)
 		if eerr != nil {
 			return "", false, fmt.Errorf("failed to edit value: %w", eerr)
 		}
 
 		return edited, edited != "", nil
 	}
+}
+
+// CheckEditorFallback returns ErrValueRequired when src names no value (no
+// --value-stdin, no argument) and the $EDITOR fallback cannot run. The real
+// $EDITOR is a blocking, interactive program: launching it under a pipe or in
+// CI would hang forever, so it runs only when stdin is a TTY. An injected
+// OpenEditor (tests) is exempt. Callers that must do slow work before
+// ResolveValue (e.g. fetch the value to edit) call it first to fail early.
+func CheckEditorFallback(src ValueSource) error {
+	if src.FromStdin || src.HasArg || src.OpenEditor != nil {
+		return nil
+	}
+
+	if !interactiveValueReader(src.Stdin) {
+		return ErrValueRequired
+	}
+
+	return nil
 }
 
 // trimValueTrailingNewline removes a single trailing newline (CRLF or LF), matching

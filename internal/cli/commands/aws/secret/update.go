@@ -8,9 +8,9 @@ import (
 	"github.com/urfave/cli/v3"
 
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/cli/valueinput"
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
@@ -61,7 +61,7 @@ EXAMPLES:
 				Name:  "yes",
 				Usage: "Skip confirmation prompt",
 			},
-			cliinternal.ValueStdinFlag(),
+			valueinput.ValueStdinFlag(),
 		},
 		Action: updateAction,
 	}
@@ -76,11 +76,11 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 	name := args.Get(0)
 	skipConfirm := cmd.Bool("yes")
 
-	newValue, proceed, err := cliinternal.ResolveValue(ctx, cliinternal.ValueSource{
-		FromStdin: cmd.Bool(cliinternal.FlagValueStdin),
+	newValue, proceed, err := valueinput.ResolveValue(ctx, valueinput.ValueSource{
+		FromStdin: cmd.Bool(valueinput.FlagValueStdin),
 		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
 		Arg:       args.Get(1),
-		Stdin:     cliinternal.ValueStdin(cmd),
+		Stdin:     valueinput.ValueStdin(cmd),
 		// Without --yes we prompt for confirmation on the same stdin below;
 		// reading the value from stdin would leave nothing for that prompt.
 		ConfirmRequired: !skipConfirm,
@@ -114,7 +114,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 
 		// Confirm operation
 		prompter := &confirm.Prompter{
-			Stdin:  cliinternal.ValueStdin(cmd),
+			Stdin:  valueinput.ValueStdin(cmd),
 			Stdout: cmd.Root().Writer,
 			Stderr: cmd.Root().ErrWriter,
 			Target: awsinternal.ConfirmTarget(ctx),

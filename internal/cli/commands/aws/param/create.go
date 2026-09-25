@@ -8,8 +8,8 @@ import (
 	"github.com/urfave/cli/v3"
 
 	awsinternal "github.com/mpyw/suve/internal/cli/commands/aws/internal"
-	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
 	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/cli/valueinput"
 	"github.com/mpyw/suve/internal/provider/aws/paramtype"
 	"github.com/mpyw/suve/internal/usecase/param"
 )
@@ -94,7 +94,7 @@ EXAMPLES:
 				Name:  "policies",
 				Usage: "Parameter policies as a JSON document",
 			},
-			cliinternal.ValueStdinFlag(),
+			valueinput.ValueStdinFlag(),
 		},
 		Action: createAction,
 	}
@@ -126,11 +126,11 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	value, proceed, err := cliinternal.ResolveValue(ctx, cliinternal.ValueSource{
-		FromStdin: cmd.Bool(cliinternal.FlagValueStdin),
+	value, proceed, err := valueinput.ResolveValue(ctx, valueinput.ValueSource{
+		FromStdin: cmd.Bool(valueinput.FlagValueStdin),
 		HasArg:    args.Len() >= 2, //nolint:mnd // arg 0 is the name, arg 1 is the optional value
 		Arg:       args.Get(1),
-		Stdin:     cliinternal.ValueStdin(cmd),
+		Stdin:     valueinput.ValueStdin(cmd),
 	})
 	if err != nil {
 		return err

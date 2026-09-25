@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/cli/valueinput"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
@@ -266,8 +267,9 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		}
 
 		err := r.Run(t.Context(), cli.AddOptions{
-			Name:  "/app/new-config",
-			Value: "direct-value",
+			Name:     "/app/new-config",
+			Value:    "direct-value",
+			HasValue: true,
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stdout.String(), "Staged for creation")
@@ -297,6 +299,7 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		err := r.Run(t.Context(), cli.AddOptions{
 			Name:        "/app/new-config",
 			Value:       "test-value",
+			HasValue:    true,
 			Description: "Test description",
 		})
 		require.NoError(t, err)
@@ -305,4 +308,147 @@ func TestAddRunner_WithOptions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Test description", lo.FromPtr(entry.Description))
 	})
+}
+
+// TestAddEditRunner_ValueSources covers the value sources of stage add/edit
+// (#985): without a terminal and without an injected editor, a missing value
+// fails instead of launching $EDITOR; an explicit "" is a value; --value-stdin
+// reads the value from stdin.
+func TestAddEditRunner_ValueSources(t *testing.T) {
+	t.Parallel()
+
+	newAdd := func(store *testutil.MockStore, stdin *bytes.Buffer) *cli.AddRunner {
+		return &cli.AddRunner{
+			UseCase: &stagingusecase.AddUseCase{Strategy: &mockStrategy{service: staging.ServiceParam}, Store: store},
+			Stdout:  &bytes.Buffer{},
+			Stderr:  &bytes.Buffer{},
+			Stdin:   stdin,
+		}
+	}
+	newEdit := func(store *testutil.MockStore, stdin *bytes.Buffer) *cli.EditRunner {
+		return &cli.EditRunner{
+			UseCase: &stagingusecase.EditUseCase{
+				Strategy: &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "remote-value"},
+				Store:    store,
+			},
+			Stdout: &bytes.Buffer{},
+			Stderr: &bytes.Buffer{},
+			Stdin:  stdin,
+		}
+	}
+	stagedValue := func(t *testing.T, store *testutil.MockStore) string {
+		t.Helper()
+
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
+		require.NoError(t, err)
+
+		return lo.FromPtr(entry.Value)
+	}
+
+	t.Run("add without value on a non-TTY stdin fails", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		err := newAdd(store, &bytes.Buffer{}).Run(t.Context(), cli.AddOptions{Name: "/app/config"})
+		require.ErrorIs(t, err, valueinput.ErrValueRequired)
+
+		_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
+		require.ErrorIs(t, err, staging.ErrNotStaged)
+	})
+
+	t.Run("edit without value on a non-TTY stdin fails", func(t *testing.T) {
+		t.Parallel()
+
+		// The check runs before the remote fetch, so a fetch failure (e.g. no
+		// credentials in CI) does not hide it.
+		r := newEdit(testutil.NewMockStore(), &bytes.Buffer{})
+		r.UseCase.Strategy = &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: errors.New("no credentials")}
+		err := r.Run(t.Context(), cli.EditOptions{Name: "/app/config"})
+		require.ErrorIs(t, err, valueinput.ErrValueRequired)
+	})
+
+	t.Run("add with an explicit empty value stages it", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		require.NoError(t, newAdd(store, &bytes.Buffer{}).Run(t.Context(), cli.AddOptions{Name: "/app/config", HasValue: true}))
+		assert.Empty(t, stagedValue(t, store))
+	})
+
+	t.Run("add --value-stdin", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		err := newAdd(store, bytes.NewBufferString("piped-value\n")).Run(t.Context(), cli.AddOptions{
+			Name: "/app/config", ValueFromStdin: true,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "piped-value", stagedValue(t, store))
+	})
+
+	t.Run("edit --value-stdin", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		err := newEdit(store, bytes.NewBufferString("piped-value\n")).Run(t.Context(), cli.EditOptions{
+			Name: "/app/config", ValueFromStdin: true,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "piped-value", stagedValue(t, store))
+	})
+
+	t.Run("--value-stdin with a value argument fails", func(t *testing.T) {
+		t.Parallel()
+
+		store := testutil.NewMockStore()
+		err := newAdd(store, bytes.NewBufferString("piped-value")).Run(t.Context(), cli.AddOptions{
+			Name: "/app/config", Value: "arg", HasValue: true, ValueFromStdin: true,
+		})
+		require.ErrorContains(t, err, "cannot combine a positional value with --value-stdin")
+	})
+}
+
+// TestAddEditCommand_ExplicitEmptyValue drives stage add/edit through their
+// commands: an explicit "" argument is an empty value, not a request for the
+// editor, so it stages without a terminal (#985).
+//
+//nolint:paralleltest // uses t.Setenv (HOME/SUVE_STAGING_KEY); cannot run in parallel
+func TestAddEditCommand_ExplicitEmptyValue(t *testing.T) {
+	scope := setupExportImportEnv(t)
+	cfg := cli.CommandConfig{
+		CommandName:   "param",
+		ItemName:      "parameter",
+		CommandPath:   "suve stage param",
+		ScopeResolver: fixedResolver(scope),
+		Factory: func(context.Context) (staging.FullStrategy, error) {
+			return &fullMockStrategy{service: staging.ServiceParam, fetchCurrentVal: "remote-value"}, nil
+		},
+	}
+
+	stagedValue := func(t *testing.T, name string) string {
+		t.Helper()
+
+		entry, ok := workingState(t, scope).Entries[staging.ServiceParam][staging.EntryKey{Name: name}]
+		require.True(t, ok, "%s must be staged", name)
+
+		return lo.FromPtr(entry.Value)
+	}
+
+	addCfg := cfg
+	addCfg.Factory = func(context.Context) (staging.FullStrategy, error) {
+		return &fullMockStrategy{service: staging.ServiceParam, fetchCurrentErr: &staging.ResourceNotFoundError{Err: errors.New("not found")}}, nil
+	}
+
+	stdout, _, err := runLeafCmd(t, cli.NewAddCommand(addCfg), &bytes.Buffer{}, "/app/new", "")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Staged for creation")
+	assert.Empty(t, stagedValue(t, "/app/new"))
+
+	stdout, _, err = runLeafCmd(t, cli.NewEditCommand(cfg), &bytes.Buffer{}, "/app/existing", "")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Staged")
+	assert.Empty(t, stagedValue(t, "/app/existing"))
+
+	_, _, err = runLeafCmd(t, cli.NewEditCommand(cfg), &bytes.Buffer{}, "/app/other")
+	require.ErrorIs(t, err, valueinput.ErrValueRequired)
 }
