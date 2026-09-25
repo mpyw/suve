@@ -97,6 +97,8 @@
   let entries: gui.SecretListEntry[] = $state([]);
   let selectedSecret: string | null = $state(null);
   let secretDetail: gui.SecretShowResult | null = $state(null);
+  // Monotonic id of the latest selection (see selectSecret).
+  let detailSeq = 0;
   let secretLog: gui.SecretLogEntry[] = $state([]);
   let detailLoading = $state(false);
   let showValue = $state(false);
@@ -156,7 +158,13 @@
   }
 
   async function selectSecret(name: string) {
+    // Only the latest selection may fill the detail pane: an earlier Show that
+    // resolves late, or a failed Show, must never leave another item's value,
+    // version or tags under the new title (#981).
+    const seq = ++detailSeq;
     selectedSecret = name;
+    secretDetail = null;
+    secretLog = [];
     detailLoading = true;
     showValue = withValue;
     stagingStatus = null;
@@ -167,6 +175,7 @@
       SecretShow(name),
       historyEnabled ? SecretLog(name, 10) : Promise.resolve(null),
     ]);
+    if (seq !== detailSeq) return; // superseded by a newer selection
     if (detailResult.status === 'fulfilled') {
       secretDetail = detailResult.value;
     } else {
@@ -179,14 +188,17 @@
     // just means no banner and never breaks the detail pane.
     if (stagingEnabled) {
       try {
-        stagingStatus = await StagingCheckStatus('secret', name, '');
+        const status = await StagingCheckStatus('secret', name, '');
+        if (seq === detailSeq) stagingStatus = status;
       } catch {
-        stagingStatus = null;
+        if (seq === detailSeq) stagingStatus = null;
       }
     }
   }
 
   function closeDetail() {
+    detailSeq++; // drop any selection still loading
+    detailLoading = false;
     selectedSecret = null;
     secretDetail = null;
     secretLog = [];
@@ -234,10 +246,11 @@
 
   // Edit modal
   function openEditModal() {
-    if (secretDetail) {
-      // Pre-fill the current description so an unchanged edit round-trips it.
-      editForm = { name: secretDetail.name, value: secretDetail.value, description: secretDetail.description ?? '' };
-    }
+    // Edit needs the selected secret's own detail; the button is disabled
+    // until it has loaded.
+    if (!selectedSecret || !secretDetail) return;
+    // Pre-fill the current description so an unchanged edit round-trips it.
+    editForm = { name: selectedSecret, value: secretDetail.value, description: secretDetail.description ?? '' };
     modalError = '';
     showEditModal = true;
   }
@@ -477,7 +490,7 @@
         <div class="detail-header">
           <h3 class="detail-title secret">{selectedSecret}</h3>
           <div class="detail-actions">
-            <button class="btn-action-sm" onclick={openEditModal}>Edit</button>
+            <button class="btn-action-sm" onclick={openEditModal} disabled={!secretDetail}>Edit</button>
             <button class="btn-action-sm btn-danger" onclick={() => selectedSecret && openDeleteModal(selectedSecret)}>Delete</button>
             {#if secretLog.length >= 2}
               <button class="btn-action-sm" class:active={diffMode.active} onclick={diffMode.toggle}>
