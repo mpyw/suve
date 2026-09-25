@@ -28,6 +28,9 @@ type CreateOutput struct {
 // CreateUseCase executes create operations.
 type CreateUseCase struct {
 	Writer provider.Writer
+	// ItemNoun names one item of the service in error messages ("parameter",
+	// "setting"; capability.ServiceCapability.ItemNoun). Empty means "entry".
+	ItemNoun string
 }
 
 // Execute runs the create use case. It creates a new parameter via the
@@ -36,7 +39,7 @@ type CreateUseCase struct {
 func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*CreateOutput, error) {
 	version, err := u.Writer.Create(ctx, input.Name, input.Value, input.Type, input.Description, input.Options...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create parameter: %w", err)
+		return nil, fmt.Errorf("failed to create %s: %w", errItemNoun(u.ItemNoun), err)
 	}
 
 	return &CreateOutput{

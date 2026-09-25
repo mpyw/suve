@@ -74,7 +74,7 @@ func TestCreateUseCase_Execute_AlreadyExists(t *testing.T) {
 		},
 	}
 
-	uc := &param.CreateUseCase{Writer: store}
+	uc := &param.CreateUseCase{Writer: store, ItemNoun: "parameter"}
 
 	_, err := uc.Execute(t.Context(), param.CreateInput{
 		Name:  "/app/existing",
@@ -103,5 +103,6 @@ func TestCreateUseCase_Execute_CreateError(t *testing.T) {
 		Type:  domain.ValueTypePlaintext,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create parameter")
+	// No ItemNoun: the neutral noun.
+	assert.Contains(t, err.Error(), "failed to create entry")
 }

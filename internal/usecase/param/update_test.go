@@ -182,26 +182,33 @@ func TestUpdateUseCase_Execute_ExplicitTypeOverridesPreserve(t *testing.T) {
 	assert.Equal(t, domain.ValueTypePlaintext, gotType)
 }
 
-// TestUpdateUseCase_Execute_NotFound verifies a missing parameter is reported
-// as not-found (only provider.ErrNotFound triggers this path).
+// TestUpdateUseCase_Execute_NotFound verifies a missing item is reported as
+// not-found (only provider.ErrNotFound triggers this path), worded with the
+// caller's item noun (#996: App Configuration says "setting", not "parameter").
 func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 	t.Parallel()
 
-	store := &providermock.Store{
-		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
-			return nil, provider.ErrNotFound
-		},
+	for _, tc := range []struct{ noun, want string }{
+		{noun: "parameter", want: "parameter not found: /app/not-exists"},
+		{noun: "setting", want: "setting not found: /app/not-exists"},
+		{noun: "", want: "entry not found: /app/not-exists"},
+	} {
+		store := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return nil, provider.ErrNotFound
+			},
+		}
+
+		uc := &param.UpdateUseCase{Store: store, ItemNoun: tc.noun}
+
+		_, err := uc.Execute(t.Context(), param.UpdateInput{
+			Name:  "/app/not-exists",
+			Value: "value",
+			Type:  domain.ValueTypePlaintext,
+		})
+		require.ErrorIs(t, err, param.ErrNotFound)
+		require.EqualError(t, err, tc.want)
 	}
-
-	uc := &param.UpdateUseCase{Store: store}
-
-	_, err := uc.Execute(t.Context(), param.UpdateInput{
-		Name:  "/app/not-exists",
-		Value: "value",
-		Type:  domain.ValueTypePlaintext,
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "parameter not found")
 }
 
 // TestUpdateUseCase_Execute_ReadError verifies a non-not-found read failure is
@@ -224,7 +231,7 @@ func TestUpdateUseCase_Execute_ReadError(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.ErrorIs(t, err, errAWS)
-	assert.NotContains(t, err.Error(), "parameter not found")
+	assert.NotErrorIs(t, err, param.ErrNotFound)
 }
 
 func TestUpdateUseCase_Execute_PutError(t *testing.T) {
@@ -239,7 +246,7 @@ func TestUpdateUseCase_Execute_PutError(t *testing.T) {
 		},
 	}
 
-	uc := &param.UpdateUseCase{Store: store}
+	uc := &param.UpdateUseCase{Store: store, ItemNoun: "setting"}
 
 	_, err := uc.Execute(t.Context(), param.UpdateInput{
 		Name:  "/app/config",
@@ -247,5 +254,5 @@ func TestUpdateUseCase_Execute_PutError(t *testing.T) {
 		Type:  domain.ValueTypePlaintext,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to update parameter")
+	assert.Contains(t, err.Error(), "failed to update setting")
 }

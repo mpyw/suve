@@ -70,7 +70,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		target = awsinternal.ConfirmTarget(ctx)
 	}
 
-	useCase := &param.DeleteUseCase{Store: store}
+	useCase := &param.DeleteUseCase{Store: store, ItemNoun: itemNoun()}
 
 	// Show current value before confirming
 	if !skipConfirm {

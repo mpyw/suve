@@ -248,7 +248,7 @@ func TestUpdateRun(t *testing.T) {
 			var buf, errBuf bytes.Buffer
 
 			r := &cmdparam.UpdateRunner{
-				UseCase: &param.UpdateUseCase{Store: tt.store},
+				UseCase: &param.UpdateUseCase{Store: tt.store, ItemNoun: "parameter"},
 				Stdout:  &buf,
 				Stderr:  &errBuf,
 			}
