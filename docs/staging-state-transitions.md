@@ -192,6 +192,8 @@ Tag operations (`tag`/`untag`) are blocked when the entry is staged for deletion
 -> tag env=prod -> ERROR: cannot modify tags on delete-staged resource
 ```
 
+`stage import --merge` keeps the same rule. When the merged result stages a key for deletion and also has tag changes for it, import drops the tag changes and prints a warning.
+
 ## Conflict Detection
 
 When applying changes, suve checks for conflicts by comparing the `BaseModifiedAt` timestamp (recorded at staging time) with the current remote `LastModified` time.
