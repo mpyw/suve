@@ -20,7 +20,8 @@ import (
 //     argument as the key, since '#', ':' and '~' are legal key characters.
 //   - Conflict detection is disabled (last-write-wins): FetchLastModified and
 //     the edit base time return zero, so apply never reports a modified-after
-//     conflict. Apply overwrites unconditionally.
+//     conflict. Apply overwrites unconditionally. FetchLastModified still
+//     reports a missing setting as not found, for the delete existence check.
 //   - Tag mutation is supported (azappconfig/v2 GET-merge-PUT + ETag): ApplyTags
 //     forwards TagEntry.Add/Remove to the store's Tag/Untag.
 //
@@ -114,12 +115,21 @@ func (s *AzureParamStrategy) ApplyTags(ctx context.Context, name string, tagEntr
 	return nil
 }
 
-// FetchLastModified returns a zero time with a nil error: App Configuration
-// staging uses last-write-wins, so no modified-after conflict is ever reported.
-// The nil error means the delete use case treats every setting as existing
-// (never "not found"); apply is idempotent on a missing setting, so this is
-// consistent with the last-write-wins model.
-func (s *AzureParamStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
+// FetchLastModified reports whether the setting exists, but never a
+// modification time: App Configuration staging uses last-write-wins, so an
+// existing setting yields a zero time and no modified-after conflict is ever
+// reported. A missing setting yields a *ResourceNotFoundError, so the delete
+// use case refuses to stage a delete of a setting that does not exist (and a
+// staged create is still checked against a setting created since).
+func (s *AzureParamStrategy) FetchLastModified(ctx context.Context, name string) (time.Time, error) {
+	if _, err := s.store.Get(ctx, name, provider.VersionRef{}); err != nil {
+		if errors.Is(err, provider.ErrNotFound) {
+			return time.Time{}, &ResourceNotFoundError{Err: err}
+		}
+
+		return time.Time{}, fmt.Errorf("failed to get setting: %w", err)
+	}
+
 	return time.Time{}, nil
 }
 
