@@ -140,4 +140,41 @@ func TestRegisterLaunchMode_Launches(t *testing.T) {
 	require.ErrorIs(t, App.Run(t.Context(), []string{"suve", "azure", "param", "--store-name", "s", "--fake-ui"}), errLaunched)
 	assert.Equal(t, provider.AzureAppConfigScope("s"), gotScope)
 	assert.Equal(t, "param", gotService)
+
+	// Every provider's service subgroup preselects its service (#995), not only
+	// Azure's.
+	for _, tt := range []struct {
+		args    []string
+		scope   provider.Scope
+		service string
+	}{
+		{[]string{"suve", "aws", "secret", "--fake-ui"}, provider.Scope{Provider: provider.ProviderAWS}, "secret"},
+		{[]string{"suve", "aws", "param", "--fake-ui"}, provider.Scope{Provider: provider.ProviderAWS}, "param"},
+		{[]string{"suve", "gcloud", "--project", "p", "secret", "--fake-ui"}, provider.GoogleCloudScope("p"), "secret"},
+		// Under stage, the scope flags given on the stage command or its service
+		// subgroup reach the launch scope (#1001).
+		{
+			[]string{"suve", "azure", "stage", "param", "--store-name", "s", "--fake-ui"},
+			provider.AzureAppConfigScope("s"), "param",
+		},
+		{
+			[]string{"suve", "azure", "stage", "--vault-name", "v", "secret", "--fake-ui"},
+			provider.AzureKeyVaultScope("v"), "secret",
+		},
+		{
+			[]string{"suve", "azure", "stage", "--vault-name", "v", "--store-name", "s", "--fake-ui"},
+			provider.Scope{Provider: provider.ProviderAzure, VaultName: "v", StoreName: "s"}, "",
+		},
+		{
+			[]string{"suve", "azure", "stage", "param", "--store-name", "s", "status", "--fake-ui"},
+			provider.AzureAppConfigScope("s"), "param",
+		},
+		{[]string{"suve", "aws", "stage", "secret", "--fake-ui"}, provider.Scope{Provider: provider.ProviderAWS}, "secret"},
+		{[]string{"suve", "gcloud", "--project", "p", "stage", "--fake-ui"}, provider.GoogleCloudScope("p"), ""},
+	} {
+		gotScope, gotService = provider.Scope{}, "unset"
+		require.ErrorIs(t, App.Run(t.Context(), tt.args), errLaunched, "%v", tt.args)
+		assert.Equal(t, tt.scope, gotScope, "%v", tt.args)
+		assert.Equal(t, tt.service, gotService, "%v", tt.args)
+	}
 }

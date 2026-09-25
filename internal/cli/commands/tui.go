@@ -13,7 +13,7 @@ import (
 )
 
 // tuiFlagName is the name of the --tui launch flag, attached to the root, each
-// provider group, and Azure's service subgroups.
+// provider group, and the service and stage subgroups (see RegisterLaunchMode).
 const tuiFlagName = "tui"
 
 // RegisterTUIFlag registers the --tui launch flag through RegisterLaunchMode
