@@ -6,33 +6,73 @@ import (
 	"fmt"
 	"regexp"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
+	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/styles"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// TestApply_FanOutAggregation pins the global apply-all fan-out: one ApplyUseCase
-// per target service, aggregated client-side into a single results view (Azure's
-// param and secret have independent scopes, so this must combine per service).
-func TestApply_FanOutAggregation(t *testing.T) {
-	t.Parallel()
+// applyAllStub builds one target of a multi-target apply: a stub whose use case
+// applies an update of name over a real strategy and the shared staging store.
+// The remote was last modified at modified, so a modification after the staged
+// base time is a conflict. puts records the names written to the remote.
+func applyAllStub(
+	t *testing.T, mem *testutil.MockStore, svc staging.Service, label, name string, conflict bool, puts *[]string,
+) *stubStaging {
+	t.Helper()
 
-	param := &stubStaging{service: "param", label: "Param", result: data.StagingApplyResult{
-		ServiceLabel: "Param",
-		Entries:      []data.ApplyEntryResult{{Name: "/a", Status: "updated"}},
-	}}
-	secret := &stubStaging{service: "secret", label: "Secret", result: data.StagingApplyResult{
-		ServiceLabel: "Secret",
-		Entries:      []data.ApplyEntryResult{{Name: "s1", Status: "created"}},
-	}}
+	base := time.Now().Add(-time.Hour)
+	modified := base.Add(-time.Hour)
+
+	if conflict {
+		modified = time.Now()
+	}
+
+	remote := &providermock.Store{
+		GetFunc: func(_ context.Context, got string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: got, Value: "remote", Version: domain.Version{ID: "1"}, Modified: new(modified)}, nil
+		},
+		PutFunc: func(_ context.Context, got, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+			*puts = append(*puts, got)
+
+			return domain.Version{ID: "2"}, nil
+		},
+	}
+
+	var strategy staging.FullStrategy = staging.NewAWSParamStrategy(remote)
+	if svc == staging.ServiceSecret {
+		strategy = staging.NewAWSSecretStrategy(remote)
+	}
+
+	require.NoError(t, mem.StageEntry(t.Context(), svc, staging.EntryKey{Name: name}, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("staged"), StagedAt: time.Now(), BaseModifiedAt: &base,
+	}))
+
+	return &stubStaging{
+		service: string(svc), label: label,
+		useCase: &stagingusecase.ApplyUseCase{Strategy: strategy, Store: mem},
+	}
+}
+
+// runApplyAll confirms a multi-target apply dialog and returns it in its results
+// phase.
+func runApplyAll(t *testing.T, targets ...data.StagingService) Model {
+	t.Helper()
 
 	d := NewApply(ApplyInput{
-		Ctx: context.Background(), Targets: []data.StagingService{param, secret},
-		TargetLine: "aws", Title: "Apply staged changes — all", EntryCount: 2, Styles: styles.New(),
+		Ctx: t.Context(), Targets: targets,
+		TargetLine: "aws", Title: "Apply staged changes — all", EntryCount: len(targets), Styles: styles.New(),
 	})
 
 	// Focus the Apply button (row 1) and confirm.
@@ -40,16 +80,62 @@ func TestApply_FanOutAggregation(t *testing.T) {
 	d, cmd := d.Update(pressEnter())
 	require.True(t, d.Busy(), "the dialog is busy while applying")
 
-	d = drive(t, d, cmd) // run the fan-out command and fold in the results
+	return drive(t, d, cmd) // run the apply command and fold in the results
+}
 
-	assert.Equal(t, []bool{false}, param.applied, "param applied once")
-	assert.Equal(t, []bool{false}, secret.applied, "secret applied once")
+// TestApply_FanOutAggregation pins the apply-all: every target is applied as one
+// all-service apply, and the per-service results render as one results view
+// grouped by service.
+func TestApply_FanOutAggregation(t *testing.T) {
+	t.Parallel()
+
+	var puts []string
+
+	mem := testutil.NewMockStore()
+	param := applyAllStub(t, mem, staging.ServiceParam, "Param", "/a", false, &puts)
+	secret := applyAllStub(t, mem, staging.ServiceSecret, "Secret", "s1", false, &puts)
+
+	d := runApplyAll(t, param, secret)
+
+	assert.Empty(t, param.applied, "a multi-target apply does not apply target by target")
+	assert.Empty(t, secret.applied)
+	assert.Equal(t, []string{"/a", "s1"}, puts, "both services are written")
 
 	view := d.View()
 	assert.Contains(t, view, "/a", "the param result is shown")
 	assert.Contains(t, view, "s1", "the secret result is shown")
 	assert.Contains(t, view, "Param", "results are grouped by service")
 	assert.Contains(t, view, "Secret")
+}
+
+// TestApply_AllRejectsWhenOneServiceConflicts pins #982: with Ignore conflicts
+// off, a conflict in one service rejects the whole apply-all, so the
+// conflict-free service is neither written nor unstaged.
+func TestApply_AllRejectsWhenOneServiceConflicts(t *testing.T) {
+	t.Parallel()
+
+	var puts []string
+
+	mem := testutil.NewMockStore()
+	param := applyAllStub(t, mem, staging.ServiceParam, "Param", "/a", false, &puts)
+	secret := applyAllStub(t, mem, staging.ServiceSecret, "Secret", "s1", true, &puts)
+
+	d := runApplyAll(t, param, secret)
+
+	assert.Empty(t, puts, "no service is written")
+
+	_, err := mem.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/a"})
+	require.NoError(t, err, "the conflict-free param stays staged")
+
+	view := d.View()
+	assert.Contains(t, view, "apply rejected: no service was applied")
+	assert.Contains(t, view, "Secret", "the conflicting service is named")
+	assert.Contains(t, view, "conflict: s1")
+	assert.NotContains(t, view, "✓", "nothing is reported as applied")
+
+	ad, ok := d.(*applyDialog)
+	require.True(t, ok)
+	assert.Equal(t, "Apply rejected: 1 conflict(s). Re-apply with Ignore conflicts to overwrite.", ad.summary())
 }
 
 // manyApplyEntries builds n distinct applied-entry results, named entry-000…entry-NNN

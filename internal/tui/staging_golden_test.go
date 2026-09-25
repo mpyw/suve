@@ -13,6 +13,7 @@ package tui
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -35,6 +36,7 @@ import (
 	"github.com/mpyw/suve/internal/tui/data"
 	"github.com/mpyw/suve/internal/tui/dialogs"
 	"github.com/mpyw/suve/internal/tui/styles"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // secretStagedValue is the secret staged value the value/diff-view goldens must
@@ -70,6 +72,15 @@ func (s *goldenStaging) Review(context.Context) (data.StagingReview, error) {
 
 func (s *goldenStaging) Apply(context.Context, bool) (data.StagingApplyResult, error) {
 	return s.applyResult, nil
+}
+
+// errStubApplyUseCase is what the stub's ApplyUseCase returns: it only answers
+// single-service applies with a preset result.
+var errStubApplyUseCase = errors.New("stub: no apply use case")
+
+// ApplyUseCase is not supported by the stub (see errStubApplyUseCase).
+func (*goldenStaging) ApplyUseCase(context.Context) (*stagingusecase.ApplyUseCase, error) {
+	return nil, errStubApplyUseCase
 }
 
 func (s *goldenStaging) Reset(context.Context) (data.StagingResetResult, error) {

@@ -3,6 +3,7 @@ package data_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
 	"github.com/mpyw/suve/internal/staging/store/file"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 	"github.com/mpyw/suve/internal/tui/data"
 )
 
@@ -360,4 +362,190 @@ func TestStagingService_CancelTags(t *testing.T) {
 		err := svc.CancelAddTag(ctx, data.StagedKey{Name: "/app/MISSING"}, "a")
 		require.ErrorIs(t, err, staging.ErrNotStaged)
 	})
+}
+
+// applyAllRemote is a providermock over one existing item whose remote was last
+// modified at modified. It records every Put, so a test can tell whether the
+// service was written to.
+type applyAllRemote struct {
+	store *providermock.Store
+	puts  []string
+	// putErr, when set, fails every Put.
+	putErr error
+}
+
+func newApplyAllRemote(modified time.Time) *applyAllRemote {
+	r := &applyAllRemote{}
+	r.store = &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{
+				Name: name, Value: "remote", Type: domain.ValueTypePlaintext,
+				Version: domain.Version{ID: "1"}, Modified: new(modified),
+			}, nil
+		},
+		PutFunc: func(_ context.Context, name, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+			if r.putErr != nil {
+				return domain.Version{}, r.putErr
+			}
+
+			r.puts = append(r.puts, name)
+
+			return domain.Version{ID: "2"}, nil
+		},
+	}
+
+	return r
+}
+
+// applyAllServices builds the AWS param and secret staging services over one
+// in-memory staging store, each staging an update of one item. A remote whose
+// last modification is after the staged base time is a conflict.
+func applyAllServices(
+	t *testing.T, paramConflicts, secretConflicts bool,
+) (services []data.StagingService, param, secret *applyAllRemote, st store.ReadWriteOperator) {
+	t.Helper()
+
+	base := time.Now().Add(-time.Hour)
+	remoteTime := func(conflict bool) time.Time {
+		if conflict {
+			return time.Now()
+		}
+
+		return base.Add(-time.Hour)
+	}
+
+	param = newApplyAllRemote(remoteTime(paramConflicts))
+	secret = newApplyAllRemote(remoteTime(secretConflicts))
+	mem := testutil.NewMockStore()
+
+	stage := func(svc staging.Service, name string) {
+		require.NoError(t, mem.StageEntry(t.Context(), svc, staging.EntryKey{Name: name}, staging.Entry{
+			Operation: staging.OperationUpdate, Value: lo.ToPtr("staged"), StagedAt: time.Now(), BaseModifiedAt: &base,
+		}))
+	}
+	stage(staging.ServiceParam, "/app/p")
+	stage(staging.ServiceSecret, "app/s")
+
+	paramSvc := data.NewStagingService(awsParamCap(t), "Parameter Store", func(context.Context) (data.StagingResources, error) {
+		return data.StagingResources{Store: mem, Strategy: staging.NewAWSParamStrategy(param.store)}, nil
+	})
+	secretSvc := data.NewStagingService(awsSecretCap(t), "Secrets Manager", func(context.Context) (data.StagingResources, error) {
+		return data.StagingResources{Store: mem, Strategy: staging.NewAWSSecretStrategy(secret.store)}, nil
+	})
+
+	return []data.StagingService{paramSvc, secretSvc}, param, secret, mem
+}
+
+// requireStaged asserts that both staged updates are still in the store.
+func requireStaged(t *testing.T, st store.ReadWriteOperator) {
+	t.Helper()
+
+	_, err := st.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/p"})
+	require.NoError(t, err, "the param update stays staged")
+
+	_, err = st.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "app/s"})
+	require.NoError(t, err, "the secret update stays staged")
+}
+
+// TestStagingApplyAll_ConflictInOneServiceAppliesNothing pins #982: a conflict
+// in either service rejects the whole apply, in either service order, so the
+// conflict-free service is neither written nor unstaged.
+func TestStagingApplyAll_ConflictInOneServiceAppliesNothing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		paramConflicts  bool
+		secretConflicts bool
+		want            []data.StagingApplyResult
+	}{
+		{
+			name: "secret conflicts", secretConflicts: true,
+			want: []data.StagingApplyResult{{ServiceLabel: "Secrets Manager", Conflicts: []string{"app/s"}}},
+		},
+		{
+			name: "param conflicts", paramConflicts: true,
+			want: []data.StagingApplyResult{{ServiceLabel: "Parameter Store", Conflicts: []string{"/app/p"}}},
+		},
+		{
+			name: "both conflict", paramConflicts: true, secretConflicts: true,
+			want: []data.StagingApplyResult{
+				{ServiceLabel: "Parameter Store", Conflicts: []string{"/app/p"}},
+				{ServiceLabel: "Secrets Manager", Conflicts: []string{"app/s"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			services, param, secret, st := applyAllServices(t, tt.paramConflicts, tt.secretConflicts)
+
+			results, err := data.StagingApplyAll(t.Context(), services, false)
+			require.NoError(t, err, "a conflict rejection is reported in the results")
+			assert.Equal(t, tt.want, results, "only the conflicting services are reported, with only their conflicts")
+
+			assert.Empty(t, param.puts, "the param service is not written")
+			assert.Empty(t, secret.puts, "the secret service is not written")
+			requireStaged(t, st)
+		})
+	}
+}
+
+// TestStagingApplyAll_IgnoreConflictsAppliesEveryService pins that with
+// conflicts ignored every service is applied, and the results carry each
+// target's label in target order.
+func TestStagingApplyAll_IgnoreConflictsAppliesEveryService(t *testing.T) {
+	t.Parallel()
+
+	services, param, secret, _ := applyAllServices(t, false, true)
+
+	results, err := data.StagingApplyAll(t.Context(), services, true)
+	require.NoError(t, err)
+
+	require.Len(t, results, 2)
+	assert.Equal(t, "Parameter Store", results[0].ServiceLabel)
+	assert.Equal(t, "Secrets Manager", results[1].ServiceLabel)
+	assert.Equal(t, []data.ApplyEntryResult{{Name: "/app/p", Status: "updated"}}, results[0].Entries)
+	assert.Equal(t, []data.ApplyEntryResult{{Name: "app/s", Status: "updated"}}, results[1].Entries)
+	assert.Equal(t, []string{"/app/p"}, param.puts)
+	assert.Equal(t, []string{"app/s"}, secret.puts)
+}
+
+// TestStagingApplyAll_PartialFailureIsReported pins that a write failure in one
+// service is reported in its result rather than as an error, while the other
+// service is still applied (the same as the CLI's all-service apply).
+func TestStagingApplyAll_PartialFailureIsReported(t *testing.T) {
+	t.Parallel()
+
+	services, param, secret, _ := applyAllServices(t, false, false)
+	param.putErr = assert.AnError
+
+	results, err := data.StagingApplyAll(t.Context(), services, false)
+	require.NoError(t, err, "a per-entry failure is reported in the results")
+
+	require.Len(t, results, 2)
+	require.Len(t, results[0].Entries, 1)
+	assert.Equal(t, "/app/p", results[0].Entries[0].Name)
+	assert.NotEmpty(t, results[0].Entries[0].Error, "the param failure is reported")
+	assert.Equal(t, []data.ApplyEntryResult{{Name: "app/s", Status: "updated"}}, results[1].Entries)
+	assert.Equal(t, []string{"app/s"}, secret.puts)
+}
+
+// TestStagingApplyAll_ResolveErrorIsHard pins that a service whose staging
+// resources cannot be resolved fails the apply before anything is written.
+func TestStagingApplyAll_ResolveErrorIsHard(t *testing.T) {
+	t.Parallel()
+
+	services, param, _, st := applyAllServices(t, false, false)
+	broken := data.NewStagingService(awsSecretCap(t), "Secrets Manager", func(context.Context) (data.StagingResources, error) {
+		return data.StagingResources{}, assert.AnError
+	})
+
+	results, err := data.StagingApplyAll(t.Context(), []data.StagingService{services[0], broken}, false)
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Nil(t, results)
+	assert.Empty(t, param.puts)
+	requireStaged(t, st)
 }

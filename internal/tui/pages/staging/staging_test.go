@@ -9,6 +9,7 @@ package staging
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"charm.land/bubbles/v2/key"
@@ -21,6 +22,7 @@ import (
 	"github.com/mpyw/suve/internal/tui/keys"
 	"github.com/mpyw/suve/internal/tui/nav"
 	"github.com/mpyw/suve/internal/tui/styles"
+	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // canceledTag records a cancel-tag call for assertions.
@@ -60,6 +62,15 @@ func (s *stubService) Apply(_ context.Context, ignoreConflicts bool) (data.Stagi
 	s.applied = append(s.applied, ignoreConflicts)
 
 	return s.applyResult, s.applyErr
+}
+
+// errStubApplyUseCase is what the stub's ApplyUseCase returns: it only answers
+// single-service applies with a preset result.
+var errStubApplyUseCase = errors.New("stub: no apply use case")
+
+// ApplyUseCase is not supported by the stub (see errStubApplyUseCase).
+func (*stubService) ApplyUseCase(context.Context) (*stagingusecase.ApplyUseCase, error) {
+	return nil, errStubApplyUseCase
 }
 
 func (s *stubService) Reset(context.Context) (data.StagingResetResult, error) {

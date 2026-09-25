@@ -55,10 +55,9 @@ type applyResultsMsg struct {
 	err     error
 }
 
-// applyDialog confirms, runs, and reports a staged-apply. It drives one
-// ApplyUseCase per target service and aggregates the results client-side, so a
-// global apply-all (Azure's param and secret have independent scopes) is one
-// coherent results view. While busy it swallows input (the #568 double-fire
+// applyDialog confirms, runs, and reports a staged-apply. Several targets (the
+// apply-all) are applied as one all-service apply, and their per-service results
+// render as one coherent results view. While busy it swallows input (the #568 double-fire
 // guard) and reports Busy() so the shell suppresses dismissal.
 type applyDialog struct {
 	// dialogLayout carries the terminal size (from the last WindowSizeMsg). The
@@ -253,26 +252,18 @@ func (d *applyDialog) activate() (Model, tea.Cmd) {
 	return d, nil
 }
 
-// applyCmd fans the apply out across every target sequentially (one goroutine,
-// so no shared state races) and aggregates the per-service results.
+// applyCmd applies every target as one operation (data.StagingApplyAll): with
+// conflict detection on, a conflict in any target rejects the whole apply, so an
+// apply-all never leaves some services applied and others rejected (#982).
 func (d *applyDialog) applyCmd() tea.Cmd {
 	ctx := d.ctx
 	targets := d.targets
 	ignore := d.ignoreConflicts
 
 	return func() tea.Msg {
-		results := make([]data.StagingApplyResult, 0, len(targets))
+		results, err := data.StagingApplyAll(ctx, targets, ignore)
 
-		for _, svc := range targets {
-			res, err := svc.Apply(ctx, ignore)
-			if err != nil {
-				return applyResultsMsg{results: results, err: err}
-			}
-
-			results = append(results, res)
-		}
-
-		return applyResultsMsg{results: results}
+		return applyResultsMsg{results: results, err: err}
 	}
 }
 
@@ -410,6 +401,12 @@ func (d *applyDialog) resultsBody() string {
 		b.WriteString(d.fit(d.styles.ErrorText.Render(d.err)) + "\n\n")
 	}
 
+	// A rejected apply-all lists only the services that conflicted, so say that
+	// the others were held back too.
+	if len(d.targets) > 1 && d.rejected() {
+		b.WriteString(d.fit(d.styles.Banner.Render("⚠ apply rejected: no service was applied")) + "\n\n")
+	}
+
 	for _, res := range d.results {
 		d.writeServiceResults(&b, res)
 	}
@@ -420,7 +417,9 @@ func (d *applyDialog) resultsBody() string {
 // writeServiceResults appends one service's entry/tag statuses, conflicts, and
 // post-apply unstage warnings.
 func (d *applyDialog) writeServiceResults(b *strings.Builder, res data.StagingApplyResult) {
-	if len(d.results) > 1 {
+	// Label every block of a multi-target apply, even when a rejection reports
+	// only one service.
+	if len(d.targets) > 1 {
 		b.WriteString(d.styles.PaneTitle.Render(res.ServiceLabel) + "\n")
 	}
 
@@ -477,10 +476,31 @@ func (d *applyDialog) unstageWarn(label, err string) string {
 	return d.styles.Banner.Render("⚠ " + label + " applied but could not be unstaged: " + err + " — clear it manually.")
 }
 
+// rejected reports whether the apply was rejected by conflicts: some conflict
+// was reported and nothing was applied or failed.
+func (d *applyDialog) rejected() bool {
+	applied, failed, conflicts := d.tally()
+
+	return conflicts > 0 && applied == 0 && failed == 0
+}
+
 // summary voices the aggregated apply outcome for the status line.
 func (d *applyDialog) summary() string {
-	applied, failed, conflicts := 0, 0, 0
+	applied, failed, conflicts := d.tally()
 
+	switch {
+	case d.rejected():
+		return fmt.Sprintf("Apply rejected: %d conflict(s). Re-apply with Ignore conflicts to overwrite.", conflicts)
+	case failed > 0:
+		return fmt.Sprintf("Applied %d, failed %d.", applied, failed)
+	default:
+		return "Applied " + strconv.Itoa(applied) + " staged change(s)."
+	}
+}
+
+// tally counts the applied and failed entry/tag results and the conflicts
+// across every service.
+func (d *applyDialog) tally() (applied, failed, conflicts int) {
 	for _, res := range d.results {
 		conflicts += len(res.Conflicts)
 
@@ -493,14 +513,7 @@ func (d *applyDialog) summary() string {
 		}
 	}
 
-	switch {
-	case conflicts > 0 && applied == 0 && failed == 0:
-		return fmt.Sprintf("Apply rejected: %d conflict(s). Re-apply with Ignore conflicts to overwrite.", conflicts)
-	case failed > 0:
-		return fmt.Sprintf("Applied %d, failed %d.", applied, failed)
-	default:
-		return "Applied " + strconv.Itoa(applied) + " staged change(s)."
-	}
+	return applied, failed, conflicts
 }
 
 // countApplyOutcome tallies a result as applied or failed.
