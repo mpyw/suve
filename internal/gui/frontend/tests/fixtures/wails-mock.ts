@@ -66,6 +66,8 @@ export interface StagedEntry {
 
 export interface StagedTagEntry {
   name: string;
+  // App Configuration namespace; empty/omitted is the null/default namespace.
+  namespace?: string;
   addTags: Record<string, string>;
   removeTags: Record<string, string>;
   // See StagedEntry.service.
@@ -1291,6 +1293,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           })),
           tagEntries: tagStaged.map((t: any) => ({
             name: t.name,
+            namespace: t.namespace ?? '',
             addTags: t.addTags,
             removeTags: t.removeTags,
           })),
@@ -1381,49 +1384,60 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       StagingUnstage: async (service: string, name: string, namespace?: string) => {
         const ns = namespace ?? '';
         const sameEntry = (s: any) => s.name === name && (s.namespace ?? '') === ns;
-        const sameName = (s: any) => s.name === name;
         if (service === 'param') {
           currentBucket().param = currentBucket().param.filter((s: any) => !sameEntry(s));
-          currentBucket().paramTags = currentBucket().paramTags.filter((s: any) => !sameName(s));
+          currentBucket().paramTags = currentBucket().paramTags.filter((s: any) => !sameEntry(s));
         } else {
           currentBucket().secret = currentBucket().secret.filter((s: any) => !sameEntry(s));
-          currentBucket().secretTags = currentBucket().secretTags.filter((s: any) => !sameName(s));
+          currentBucket().secretTags = currentBucket().secretTags.filter((s: any) => !sameEntry(s));
         }
         return { name };
       },
-      StagingAddTag: async (service: string, name: string, key: string, value: string) => {
+      StagingAddTag: async (service: string, name: string, key: string, value: string, namespace?: string) => {
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
-        let entry = tagStaged.find((t: any) => t.name === name);
+        const ns = namespace ?? '';
+        let entry = tagStaged.find((t: any) => t.name === name && (t.namespace ?? '') === ns);
         if (!entry) {
-          entry = { name, addTags: {}, removeTags: {} };
+          entry = { name, namespace: ns, addTags: {}, removeTags: {} };
           tagStaged.push(entry);
         }
         entry.addTags[key] = value;
         return { name };
       },
-      StagingRemoveTag: async (service: string, name: string, key: string) => {
+      StagingRemoveTag: async (service: string, name: string, key: string, namespace?: string) => {
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
-        let entry = tagStaged.find((t: any) => t.name === name);
+        const ns = namespace ?? '';
+        let entry = tagStaged.find((t: any) => t.name === name && (t.namespace ?? '') === ns);
         if (!entry) {
-          entry = { name, addTags: {}, removeTags: {} };
+          entry = { name, namespace: ns, addTags: {}, removeTags: {} };
           tagStaged.push(entry);
         }
         entry.removeTags[key] = ''; // Value will be fetched from AWS in real implementation
         return { name };
       },
-      StagingCancelAddTag: async (service: string, name: string, key: string) => {
+      StagingCancelAddTag: async (service: string, name: string, key: string, namespace?: string) => {
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
-        const entry = tagStaged.find((t: any) => t.name === name);
+        const ns = namespace ?? '';
+        const entry = tagStaged.find((t: any) => t.name === name && (t.namespace ?? '') === ns);
         if (entry) {
           delete entry.addTags[key];
+          // Like the backend, a tag entry with nothing left is unstaged.
+          if (Object.keys(entry.addTags).length === 0 && Object.keys(entry.removeTags).length === 0) {
+            tagStaged.splice(tagStaged.indexOf(entry), 1);
+          }
         }
         return { name };
       },
-      StagingCancelRemoveTag: async (service: string, name: string, key: string) => {
+      StagingCancelRemoveTag: async (service: string, name: string, key: string, namespace?: string) => {
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
-        const entry = tagStaged.find((t: any) => t.name === name);
+        const ns = namespace ?? '';
+        const entry = tagStaged.find((t: any) => t.name === name && (t.namespace ?? '') === ns);
         if (entry) {
           delete entry.removeTags[key];
+          // Like the backend, a tag entry with nothing left is unstaged.
+          if (Object.keys(entry.addTags).length === 0 && Object.keys(entry.removeTags).length === 0) {
+            tagStaged.splice(tagStaged.indexOf(entry), 1);
+          }
         }
         return { name };
       },
@@ -1561,7 +1575,7 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         const ns = namespace ?? '';
         const hasEntry = staged.some((s: any) => s.name === name && (s.namespace ?? '') === ns);
-        const hasTags = tagStaged.some((t: any) => t.name === name);
+        const hasTags = tagStaged.some((t: any) => t.name === name && (t.namespace ?? '') === ns);
         return { hasEntry, hasTags };
       },
     };

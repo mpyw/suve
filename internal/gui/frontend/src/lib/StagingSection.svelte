@@ -96,14 +96,20 @@
     return entry.operation !== 'delete' && hasValueChange(entry);
   }
 
-  function findTagEntry(name: string): gui.StagingDiffTagEntry | undefined {
-    return tagEntries.find(t => t.name === name);
+  // Tag and value entries pair on (name, namespace): App Configuration stages the
+  // same key in several namespaces, and each is its own entry (#988).
+  function sameKey(a: { name: string; namespace?: string }, b: { name: string; namespace?: string }): boolean {
+    return a.name === b.name && (a.namespace ?? '') === (b.namespace ?? '');
+  }
+
+  function findTagEntry(entry: gui.StagingDiffEntry): gui.StagingDiffTagEntry | undefined {
+    return tagEntries.find(t => sameKey(t, entry));
   }
 
   // Tag entries with no matching value entry represent a tag-only staged change.
   // The value-entry loop only draws tags nested inside a value entry, so these
   // get their own rows and are counted toward the section total and gating.
-  const tagOnlyEntries = $derived(tagEntries.filter(t => !entries.some(e => e.name === t.name)));
+  const tagOnlyEntries = $derived(tagEntries.filter(t => !entries.some(e => sameKey(e, t))));
 </script>
 
 <div class="section">
@@ -126,7 +132,7 @@
   {:else}
     <ul class="entry-list">
       {#each entries as entry}
-        {@const tagEntry = findTagEntry(entry.name)}
+        {@const tagEntry = findTagEntry(entry)}
         {@const rowSecret = secret || entry.secret}
         <li class="entry-item">
           <div class="entry-header">
