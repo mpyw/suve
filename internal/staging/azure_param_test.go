@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -166,16 +167,58 @@ func TestAzureParamStrategy_ErrorWrapping(t *testing.T) {
 }
 
 // TestAzureParamStrategy_LastWriteWins asserts the last-write-wins
-// semantics: FetchLastModified always returns zero time and never touches the
-// store, so no modified-after conflict is ever reported.
+// semantics: FetchLastModified returns a zero time for an existing setting, so
+// no modified-after conflict is ever reported, even when the setting carries a
+// modification time.
 func TestAzureParamStrategy_LastWriteWins(t *testing.T) {
 	t.Parallel()
 
-	// A store whose funcs would panic if called: FetchLastModified must not
-	// call the store at all.
-	got, err := staging.NewAzureParamStrategy(&providermock.Store{}).FetchLastModified(t.Context(), "cfg")
+	modified := time.Now()
+	store := &providermock.Store{
+		GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: "cfg", Value: "v", Modified: &modified}, nil
+		},
+	}
+	got, err := staging.NewAzureParamStrategy(store).FetchLastModified(t.Context(), "cfg")
 	require.NoError(t, err)
 	assert.True(t, got.IsZero())
+}
+
+// TestAzureParamStrategy_FetchLastModifiedExistence covers #998: a missing
+// setting is reported as not found, so stage delete refuses it, and any other
+// read error is wrapped.
+func TestAzureParamStrategy_FetchLastModifiedExistence(t *testing.T) {
+	t.Parallel()
+
+	t.Run("missing setting is not found", func(t *testing.T) {
+		t.Parallel()
+
+		store := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return nil, provider.ErrNotFound
+			},
+		}
+		_, err := staging.NewAzureParamStrategy(store).FetchLastModified(t.Context(), "typo-key")
+
+		var notFound *staging.ResourceNotFoundError
+		require.ErrorAs(t, err, &notFound)
+	})
+
+	t.Run("other read error is wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		boom := errors.New("boom")
+		store := &providermock.Store{
+			GetFunc: func(_ context.Context, _ string, _ provider.VersionRef) (*domain.Entry, error) {
+				return nil, boom
+			},
+		}
+		_, err := staging.NewAzureParamStrategy(store).FetchLastModified(t.Context(), "cfg")
+		require.ErrorIs(t, err, boom)
+
+		var notFound *staging.ResourceNotFoundError
+		assert.NotErrorAs(t, err, &notFound)
+	})
 }
 
 // TestAzureParamStrategy_ApplyTags asserts staged tag changes forward

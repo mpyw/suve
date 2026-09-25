@@ -274,6 +274,52 @@ func TestAzureAppConfigStage_Namespaces(t *testing.T) {
 	})
 }
 
+// TestAzureAppConfigStage_DeleteRequiresExistence covers #998: stage delete of
+// a setting that does not exist in the target namespace is refused instead of
+// being staged (and later reported as "Deleted"). A setting that exists is
+// still staged and deleted.
+func TestAzureAppConfigStage_DeleteRequiresExistence(t *testing.T) {
+	setupAzureAppConfig(t)
+	setupTempHome(t)
+
+	const key = "suve/e2e/az/ac/stage/delete-existence"
+
+	cleanup := func() { _, _ = runAzureParam(t, "delete", "--yes", key) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	_, err := runAzureParam(t, "create", key, "value")
+	require.NoError(t, err)
+
+	t.Run("missing-key-refused", func(t *testing.T) {
+		_, err := runAzureStage(t, "param", "delete", key+"-typo")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot delete: resource not found")
+	})
+
+	t.Run("missing-in-namespace-refused", func(t *testing.T) {
+		_, err := runAzureStage(t, "param", "delete", "--namespace", "dev", key)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot delete: resource not found")
+	})
+
+	t.Run("existing-key-deleted", func(t *testing.T) {
+		stdout, err := runAzureStage(t, "param", "status")
+		require.NoError(t, err)
+		assert.NotContains(t, stdout, key)
+
+		_, err = runAzureStage(t, "param", "delete", key)
+		require.NoError(t, err)
+
+		stdout, err = runAzureStage(t, "param", "apply", "--yes")
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Deleted "+key+"\n")
+
+		_, err = runAzureParam(t, "show", "--raw", key)
+		require.Error(t, err)
+	})
+}
+
 // TestAzureStageGlobal_KeyVaultOnly exercises the provider-wide `suve azure stage`
 // global commands (status/diff/apply) when ONLY Key Vault is connected: App
 // Configuration is not configured (no AZURE_APPCONFIG_NAME), so the global
