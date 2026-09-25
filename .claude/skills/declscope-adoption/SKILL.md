@@ -10,7 +10,7 @@ x-embedded-digest: "sha256:f344c4e28af4379d944b3b6563f74727999fae4218804bb2bf0b5
 
 # Adopting declscope
 
-Written against **declscope 0.13.0**. Check the version first: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.13.1**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
