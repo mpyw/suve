@@ -246,6 +246,26 @@ func TestGlobalExport(t *testing.T) {
 		assert.Equal(t, "param", env.Service)
 	})
 
+	// Regression for #984: --passphrase-stdin with an empty stdin (an unset
+	// variable piped in, or </dev/null) must not fall back to plaintext and
+	// clear the working area.
+	for name, input := range map[string]string{"EOF": "", "empty line": "\n"} {
+		t.Run("--passphrase-stdin with empty passphrase errors ("+name+")", func(t *testing.T) {
+			scope := setupExportImportEnv(t)
+			stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+
+			dir := filepath.Join(t.TempDir(), "backup")
+
+			stdout, _, err := runLeafCmd(t, globalExportCmd(scope), bytes.NewBufferString(input), dir, "--passphrase-stdin")
+			require.ErrorContains(t, err, "empty passphrase read from stdin")
+			assert.NotContains(t, stdout, "exported")
+
+			_, err = os.Stat(filepath.Join(dir, "param.json"))
+			assert.True(t, os.IsNotExist(err), "no export file must be written")
+			assert.False(t, workingState(t, scope).IsEmpty(), "working area must be kept")
+		})
+	}
+
 	// Regression for #471: with --passphrase-stdin against a pre-existing target,
 	// the overwrite confirmation must NOT read the passphrase line as a y/N answer
 	// and silently cancel at exit 0. Without --yes it errors clearly; the passphrase
