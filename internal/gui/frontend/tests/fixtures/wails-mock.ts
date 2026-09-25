@@ -62,6 +62,10 @@ export interface StagedEntry {
   // entry's DTO (mirroring the backend's DiffEntry.Secret) so the staging review
   // masks a SecureString param even in the non-secret Param section.
   secret?: boolean;
+  // Optional remote-fetch failure. When set, StagingDiff reports the entry as a
+  // warning entry carrying only this reason, like DiffUseCase does when the
+  // remote read fails for a reason other than not-found.
+  diffWarning?: string;
 }
 
 export interface StagedTagEntry {
@@ -1362,7 +1366,14 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         return {
           itemName: service === 'param' ? 'parameter' : 'secret',
-          entries: staged.map((s: any) => ({
+          entries: staged.map((s: any) => s.diffWarning ? {
+            name: s.name,
+            namespace: s.namespace ?? '',
+            type: 'warning',
+            operation: '',
+            warning: s.diffWarning,
+            secret: false,
+          } : ({
             name: s.name,
             namespace: s.namespace ?? '',
             type: s.operation === 'create' ? 'create' : 'normal',
