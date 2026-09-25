@@ -126,6 +126,10 @@ export function StagingApply(arg1, arg2) {
   return window['go']['gui']['App']['StagingApply'](arg1, arg2);
 }
 
+export function StagingApplyAll(arg1) {
+  return window['go']['gui']['App']['StagingApplyAll'](arg1);
+}
+
 export function StagingCancelAddTag(arg1, arg2, arg3, arg4) {
   return window['go']['gui']['App']['StagingCancelAddTag'](arg1, arg2, arg3, arg4);
 }

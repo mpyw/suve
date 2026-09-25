@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingAddTag, StagingApply, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingInspectImportFile, StagingPickExportPath, StagingPickImportPath, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
+  import { StagingAddTag, StagingApply, StagingApplyAll, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingInspectImportFile, StagingPickExportPath, StagingPickImportPath, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
   import { capability, gui } from '../../wailsjs/go/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
@@ -148,45 +148,27 @@
     modalError = '';
     applyResult = null;
     try {
-      // "Apply All" (applyService === 'all') applies every service with staged
-      // changes in one click — each service is a separate backend call (Azure
-      // App Configuration and Key Vault have independent scopes), so aggregate
-      // the per-service results into one. Per-section apply passes a concrete
-      // service and applies just that one.
-      const targets = applyService === 'all' ? stagedServices() : [applyService];
-
-      const merged = new gui.StagingApplyResult({
+      // "Apply All" (applyService === 'all') is one backend call through the
+      // same all-service use case as the CLI: every service is conflict-checked
+      // before any is applied, so a conflict in one service applies nothing
+      // (#982). Per-section apply passes a concrete service.
+      const r = applyService === 'all'
+        ? await StagingApplyAll(ignoreConflicts)
+        : await StagingApply(applyService, ignoreConflicts);
+      // The backend marshals empty slices as null, so normalize the lists.
+      applyResult = new gui.StagingApplyResult({
+        ...r,
         serviceName: getServiceName(applyService),
-        entryResults: [],
-        tagResults: [],
-        conflicts: [],
-        entrySucceeded: 0,
-        entryFailed: 0,
-        tagSucceeded: 0,
-        tagFailed: 0,
+        conflicts: r.conflicts ?? [],
+        entryResults: r.entryResults ?? [],
+        tagResults: r.tagResults ?? [],
       });
-
-      for (const svc of targets) {
-        const r = await StagingApply(svc, ignoreConflicts);
-        merged.entrySucceeded += r.entrySucceeded;
-        merged.entryFailed += r.entryFailed;
-        merged.tagSucceeded += r.tagSucceeded;
-        merged.tagFailed += r.tagFailed;
-        // The backend marshals empty slices as null, so guard every spread.
-        merged.conflicts = [...(merged.conflicts ?? []), ...(r.conflicts ?? [])];
-        merged.entryResults = [...merged.entryResults, ...(r.entryResults ?? [])];
-        merged.tagResults = [...merged.tagResults, ...(r.tagResults ?? [])];
-      }
-
-      applyResult = merged;
     } catch (e) {
       modalError = parseError(e);
     } finally {
-      // Reconcile the view with the backend regardless of a mid-loop rejection.
-      // "Apply All" applies each service in a separate call, and every success
-      // unstages that service's entries on disk. If a later service rejects
-      // (conflict / per-entry failure), the already-applied entries must not keep
-      // rendering as pending with a stale badge until a manual Refresh (#477).
+      // Reconcile the view with the backend regardless of the outcome: applied
+      // entries are unstaged on disk even when others fail, so they must not
+      // keep rendering as pending with a stale badge until a manual Refresh (#477).
       modalLoading = false;
       await loadStatus();
     }
@@ -212,8 +194,8 @@
     try {
       // "Reset All" (resetService === 'all') resets every service with staged
       // changes — each is a separate backend call (Azure App Configuration and
-      // Key Vault have independent scopes), mirroring "Apply All". Per-section
-      // reset passes a concrete service.
+      // Key Vault have independent scopes). Per-section reset passes a concrete
+      // service.
       const targets = resetService === 'all' ? stagedServices() : [resetService];
       for (const svc of targets) {
         await StagingReset(svc);
@@ -236,8 +218,7 @@
   }
 
   // Services that currently have staged changes (entries or tags), in display
-  // order. Drives "Apply All" so a single click applies every service, not just
-  // the first non-empty one.
+  // order. Drives "Reset All" so a single click resets every service.
   function stagedServices(): string[] {
     const targets: string[] = [];
     if (paramEntries.length > 0 || paramTagEntries.length > 0) targets.push('param');

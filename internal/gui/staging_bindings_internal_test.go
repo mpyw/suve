@@ -7,14 +7,18 @@ package gui
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/providermock"
+	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
@@ -415,4 +419,165 @@ func TestApp_StagingWriteBindings_GoogleCloud(t *testing.T) {
 	require.Len(t, status.Secret, 1)
 	assert.Equal(t, "create", status.Secret[0].Operation)
 	assert.Empty(t, status.Param, "Google Cloud has no param service")
+}
+
+// stagingApplyAllStore is a providermock for both AWS services: "taken" already
+// exists (so a staged create of it conflicts), every other name is not found.
+// Each write is recorded in *writes.
+func stagingApplyAllStore(writes *[]string) *providermock.Store {
+	modified := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	record := func(_ context.Context, name, _ string, _ domain.ValueType, _ string, _ ...provider.WriteOption) (domain.Version, error) {
+		*writes = append(*writes, name)
+
+		return domain.Version{ID: "1"}, nil
+	}
+
+	return &providermock.Store{
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			if name != "taken" {
+				return nil, provider.ErrNotFound
+			}
+
+			return &domain.Entry{Name: name, Value: "remote", Modified: &modified}, nil
+		},
+		CreateFunc: record,
+		PutFunc:    record,
+	}
+}
+
+// TestApp_StagingApplyAll pins the all-service apply to GlobalApplyUseCase's
+// contract (#982): a conflict in one service rejects the whole apply, so the
+// other service is neither written nor unstaged. Ignoring conflicts applies both.
+//
+//nolint:paralleltest // overrides the package-global registry.
+func TestApp_StagingApplyAll(t *testing.T) {
+	stage := func(t *testing.T, app *App) {
+		t.Helper()
+
+		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("p"),
+		}))
+		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, staging.EntryKey{Name: "taken"}, staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("s"),
+		}))
+	}
+
+	t.Run("a conflict in one service applies nothing", func(t *testing.T) {
+		var writes []string
+
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingApplyAllStore(&writes))
+		stage(t, app)
+
+		result, err := app.StagingApplyAll(false)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"Secrets Manager: taken"}, result.Conflicts)
+		assert.Zero(t, result.EntrySucceeded)
+		assert.Empty(t, writes)
+
+		status, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Len(t, status.Param, 1, "the conflict-free param must stay staged")
+		assert.Len(t, status.Secret, 1)
+	})
+
+	t.Run("ignoring conflicts applies every service", func(t *testing.T) {
+		var writes []string
+
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingApplyAllStore(&writes))
+		stage(t, app)
+
+		result, err := app.StagingApplyAll(true)
+		require.NoError(t, err)
+		assert.Empty(t, result.Conflicts)
+		assert.Equal(t, 2, result.EntrySucceeded)
+		assert.ElementsMatch(t, []string{"/app/new", "taken"}, writes)
+		assert.ElementsMatch(t, []string{"/app/new", "taken"}, lo.Map(result.EntryResults, func(r StagingApplyEntryResult, _ int) string { return r.Name }))
+
+		status, err := app.StagingStatus()
+		require.NoError(t, err)
+		assert.Empty(t, status.Param)
+		assert.Empty(t, status.Secret)
+	})
+
+	t.Run("a store read failure is an error", func(t *testing.T) {
+		var writes []string
+
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, stagingApplyAllStore(&writes))
+		mockStore := testutil.NewMockStore()
+		mockStore.ListEntriesErr = errors.New("list boom")
+		app.stagingStore = mockStore
+
+		result, err := app.StagingApplyAll(false)
+		require.ErrorContains(t, err, "list boom")
+		assert.Nil(t, result)
+	})
+
+	t.Run("a per-entry failure returns the populated result", func(t *testing.T) {
+		var writes []string
+
+		store := stagingApplyAllStore(&writes)
+		store.CreateFunc = func(context.Context, string, string, domain.ValueType, string, ...provider.WriteOption) (domain.Version, error) {
+			return domain.Version{}, errors.New("create boom")
+		}
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, store)
+		stage(t, app)
+
+		result, err := app.StagingApplyAll(true)
+		require.NoError(t, err)
+		assert.Equal(t, 2, result.EntryFailed)
+		require.Len(t, result.EntryResults, 2)
+		assert.Contains(t, result.EntryResults[0].Error, "create boom")
+	})
+
+	t.Run("a service with nothing staged builds no client", func(t *testing.T) {
+		var writes []string
+
+		store := stagingApplyAllStore(&writes)
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAWS}, store)
+		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceParam, staging.EntryKey{Name: "/app/new"}, staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("p"),
+		}))
+
+		// Only the param service may resolve a provider store.
+		registry = provider.NewRegistry()
+		registry.Register(provider.ProviderAWS, stagingKindOnlyFactory{kind: provider.KindParam, store: store})
+
+		result, err := app.StagingApplyAll(false)
+		require.NoError(t, err)
+		assert.Equal(t, 1, result.EntrySucceeded)
+		assert.Equal(t, []string{"/app/new"}, writes)
+	})
+
+	t.Run("a service the scope does not configure is skipped", func(t *testing.T) {
+		var writes []string
+
+		// Azure with only a Key Vault: App Configuration is not configured.
+		app := setupStagingWriteBindingApp(t, provider.Scope{Provider: provider.ProviderAzure, VaultName: "v"}, stagingApplyAllStore(&writes))
+		require.NoError(t, app.stagingStore.StageEntry(app.ctx, staging.ServiceSecret, staging.EntryKey{Name: "fresh"}, staging.Entry{
+			Operation: staging.OperationCreate,
+			Value:     lo.ToPtr("s"),
+		}))
+
+		result, err := app.StagingApplyAll(false)
+		require.NoError(t, err)
+		assert.Equal(t, 1, result.EntrySucceeded)
+		assert.Equal(t, []string{"fresh"}, writes)
+	})
+}
+
+// stagingKindOnlyFactory serves store for one service kind and fails for any other.
+type stagingKindOnlyFactory struct {
+	kind  provider.Kind
+	store provider.Store
+}
+
+func (f stagingKindOnlyFactory) Store(_ context.Context, _ provider.Scope, kind provider.Kind) (provider.Store, error) {
+	if kind != f.kind {
+		return nil, errors.New("client init failed")
+	}
+
+	return f.store, nil
 }
