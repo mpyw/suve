@@ -10,7 +10,7 @@
   import StagingBanner from './StagingBanner.svelte';
   import TagList from './TagList.svelte';
   import { createDiffMode } from './useDiffMode.svelte';
-  import { createDebouncer, formatDate, maskValue, NS_ALL, NS_NULL, parseError } from './viewUtils';
+  import { capitalize, createDebouncer, formatDate, maskValue, NS_ALL, NS_NULL, parseError } from './viewUtils';
   import './common.css';
 
   interface Props {
@@ -34,6 +34,9 @@
   // Capability-driven visibility: App mounts this view only with the service's
   // capability, so every flag is read as-is.
   const stagingEnabled = $derived(capability.hasStaging);
+  // The word for one item ("parameter", "setting") in titles and prompts.
+  const itemNoun = $derived(capability.itemNoun);
+  const ItemNoun = $derived(capitalize(capability.itemNoun));
   const tagsEnabled = $derived(capability.hasTags);
   const historyEnabled = $derived(capability.hasVersionHistory);
   // The Description input is shown only where the provider persists it (AWS
@@ -486,7 +489,7 @@
     <div class="list-panel" class:collapsed={selectedParam !== null}>
       {#if visibleEntries.length === 0 && !loading}
         <div class="empty-state">
-          No parameters found. Try adjusting the prefix filter.
+          No {itemNoun}s found. Try adjusting the prefix filter.
         </div>
       {:else}
         <ul class="item-list">
@@ -646,7 +649,7 @@
 </div>
 
 <!-- Set Modal -->
-<Modal title={isEditMode ? 'Edit Parameter' : 'New Parameter'} show={showSetModal} onclose={() => showSetModal = false}>
+<Modal title={isEditMode ? `Edit ${ItemNoun}` : `New ${ItemNoun}`} show={showSetModal} onclose={() => showSetModal = false}>
   <form class="modal-form" onsubmit={handleSet}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -703,7 +706,7 @@
         id="param-value"
         class="form-input form-textarea"
         bind:value={setForm.value}
-        placeholder="Parameter value"
+        placeholder={`${ItemNoun} value`}
         rows="5"
       ></textarea>
     </div>
@@ -736,12 +739,12 @@
 </Modal>
 
 <!-- Delete Modal -->
-<Modal title="Delete Parameter" show={showDeleteModal} onclose={() => showDeleteModal = false}>
+<Modal title={`Delete ${ItemNoun}`} show={showDeleteModal} onclose={() => showDeleteModal = false}>
   <div class="modal-confirm">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
     {/if}
-    <p>Are you sure you want to delete this parameter?</p>
+    <p>Are you sure you want to delete this {itemNoun}?</p>
     <code class="delete-target param">{deleteTarget}</code>
     <p class="warning">{immediate ? 'This action cannot be undone.' : 'This will stage a delete operation.'}</p>
     {#if stagingEnabled}
