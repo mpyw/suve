@@ -879,3 +879,53 @@ func TestDiffUseCase_Execute_TagOnlyVanishedRemoteKeepsOtherNamespaceTags(t *tes
 	_, err = store.GetTag(t.Context(), staging.ServiceParam, kept)
 	require.NoError(t, err)
 }
+
+// TestDiffUseCase_Execute_TagOnlyProbeErrors: a strategy that cannot be
+// resolved for a tag-only key, or a failed unstage of a vanished key's tags,
+// fails the diff instead of reporting tags as discarded.
+func TestDiffUseCase_Execute_TagOnlyProbeErrors(t *testing.T) {
+	t.Parallel()
+
+	key := staging.EntryKey{Name: "/app/gone"}
+
+	newStore := func(t *testing.T) *testutil.MockStore {
+		t.Helper()
+
+		store := testutil.NewMockStore()
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+			Add: map[string]string{"env": "prod"}, StagedAt: time.Now(),
+		}))
+
+		return store
+	}
+
+	t.Run("strategy", func(t *testing.T) {
+		t.Parallel()
+
+		uc := &usecasestaging.DiffUseCase{
+			Strategy: newMockDiffStrategy(),
+			Store:    newStore(t),
+			StrategyFor: func(string) (staging.DiffStrategy, error) {
+				return nil, errors.New("no strategy")
+			},
+		}
+
+		_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+		require.ErrorContains(t, err, "no strategy")
+	})
+
+	t.Run("unstage", func(t *testing.T) {
+		t.Parallel()
+
+		store := newStore(t)
+		store.UnstageTagErr = errors.New("disk full")
+
+		strategy := newMockDiffStrategy()
+		strategy.fetchErrors[key.Name] = fmt.Errorf("%w: not found", provider.ErrNotFound)
+
+		uc := &usecasestaging.DiffUseCase{Strategy: strategy, Store: store}
+
+		_, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+		require.ErrorContains(t, err, "failed to unstage tags of /app/gone")
+	})
+}
