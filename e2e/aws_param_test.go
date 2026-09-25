@@ -2385,6 +2385,32 @@ func TestAWSParam_ExportImportEncrypted(t *testing.T) {
 	assert.Equal(t, "secret-value", strings.TrimSpace(stdout))
 }
 
+// TestAWSParam_ExportEmptyStdinPassphrase tests that --passphrase-stdin with an
+// empty stdin is refused instead of writing a plaintext export and clearing the
+// working area (#984).
+func TestAWSParam_ExportEmptyStdinPassphrase(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-param-export-empty-passphrase/test"
+	exportPath := filepath.Join(t.TempDir(), "param.json")
+
+	_, _, err := runSubCommand(t, aws.StageParamCommand(), "add", paramName, "secret-value")
+	require.NoError(t, err)
+
+	_, _, err = runSubCommandWithStdin(
+		t, aws.StageParamCommand(), strings.NewReader(""), "export", exportPath, "--passphrase-stdin",
+	)
+	require.ErrorContains(t, err, "empty passphrase read from stdin")
+
+	_, statErr := os.Stat(exportPath)
+	assert.True(t, os.IsNotExist(statErr), "no export file must be written")
+
+	stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "status")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, paramName, "the working area must be kept")
+}
+
 // TestAWSParam_ImportMissingFile tests that a service-specific import of a
 // non-existent file is a hard error.
 func TestAWSParam_ImportMissingFile(t *testing.T) {

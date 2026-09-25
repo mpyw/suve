@@ -61,9 +61,15 @@ func exportFlags() []cli.Flag {
 	}
 }
 
+// errExportEmptyPassphrase rejects an empty --passphrase-stdin passphrase on export.
+var errExportEmptyPassphrase = errors.New(
+	"empty passphrase read from stdin; omit --passphrase-stdin to export as plain text",
+)
+
 // exportPassphrase prompts for the encryption passphrase once per command.
 // It returns the passphrase (empty means plaintext), whether the user cancelled,
-// and any error. --passphrase-stdin reads from stdin; otherwise a TTY is prompted
+// and any error. --passphrase-stdin reads from stdin and rejects an empty
+// passphrase; otherwise a TTY is prompted
 // interactively and a non-TTY falls back to plaintext with a warning.
 func exportPassphrase(cmd *cli.Command, stdin *bufio.Reader) (pass string, cancelled bool, err error) {
 	prompter := &passphrase.Prompter{
@@ -78,6 +84,13 @@ func exportPassphrase(cmd *cli.Command, stdin *bufio.Reader) (pass string, cance
 		pass, err = prompter.ReadFromStdin()
 		if err != nil {
 			return "", false, fmt.Errorf("failed to read passphrase from stdin: %w", err)
+		}
+
+		// --passphrase-stdin asks for an encrypted export, and an empty
+		// passphrase would silently select the plaintext envelope (e.g. an unset
+		// variable piped in, or </dev/null).
+		if pass == "" {
+			return "", false, errExportEmptyPassphrase
 		}
 
 		return pass, false, nil
