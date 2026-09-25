@@ -204,12 +204,15 @@ export interface MockState {
     operation: string;
     message: string;
   };
-  // Per-service StagingApply failure: when set, StagingApply rejects for exactly
-  // this service ('param'/'secret') BEFORE unstaging it, leaving its entries
-  // staged — while other services still apply+unstage. Mirrors the real backend
-  // turning any Execute error (conflict / per-entry failure) into a rejected
-  // Wails promise, so "Apply All" can succeed for one service and fail another.
+  // Per-service apply failure: when set, StagingApply rejects for exactly this
+  // service ('param'/'secret') BEFORE unstaging it, leaving its entries staged.
+  // StagingApplyAll rejects as a whole when this service has staged changes,
+  // applying nothing (a hard failure such as a store read error).
   stagingApplyFailService?: Service;
+  // Staged names whose apply is rejected as a conflict, per service. Without
+  // ignoreConflicts, StagingApply for that service and StagingApplyAll for every
+  // service return the conflicts and apply nothing, mirroring the backend (#982).
+  stagingApplyConflicts?: Partial<Record<Service, string[]>>;
   // Per-service post-apply unstage failure: when set, StagingApply for this
   // service reports each entry/tag as successfully applied but carries an
   // unstageError (the cloud write landed but the staged entry could not be
@@ -884,6 +887,86 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
     // wrote (path, header, payload) without a real backend.
     (window as any).__exportFiles = () => state.files;
 
+    // The staged keys of one service that the spec marked as conflicting, as
+    // staging.EntryKey.Label() renders them ("name" or "name [namespace]"),
+    // sorted by (name, namespace) like the backend.
+    function stagedConflicts(service: string): string[] {
+      const names = state.stagingApplyConflicts?.[service] ?? [];
+      const bucket = currentBucket();
+      const staged = service === 'param'
+        ? [...bucket.param, ...bucket.paramTags]
+        : [...bucket.secret, ...bucket.secretTags];
+      const keys = staged
+        .filter((s: any) => names.includes(s.name))
+        .map((s: any) => ({ name: s.name as string, namespace: (s.namespace ?? '') as string }))
+        .sort((a, b) => a.name.localeCompare(b.name) || a.namespace.localeCompare(b.namespace));
+      const labels = keys.map((k) => (k.namespace ? `${k.name} [${k.namespace}]` : k.name));
+      return [...new Set(labels)];
+    }
+
+    // A rejected apply's result: the conflicts and nothing applied.
+    function conflictResult(conflicts: string[]): any {
+      return {
+        serviceName: '',
+        entryResults: null,
+        tagResults: null,
+        conflicts,
+        entrySucceeded: 0,
+        entryFailed: 0,
+        tagSucceeded: 0,
+        tagFailed: 0,
+      };
+    }
+
+    function serviceDisplayName(service: string): string {
+      const p = state.currentScope?.provider || 'aws';
+      const cap = state.capabilities.find((c: any) => c.provider === p);
+      return cap?.services.find((s: any) => s.service === service)?.displayName ?? service;
+    }
+
+    // Apply (and unstage) one service's whole bucket.
+    function applyServiceBucket(service: string): any {
+      const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
+      const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
+      const entryCount = staged.length;
+      const tagCount = tagStaged.length;
+      // The cloud write landed but clearing the staged entries failed: report
+      // each result with an unstageError and leave the bucket populated (#447).
+      if (state.stagingApplyUnstageErrorService === service) {
+        return {
+          serviceName: service,
+          entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, namespace: s.namespace ?? '', status: s.operation === 'delete' ? 'deleted' : 'updated', unstageError: 'keychain locked' })) : null,
+          tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, namespace: t.namespace ?? '', status: 'updated', unstageError: 'keychain locked' })) : null,
+          conflicts: null,
+          entrySucceeded: entryCount,
+          entryFailed: 0,
+          tagSucceeded: tagCount,
+          tagFailed: 0,
+        };
+      }
+      if (service === 'param') {
+        currentBucket().param = [];
+        currentBucket().paramTags = [];
+      } else {
+        currentBucket().secret = [];
+        currentBucket().secretTags = [];
+      }
+      // Mirror the Go backend faithfully: empty slices marshal to null (not
+      // []), so the frontend must guard spreads/reads. Returning [] here would
+      // hide those bugs (this is exactly how the "Apply All" spread crash
+      // slipped past the mock once).
+      return {
+        serviceName: service,
+        entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, namespace: s.namespace ?? '', status: s.operation === 'delete' ? 'deleted' : 'updated' })) : null,
+        tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, namespace: t.namespace ?? '', status: 'updated' })) : null,
+        conflicts: null,
+        entrySucceeded: entryCount,
+        entryFailed: 0,
+        tagSucceeded: tagCount,
+        tagFailed: 0,
+      };
+    }
+
     const mockApp = {
       // Provider selection / capabilities (multi-cloud)
       DetectProviders: async () => state.detectResult,
@@ -1296,51 +1379,48 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
           })),
         };
       },
-      StagingApply: async (service: string) => {
+      StagingApply: async (service: string, ignoreConflicts?: boolean) => {
+        calls.push('StagingApply');
         // Reject for the designated service WITHOUT unstaging it, mirroring the
-        // backend turning any Execute error into a rejected promise (#477).
+        // backend turning a hard Execute error into a rejected promise (#477).
         if (state.stagingApplyFailService === service) {
           throw new Error(`staging apply failed for ${service}`);
         }
-        const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
-        const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
-        const entryCount = staged.length;
-        const tagCount = tagStaged.length;
-        // The cloud write landed but clearing the staged entries failed: report
-        // each result with an unstageError and leave the bucket populated (#447).
-        if (state.stagingApplyUnstageErrorService === service) {
-          return {
-            serviceName: service,
-            entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, namespace: s.namespace ?? '', status: s.operation === 'delete' ? 'deleted' : 'updated', unstageError: 'keychain locked' })) : null,
-            tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, namespace: t.namespace ?? '', status: 'updated', unstageError: 'keychain locked' })) : null,
-            conflicts: null,
-            entrySucceeded: entryCount,
-            entryFailed: 0,
-            tagSucceeded: tagCount,
-            tagFailed: 0,
-          };
+        const conflicts = ignoreConflicts ? [] : stagedConflicts(service);
+        if (conflicts.length > 0) return conflictResult(conflicts);
+        return applyServiceBucket(service);
+      },
+      // The all-service apply: every staged service is conflict-checked before
+      // any is applied, so one conflict or hard failure applies nothing (#982).
+      StagingApplyAll: async (ignoreConflicts: boolean) => {
+        calls.push('StagingApplyAll');
+        const services = (['param', 'secret'] as const).filter((svc) => {
+          const bucket = currentBucket();
+          return svc === 'param'
+            ? bucket.param.length + bucket.paramTags.length > 0
+            : bucket.secret.length + bucket.secretTags.length > 0;
+        });
+        if (services.some((svc) => state.stagingApplyFailService === svc)) {
+          throw new Error(`staging apply failed for ${state.stagingApplyFailService}`);
         }
-        if (service === 'param') {
-          currentBucket().param = [];
-          currentBucket().paramTags = [];
-        } else {
-          currentBucket().secret = [];
-          currentBucket().secretTags = [];
+        if (!ignoreConflicts) {
+          const conflicts = services.flatMap((svc) =>
+            stagedConflicts(svc).map((name) => `${serviceDisplayName(svc)}: ${name}`),
+          );
+          if (conflicts.length > 0) return conflictResult(conflicts);
         }
-        // Mirror the Go backend faithfully: empty slices marshal to null (not
-        // []), so the frontend must guard spreads/reads. Returning [] here would
-        // hide those bugs (this is exactly how the "Apply All" spread crash
-        // slipped past the mock once).
-        return {
-          serviceName: service,
-          entryResults: entryCount > 0 ? staged.map((s: any) => ({ name: s.name, namespace: s.namespace ?? '', status: s.operation === 'delete' ? 'deleted' : 'updated' })) : null,
-          tagResults: tagCount > 0 ? tagStaged.map((t: any) => ({ name: t.name, namespace: t.namespace ?? '', status: 'updated' })) : null,
-          conflicts: null,
-          entrySucceeded: entryCount,
-          entryFailed: 0,
-          tagSucceeded: tagCount,
-          tagFailed: 0,
-        };
+        const merged = conflictResult([]);
+        merged.conflicts = null;
+        for (const svc of services) {
+          const r = applyServiceBucket(svc);
+          merged.entryResults = [...(merged.entryResults ?? []), ...(r.entryResults ?? [])];
+          merged.tagResults = [...(merged.tagResults ?? []), ...(r.tagResults ?? [])];
+          merged.entrySucceeded += r.entrySucceeded;
+          merged.tagSucceeded += r.tagSucceeded;
+        }
+        if (merged.entryResults?.length === 0) merged.entryResults = null;
+        if (merged.tagResults?.length === 0) merged.tagResults = null;
+        return merged;
       },
       StagingReset: async (service: string) => {
         if (service === 'param') {

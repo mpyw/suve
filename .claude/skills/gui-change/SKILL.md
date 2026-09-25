@@ -69,6 +69,10 @@ landed across #273–#282.
   TUI share (the GUI's `stagingBinding`, `stagingScopeForKindScoped`,
   `effectiveParamScopeScoped`, and `parseSpec` in `internal/gui/spec.go`,
   which uses `Binding.SplitSpec`).
+- "Apply All" is the `StagingApplyAll` binding (`internal/gui/staging_apply.go`)
+  over `usecase/staging.GlobalApplyUseCase`, the same use case as the CLI's
+  all-service `stage apply`: every service is conflict-checked before any is
+  applied. Never loop the per-service `StagingApply` from the frontend.
 - The launch scope and the bare-launch provider come from the shared helpers:
   `RegisterLaunchMode` (`internal/cli/commands/launch.go`),
   `detect.HydrateScope`, and `detect.Result.UniqueProvider`.

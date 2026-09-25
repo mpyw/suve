@@ -65,6 +65,8 @@ export function StagingAddTag(arg1:string,arg2:string,arg3:string,arg4:string,ar
 
 export function StagingApply(arg1:string,arg2:boolean):Promise<gui.StagingApplyResult>;
 
+export function StagingApplyAll(arg1:boolean):Promise<gui.StagingApplyResult>;
+
 export function StagingCancelAddTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingCancelAddTagResult>;
 
 export function StagingCancelRemoveTag(arg1:string,arg2:string,arg3:string,arg4:string):Promise<gui.StagingCancelRemoveTagResult>;
