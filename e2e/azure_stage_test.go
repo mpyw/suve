@@ -588,3 +588,43 @@ func TestAzureAppConfigStage_ExportImport(t *testing.T) {
 		assert.Equal(t, "exported-value", stdout)
 	})
 }
+
+// TestAzureKeyVaultStage_ResourceFlagBeatsEnv verifies that --vault-name given on
+// `azure stage`, before the service subgroup, names the staged vault even when
+// AZURE_KEYVAULT_NAME points at another one (#979).
+func TestAzureKeyVaultStage_ResourceFlagBeatsEnv(t *testing.T) {
+	setupAzureKeyVault(t)
+	setupTempHome(t)
+
+	const name = "suve-e2e-az-stage-flag-beats-env"
+
+	cleanup := func() { _, _ = runAzureSecret(t, "delete", "--yes", name) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// The emulator setup pins the vault to "suve-e2e"; point the env elsewhere.
+	t.Setenv("AZURE_KEYVAULT_NAME", "suve-e2e-other")
+
+	_, err := runAzureStage(t, "--vault-name", "suve-e2e", "secret", "add", name, "flag-value")
+	require.NoError(t, err)
+
+	named, err := file.NewWorkingStore(provider.AzureKeyVaultScope("suve-e2e"))
+	require.NoError(t, err)
+	entry, err := named.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: name})
+	require.NoError(t, err)
+	assert.Equal(t, "flag-value", lo.FromPtr(entry.Value))
+
+	fromEnv, err := file.NewWorkingStore(provider.AzureKeyVaultScope("suve-e2e-other"))
+	require.NoError(t, err)
+	_, err = fromEnv.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: name})
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	stdout, err := runAzureStage(t, "--vault-name", "suve-e2e", "secret", "apply", "--yes")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, name)
+
+	t.Setenv("AZURE_KEYVAULT_NAME", "suve-e2e")
+	stdout, err = runAzureSecret(t, "show", "--raw", name)
+	require.NoError(t, err)
+	assert.Equal(t, "flag-value", stdout)
+}

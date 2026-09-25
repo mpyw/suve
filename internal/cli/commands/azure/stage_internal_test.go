@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 	stgcli "github.com/mpyw/suve/internal/staging/cli"
@@ -104,4 +105,89 @@ func stageHelpTexts(cmd *cli.Command, path string) map[string]string {
 	walk(cmd, path)
 
 	return texts
+}
+
+// stageScopeProbe runs `stage <args...>` with a probe leaf appended to both
+// service subgroups and returns the staging target each resolver saw.
+func stageScopeProbe(t *testing.T, args ...string) string {
+	t.Helper()
+
+	var got string
+
+	stage := StageCommand()
+	for _, sub := range stage.Commands {
+		switch sub.Name {
+		case stageNounSecret:
+			sub.Commands = append(sub.Commands, &cli.Command{
+				Name: "probe",
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					got = stageResolvedTarget(azureinternal.KeyVaultStagingScopeResolver(ctx))
+
+					return nil
+				},
+			})
+		case "param":
+			sub.Commands = append(sub.Commands, &cli.Command{
+				Name: "probe",
+				Action: func(ctx context.Context, _ *cli.Command) error {
+					got = stageResolvedTarget(azureinternal.AppConfigStagingScopeResolver(ctx))
+
+					return nil
+				},
+			})
+		}
+	}
+
+	app := &cli.Command{Name: "suve", Commands: []*cli.Command{stage}}
+	require.NoError(t, app.Run(t.Context(), append([]string{"suve", "stage"}, args...)))
+
+	return got
+}
+
+func stageResolvedTarget(scope staging.ResolvedScope, err error) string {
+	if err != nil {
+		return "error: " + err.Error()
+	}
+
+	return scope.Target.String()
+}
+
+// TestStageResourceFlagPosition verifies that --vault-name / --store-name name
+// the staged resource wherever they appear (before the service subgroup, after
+// it, or after the leaf), and that an explicit flag always beats the env var.
+//
+//nolint:paralleltest // uses t.Setenv (AZURE_KEYVAULT_NAME/AZURE_APPCONFIG_NAME); cannot run in parallel
+func TestStageResourceFlagPosition(t *testing.T) {
+	for _, env := range []string{"", "from-env"} {
+		t.Run("env="+env, func(t *testing.T) {
+			t.Setenv("AZURE_KEYVAULT_NAME", env)
+			t.Setenv("AZURE_APPCONFIG_NAME", env)
+
+			tests := []struct {
+				name string
+				args []string
+				want string
+			}{
+				{"vault before subgroup", []string{"--vault-name", "vb", "secret", "probe"}, "vault vb"},
+				{"vault after subgroup", []string{"secret", "--vault-name", "vb", "probe"}, "vault vb"},
+				{"vault after leaf", []string{"secret", "probe", "--vault-name", "vb"}, "vault vb"},
+				{"store before subgroup", []string{"--store-name", "sb", "param", "probe"}, "store sb"},
+				{"store after subgroup", []string{"param", "--store-name", "sb", "probe"}, "store sb"},
+				{"store after leaf", []string{"param", "probe", "--store-name", "sb"}, "store sb"},
+			}
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					assert.Equal(t, tt.want, stageScopeProbe(t, tt.args...))
+				})
+			}
+		})
+	}
+
+	t.Run("env fallback", func(t *testing.T) {
+		t.Setenv("AZURE_KEYVAULT_NAME", "va")
+		t.Setenv("AZURE_APPCONFIG_NAME", "sa")
+
+		assert.Equal(t, "vault va", stageScopeProbe(t, "secret", "probe"))
+		assert.Equal(t, "store sa", stageScopeProbe(t, "param", "probe"))
+	})
 }
