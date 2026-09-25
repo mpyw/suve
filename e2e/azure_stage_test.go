@@ -8,6 +8,7 @@ package e2e_test
 
 import (
 	"bytes"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
@@ -627,4 +628,27 @@ func TestAzureKeyVaultStage_ResourceFlagBeatsEnv(t *testing.T) {
 	stdout, err = runAzureSecret(t, "show", "--raw", name)
 	require.NoError(t, err)
 	assert.Equal(t, "flag-value", stdout)
+}
+
+// TestAzureKeyVaultStage_KeyMismatch verifies that a working staging area
+// written under one data key and read under another reports a key mismatch
+// naming SUVE_STAGING_KEY, not a wrong passphrase (#1008).
+func TestAzureKeyVaultStage_KeyMismatch(t *testing.T) {
+	setupAzureKeyVault(t)
+	setupTempHome(t)
+	setAzureKeyVaultStagingKey(t)
+
+	store, err := file.NewWorkingStore(provider.AzureKeyVaultScope("suve-e2e"))
+	require.NoError(t, err)
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "suve-e2e-key-mismatch"}, staging.Entry{
+		Operation: staging.OperationCreate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+	}))
+
+	other := make([]byte, 32)
+	other[0] = 0xff
+	t.Setenv("SUVE_STAGING_KEY", base64.StdEncoding.EncodeToString(other))
+
+	_, err = runAzureStage(t, "secret", "status")
+	require.ErrorContains(t, err, "SUVE_STAGING_KEY")
+	assert.NotContains(t, err.Error(), "passphrase")
 }

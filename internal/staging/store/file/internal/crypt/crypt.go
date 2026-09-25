@@ -92,8 +92,16 @@ var kdfParamsByVersion = map[byte]argonParams{
 var (
 	// ErrInvalidFormat is returned when the data format is invalid.
 	ErrInvalidFormat = errors.New("invalid encrypted format")
-	// ErrDecryptionFailed is returned when decryption fails (wrong passphrase/key or corrupted data).
+	// ErrDecryptionFailed is returned when passphrase decryption fails (wrong
+	// passphrase or corrupted data).
 	ErrDecryptionFailed = errors.New("decryption failed: wrong passphrase or corrupted data")
+	// ErrKeyMismatch is returned when raw-key decryption fails. The working
+	// staging area never uses a passphrase, so the likely cause is a data key
+	// that differs from the one the file was written with.
+	ErrKeyMismatch = errors.New(
+		"decryption failed: the staging data key does not match the one this data was written with " +
+			"(is SUVE_STAGING_KEY set differently from before, or was the keychain key replaced?), or the data is corrupted",
+	)
 	// ErrNotEncrypted is returned when trying to decrypt unencrypted data.
 	ErrNotEncrypted = errors.New("data is not encrypted")
 	// ErrInvalidKeyLength is returned when a raw key is not exactly RawKeyLen bytes.
@@ -267,7 +275,7 @@ func EncryptWithKey(data, key []byte) ([]byte, error) {
 // DecryptWithKey decrypts raw-key (v2) data using the supplied 32-byte key.
 // Returns ErrNotEncrypted if data doesn't have the encryption header.
 // Returns ErrInvalidFormat if the data is not raw-key (v2) format.
-// Returns ErrDecryptionFailed if the key is wrong or data is corrupted.
+// Returns ErrKeyMismatch if the key is wrong or data is corrupted.
 func DecryptWithKey(data, key []byte) ([]byte, error) {
 	if len(key) != RawKeyLen {
 		return nil, ErrInvalidKeyLength
@@ -303,7 +311,7 @@ func DecryptWithKey(data, key []byte) ([]byte, error) {
 
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return nil, ErrDecryptionFailed
+		return nil, ErrKeyMismatch
 	}
 
 	return plaintext, nil
