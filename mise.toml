@@ -87,13 +87,16 @@ run = [
 ]
 
 [tasks.tidy-check]
-description = "Fail if go.mod/go.sum of the root module or the gui/ module is not tidy (prints the diff)"
+description = "Fail if go.mod/go.sum of the root module or the gui/ module is not tidy (prints the diff), or if the Go version pins drift from go.mod"
 # gui/ is a separate module that replaces github.com/mpyw/suve with ../, so a
 # dependency bump in the root leaves gui/go.mod behind until it is re-tidied.
 # declscope cannot load an untidy module. Fix with `go mod tidy` in the module.
+# check-go-version.sh also keeps gui/go.mod, the `go` pin above, and the e2e
+# test-runner image in compose.test.yaml on the go.mod version.
 run = [
   "go mod tidy -diff",
   "cd gui && go mod tidy -diff",
+  "bash .github/scripts/check-go-version.sh",
 ]
 
 [tasks.declscope]
