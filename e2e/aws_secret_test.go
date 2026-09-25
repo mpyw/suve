@@ -19,6 +19,7 @@ import (
 
 	"github.com/mpyw/suve/internal/cli/commands/aws"
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
+	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
 )
 
@@ -132,6 +133,14 @@ func TestAWSSecret_FullWorkflow(t *testing.T) {
 	t.Run("delete-with-recovery", func(t *testing.T) {
 		_, _, err := runCommand(t, cmdsecret.DeleteCommand(), "--yes", "--recovery-window", "7", secretName)
 		require.NoError(t, err)
+	})
+
+	// #1012: the name of a secret scheduled for deletion is neither free nor
+	// live, so create fails with the pending-deletion sentinel and a restore hint.
+	t.Run("create-while-scheduled-for-deletion", func(t *testing.T) {
+		_, _, err := runCommand(t, cmdsecret.CreateCommand(), secretName, "again")
+		require.ErrorIs(t, err, provider.ErrPendingDeletion)
+		assert.Contains(t, err.Error(), "secret restore")
 	})
 
 	// 12. Restore

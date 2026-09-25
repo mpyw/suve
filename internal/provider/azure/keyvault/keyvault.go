@@ -298,6 +298,12 @@ func (s *Store) Put(
 func (s *Store) setSecret(ctx context.Context, name, value string) (domain.Version, error) {
 	resp, err := s.client.SetSecret(ctx, name, azsecrets.SetSecretParameters{Value: lo.ToPtr(value)})
 	if err != nil {
+		if isDeletedButRecoverable(err) {
+			return domain.Version{}, fmt.Errorf(
+				"%w: %s (run `secret restore` to recover it): %w", provider.ErrPendingDeletion, name, err,
+			)
+		}
+
 		return domain.Version{}, fmt.Errorf("failed to set secret: %w", err)
 	}
 
@@ -493,6 +499,18 @@ func isNotFound(err error) bool {
 	var re *azcore.ResponseError
 
 	return errors.As(err, &re) && re.StatusCode == http.StatusNotFound
+}
+
+// isDeletedButRecoverable reports whether a SetSecret error is Key Vault's 409
+// for a name held by a soft-deleted secret: the secret is not readable
+// (GetSecret returns 404) but its name is not free. SetSecret on a live secret
+// just adds a version, so a 409 there means this state. The status code
+// decides because the error code varies: Azure sends "Conflict" with the inner
+// code ObjectIsDeletedButRecoverable, and emulators send their own codes.
+func isDeletedButRecoverable(err error) bool {
+	var re *azcore.ResponseError
+
+	return errors.As(err, &re) && re.StatusCode == http.StatusConflict
 }
 
 // mapError maps an Azure 404 to provider.ErrNotFound and otherwise wraps the

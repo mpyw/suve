@@ -405,6 +405,12 @@ func TestAzureKeyVault_SoftDelete(t *testing.T) {
 		_, err = runAzureSecret(t, "show", "--raw", name)
 		require.Error(t, err)
 
+		// #1012: the soft-deleted name is not free, so create fails with the
+		// pending-deletion sentinel and a restore hint.
+		_, err = runAzureSecret(t, "create", name, "v2")
+		require.ErrorIs(t, err, provider.ErrPendingDeletion)
+		assert.Contains(t, err.Error(), "secret restore")
+
 		_, err = runAzureSecret(t, "restore", name)
 		require.NoError(t, err)
 

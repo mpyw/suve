@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	secretsmanagersdk "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
@@ -248,6 +249,10 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 			return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 		}
 
+		if isPendingDeletion(err) {
+			return nil, pendingDeletionError(name, err)
+		}
+
 		return nil, fmt.Errorf("failed to get secret value: %w", err)
 	}
 
@@ -375,6 +380,10 @@ func (s *Store) Create(
 			return domain.Version{}, fmt.Errorf("%w: %s", provider.ErrAlreadyExists, name)
 		}
 
+		if isPendingDeletion(err) {
+			return domain.Version{}, pendingDeletionError(name, err)
+		}
+
 		return domain.Version{}, fmt.Errorf("failed to create secret: %w", err)
 	}
 
@@ -413,6 +422,10 @@ func (s *Store) Put(
 			return s.Create(ctx, name, value, valueType, description, opts...)
 		}
 
+		if isPendingDeletion(err) {
+			return domain.Version{}, pendingDeletionError(name, err)
+		}
+
 		return domain.Version{}, fmt.Errorf("failed to update secret: %w", err)
 	}
 
@@ -421,6 +434,28 @@ func (s *Store) Put(
 	}
 
 	return domain.Version{ID: aws.ToString(updated.VersionId)}, nil
+}
+
+// isPendingDeletion reports whether err is the InvalidRequestException Secrets
+// Manager returns for a secret scheduled for deletion ("... marked for
+// deletion" on reads and updates, "... already scheduled for deletion" on
+// create; localstack says "... currently marked deleted"). The exception type
+// alone also covers unrelated invalid requests, so the message decides.
+func isPendingDeletion(err error) bool {
+	e, ok := errors.AsType[*types.InvalidRequestException](err)
+	if !ok {
+		return false
+	}
+
+	msg := e.ErrorMessage()
+
+	return strings.Contains(msg, "for deletion") || strings.Contains(msg, "marked deleted")
+}
+
+// pendingDeletionError wraps provider.ErrPendingDeletion with the name, a
+// restore hint and the service error.
+func pendingDeletionError(name string, err error) error {
+	return fmt.Errorf("%w: %s (run `secret restore` to recover it): %w", provider.ErrPendingDeletion, name, err)
 }
 
 // applyRotation issues a RotateSecret request when a RotationRules option with a
@@ -454,6 +489,10 @@ func (s *Store) Delete(ctx context.Context, name string, opts ...provider.Delete
 			return fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 		}
 
+		if isPendingDeletion(err) {
+			return pendingDeletionError(name, err)
+		}
+
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
 
@@ -466,6 +505,10 @@ func (s *Store) Restore(ctx context.Context, name string) error {
 		SecretId: aws.String(name),
 	})
 	if err != nil {
+		if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
+			return fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+		}
+
 		return fmt.Errorf("failed to restore secret: %w", err)
 	}
 

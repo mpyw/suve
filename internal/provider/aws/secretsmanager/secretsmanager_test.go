@@ -921,3 +921,68 @@ func TestTruncateVersionID(t *testing.T) {
 		assert.Empty(t, result)
 	})
 }
+
+// TestPendingDeletionMapsSentinel is the #1012 regression: a secret scheduled
+// for deletion makes Secrets Manager return InvalidRequestException on reads,
+// creates, updates and deletes. Each maps to provider.ErrPendingDeletion with a
+// restore hint, while an unrelated InvalidRequestException stays unmapped.
+func TestPendingDeletionMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	marked := &types.InvalidRequestException{Message: aws.String(
+		"You can't perform this operation on the secret because it was marked for deletion.",
+	)}
+	scheduled := &types.InvalidRequestException{Message: aws.String(
+		"You can't create this secret because a secret with this name is already scheduled for deletion.",
+	)}
+
+	store := secretsmanager.New(&mockClient{
+		getValue: func(*secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error) {
+			return nil, marked
+		},
+		create: func(*secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
+			return nil, scheduled
+		},
+		updateSec: func(*secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error) {
+			return nil, marked
+		},
+		deleteSec: func(*secretsmanagersdk.DeleteSecretInput) (*secretsmanagersdk.DeleteSecretOutput, error) {
+			return nil, marked
+		},
+	})
+
+	_, getErr := store.Get(t.Context(), "app/db", provider.VersionRef{})
+	_, createErr := store.Create(t.Context(), "app/db", "v", domain.ValueTypeSecret, "")
+	_, putErr := store.Put(t.Context(), "app/db", "v", domain.ValueTypeSecret, "")
+	deleteErr := store.Delete(t.Context(), "app/db")
+
+	for op, err := range map[string]error{"get": getErr, "create": createErr, "put": putErr, "delete": deleteErr} {
+		require.ErrorIs(t, err, provider.ErrPendingDeletion, op)
+		require.NotErrorIs(t, err, provider.ErrNotFound, op)
+		require.NotErrorIs(t, err, provider.ErrAlreadyExists, op)
+		assert.Contains(t, err.Error(), "scheduled for deletion: app/db (run `secret restore` to recover it)", op)
+	}
+
+	other := secretsmanager.New(&mockClient{
+		getValue: func(*secretsmanagersdk.GetSecretValueInput) (*secretsmanagersdk.GetSecretValueOutput, error) {
+			return nil, &types.InvalidRequestException{Message: aws.String("some other invalid request")}
+		},
+	})
+
+	_, err := other.Get(t.Context(), "app/db", provider.VersionRef{})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, provider.ErrPendingDeletion)
+}
+
+// TestRestore_NotFoundMapsSentinel covers Restore's ResourceNotFound mapping.
+func TestRestore_NotFoundMapsSentinel(t *testing.T) {
+	t.Parallel()
+
+	store := secretsmanager.New(&mockClient{
+		restore: func(*secretsmanagersdk.RestoreSecretInput) (*secretsmanagersdk.RestoreSecretOutput, error) {
+			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
+		},
+	})
+
+	require.ErrorIs(t, store.Restore(t.Context(), "missing"), provider.ErrNotFound)
+}
