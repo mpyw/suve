@@ -98,6 +98,12 @@
 
   // Tag and value entries pair on (name, namespace): App Configuration stages the
   // same key in several namespaces, and each is its own entry (#988).
+  // A warning entry is a staged change whose remote could not be fetched (for
+  // a reason other than not-found). It carries only the reason in `warning`.
+  function isWarning(entry: gui.StagingDiffEntry): boolean {
+    return entry.type === 'warning';
+  }
+
   function sameKey(a: { name: string; namespace?: string }, b: { name: string; namespace?: string }): boolean {
     return a.name === b.name && (a.namespace ?? '') === (b.namespace ?? '');
   }
@@ -109,7 +115,8 @@
   // Tag entries with no matching value entry represent a tag-only staged change.
   // The value-entry loop only draws tags nested inside a value entry, so these
   // get their own rows and are counted toward the section total and gating.
-  const tagOnlyEntries = $derived(tagEntries.filter(t => !entries.some(e => sameKey(e, t))));
+  // A warning row draws no tags, so its key's tag changes get their own row.
+  const tagOnlyEntries = $derived(tagEntries.filter(t => !entries.some(e => !isWarning(e) && sameKey(e, t))));
 </script>
 
 <div class="section">
@@ -136,9 +143,13 @@
         {@const rowSecret = secret || entry.secret}
         <li class="entry-item">
           <div class="entry-header">
-            <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
-              {entry.operation}
-            </span>
+            {#if isWarning(entry)}
+              <span class="operation-badge operation-badge-warning">warning</span>
+            {:else}
+              <span class="operation-badge" style="background: {getOperationColor(entry.operation || '')}">
+                {entry.operation}
+              </span>
+            {/if}
             {#if showNamespace}
               <span class="namespace-badge">{entry.namespace || '(NULL)'}</span>
             {/if}
@@ -150,69 +161,76 @@
               <button class="btn-entry btn-unstage" disabled={busyActions.has(`u:${entry.namespace}:${entry.name}`)} onclick={() => runRowAction(`u:${entry.namespace}:${entry.name}`, () => onunstage(entry.name, entry.namespace))}>Unstage</button>
             </div>
           </div>
-          <div class="entry-tags">
-            {#if hasTags}
-            {#if tagEntry?.addTags && Object.keys(tagEntry.addTags).length > 0}
-              <div class="tag-changes tag-add">
-                <span class="tag-label">+ Tags:</span>
-                {#each Object.entries(tagEntry.addTags) as [key, value]}
-                  <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(entry.name, entry.namespace, key, value)}>
-                    {key}={value}
-                    <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); runRowAction(`rt:${entry.namespace}:${entry.name}:${key}`, () => onremovetag(entry.name, entry.namespace, key)); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') runRowAction(`rt:${entry.namespace}:${entry.name}:${key}`, () => onremovetag(entry.name, entry.namespace, key)); }}>×</span>
-                  </button>
-                {/each}
-              </div>
-            {/if}
-            {#if tagEntry?.removeTags && Object.keys(tagEntry.removeTags).length > 0}
-              <div class="tag-changes tag-remove">
-                <span class="tag-label">- Tags:</span>
-                {#each Object.entries(tagEntry.removeTags) as [key, value]}
-                  <span class="tag-item">
-                    {value ? `${key}=${value}` : key}
-                    <button class="tag-cancel-btn" disabled={busyActions.has(`cu:${entry.namespace}:${entry.name}:${key}`)} onclick={() => runRowAction(`cu:${entry.namespace}:${entry.name}:${key}`, () => oncanceluntag(entry.name, entry.namespace, key))} title="Cancel untag">↩</button>
-                  </span>
-                {/each}
-              </div>
-            {/if}
-            {#if entry.operation !== 'delete'}
-              <button class="btn-add-tag" onclick={() => onaddtag(entry.name, entry.namespace)}>+ Add Tag</button>
-            {/if}
-            {/if}
-          </div>
-          {#if entry.operation === 'delete'}
-            {#if viewMode === 'diff'}
-              <div class="entry-diff">
-                <!-- The remote-vs-staged comparison is revealed by default (the
-                     user explicitly opened this diff, #735); the DiffDisplay
-                     Hide/Show toggle can mask it. Only the remote side is secret
-                     — the staged side is the literal "(deleted)" sentinel — so
-                     pass oldSecret rather than secret (which would mask both). -->
-                <DiffDisplay
-                  oldValue={entry.remoteValue || ''}
-                  newValue="(deleted)"
-                  oldSecret={rowSecret}
-                  oldLabel="Remote"
-                  newLabel="Staged"
-                  oldSubLabel={entry.remoteIdentifier || ''}
-                />
-              </div>
-            {:else}
-              <pre class="entry-value entry-value-delete">(will be deleted)</pre>
-            {/if}
-          {:else if entry.stagedValue !== undefined && entry.stagedValue !== ''}
-            {#if viewMode === 'diff' && entry.operation !== 'create'}
-              <div class="entry-diff">
-                <DiffDisplay
-                  oldValue={entry.remoteValue || ''}
-                  newValue={entry.stagedValue}
-                  secret={rowSecret}
-                  oldLabel="Remote"
-                  newLabel="Staged"
-                  oldSubLabel={entry.remoteIdentifier || ''}
-                />
-              </div>
-            {:else}
-              <pre class="entry-value">{rowSecret ? maskValue(entry.stagedValue) : entry.stagedValue}</pre>
+          {#if isWarning(entry)}
+            <!-- The remote fetch failed (not a not-found): the entry stays staged,
+                 but there is no value to show or edit, so only the reason and
+                 Unstage remain (#993). -->
+            <div class="entry-warning" data-testid="entry-warning">{entry.warning}</div>
+          {:else}
+            <div class="entry-tags">
+              {#if hasTags}
+              {#if tagEntry?.addTags && Object.keys(tagEntry.addTags).length > 0}
+                <div class="tag-changes tag-add">
+                  <span class="tag-label">+ Tags:</span>
+                  {#each Object.entries(tagEntry.addTags) as [key, value]}
+                    <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(entry.name, entry.namespace, key, value)}>
+                      {key}={value}
+                      <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); runRowAction(`rt:${entry.namespace}:${entry.name}:${key}`, () => onremovetag(entry.name, entry.namespace, key)); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') runRowAction(`rt:${entry.namespace}:${entry.name}:${key}`, () => onremovetag(entry.name, entry.namespace, key)); }}>×</span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+              {#if tagEntry?.removeTags && Object.keys(tagEntry.removeTags).length > 0}
+                <div class="tag-changes tag-remove">
+                  <span class="tag-label">- Tags:</span>
+                  {#each Object.entries(tagEntry.removeTags) as [key, value]}
+                    <span class="tag-item">
+                      {value ? `${key}=${value}` : key}
+                      <button class="tag-cancel-btn" disabled={busyActions.has(`cu:${entry.namespace}:${entry.name}:${key}`)} onclick={() => runRowAction(`cu:${entry.namespace}:${entry.name}:${key}`, () => oncanceluntag(entry.name, entry.namespace, key))} title="Cancel untag">↩</button>
+                    </span>
+                  {/each}
+                </div>
+              {/if}
+              {#if entry.operation !== 'delete'}
+                <button class="btn-add-tag" onclick={() => onaddtag(entry.name, entry.namespace)}>+ Add Tag</button>
+              {/if}
+              {/if}
+            </div>
+            {#if entry.operation === 'delete'}
+              {#if viewMode === 'diff'}
+                <div class="entry-diff">
+                  <!-- The remote-vs-staged comparison is revealed by default (the
+                       user explicitly opened this diff, #735); the DiffDisplay
+                       Hide/Show toggle can mask it. Only the remote side is secret
+                       — the staged side is the literal "(deleted)" sentinel — so
+                       pass oldSecret rather than secret (which would mask both). -->
+                  <DiffDisplay
+                    oldValue={entry.remoteValue || ''}
+                    newValue="(deleted)"
+                    oldSecret={rowSecret}
+                    oldLabel="Remote"
+                    newLabel="Staged"
+                    oldSubLabel={entry.remoteIdentifier || ''}
+                  />
+                </div>
+              {:else}
+                <pre class="entry-value entry-value-delete">(will be deleted)</pre>
+              {/if}
+            {:else if entry.stagedValue !== undefined && entry.stagedValue !== ''}
+              {#if viewMode === 'diff' && entry.operation !== 'create'}
+                <div class="entry-diff">
+                  <DiffDisplay
+                    oldValue={entry.remoteValue || ''}
+                    newValue={entry.stagedValue}
+                    secret={rowSecret}
+                    oldLabel="Remote"
+                    newLabel="Staged"
+                    oldSubLabel={entry.remoteIdentifier || ''}
+                  />
+                </div>
+              {:else}
+                <pre class="entry-value">{rowSecret ? maskValue(entry.stagedValue) : entry.stagedValue}</pre>
+              {/if}
             {/if}
           {/if}
         </li>
@@ -403,6 +421,20 @@
     color: #fff;
     text-transform: uppercase;
     font-weight: bold;
+  }
+
+  .operation-badge-warning {
+    background: #b26a00;
+  }
+
+  .entry-warning {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    background: rgba(255, 152, 0, 0.12);
+    color: #ffb74d;
+    font-size: 12px;
+    word-break: break-word;
   }
 
   .entry-name {
