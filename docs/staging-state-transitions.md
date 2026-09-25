@@ -104,6 +104,14 @@ remote value: "foo"
 -> edit "foo" -> Unstaged (reverted to remote)
 ```
 
+#### Kept Staged Options
+When `add` or `edit` re-stages an entry that is already staged, a value type (`--secure`/`--type`) or `--description` the command does not give keeps its staged value. Only an option given again replaces it. The same holds for a GUI re-edit (which never passes these options) and a TUI re-edit that leaves them empty.
+
+```
+-> edit /app/config v1 --description "new desc" -> Update staged (description="new desc")
+-> edit /app/config v2                          -> Update staged (value="v2", description="new desc")
+```
+
 #### Tag Cascade on Create Delete
 When a `Create`-staged resource is deleted (unstaged), any associated tag changes are also discarded. This prevents orphaned tag operations that would fail on apply.
 

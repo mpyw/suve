@@ -805,6 +805,34 @@ func TestAWSParam_StagingAddViaCLI(t *testing.T) {
 	})
 }
 
+// TestAWSParam_StagingReEditKeepsDescription covers #990: re-staging an edit
+// without --description keeps the description staged by an earlier edit.
+func TestAWSParam_StagingReEditKeepsDescription(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/re-edit-description/param"
+
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	})
+
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "v0")
+	require.NoError(t, err)
+
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "edit", "--description", "staged description", paramName, "v1")
+	require.NoError(t, err)
+
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "edit", paramName, "v2")
+	require.NoError(t, err)
+
+	entry, err := newStore().GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
+	require.NoError(t, err)
+	assert.Equal(t, "v2", lo.FromPtr(entry.Value))
+	assert.Equal(t, "staged description", lo.FromPtr(entry.Description))
+}
+
 // TestAWSParam_StagingAddWithOptions tests stage add with description and stage tag for tags.
 func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 	setupEnv(t)
