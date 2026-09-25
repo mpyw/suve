@@ -78,7 +78,9 @@ services:
     # matching endpoint env var(s) with `docker compose run -e` — the per-provider
     # endpoints are deliberately NOT baked in here, so a provider's e2e tests
     # skip (their endpoint env unset) unless that provider's task set them.
-    image: golang:1.25.11
+    # Must match the go directive in go.mod (checked by
+    # .github/scripts/check-go-version.sh, run by `mise tidy-check`).
+    image: golang:1.27.0
     working_dir: /app
     volumes:
       # Source is READ-ONLY: the suite writes nothing into the repo (TestMain

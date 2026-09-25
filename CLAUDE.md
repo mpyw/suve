@@ -36,7 +36,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 mise test                  # unit tests
 mise lint                  # tidy-check, golangci-lint, deadcode, then declscope under every build configuration
 mise deadcode              # deadcode gate only (test-only helpers waived in .github/deadcode-allow.txt)
-mise tidy-check            # fail if the root or gui/ module is not tidy (fix: `go mod tidy` in that module)
+mise tidy-check            # fail if the root or gui/ module is not tidy (fix: `go mod tidy` in that module), or Go version pins drift from go.mod
 mise declscope             # declscope only: no tags, production+e2e (host OS), production+e2e (windows), gui/ module
 mise build-cli             # build bin/suve (CLI)
 mise build-gui             # build bin/suve with the GUI frontend embedded

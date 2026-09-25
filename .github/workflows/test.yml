@@ -393,7 +393,7 @@ jobs:
           install_args: "go golangci-lint go:golang.org/x/tools/cmd/deadcode"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check go.mod is tidy (root and gui/)
+      - name: Check go.mod is tidy (root and gui/) and Go version pins match
         run: mise run tidy-check
 
       - name: Run golangci-lint (default build)
