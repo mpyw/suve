@@ -74,7 +74,7 @@ func runAzureSecret(t *testing.T, args ...string) (string, error) {
 //declscope:package // shared with the TUI suite
 func setAzureKeyVaultStagingKey(t *testing.T) {
 	t.Helper()
-	// EnvStagingKey ("SUVE_STAGING_KEY") is defined in an internal keyprovider
+	// envStagingKey ("SUVE_STAGING_KEY") is defined in an internal keyprovider
 	// package the e2e module cannot import; use the literal name.
 	t.Setenv("SUVE_STAGING_KEY", base64.StdEncoding.EncodeToString(make([]byte, 32)))
 }

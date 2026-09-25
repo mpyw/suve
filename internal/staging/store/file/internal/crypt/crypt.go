@@ -45,15 +45,15 @@ func ResetRandReader() {
 	randReader = rand.Reader
 }
 
-// SetCipherFuncs sets the cipher creation functions for testing.
+// setCipherFuncs sets the cipher creation functions for testing.
 // This should only be used in tests.
-func SetCipherFuncs(newCipher func(key []byte) (cipher.Block, error), newGCM func(cipher cipher.Block) (cipher.AEAD, error)) {
+func setCipherFuncs(newCipher func(key []byte) (cipher.Block, error), newGCM func(cipher cipher.Block) (cipher.AEAD, error)) {
 	newCipherFunc = newCipher
 	newGCMFunc = newGCM
 }
 
-// ResetCipherFuncs resets the cipher functions to defaults.
-func ResetCipherFuncs() {
+// resetCipherFuncs resets the cipher functions to defaults.
+func resetCipherFuncs() {
 	newCipherFunc = aes.NewCipher
 	newGCMFunc = cipher.NewGCM
 }
@@ -62,11 +62,15 @@ const (
 	// MagicHeader identifies encrypted files.
 	MagicHeader = "SUVE_ENC"
 	// Version is the passphrase-based (Argon2id) encryption format version.
+	//
+	//declscope:ignore overexported // crypt_test.go builds v1 headers with it and checks the version Encrypt writes
 	Version = byte(1)
 	// VersionRawKey is the legacy raw-key encryption format version.
 	// It stores no salt and performs no KDF; the supplied 32-byte key is used
 	// directly as the AES-256-GCM key. It binds no associated data. It is only
 	// read (DecryptWithKey), never written.
+	//
+	//declscope:ignore overexported // crypt_test.go builds legacy v2 headers with it
 	VersionRawKey = byte(2)
 	// VersionRawKeyAAD is the raw-key encryption format version that EncryptWithKey
 	// writes: the v2 layout, with the header and the caller's associated data
@@ -102,6 +106,8 @@ var kdfParamsByVersion = map[byte]argonParams{
 
 var (
 	// ErrInvalidFormat is returned when the data format is invalid.
+	//
+	//declscope:ignore overexported // sentinel of the exported decrypt functions; crypt_test.go matches it with errors.Is
 	ErrInvalidFormat = errors.New("invalid encrypted format")
 	// ErrDecryptionFailed is returned when passphrase decryption fails (wrong
 	// passphrase or corrupted data).
@@ -114,8 +120,12 @@ var (
 			"(is SUVE_STAGING_KEY set differently from before, or was the keychain key replaced?), or the data is corrupted",
 	)
 	// ErrNotEncrypted is returned when trying to decrypt unencrypted data.
+	//
+	//declscope:ignore overexported // sentinel of the exported decrypt functions; crypt_test.go matches it with errors.Is
 	ErrNotEncrypted = errors.New("data is not encrypted")
 	// ErrInvalidKeyLength is returned when a raw key is not exactly RawKeyLen bytes.
+	//
+	//declscope:ignore overexported // sentinel of the exported raw-key functions; crypt_test.go matches it with errors.Is
 	ErrInvalidKeyLength = errors.New("invalid key length: must be 32 bytes")
 )
 

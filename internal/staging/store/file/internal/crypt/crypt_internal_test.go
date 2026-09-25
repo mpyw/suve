@@ -271,9 +271,9 @@ func TestSetCipherFuncs_AndReset(t *testing.T) {
 		return nil, errors.New("custom GCM error")
 	}
 
-	SetCipherFuncs(customCipher, customGCM)
+	setCipherFuncs(customCipher, customGCM)
 
-	defer ResetCipherFuncs()
+	defer resetCipherFuncs()
 
 	_, err := Encrypt([]byte("test"), "pass")
 
@@ -281,7 +281,7 @@ func TestSetCipherFuncs_AndReset(t *testing.T) {
 	require.Error(t, err)
 
 	// Reset and verify normal operation
-	ResetCipherFuncs()
+	resetCipherFuncs()
 
 	result, err := Encrypt([]byte("test"), "pass")
 	require.NoError(t, err)

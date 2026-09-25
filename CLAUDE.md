@@ -34,10 +34,10 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ```bash
 mise test                  # unit tests
-mise lint                  # tidy-check, golangci-lint, deadcode, then declscope under every build configuration
+mise lint                  # tidy-check, golangci-lint, deadcode, then declscope shrink and declscope under every build configuration
 mise deadcode              # deadcode gate only (test-only helpers waived in .github/deadcode-allow.txt)
 mise tidy-check            # fail if the root or gui/ module is not tidy (fix: `go mod tidy` in that module), or Go version pins drift from go.mod
-mise declscope             # declscope only: no tags, production+e2e (host OS), production+e2e (windows), gui/ module
+mise declscope             # declscope shrink, then declscope: no tags, production+e2e (host OS), production+e2e (windows), gui/ module
 mise build-cli             # build bin/suve (CLI)
 mise build-gui             # build bin/suve with the GUI frontend embedded
 mise generate-gui-bindings # regenerate Wails bindings (rebuild GUI afterward)
@@ -65,7 +65,11 @@ GOFLAGS=-tags=production,e2e declscope ./...
 GOOS=windows GOFLAGS=-tags=production,e2e declscope ./...
 ```
 
-`mise declscope` runs `.github/scripts/check-declscope.sh`, which covers every configuration the host can type-check: no tags, `production,e2e` on the host OS, `production,e2e` for `windows`, and the `gui/` module with the host tags. The Linux and macOS Wails backends use cgo, so CI runs the script on both a Linux and a macOS runner. The `declscope-adoption` skill is vendored from the declscope release and is overwritten on each bump, so keep repository-specific notes here, not in that skill.
+`mise declscope` runs `.github/scripts/check-declscope.sh`, which covers every configuration the host can type-check: no tags, `production,e2e` on the host OS, `production,e2e` for `windows`, and the `gui/` module with the host tags. The Linux and macOS Wails backends use cgo, so CI runs the script on both a Linux and a macOS runner.
+
+The script runs `declscope shrink` under every configuration before the analyzer. shrink reports the exported declarations that nothing outside their `internal/` package uses (`declscope shrink -fix ./...` unexports them), and an unexported declaration becomes private to its file, which only the analyzer checks. It judges only the `internal/` directories nested below the root one: the `gui/` module can import the root `internal/`, so shrink prints "not judged" for those packages. Silence a report with `//declscope:ignore overexported // <reason>`; a bare `//declscope:ignore` does not reach it.
+
+The `declscope-adoption` skill is vendored from the declscope release and is overwritten on each bump, so keep repository-specific notes here, not in that skill.
 
 ## Testing
 

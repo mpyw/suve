@@ -420,6 +420,8 @@ jobs:
   # runs it with no tags, with production+e2e on the host OS, with
   # production+e2e for windows, and on the separate gui/ module. The Linux and macOS Wails backends use cgo, so
   # their OS files are type-checked only on their own host: one leg per OS.
+  # `declscope shrink` runs first under the same configurations: a declaration
+  # it unexports becomes private to its file, which only the analyzer checks.
   declscope:
     name: declscope (${{ matrix.os }})
     runs-on: ${{ matrix.runner }}
@@ -447,7 +449,7 @@ jobs:
           for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
           for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
 
-      - name: Run declscope under every build configuration
+      - name: Run declscope shrink, then declscope, under every build configuration
         run: mise run declscope
 
   naming:

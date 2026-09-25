@@ -37,9 +37,9 @@ import (
 )
 
 const (
-	// EnvStagingKey is the environment variable holding a base64-standard
+	// envStagingKey is the environment variable holding a base64-standard
 	// encoded 32-byte key that overrides the keychain.
-	EnvStagingKey = "SUVE_STAGING_KEY"
+	envStagingKey = "SUVE_STAGING_KEY"
 
 	// keychainService is the OS keychain service name.
 	keychainService = "suve"
@@ -101,7 +101,7 @@ func (e *KeychainUnavailableError) Unwrap() error { return e.Err }
 // hard keychain failure (as a *KeychainUnavailableError).
 func Resolve() (key []byte, plaintext, needsMint bool, err error) {
 	// 1. Environment variable override.
-	if raw, ok := lookupEnvFunc(EnvStagingKey); ok {
+	if raw, ok := lookupEnvFunc(envStagingKey); ok {
 		envKey, decErr := decodeEnvKey(raw)
 		if decErr != nil {
 			return nil, false, false, decErr
@@ -134,11 +134,11 @@ func Resolve() (key []byte, plaintext, needsMint bool, err error) {
 func decodeEnvKey(raw string) ([]byte, error) {
 	decoded, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
-		return nil, fmt.Errorf("%s must be base64-standard encoded: %w", EnvStagingKey, err)
+		return nil, fmt.Errorf("%s must be base64-standard encoded: %w", envStagingKey, err)
 	}
 
 	if len(decoded) != keyLen {
-		return nil, fmt.Errorf("%s must decode to exactly %d bytes, got %d", EnvStagingKey, keyLen, len(decoded))
+		return nil, fmt.Errorf("%s must decode to exactly %d bytes, got %d", envStagingKey, keyLen, len(decoded))
 	}
 
 	return decoded, nil
