@@ -161,10 +161,14 @@ var descriptors = map[provider.Provider]descriptor{
 		// key, so each kind gets its own service-specific scope.
 		stagingScope: func(sc provider.Scope, kind provider.Kind) (staging.ResolvedScope, bool) {
 			if kind == provider.KindParam {
-				scope := provider.AzureAppConfigScope(sc.StoreName)
+				// The bucket is per store: every namespace's entries share it, and
+				// apply pushes them all. The target therefore names the store
+				// alone, so a prompt never implies that one namespace is applied.
+				store := provider.AzureAppConfigScope(sc.StoreName)
+				scope := store
 				scope.AppConfigNamespace = sc.AppConfigNamespace
 
-				return staging.ResolvedScope{Scope: scope, Target: scope.Target()}, true
+				return staging.ResolvedScope{Scope: scope, Target: store.Target()}, true
 			}
 
 			scope := provider.AzureKeyVaultScope(sc.VaultName)

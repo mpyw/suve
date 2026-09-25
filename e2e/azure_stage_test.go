@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -234,6 +235,24 @@ func TestAzureAppConfigStage_Namespaces(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, stdout, key)
 		assert.Contains(t, stdout, "[dev]")
+	})
+
+	// The apply prompt names the store alone, even with --namespace: the store's
+	// one bucket holds every namespace and apply pushes them all (#994).
+	t.Run("apply-prompt-names-store-only", func(t *testing.T) {
+		var errBuf bytes.Buffer
+
+		app := &cli.Command{
+			Name:      "suve",
+			Reader:    strings.NewReader("n\n"),
+			Writer:    &bytes.Buffer{},
+			ErrWriter: &errBuf,
+			Commands:  []*cli.Command{azure.Command()},
+		}
+		err := app.Run(testContext(t), []string{"suve", "azure", "stage", "param", "--namespace", "dev", "apply"})
+		require.NoError(t, err)
+		assert.Contains(t, errBuf.String(), "Target: store suve-e2e\n")
+		assert.NotContains(t, errBuf.String(), "namespace dev")
 	})
 
 	t.Run("apply-writes-each-namespace", func(t *testing.T) {

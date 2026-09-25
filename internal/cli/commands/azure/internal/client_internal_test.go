@@ -34,8 +34,12 @@ func TestAppConfigStagingScopeResolver(t *testing.T) {
 	require.NoError(t, err)
 
 	want := provider.AzureAppConfigScope("my-store")
+	target := want.Target()
 	want.AppConfigNamespace = "dev"
-	assert.Equal(t, staging.ResolvedScope{Scope: want, Target: want.Target()}, got)
+	// The target names the store alone: its staging bucket holds every
+	// namespace, and apply pushes them all (#994).
+	assert.Equal(t, staging.ResolvedScope{Scope: want, Target: target}, got)
+	assert.Equal(t, "store my-store", got.Target.String())
 	assert.Equal(t, "dev", AppConfigNamespace(ctx))
 }
 

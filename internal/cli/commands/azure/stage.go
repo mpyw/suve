@@ -125,8 +125,9 @@ func appConfigStageGroup() *cli.Command {
 				Name:    "namespace",
 				Aliases: []string{"ns"},
 				Usage: "App Configuration namespace to stage under (the label axis; Azure calls " +
-					`it a "label"). Staging is per-(store, namespace); a staged op needs one ` +
-					"namespace. Empty = the default namespace (defaults to $AZURE_APPCONFIG_NAMESPACE)",
+					`it a "label"). Staging is per store: each staged entry keeps its namespace, ` +
+					"and apply pushes every namespace's entries. A staged op needs one namespace. " +
+					"Empty = the default namespace (defaults to $AZURE_APPCONFIG_NAMESPACE)",
 				Sources: cli.EnvVars("AZURE_APPCONFIG_NAMESPACE"),
 			},
 		},
