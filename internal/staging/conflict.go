@@ -2,6 +2,8 @@ package staging
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/mpyw/suve/internal/parallel"
@@ -22,6 +24,13 @@ type conflictLastModifiedResults = map[EntryKey]*parallel.Result[time.Time]
 //     and a remote that no longer exists is skipped (the tag apply fails on its
 //     own).
 //
+// The check fails closed: when a probe fails for any reason other than
+// ResourceNotFoundError (throttling, a network error, a read-denied policy),
+// the key cannot be proven conflict-free, so a non-nil error naming every such
+// key is returned and the caller must not apply. Many write paths do not
+// re-read before writing (a Delete never does), so skipping the key would let
+// the apply overwrite or delete a newer remote version unchecked.
+//
 // Each key is probed through the strategy resolved for its own namespace, so
 // two same-named entries in different App Configuration namespaces never
 // collapse onto one namespace's remote state; namespace-agnostic providers
@@ -33,14 +42,14 @@ func CheckEntryAndTagConflicts(
 	resolve ApplyStrategyResolver,
 	entries map[EntryKey]Entry,
 	tags map[EntryKey]TagEntry,
-) map[EntryKey]struct{} {
+) (map[EntryKey]struct{}, error) {
 	conflicts := make(map[EntryKey]struct{})
 
 	toCheckCreate, toCheckModified := classifyConflictEntries(entries)
 	toCheckTags := conflictTagsWithBase(tags)
 
 	if len(toCheckCreate) == 0 && len(toCheckModified) == 0 && len(toCheckTags) == 0 {
-		return conflicts
+		return conflicts, nil
 	}
 
 	// Merge the key sets so each remote is fetched exactly once, then share the
@@ -51,6 +60,10 @@ func CheckEntryAndTagConflicts(
 	addConflictKeys(keys, toCheckTags)
 
 	results := fetchConflictLastModified(ctx, resolve, keys)
+
+	if err := conflictProbeErrors(results); err != nil {
+		return nil, err
+	}
 
 	// Create: conflict if the resource now exists (someone else created it).
 	for key := range toCheckCreate {
@@ -65,7 +78,30 @@ func CheckEntryAndTagConflicts(
 	markConflictsModifiedAfterBase(toCheckModified, func(e Entry) time.Time { return *e.BaseModifiedAt }, results, conflicts)
 	markConflictsModifiedAfterBase(toCheckTags, func(t TagEntry) time.Time { return *t.BaseModifiedAt }, results, conflicts)
 
-	return conflicts
+	return conflicts, nil
+}
+
+// conflictProbeErrors joins, in (name, namespace) order, the probe failures that
+// leave a key unchecked: every fetch error except ResourceNotFoundError, which
+// is a definite answer (the remote does not exist). It returns nil when every
+// key was probed.
+func conflictProbeErrors(results conflictLastModifiedResults) error {
+	var errs []error
+
+	for _, key := range SortedEntryKeys(results) {
+		err := results[key].Err
+		if err == nil {
+			continue
+		}
+
+		if notFoundErr := (*ResourceNotFoundError)(nil); errors.As(err, &notFoundErr) {
+			continue
+		}
+
+		errs = append(errs, fmt.Errorf("cannot check %s for conflicts: %w", key.Label(), err))
+	}
+
+	return errors.Join(errs...)
 }
 
 // classifyConflictEntries splits entries into those checked for a Create conflict (the
@@ -123,9 +159,10 @@ func fetchConflictLastModified(ctx context.Context, resolve ApplyStrategyResolve
 }
 
 // markConflictsModifiedAfterBase adds to conflicts every key whose remote was modified
-// strictly after its staged base time. A fetch error or a zero time (the remote
-// no longer exists) is skipped — the apply will fail on its own. base extracts
-// each item's staged base time.
+// strictly after its staged base time. A not-found fetch or a zero time (the
+// remote no longer exists) is not a conflict: there is no newer version to
+// lose. Other fetch errors never reach here (see conflictProbeErrors). base
+// extracts each item's staged base time.
 //
 // Strict After: on second-granular providers (e.g. Azure Key Vault) an
 // out-of-band write in the same wall-clock second compares as equal and escapes

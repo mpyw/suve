@@ -702,3 +702,50 @@ func TestApplyUseCase_Execute_ResultOrder(t *testing.T) {
 		return staging.EntryKey{Name: r.Name, Namespace: r.Namespace}
 	}))
 }
+
+// TestApplyUseCase_Execute_ProbeErrorFailsClosed covers #989: when the conflict
+// probe fails for a reason other than not-found, the key cannot be proven
+// conflict-free, so the apply is rejected with the probe error and nothing is
+// written. A not-found probe is still a definite answer and does not block.
+func TestApplyUseCase_Execute_ProbeErrorFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	for _, op := range []staging.Operation{staging.OperationCreate, staging.OperationUpdate, staging.OperationDelete} {
+		t.Run(string(op), func(t *testing.T) {
+			t.Parallel()
+
+			key := staging.EntryKey{Name: "/app/probe"}
+			store := testutil.NewMockStore()
+			entry := staging.Entry{Operation: op, StagedAt: time.Now()}
+			if op != staging.OperationDelete {
+				entry.Value = lo.ToPtr("staged")
+			}
+			if op != staging.OperationCreate {
+				entry.BaseModifiedAt = &base
+			}
+			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, key, entry))
+
+			strategy := newMockApplyStrategy()
+			strategy.fetchModifiedErr = errors.New("AccessDeniedException")
+
+			uc := &usecasestaging.ApplyUseCase{Strategy: strategy, Store: store}
+
+			output, err := uc.Execute(t.Context(), usecasestaging.ApplyInput{})
+			require.EqualError(t, err, "apply rejected: conflict check failed (ignore conflicts to skip it): "+
+				"cannot check /app/probe for conflicts: AccessDeniedException")
+			assert.Nil(t, output)
+
+			_, err = store.GetEntry(t.Context(), staging.ServiceParam, key)
+			require.NoError(t, err, "the entry must stay staged")
+
+			// A not-found probe does not block the apply.
+			strategy.fetchModifiedErr = &staging.ResourceNotFoundError{}
+
+			output, err = uc.Execute(t.Context(), usecasestaging.ApplyInput{})
+			require.NoError(t, err)
+			assert.Equal(t, 1, output.EntrySucceeded)
+		})
+	}
+}

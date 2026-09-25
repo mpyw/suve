@@ -125,7 +125,12 @@ func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOut
 
 	// Check for conflicts (see conflicts).
 	if !input.IgnoreConflicts {
-		if conflicts := u.conflicts(ctx, entries, tags); len(conflicts) > 0 {
+		conflicts, err := u.conflicts(ctx, entries, tags)
+		if err != nil {
+			return nil, applyConflictCheckError(err)
+		}
+
+		if len(conflicts) > 0 {
 			output.Conflicts = conflicts
 
 			return output, fmt.Errorf("apply rejected: %d conflict(s) detected", len(conflicts))
@@ -188,11 +193,25 @@ func (u *ApplyUseCase) staged(
 // a remote modified after that base time is a conflict for either kind. The
 // merged check fetches each remote once — even when a key has both a value and
 // a tag change — and reports that key once. The full EntryKey is kept so
-// callers can render the namespace badge.
+// callers can render the namespace badge. A probe that fails for a reason
+// other than not-found returns an error: the key cannot be proven
+// conflict-free, so nothing may be applied.
 func (u *ApplyUseCase) conflicts(
 	ctx context.Context, entries map[staging.EntryKey]staging.Entry, tags map[staging.EntryKey]staging.TagEntry,
-) []staging.EntryKey {
-	return staging.SortedEntryKeys(staging.CheckEntryAndTagConflicts(ctx, u.strategyForNamespace, entries, tags))
+) ([]staging.EntryKey, error) {
+	conflicts, err := staging.CheckEntryAndTagConflicts(ctx, u.strategyForNamespace, entries, tags)
+	if err != nil {
+		return nil, err
+	}
+
+	return staging.SortedEntryKeys(conflicts), nil
+}
+
+// applyConflictCheckError wraps a failed conflict check into the apply rejection
+// returned with a nil output, so every caller surfaces it as a hard error. The
+// use case has written nothing when it returns this error.
+func applyConflictCheckError(err error) error {
+	return fmt.Errorf("apply rejected: conflict check failed (ignore conflicts to skip it): %w", err)
 }
 
 func (u *ApplyUseCase) applyEntries(ctx context.Context, service staging.Service, entries map[staging.EntryKey]staging.Entry, output *ApplyOutput) {
