@@ -19,7 +19,8 @@
 //     first and reports provider.ErrAlreadyExists when the secret exists. This
 //     check-then-set is inherently racy; a concurrent create is not detected.
 //   - Tags live on a secret version and are mutated via an UpdateSecretProperties
-//     read-modify-write against the current version.
+//     read-modify-write against the current version, read from the version
+//     list so a disabled latest version can still be tagged.
 package keyvault
 
 import (
@@ -368,22 +369,29 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	return s.updateTags(ctx, name, version, tags)
 }
 
-// currentTags fetches the current version's tags as a mutable map, along with
+// currentTags returns the current version's tags as a mutable map, along with
 // that version's id. The version is required for the write-back: Key Vault's
 // update is PATCH /secrets/{name}/{version}, and an empty version collapses the
 // URL to /secrets/{name}/ which rejects PATCH with 405.
+//
+// The current version comes from the version list (the same one History marks
+// Current), not from an unversioned GetSecret: that returns 403 when the latest
+// version is disabled, while its properties can still be updated.
 func (s *Store) currentTags(ctx context.Context, name string) (map[string]string, string, error) {
-	resp, err := s.client.GetSecret(ctx, name, "")
+	versions, err := s.versionsNewestFirst(ctx, name)
 	if err != nil {
-		return nil, "", mapError(err, name, "get secret")
+		return nil, "", err
 	}
 
-	tags := make(map[string]string, len(resp.Tags))
-	for k, v := range resp.Tags {
-		tags[k] = lo.FromPtr(v)
+	if len(versions) == 0 {
+		return nil, "", fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 	}
 
-	return tags, versionID(resp.ID), nil
+	current := versions[0]
+
+	return lo.SliceToMap(current.tags, func(t domain.Tag) (string, string) {
+		return t.Key, t.Value
+	}), current.id, nil
 }
 
 // updateTags writes the tags map back to the given secret version. version must
