@@ -371,3 +371,39 @@ func TestAzureKeyVault_SoftDelete(t *testing.T) {
 		assert.Equal(t, "v1", stdout)
 	})
 }
+
+// TestAzureKeyVault_DeleteConfirmTarget verifies the delete confirmation names
+// the vault it applies to and describes the delete as recoverable (Key Vault
+// soft-delete), not permanent (#1006). It aborts with "n".
+func TestAzureKeyVault_DeleteConfirmTarget(t *testing.T) {
+	setupAzureKeyVault(t)
+
+	const name = "suve-e2e-az-kv-confirm-target"
+
+	_, _ = runAzureSecret(t, "delete", "--yes", name)
+	t.Cleanup(func() { _, _ = runAzureSecret(t, "delete", "--yes", name) })
+
+	_, err := runAzureSecret(t, "create", name, "keep-me")
+	require.NoError(t, err)
+
+	var errBuf bytes.Buffer
+
+	app := &cli.Command{
+		Name:      "suve",
+		Writer:    &bytes.Buffer{},
+		ErrWriter: &errBuf,
+		Commands:  []*cli.Command{azure.Command()},
+	}
+
+	withOSStdin(t, "n\n", func() {
+		err = app.Run(testContext(t), []string{"suve", "azure", "secret", "delete", name})
+	})
+	require.NoError(t, err)
+	assert.Contains(t, errBuf.String(), "Target: vault suve-e2e")
+	assert.Contains(t, errBuf.String(), "recoverable")
+	assert.NotContains(t, errBuf.String(), "permanently delete")
+
+	stdout, err := runAzureSecret(t, "show", "--raw", name)
+	require.NoError(t, err)
+	assert.Equal(t, "keep-me", stdout)
+}

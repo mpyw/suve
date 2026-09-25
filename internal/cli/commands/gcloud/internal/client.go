@@ -49,6 +49,18 @@ func SecretStore(ctx context.Context) (provider.Store, error) {
 	return cliinternal.Store(ctx, provider.GoogleCloudScope(project), provider.KindSecret)
 }
 
+// ConfirmTarget describes the Google Cloud project for a confirmation prompt
+// ("project my-project"). It returns "" when no project was resolved, so the
+// prompt shows no target line.
+func ConfirmTarget(ctx context.Context) string {
+	project := projectFromContext(ctx)
+	if project == "" {
+		return ""
+	}
+
+	return provider.GoogleCloudScope(project).Target().String()
+}
+
 // StagingScopeResolver resolves the Google Cloud staging scope from the project
 // stashed in the context (see WithProject). It performs no network calls. It
 // satisfies staging.ScopeResolver.

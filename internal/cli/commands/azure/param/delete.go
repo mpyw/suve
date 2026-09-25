@@ -80,6 +80,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		Stdin:  os.Stdin,
 		Stdout: cmd.Root().Writer,
 		Stderr: cmd.Root().ErrWriter,
+		Target: azureinternal.AppConfigConfirmTarget(ctx),
 	}
 
 	confirmed, err := prompter.ConfirmDelete(name, skipConfirm)

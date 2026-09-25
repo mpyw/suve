@@ -327,6 +327,39 @@ func TestPrompter_ConfirmDelete(t *testing.T) {
 		assert.Contains(t, stderr.String(), "permanently delete")
 	})
 
+	t.Run("recoverable delete names the recovery instead of a permanent delete", func(t *testing.T) {
+		t.Parallel()
+
+		var stderr bytes.Buffer
+
+		p := &confirm.Prompter{
+			Stdin:  strings.NewReader("y\n"),
+			Stdout: io.Discard,
+			Stderr: &stderr,
+			Target: "vault my-vault",
+		}
+
+		result, err := p.ConfirmRecoverableDelete("my-secret", "recoverable with restore", false)
+		require.NoError(t, err)
+		assert.True(t, result)
+		assert.Contains(t, stderr.String(), "Target: vault my-vault")
+		assert.Contains(t, stderr.String(), "This will delete: my-secret (recoverable with restore)")
+		assert.NotContains(t, stderr.String(), "permanently")
+	})
+
+	t.Run("recoverable delete skips the prompt with skipConfirm", func(t *testing.T) {
+		t.Parallel()
+
+		var stderr bytes.Buffer
+
+		p := &confirm.Prompter{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: &stderr}
+
+		result, err := p.ConfirmRecoverableDelete("my-secret", "recoverable", true)
+		require.NoError(t, err)
+		assert.True(t, result)
+		assert.Empty(t, stderr.String())
+	})
+
 	t.Run("decline delete", func(t *testing.T) {
 		t.Parallel()
 

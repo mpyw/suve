@@ -108,6 +108,28 @@ func AppConfigStore(ctx context.Context) (provider.Store, error) {
 	return cliinternal.Store(ctx, appConfigScope(sc), provider.KindParam)
 }
 
+// KeyVaultConfirmTarget describes the Key Vault for a confirmation prompt
+// ("vault my-vault"). It returns "" when no vault was resolved.
+func KeyVaultConfirmTarget(ctx context.Context) string {
+	sc := scopeFromContext(ctx)
+	if sc.vaultName == "" {
+		return ""
+	}
+
+	return provider.AzureKeyVaultScope(sc.vaultName).Target().String()
+}
+
+// AppConfigConfirmTarget describes the App Configuration store and namespace
+// for a confirmation prompt. It returns "" when no store was resolved.
+func AppConfigConfirmTarget(ctx context.Context) string {
+	sc := scopeFromContext(ctx)
+	if sc.storeName == "" {
+		return ""
+	}
+
+	return appConfigScope(sc).Target().String()
+}
+
 // KeyVaultStagingScopeResolver resolves the Azure Key Vault staging scope from
 // the vault name stashed in the context (see WithVaultName). It performs no
 // network calls.

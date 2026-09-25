@@ -37,6 +37,8 @@ import (
 // withOSStdin temporarily replaces os.Stdin with a pipe preloaded with input,
 // runs fn, then restores the original os.Stdin. Used for the delete actions,
 // whose confirmation prompter reads os.Stdin directly.
+//
+//declscope:package // shared with the Google Cloud and Azure delete-prompt tests
 func withOSStdin(t *testing.T, input string, fn func()) {
 	t.Helper()
 
@@ -225,7 +227,10 @@ func TestAWSSecret_DeleteConfirmPrompt(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Contains(t, stderr, "delete-me-secret", "current value should be shown before the prompt")
-		assert.Contains(t, stderr, "permanently delete")
+		// Without --force the secret gets a recovery window, so the prompt must
+		// not claim a permanent delete (#1006).
+		assert.Contains(t, stderr, "recoverable for 30 days")
+		assert.NotContains(t, stderr, "permanently delete")
 		assert.Contains(t, stderr, "[y/N]")
 
 		// The secret still exists.
