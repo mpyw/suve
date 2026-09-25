@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/golden"
 	teatest "github.com/charmbracelet/x/exp/teatest/v2"
@@ -124,6 +125,92 @@ func TestUpdate_DialogModality(t *testing.T) {
 	m = updateApp(t, m, specialKey(tea.KeyEscape))
 	assert.Empty(t, m.dialogs, "esc closes the dialog")
 	assert.Len(t, fd.got, 1, "esc is consumed by the close, not forwarded")
+}
+
+// pageOwnedMsg stands in for a page's own async result (list/detail/staged
+// loads, review results) in the modal routing tests.
+type pageOwnedMsg struct{}
+
+// TestUpdate_DialogOpenForwardsNonInputToPage pins #987: while a dialog is open,
+// a message the shell does not handle itself reaches both the top dialog and the
+// active page (so the page's async results and spinner ticks still land), while
+// user input such as a paste reaches the dialog only.
+func TestUpdate_DialogOpenForwardsNonInputToPage(t *testing.T) {
+	t.Parallel()
+
+	m := newApp(config{scope: provider.Scope{Provider: provider.ProviderAWS}, target: awsTargetFixture()})
+	rp := &recordingPage{}
+	m.pages = []page{rp}
+	fd := &fakeDialog{}
+	m.dialogs = []dialog{fd}
+
+	m = updateApp(t, m, pageOwnedMsg{})
+	m = updateApp(t, m, spinner.TickMsg{})
+
+	require.Len(t, rp.got, 2, "the page beneath the dialog still receives non-input messages")
+	assert.IsType(t, pageOwnedMsg{}, rp.got[0])
+	assert.IsType(t, spinner.TickMsg{}, rp.got[1])
+	require.Len(t, fd.got, 2, "the dialog receives them too")
+
+	m = updateApp(t, m, tea.PasteMsg{Content: "typed"})
+	updateApp(t, m, tea.KeyReleaseMsg{Code: 'x', Text: "x"})
+
+	assert.Len(t, rp.got, 2, "a paste or key release never leaks to the page beneath the dialog")
+	require.Len(t, fd.got, 4, "the paste and key release reach the dialog")
+	assert.IsType(t, tea.PasteMsg{}, fd.got[2])
+	assert.IsType(t, tea.KeyReleaseMsg{}, fd.got[3])
+}
+
+// TestUpdate_ListLoadedWhileDialogOpen replays #987 end to end: the browser's
+// initial loads land while a dialog covers it, and after the dialog is canceled
+// the list shows the loaded entries rather than an empty "entries (0)".
+func TestUpdate_ListLoadedWhileDialogOpen(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	m := newApp(config{
+		scope:     provider.Scope{Provider: provider.ProviderAWS},
+		target:    awsTargetFixture(),
+		sourceFor: sourceForShape("param", awsParamSource(), staticProbe{keys: map[data.StagedKey]struct{}{}}),
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: 120, Height: 34})
+
+	// Hold back the initial loads and the spinner's first tick.
+	var (
+		pending []tea.Msg
+		tick    tea.Msg
+	)
+
+	for _, msg := range drainBatch(m.initialPageCmd()) {
+		if _, ok := msg.(spinner.TickMsg); ok {
+			tick = msg
+
+			continue
+		}
+
+		pending = append(pending, msg)
+	}
+
+	require.NotEmpty(t, pending, "the browser issues its initial loads")
+	require.NotNil(t, tick, "the browser starts its spinner")
+
+	m = updateApp(t, m, nav.OpenError{Title: "boom", Message: "a dialog opened before the list landed"})
+	require.Len(t, m.dialogs, 1)
+
+	// The spinner's tick chain survives the dialog: the page re-arms the next tick.
+	next, cmd := m.Update(tick)
+	m = next.(*App) //nolint:forcetypeassert // Update always returns *App
+	assert.NotNil(t, cmd, "the browser re-arms its spinner tick while the dialog is open")
+
+	for _, msg := range pending {
+		m = updateApp(t, m, msg)
+	}
+
+	m = updateApp(t, m, dialogs.CanceledMsg{})
+	require.Empty(t, m.dialogs)
+
+	out := m.View().Content
+	assert.Contains(t, out, "/app/", "the list loaded while the dialog was open is shown after it closes")
+	assert.NotContains(t, out, "entries (0)")
 }
 
 // TestUpdate_DialogCapturesGlobalKeys pins the Step-2 carried-over fix: while a
