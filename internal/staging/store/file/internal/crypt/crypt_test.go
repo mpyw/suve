@@ -328,7 +328,7 @@ func TestDecryptWithKey_WrongKey(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = crypt.DecryptWithKey(encrypted, wrongKey)
-	assert.ErrorIs(t, err, crypt.ErrDecryptionFailed)
+	assert.ErrorIs(t, err, crypt.ErrKeyMismatch)
 }
 
 // TestCrossReject verifies the two formats reject each other's data.

@@ -99,7 +99,9 @@ func TestStore_KeyWrongKeyFails(t *testing.T) {
 	other.key = wrong
 
 	_, err := other.Drain(t.Context(), "", true)
-	assert.ErrorIs(t, err, crypt.ErrDecryptionFailed)
+	require.ErrorIs(t, err, crypt.ErrKeyMismatch)
+	assert.Contains(t, err.Error(), "SUVE_STAGING_KEY")
+	assert.NotContains(t, err.Error(), "passphrase")
 }
 
 // TestNewWorkingStore_KeyConfigured verifies the constructor stores the
