@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/gofrs/flock"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -429,4 +431,62 @@ func TestLock_CreatesLockfileAndOperationsWork(t *testing.T) {
 	got, err := store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/a", Namespace: ""})
 	require.NoError(t, err)
 	assert.Equal(t, "v", lo.FromPtr(got.Value))
+}
+
+// TestNewWorkingStore_KeyResolutionUsesGlobalLock covers #999: the data key
+// lives in one global keychain slot, so its Resolve/Mint sequence must be
+// serialized across scopes, not per scope directory. Another holder of the
+// staging-root key lock (standing in for a process working in a different
+// scope) must block key resolution until it releases the lock.
+//
+//nolint:paralleltest // overrides package-level hook vars.
+func TestNewWorkingStore_KeyResolutionUsesGlobalLock(t *testing.T) {
+	origResolve := resolveKeyFunc
+	origHome := userHomeDirFunc
+
+	defer func() {
+		resolveKeyFunc = origResolve
+		userHomeDirFunc = origHome
+	}()
+
+	home := t.TempDir()
+	userHomeDirFunc = func() (string, error) { return home, nil }
+
+	resolved := make(chan struct{}, 1)
+	resolveKeyFunc = func() ([]byte, bool, bool, error) {
+		resolved <- struct{}{}
+
+		return newTestKey(), false, false, nil
+	}
+
+	// Hold the key lock through a separate file handle, as another process
+	// staging in another scope would.
+	lockDir := filepath.Join(home, baseDirName, stagingDir)
+	require.NoError(t, os.MkdirAll(lockDir, 0o700))
+
+	other := flock.New(filepath.Join(lockDir, keyLockFileName))
+	require.NoError(t, other.Lock())
+
+	done := make(chan error, 1)
+
+	go func() {
+		_, err := NewWorkingStore(provider.GoogleCloudScope("my-project"))
+		done <- err
+	}()
+
+	select {
+	case <-resolved:
+		t.Fatal("key resolution ran while another scope held the key lock")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	require.NoError(t, other.Unlock())
+
+	select {
+	case <-resolved:
+	case <-time.After(5 * time.Second):
+		t.Fatal("key resolution did not run after the key lock was released")
+	}
+
+	require.NoError(t, <-done)
 }

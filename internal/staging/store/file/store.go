@@ -200,13 +200,17 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 		return nil, err
 	}
 
-	// Serialize key resolution and minting across processes under the scope
-	// flock. Without it, two concurrent first runs both observe an empty
-	// keychain, each mints a different random key, and the second store
-	// overwrites the first in the keychain — leaving state written under the
-	// first key permanently undecryptable. Holding the lock across
-	// Resolve/needsMint/Mint makes the loser observe the winner's freshly
-	// stored key via Resolve instead of minting its own.
+	// Serialize key resolution and minting across processes. Without it, two
+	// concurrent first runs both observe an empty keychain, each mints a
+	// different random key, and the second overwrites the first in the keychain
+	// — leaving state written under the first key permanently undecryptable.
+	// The key lives in ONE keychain slot shared by every scope, so the lock must
+	// be global too (keyLock): a per-scope lock would let the GUI on one scope
+	// and the CLI on another both mint. Holding it across Resolve/needsMint/Mint
+	// makes the loser observe the winner's freshly stored key via Resolve
+	// instead of minting its own. The scope lock is then taken inside it (always
+	// in that order) so the encrypted-state guard below reads a stable scope.
+	defer keyLock()()
 	defer s.lock()()
 
 	key, plaintext, needsMint, err := resolveKeyFunc()
@@ -425,6 +429,37 @@ func (s *Store) lock() func() {
 		_ = fl.Unlock()
 		fileMu.Unlock()
 	}
+}
+
+// keyLockFileName is the advisory lockfile at the staging root that serializes
+// the working-store data-key Resolve/Mint sequence across processes and scopes.
+const keyLockFileName = ".keylock"
+
+// keyLock acquires, best-effort, an exclusive OS file lock on the staging-root
+// key lockfile (~/.suve/staging/.keylock) and returns the release function
+// (intended for `defer keyLock()()`). The data key is global (one keychain
+// slot), so minting it must be serialized across every scope, not per scope
+// directory. Callers take it before any scope lock. Like lock, a failure to
+// create or acquire the file degrades to no cross-process lock rather than
+// failing the operation; within one process fileMu (taken by lock) still
+// serializes the sequence.
+func keyLock() func() {
+	homeDir, err := userHomeDirFunc()
+	if err != nil {
+		return func() {}
+	}
+
+	dir := filepath.Join(homeDir, baseDirName, stagingDir)
+	if err := os.MkdirAll(dir, 0o700); err != nil { //nolint:mnd // owner-only directory
+		return func() {}
+	}
+
+	fl := flock.New(filepath.Join(dir, keyLockFileName))
+	if err := fl.Lock(); err != nil {
+		return func() {}
+	}
+
+	return func() { _ = fl.Unlock() }
 }
 
 // lockPath returns the advisory lockfile path: the scope directory's .lock in
