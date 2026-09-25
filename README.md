@@ -399,7 +399,7 @@ suve uses standard AWS SDK configuration:
 > [!WARNING]
 > Ensure your IAM role/user has appropriate permissions:
 > - SSM: `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParameterHistory`, `ssm:PutParameter`, `ssm:DeleteParameter`, `ssm:DescribeParameters`, `ssm:AddTagsToResource`, `ssm:RemoveTagsFromResource`
-> - SM: `secretsmanager:GetSecretValue`, `secretsmanager:ListSecretVersionIds`, `secretsmanager:ListSecrets`, `secretsmanager:CreateSecret`, `secretsmanager:PutSecretValue`, `secretsmanager:UpdateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:RestoreSecret`, `secretsmanager:TagResource`, `secretsmanager:UntagResource`
+> - SM: `secretsmanager:GetSecretValue`, `secretsmanager:DescribeSecret`, `secretsmanager:ListSecretVersionIds`, `secretsmanager:ListSecrets`, `secretsmanager:CreateSecret` (new secrets only), `secretsmanager:UpdateSecret`, `secretsmanager:DeleteSecret`, `secretsmanager:RestoreSecret`, `secretsmanager:TagResource`, `secretsmanager:UntagResource`
 
 ### Google Cloud Configuration
 
