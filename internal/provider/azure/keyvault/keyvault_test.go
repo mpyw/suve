@@ -328,10 +328,11 @@ func TestTag(t *testing.T) {
 	var written map[string]*string
 
 	m := &mockClient{
-		getFunc: func(_ context.Context, name, _ string) (azsecrets.GetSecretResponse, error) {
-			return azsecrets.GetSecretResponse{Secret: azsecrets.Secret{
-				ID:   secretID(name, "v1"),
-				Tags: map[string]*string{"existing": lo.ToPtr("keep")},
+		listVersFunc: func(_ context.Context, name string) ([]*azsecrets.SecretProperties, error) {
+			return []*azsecrets.SecretProperties{{
+				ID:         secretID(name, "v1"),
+				Tags:       map[string]*string{"existing": lo.ToPtr("keep")},
+				Attributes: &azsecrets.SecretAttributes{Created: at(1, 1)},
 			}}, nil
 		},
 		updateFunc: func(_ context.Context, _, version string, params updParams) (updResp, error) {
@@ -357,10 +358,11 @@ func TestUntag(t *testing.T) {
 	var written map[string]*string
 
 	m := &mockClient{
-		getFunc: func(_ context.Context, name, _ string) (azsecrets.GetSecretResponse, error) {
-			return azsecrets.GetSecretResponse{Secret: azsecrets.Secret{
-				ID:   secretID(name, "v1"),
-				Tags: map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("backend")},
+		listVersFunc: func(_ context.Context, name string) ([]*azsecrets.SecretProperties, error) {
+			return []*azsecrets.SecretProperties{{
+				ID:         secretID(name, "v1"),
+				Tags:       map[string]*string{"env": lo.ToPtr("prod"), "team": lo.ToPtr("backend")},
+				Attributes: &azsecrets.SecretAttributes{Created: at(1, 1)},
 			}}, nil
 		},
 		updateFunc: func(_ context.Context, _, version string, params updParams) (updResp, error) {
@@ -378,6 +380,60 @@ func TestUntag(t *testing.T) {
 	_, hasTeam := written["team"]
 	assert.False(t, hasTeam)
 	assert.Equal(t, "prod", lo.FromPtr(written["env"]))
+}
+
+// TestTag_DisabledLatestVersion is the #1014 regression: an unversioned
+// GetSecret returns 403 when the latest version is disabled, but its properties
+// can still be updated. Tag reads the newest version's id and tags from the
+// version list and never calls GetSecret.
+func TestTag_DisabledLatestVersion(t *testing.T) {
+	t.Parallel()
+
+	var (
+		gotVersion string
+		written    map[string]*string
+	)
+
+	store := keyvault.New(&mockClient{
+		getFunc: func(context.Context, string, string) (azsecrets.GetSecretResponse, error) {
+			return azsecrets.GetSecretResponse{}, &azcore.ResponseError{StatusCode: http.StatusForbidden}
+		},
+		listVersFunc: func(_ context.Context, name string) ([]*azsecrets.SecretProperties, error) {
+			return []*azsecrets.SecretProperties{
+				{
+					ID:         secretID(name, "old"),
+					Tags:       map[string]*string{"stale": lo.ToPtr("x")},
+					Attributes: &azsecrets.SecretAttributes{Created: at(1, 1), Enabled: lo.ToPtr(true)},
+				},
+				{
+					ID:         secretID(name, "latest"),
+					Tags:       map[string]*string{"existing": lo.ToPtr("keep")},
+					Attributes: &azsecrets.SecretAttributes{Created: at(2, 1), Enabled: lo.ToPtr(false)},
+				},
+			}, nil
+		},
+		updateFunc: func(_ context.Context, _, version string, params updParams) (updResp, error) {
+			gotVersion = version
+			written = params.Tags
+
+			return updResp{}, nil
+		},
+	})
+
+	require.NoError(t, store.Tag(t.Context(), "my-secret", map[string]string{"env": "prod"}))
+	assert.Equal(t, "latest", gotVersion)
+	assert.Equal(t, map[string]*string{"existing": lo.ToPtr("keep"), "env": lo.ToPtr("prod")}, written)
+}
+
+// TestTag_NoVersions verifies tagging a secret with no versions is not-found.
+func TestTag_NoVersions(t *testing.T) {
+	t.Parallel()
+
+	store := keyvault.New(&mockClient{
+		listVersFunc: func(context.Context, string) ([]*azsecrets.SecretProperties, error) { return nil, nil },
+	})
+
+	require.ErrorIs(t, store.Tag(t.Context(), "gone", map[string]string{"k": "v"}), provider.ErrNotFound)
 }
 
 // Compile-time assertion that the mock satisfies the adapter's Client interface.
@@ -742,8 +798,8 @@ func TestStore_ErrorPaths(t *testing.T) {
 		t.Parallel()
 
 		store := keyvault.New(&mockClient{
-			getFunc: func(_ context.Context, _, _ string) (azsecrets.GetSecretResponse, error) {
-				return azsecrets.GetSecretResponse{}, serverError()
+			listVersFunc: func(context.Context, string) ([]*azsecrets.SecretProperties, error) {
+				return nil, serverError()
 			},
 		})
 		err := store.Tag(t.Context(), "s", map[string]string{"env": "prod"})
@@ -754,8 +810,8 @@ func TestStore_ErrorPaths(t *testing.T) {
 		t.Parallel()
 
 		store := keyvault.New(&mockClient{
-			getFunc: func(_ context.Context, name, _ string) (azsecrets.GetSecretResponse, error) {
-				return azsecrets.GetSecretResponse{Secret: azsecrets.Secret{
+			listVersFunc: func(_ context.Context, name string) ([]*azsecrets.SecretProperties, error) {
+				return []*azsecrets.SecretProperties{{
 					ID:   secretID(name, "v1"),
 					Tags: map[string]*string{"env": lo.ToPtr("prod")},
 				}}, nil
