@@ -11,6 +11,7 @@
 package tui
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -117,7 +118,7 @@ func TestBrowser_AWSParamValuesOnGolden(t *testing.T) { //nolint:paralleltest //
 	})
 
 	// Press `v` to turn values on; the list reloads with the value under each name.
-	screen := captureBrowserKeys(t, m, "SecureString", 'v')
+	screen := captureBrowserKeys(t, m, "SecureString", "postgres://db.internal:5432/app", 'v')
 
 	require.Contains(t, screen, "postgres://db.internal:5432/app",
 		"values:on reveals the SecureString value in the list preview (explicit reveal, GUI parity)")
@@ -141,7 +142,7 @@ func TestBrowser_AWSParamHistoryFocusGolden(t *testing.T) { //nolint:paralleltes
 	})
 
 	// Drive to the loaded state, then press enter to focus the history pane.
-	golden.RequireEqual(t, captureBrowserAfterKeys(t, m, "SecureString", keyEnterMsg()))
+	golden.RequireEqual(t, captureBrowserAfterKeys(t, m, "SecureString", "esc: list", keyEnterMsg()))
 }
 
 // TestBrowser_AWSParamHistoryValueRevealGolden pins #733: each version row shows
@@ -159,7 +160,7 @@ func TestBrowser_AWSParamHistoryValueRevealGolden(t *testing.T) { //nolint:paral
 	})
 
 	// The default masked screen shows bullets in the history; press `x` to reveal.
-	screen := captureBrowserKeys(t, m, "SecureString", 'x')
+	screen := captureBrowserKeys(t, m, "SecureString", "postgres://db.internal:5432/app", 'x')
 
 	require.Contains(t, screen, "postgres://db.internal:5432/app", "x reveals the current and history values")
 	golden.RequireEqual(t, screen)
@@ -187,7 +188,7 @@ func TestBrowser_DeleteStagedGateStatusGolden(t *testing.T) { //nolint:parallelt
 		sourceFor: sourceForShape("secret", awsSecretSource(), probe),
 	})
 
-	screen := captureBrowserAfterKeys(t, m, "Version ID", keyPress('t'))
+	screen := captureBrowserAfterKeys(t, m, "Version ID", "cannot tag: staged for deletion", keyPress('t'))
 
 	require.Contains(t, screen, "cannot tag: staged for deletion", "the gate surfaces a status message rather than the tag dialog")
 	golden.RequireEqual(t, screen)
@@ -269,7 +270,7 @@ func TestBrowser_CopyKeepsMaskGolden(t *testing.T) { //nolint:paralleltest // go
 		sourceFor: sourceForShape("param", awsParamSource(), nil),
 	})
 
-	screen := captureBrowserKeys(t, m, "SecureString", 'y')
+	screen := captureBrowserKeys(t, m, "SecureString", "copied (value stays masked)", 'y')
 
 	assert.Contains(t, screen, "copied (value stays masked)", "the copy status shows")
 	assert.NotContains(t, screen, "postgres://db.internal:5432/app", "the copied secret is NOT revealed on screen")
@@ -486,9 +487,10 @@ func browserGolden(t *testing.T, m *App, marker string) {
 }
 
 // captureBrowserKeys drives a browser app to its loaded state (marker), sends the
-// given rune keys, quits, and renders the SETTLED final model's screen — so a
-// golden can capture the screen after a key toggle (copy, parse-json, values).
-func captureBrowserKeys(t *testing.T, m *App, marker string, keys ...rune) string {
+// given rune keys, waits for settled to render, quits, and renders the SETTLED
+// final model's screen — so a golden can capture the screen after a key toggle
+// (copy, parse-json, values).
+func captureBrowserKeys(t *testing.T, m *App, marker, settled string, keys ...rune) string {
 	t.Helper()
 
 	presses := make([]tea.KeyPressMsg, len(keys))
@@ -496,22 +498,34 @@ func captureBrowserKeys(t *testing.T, m *App, marker string, keys ...rune) strin
 		presses[i] = keyPress(k)
 	}
 
-	return captureBrowserAfterKeys(t, m, marker, presses...)
+	return captureBrowserAfterKeys(t, m, marker, settled, presses...)
 }
 
 // captureBrowserAfterKeys drives a browser app to its loaded state (waiting for
 // marker), sends follow-up key presses (e.g. enter to focus the history or `v` to
-// toggle values), quits, and renders the settled final model's screen.
-func captureBrowserAfterKeys(t *testing.T, m *App, marker string, keys ...tea.KeyPressMsg) string {
+// toggle values), waits for settled to render, quits, and renders the settled
+// final model's screen.
+//
+// settled must be text that only the post-key state renders. A key can start an
+// async command (`v` reloads the list), and `q` sent right after the key can be
+// processed before that command's result arrives, so the final model would
+// still be loading. Waiting for settled first makes the quit land after the
+// key's effect. The wait reuses the marker wait's buffer so the vt replays the
+// whole stream, not only the diff frames drawn after the key.
+func captureBrowserAfterKeys(t *testing.T, m *App, marker, settled string, keys ...tea.KeyPressMsg) string {
 	t.Helper()
 
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(browserTermWidth, browserTermHeight))
 
-	waitFor(t, tm, marker)
+	var buf bytes.Buffer
+
+	waitForInBuf(t, tm, &buf, marker)
 
 	for _, k := range keys {
 		tm.Send(k)
 	}
+
+	waitForInBuf(t, tm, &buf, settled)
 
 	tm.Send(keyPress('q'))
 
