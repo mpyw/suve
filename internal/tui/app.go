@@ -480,14 +480,38 @@ func (m *App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m.updateActivePage(msg)
 }
 
-// routeToFocused forwards a non-input message to the focused component: the top
-// dialog when modal, else the active page.
+// routeToFocused forwards a message the shell did not handle itself. With no
+// dialog open it goes to the active page. While a dialog is open, user input
+// (keys, mouse, paste) goes to the top dialog only, so the modal keeps
+// capturing input. Every other message goes to both the top dialog and the
+// active page: the page's async results (list, detail, history, staged probe,
+// review, action done) and its spinner ticks must still land while a dialog
+// covers it (#987). Each side ignores message types it does not own, and the
+// pages' token/seq guards drop stale results.
 func (m *App) routeToFocused(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if len(m.dialogs) > 0 {
-		return m.updateTopDialog(msg)
+	if len(m.dialogs) == 0 {
+		return m.updateActivePage(msg)
 	}
 
-	return m.updateActivePage(msg)
+	_, dialogCmd := m.updateTopDialog(msg)
+	if isUserInput(msg) {
+		return m, dialogCmd
+	}
+
+	_, pageCmd := m.updateActivePage(msg)
+
+	return m, tea.Batch(dialogCmd, pageCmd)
+}
+
+// isUserInput reports whether msg is terminal input from the user, which only
+// the top dialog may receive while one is open.
+func isUserInput(msg tea.Msg) bool {
+	switch msg.(type) {
+	case tea.KeyMsg, tea.MouseMsg, tea.PasteMsg, tea.PasteStartMsg, tea.PasteEndMsg:
+		return true
+	default:
+		return false
+	}
 }
 
 // updateActivePage forwards a message to the top page.
