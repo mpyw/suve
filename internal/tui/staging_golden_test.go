@@ -560,3 +560,54 @@ func TestStaging_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, after.EntryCount()+after.TagCount(), "the section is empty after apply")
 }
+
+// TestStaging_StaleReviewAcrossTabSwitch replays #1011: a review from a
+// superseded staging page (Staging → another tab → Staging again) lands after
+// the new page's fresh review. The new page must keep the fresh review rather
+// than resurrect an entry that was unstaged meanwhile.
+func TestStaging_StaleReviewAcrossTabSwitch(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	svc := &goldenStaging{
+		service: "param", label: "Param", svcCap: goldenCap("aws", "param"),
+		review: data.StagingReview{Entries: []data.StagedDiffRow{
+			{Name: "/stale/ENTRY", Type: data.StagedDiffCreate, Operation: "create", StagedValue: "v"},
+		}},
+	}
+	m := newApp(config{
+		scope:   provider.Scope{Provider: provider.ProviderAWS},
+		target:  awsTargetFixture(),
+		service: "staging",
+		stagingFor: func(s string) data.StagingService {
+			if s == "param" {
+				return svc
+			}
+
+			return nil
+		},
+	})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: 120, Height: 34})
+
+	// Leave the Staging tab, come back, and hold back that page's review.
+	m = updateApp(t, m, keyPress('1'))
+	next, cmd := m.Update(keyPress('3'))
+	m = next.(*App) //nolint:forcetypeassert // Update always returns *App
+	stale := drainBatch(cmd)
+
+	// The entry is unstaged elsewhere; switch away and back again.
+	m = updateApp(t, m, keyPress('1'))
+	svc.review = data.StagingReview{}
+	next, cmd = m.Update(keyPress('3'))
+	m = next.(*App) //nolint:forcetypeassert // Update always returns *App
+
+	for _, msg := range drainBatch(cmd) {
+		m = updateApp(t, m, msg)
+	}
+
+	for _, msg := range stale {
+		m = updateApp(t, m, msg)
+	}
+
+	assert.NotContains(t, m.View().Content, "/stale/ENTRY",
+		"the superseded page's review is not applied to the new staging page")
+}

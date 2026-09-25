@@ -136,9 +136,12 @@ func (p stagingPage) HelpKeyMap() help.KeyMap       { return p.m.HelpKeyMap() }
 func (p stagingPage) capturesInput() bool { return false }
 
 // newStagingPage builds the staging page adapter over the offered services'
-// staging seams.
-func newStagingPage(ctx context.Context, services []data.StagingService, st styles.Styles, km keys.Map) stagingPage {
-	return stagingPage{m: staging.New(ctx, services, st, km)}
+// staging seams. token is the page-generation identity the app bumps per page
+// creation so a superseded prior page's in-flight result is dropped (#1011).
+func newStagingPage(
+	ctx context.Context, token int, services []data.StagingService, st styles.Styles, km keys.Map,
+) stagingPage {
+	return stagingPage{m: staging.New(ctx, token, services, st, km)}
 }
 
 // newStaticDiffPage builds a diff page over already-known content (the staging

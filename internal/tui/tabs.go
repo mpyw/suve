@@ -153,7 +153,8 @@ func (m *App) pageForTab(i int) (page, tea.Cmd) {
 
 	if tab.Service == stagingService {
 		if services := m.stagingServicesFor(m.offeredServices()); len(services) > 0 {
-			p := newStagingPage(m.runCtx, services, m.styles, m.keys)
+			m.pageGen++
+			p := newStagingPage(m.runCtx, m.pageGen, services, m.styles, m.keys)
 
 			return p, p.Init()
 		}
