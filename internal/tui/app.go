@@ -138,7 +138,8 @@ type escInterceptor interface {
 type targetMsg struct{ target provider.Target }
 
 // targetErrMsg reports that the target lookup failed; the status bar simply
-// stops showing the loading placeholder.
+// stops showing the loading placeholder, and the lookup is retried after the
+// next staged-count report (see App.retryTarget).
 type targetErrMsg struct{ err error }
 
 // App is the root Bubble Tea model — the app shell.
@@ -176,6 +177,17 @@ type App struct {
 	// fetchTarget resolves target while target.Pending is set.
 	fetchTarget targetFetcher
 	target      provider.Target
+	// retryTarget is set when the last target lookup failed. The lookup is then
+	// retried once the next staged count is reported (#1005): a staging probe or
+	// review has just run, and on AWS it resolves the same memoized STS identity,
+	// so a transient failure at launch does not leave the target blank for the
+	// whole session. Retrying on that event rather than on a timer adds no
+	// lookups while the network stays down and nothing is being refreshed.
+	retryTarget bool
+	// stagedSinceFetch records that a staged count arrived while the target
+	// lookup was in flight, so a failure retries at once instead of waiting for a
+	// count that has already been reported.
+	stagedSinceFetch bool
 
 	// sourceFor is the injected data seam (see config); runCtx is the Run context
 	// threaded into pages.
@@ -273,6 +285,7 @@ func (m *App) Init() tea.Cmd {
 // fetchTargetCmd runs the injected target fetcher off the update loop.
 func (m *App) fetchTargetCmd() tea.Cmd {
 	fetch := m.fetchTarget
+	m.stagedSinceFetch = false
 
 	return func() tea.Msg {
 		target, err := fetch()
@@ -282,6 +295,18 @@ func (m *App) fetchTargetCmd() tea.Cmd {
 
 		return targetMsg{target: target}
 	}
+}
+
+// retryTargetCmd re-runs a failed target lookup, once per failure (see
+// retryTarget), or returns nil when there is nothing to retry.
+func (m *App) retryTargetCmd() tea.Cmd {
+	if !m.retryTarget {
+		return nil
+	}
+
+	m.retryTarget = false
+
+	return m.fetchTargetCmd()
 }
 
 // Update dispatches messages. Input (keys, mouse) is routed dialogs-first, then
@@ -306,10 +331,16 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case targetMsg:
 		m.target = msg.target
 		m.target.Pending = false
+		m.retryTarget = false
 
 		return m, nil
 	case targetErrMsg:
 		m.target.Pending = false
+		m.retryTarget = m.fetchTarget != nil
+
+		if m.stagedSinceFetch {
+			return m, m.retryTargetCmd()
+		}
 
 		return m, nil
 	case cursor.BlinkMsg:
@@ -353,8 +384,9 @@ func (m *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case nav.StagedCount:
 		m.stagedCounts[msg.Service] = msg.Count
 		m.refreshStagingTab()
+		m.stagedSinceFetch = true
 
-		return m, nil
+		return m, m.retryTargetCmd()
 	case dialogs.MutationDoneMsg:
 		return m, m.onMutationDone(msg)
 	case dialogs.CanceledMsg:

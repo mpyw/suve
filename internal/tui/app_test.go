@@ -575,6 +575,86 @@ func requireShellGolden(t *testing.T, m *App) {
 	golden.RequireEqual(t, renderVisibleScreen(t, out))
 }
 
+// TestUpdate_FailedTargetRetriesAfterStagedCount pins #1005: a target lookup
+// that fails at launch (a transient STS failure) is retried once the next staged
+// count is reported, so the status bar and the apply line recover instead of
+// staying blank for the session. Each failure arms exactly one retry.
+func TestUpdate_FailedTargetRetriesAfterStagedCount(t *testing.T) {
+	t.Parallel()
+
+	resolved := provider.AWSTarget("dev", "123456789012", "ap-northeast-1")
+	calls := 0
+	m := newApp(config{
+		scope: provider.Scope{Provider: provider.ProviderAWS},
+		fetchTarget: func() (provider.Target, error) {
+			calls++
+			if calls == 1 {
+				return provider.Target{}, errors.New("sts unreachable")
+			}
+
+			return resolved, nil
+		},
+	})
+
+	m = updateApp(t, m, m.fetchTargetCmd()())
+	assert.Equal(t, "AWS", m.applyTargetLine(), "the failed lookup leaves the target blank")
+
+	// A staged count arrives (the staging probe has just resolved the identity):
+	// the lookup is retried and the target appears.
+	next, cmd := m.Update(nav.StagedCount{Service: "param", Count: 0})
+	m = next.(*App) //nolint:forcetypeassert // Update always returns *App
+	require.NotNil(t, cmd, "a staged count after a failed lookup retries it")
+	m = updateApp(t, m, cmd())
+	assert.Equal(t, "AWS · profile dev · account 123456789012 · region ap-northeast-1", m.applyTargetLine())
+	assert.Equal(t, 2, calls)
+
+	// Once resolved, later staged counts do not look the target up again.
+	_, cmd = m.Update(nav.StagedCount{Service: "param", Count: 1})
+	assert.Nil(t, cmd)
+	assert.Equal(t, 2, calls)
+}
+
+// TestUpdate_FailedTargetRetryBounds pins the retry's limits (#1005): a failed
+// retry arms the next one, several staged counts start only one lookup, and a
+// staged count that arrived while the lookup was in flight retries at once.
+func TestUpdate_FailedTargetRetryBounds(t *testing.T) {
+	t.Parallel()
+
+	calls := 0
+	m := newApp(config{
+		scope: provider.Scope{Provider: provider.ProviderAWS},
+		fetchTarget: func() (provider.Target, error) {
+			calls++
+
+			return provider.Target{}, errors.New("sts unreachable")
+		},
+	})
+
+	fetch := m.fetchTargetCmd()
+	m = updateApp(t, m, fetch())
+
+	// Two staged counts (a two-section review) start one lookup, not two.
+	next, retry := m.Update(nav.StagedCount{Service: "param", Count: 0})
+	m = next.(*App) //nolint:forcetypeassert // Update always returns *App
+	require.NotNil(t, retry)
+	next, second := m.Update(nav.StagedCount{Service: "secret", Count: 0})
+	m = next.(*App) //nolint:forcetypeassert // Update always returns *App
+	assert.Nil(t, second, "a retry already in flight is not started again")
+
+	// That count arrived while the retry was in flight, so its failure retries
+	// at once rather than waiting for another count.
+	next, again := m.Update(retry())
+	m = next.(*App) //nolint:forcetypeassert // Update always returns *App
+	require.NotNil(t, again, "a count seen during the lookup retries at once")
+
+	// With no count during this lookup, its failure only arms the next retry.
+	next, cmd := m.Update(again())
+	m = next.(*App) //nolint:forcetypeassert // Update always returns *App
+	assert.Nil(t, cmd)
+	assert.True(t, m.retryTarget, "the failed retry arms the next one")
+	assert.Equal(t, 3, calls)
+}
+
 // TestUpdate_PendingTargetResolves pins the async target flow: a pending AWS
 // target starts a fetch on Init, the resolved target replaces it, and a failed
 // fetch only clears the pending flag. A target that describes itself (Google
