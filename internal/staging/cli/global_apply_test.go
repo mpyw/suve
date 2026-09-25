@@ -34,6 +34,7 @@ type globalApplyStrategy struct {
 	applyFunc            func(ctx context.Context, name string, entry staging.Entry) error
 	applyTagsFunc        func(ctx context.Context, name string, tagEntry staging.TagEntry) error
 	fetchLastModifiedVal time.Time
+	fetchLastModifiedErr error
 }
 
 func (m *globalApplyStrategy) Service() staging.Service { return m.service }
@@ -50,7 +51,7 @@ func (m *globalApplyStrategy) Apply(ctx context.Context, name string, entry stag
 }
 
 func (m *globalApplyStrategy) FetchLastModified(_ context.Context, _ string) (time.Time, error) {
-	return m.fetchLastModifiedVal, nil
+	return m.fetchLastModifiedVal, m.fetchLastModifiedErr
 }
 
 func (m *globalApplyStrategy) ApplyTags(ctx context.Context, name string, tagEntry staging.TagEntry) error {
@@ -637,6 +638,47 @@ func TestGlobalApply_ConflictDetection_DeleteConflict(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "conflict(s) detected")
 	assert.Contains(t, errBuf.String(), "conflict detected for my-secret")
+}
+
+// TestGlobalApply_ConflictDetection_ProbeError covers #989: a conflict probe
+// that fails (here a throttled read) rejects the apply with the probe error
+// instead of treating the key as conflict-free, and the delete never runs.
+func TestGlobalApply_ConflictDetection_ProbeError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	baseTime := time.Now().Add(-1 * time.Hour)
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
+		Operation:      staging.OperationDelete,
+		StagedAt:       time.Now(),
+		BaseModifiedAt: &baseTime,
+	})
+
+	secretMock := newGlobalApplySecretStrategy()
+	secretMock.fetchLastModifiedErr = errors.New("ThrottlingException: rate exceeded")
+	secretMock.applyFunc = func(context.Context, string, staging.Entry) error {
+		t.Error("apply must not run when the conflict check failed")
+
+		return nil
+	}
+
+	var buf, errBuf bytes.Buffer
+
+	r := &stgcli.GlobalApplyRunner{
+		UseCase:       globalApplyServices(globalApplySecret(secretMock, store)),
+		ProviderLabel: "AWS",
+		Stdout:        &buf,
+		Stderr:        &errBuf,
+	}
+
+	err := r.Run(t.Context())
+	require.EqualError(t, err, "apply rejected: conflict check failed (ignore conflicts to skip it): "+
+		"Secrets Manager: cannot check my-secret for conflicts: ThrottlingException: rate exceeded")
+	assert.Empty(t, buf.String())
+
+	_, err = store.GetEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"})
+	require.NoError(t, err, "the delete stays staged")
 }
 
 func TestGlobalApply_ConflictDetection_IgnoreConflicts(t *testing.T) {

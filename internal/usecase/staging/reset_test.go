@@ -609,12 +609,13 @@ func TestResetUseCase_Execute_Restore_AnchorsConflictBase(t *testing.T) {
 
 	// A far-future remote modification must now be flagged as a conflict.
 	strategy := &stubApplyStrategy{lastModified: base.Add(24 * time.Hour)}
-	conflicts := staging.CheckEntryAndTagConflicts(
+	conflicts, err := staging.CheckEntryAndTagConflicts(
 		t.Context(),
 		func(string) (staging.ApplyStrategy, error) { return strategy, nil },
 		map[staging.EntryKey]staging.Entry{key: *entry},
 		nil,
 	)
+	require.NoError(t, err)
 	assert.Contains(t, conflicts, key)
 }
 

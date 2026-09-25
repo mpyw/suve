@@ -87,3 +87,44 @@ func TestGlobalApplyUseCase_SkipsEmptyServicesAndCounts(t *testing.T) {
 	assert.Equal(t, 1, output.Succeeded)
 	assert.Equal(t, 1, output.Failed)
 }
+
+// TestGlobalApplyUseCase_ProbeErrorBlocksEveryService covers #989: a conflict
+// probe that fails (other than not-found) in one service rejects the whole
+// apply with the probe error, and nothing is applied in any service.
+func TestGlobalApplyUseCase_ProbeErrorBlocksEveryService(t *testing.T) {
+	t.Parallel()
+
+	base := time.Now().Add(-time.Hour)
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), StagedAt: time.Now(), BaseModifiedAt: &base,
+	}))
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
+		Operation: staging.OperationDelete, StagedAt: time.Now(), BaseModifiedAt: &base,
+	}))
+
+	param := newMockApplyStrategy()
+	param.lastModified["/app/config"] = base
+	secret := newGlobalApplySecretStrategy()
+	secret.fetchModifiedErr = errors.New("ThrottlingException: rate exceeded")
+
+	uc := &usecasestaging.GlobalApplyUseCase{Services: []*usecasestaging.ApplyUseCase{
+		{Strategy: param, Store: store},
+		{Strategy: secret, Store: store},
+	}}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.GlobalApplyInput{})
+	require.EqualError(t, err, "apply rejected: conflict check failed (ignore conflicts to skip it): "+
+		"Secrets Manager: cannot check my-secret for conflicts: ThrottlingException: rate exceeded")
+	assert.Nil(t, output)
+
+	for svc, name := range map[staging.Service]string{staging.ServiceParam: "/app/config", staging.ServiceSecret: "my-secret"} {
+		_, err = store.GetEntry(t.Context(), svc, staging.EntryKey{Name: name})
+		require.NoError(t, err, "%s must stay staged", name)
+	}
+
+	// Ignoring conflicts skips the probe entirely, so the apply goes through.
+	output, err = uc.Execute(t.Context(), usecasestaging.GlobalApplyInput{IgnoreConflicts: true})
+	require.NoError(t, err)
+	assert.Equal(t, 2, output.Succeeded)
+}

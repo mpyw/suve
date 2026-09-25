@@ -6,6 +6,7 @@ package staging
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/mpyw/suve/internal/staging"
@@ -85,10 +86,23 @@ func (u *GlobalApplyUseCase) Execute(ctx context.Context, input GlobalApplyInput
 	output := &GlobalApplyOutput{}
 
 	if !input.IgnoreConflicts {
+		var checkErrs []error
+
 		for _, s := range staged {
-			for _, key := range s.useCase.conflicts(ctx, s.entries, s.tags) {
+			keys, err := s.useCase.conflicts(ctx, s.entries, s.tags)
+			if err != nil {
+				checkErrs = append(checkErrs, fmt.Errorf("%s: %w", s.output.ServiceName, err))
+
+				continue
+			}
+
+			for _, key := range keys {
 				output.Conflicts = append(output.Conflicts, GlobalApplyConflict{ServiceName: s.output.ServiceName, Key: key})
 			}
+		}
+
+		if len(checkErrs) > 0 {
+			return nil, applyConflictCheckError(errors.Join(checkErrs...))
 		}
 
 		if len(output.Conflicts) > 0 {

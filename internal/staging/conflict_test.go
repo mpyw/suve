@@ -9,6 +9,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/staging"
 )
@@ -68,7 +69,8 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 		t.Parallel()
 
 		strategy := &mockApplyStrategy{}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), map[staging.EntryKey]staging.Entry{}, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), map[staging.EntryKey]staging.Entry{}, nil)
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
@@ -80,7 +82,8 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 			{Name: "item1"}: {Operation: staging.OperationUpdate},
 			{Name: "item2"}: {Operation: staging.OperationDelete},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
@@ -95,7 +98,8 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "new-item"})
 	})
 
@@ -111,22 +115,8 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 		entries := map[staging.EntryKey]staging.Entry{
 			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
-		assert.Empty(t, conflicts)
-	})
-
-	t.Run("create fetch error - no conflict assumed", func(t *testing.T) {
-		t.Parallel()
-
-		strategy := &mockApplyStrategy{
-			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
-				return time.Time{}, errors.New("access denied")
-			},
-		}
-		entries := map[staging.EntryKey]staging.Entry{
-			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
-		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
@@ -145,7 +135,8 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "existing-item"})
 	})
 
@@ -164,26 +155,8 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
-		assert.Empty(t, conflicts)
-	})
-
-	t.Run("update fetch error - no conflict assumed", func(t *testing.T) {
-		t.Parallel()
-
-		strategy := &mockApplyStrategy{
-			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
-				return time.Time{}, errors.New("access denied")
-			},
-		}
-		entries := map[staging.EntryKey]staging.Entry{
-			{Name: "existing-item"}: {
-				Operation:      staging.OperationUpdate,
-				Value:          lo.ToPtr("value"),
-				BaseModifiedAt: &baseTime,
-			},
-		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
@@ -201,7 +174,8 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "delete-item"})
 	})
 
@@ -219,7 +193,8 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
@@ -248,10 +223,108 @@ func TestCheckEntryAndTagConflicts_Entries(t *testing.T) {
 			{Name: "delete-item"}:        {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
 			{Name: "update-no-conflict"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
 		assert.Len(t, conflicts, 2)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "create-item"})
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "update-item"})
+	})
+}
+
+// TestCheckEntryAndTagConflicts_ProbeErrors covers #989: a probe that fails for
+// any reason other than not-found fails the check closed and names the key,
+// while a not-found probe is a definite answer and is not a conflict.
+func TestCheckEntryAndTagConflicts_ProbeErrors(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	laterTime := time.Date(2024, 1, 1, 13, 0, 0, 0, time.UTC)
+
+	t.Run("create fetch error - check fails", func(t *testing.T) {
+		t.Parallel()
+
+		probeErr := errors.New("access denied")
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return time.Time{}, probeErr
+			},
+		}
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+		}
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.ErrorIs(t, err, probeErr)
+		require.ErrorContains(t, err, "cannot check new-item for conflicts: access denied")
+		assert.Nil(t, conflicts)
+	})
+	t.Run("create not found - no conflict", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return time.Time{}, &staging.ResourceNotFoundError{Err: errors.New("not found")}
+			},
+		}
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "new-item"}: {Operation: staging.OperationCreate, Value: lo.ToPtr("value")},
+		}
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
+		assert.Empty(t, conflicts)
+	})
+	t.Run("update fetch error - check fails", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return time.Time{}, errors.New("ThrottlingException: rate exceeded")
+			},
+		}
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "existing-item"}: {
+				Operation:      staging.OperationUpdate,
+				Value:          lo.ToPtr("value"),
+				BaseModifiedAt: &baseTime,
+			},
+		}
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.ErrorContains(t, err, "cannot check existing-item for conflicts: ThrottlingException: rate exceeded")
+		assert.Nil(t, conflicts)
+	})
+	t.Run("delete fetch error - check fails", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, name string) (time.Time, error) {
+				if name == "delete-item" {
+					return time.Time{}, errors.New("access denied")
+				}
+
+				return laterTime, nil
+			},
+		}
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "delete-item"}: {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
+			{Name: "update-item"}: {Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), BaseModifiedAt: &baseTime},
+		}
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.EqualError(t, err, "cannot check delete-item for conflicts: access denied")
+		assert.Nil(t, conflicts)
+	})
+	t.Run("delete not found - no conflict", func(t *testing.T) {
+		t.Parallel()
+
+		strategy := &mockApplyStrategy{
+			fetchLastModifiedFunc: func(_ context.Context, _ string) (time.Time, error) {
+				return time.Time{}, &staging.ResourceNotFoundError{}
+			},
+		}
+		entries := map[staging.EntryKey]staging.Entry{
+			{Name: "delete-item"}: {Operation: staging.OperationDelete, BaseModifiedAt: &baseTime},
+		}
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, nil)
+		require.NoError(t, err)
+		assert.Empty(t, conflicts)
 	})
 }
 
@@ -265,7 +338,8 @@ func TestCheckEntryAndTagConflicts_Tags(t *testing.T) {
 		t.Parallel()
 
 		strategy := &mockApplyStrategy{}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, map[staging.EntryKey]staging.TagEntry{})
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, map[staging.EntryKey]staging.TagEntry{})
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
@@ -280,7 +354,8 @@ func TestCheckEntryAndTagConflicts_Tags(t *testing.T) {
 		tags := map[staging.EntryKey]staging.TagEntry{
 			{Name: "item1"}: {Add: map[string]string{"env": "prod"}},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
@@ -298,7 +373,8 @@ func TestCheckEntryAndTagConflicts_Tags(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		require.NoError(t, err)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "existing-item"})
 	})
 
@@ -316,7 +392,8 @@ func TestCheckEntryAndTagConflicts_Tags(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
@@ -334,11 +411,12 @@ func TestCheckEntryAndTagConflicts_Tags(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		require.NoError(t, err)
 		assert.Empty(t, conflicts)
 	})
 
-	t.Run("fetch error - no conflict assumed", func(t *testing.T) {
+	t.Run("fetch error - check fails", func(t *testing.T) {
 		t.Parallel()
 
 		strategy := &mockApplyStrategy{
@@ -352,8 +430,9 @@ func TestCheckEntryAndTagConflicts_Tags(t *testing.T) {
 				BaseModifiedAt: &baseTime,
 			},
 		}
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
-		assert.Empty(t, conflicts)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), nil, tags)
+		require.ErrorContains(t, err, "cannot check existing-item for conflicts: access denied")
+		assert.Nil(t, conflicts)
 	})
 
 	t.Run("per-namespace - each probed against its own remote", func(t *testing.T) {
@@ -377,7 +456,8 @@ func TestCheckEntryAndTagConflicts_Tags(t *testing.T) {
 			{Name: "k", Namespace: "dev"}: {Add: map[string]string{"a": "1"}, BaseModifiedAt: &baseTime},
 		}
 
-		conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolve, nil, tags)
+		conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolve, nil, tags)
+		require.NoError(t, err)
 		assert.Len(t, conflicts, 1)
 		assert.Contains(t, conflicts, staging.EntryKey{Name: "k", Namespace: "dev"})
 		assert.NotContains(t, conflicts, staging.EntryKey{Name: "k", Namespace: ""})
@@ -416,7 +496,8 @@ func TestCheckEntryAndTagConflicts_SingleFetch(t *testing.T) {
 		{Name: "item"}: {Add: map[string]string{"env": "prod"}, BaseModifiedAt: &baseTime},
 	}
 
-	conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, tags)
+	conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolverFor(strategy), entries, tags)
+	require.NoError(t, err)
 
 	// The key is reported once despite conflicting on both its value and its tags.
 	assert.Len(t, conflicts, 1)
@@ -430,8 +511,8 @@ func TestCheckEntryAndTagConflicts_SingleFetch(t *testing.T) {
 }
 
 // TestCheckConflicts_ResolverError verifies that a per-namespace resolver which
-// fails to resolve a strategy is treated like a fetch error: the entry is
-// skipped (no conflict) and the failure surfaces later on the apply attempt.
+// fails to resolve a strategy is treated like a fetch error: the check fails
+// closed and names every unchecked key in (name, namespace) order.
 func TestCheckEntryAndTagConflicts_ResolverError(t *testing.T) {
 	t.Parallel()
 
@@ -449,8 +530,10 @@ func TestCheckEntryAndTagConflicts_ResolverError(t *testing.T) {
 		},
 	}
 
-	conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolve, entries, nil)
-	assert.Empty(t, conflicts)
+	conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolve, entries, nil)
+	require.EqualError(t, err, "cannot check create-item for conflicts: cannot resolve strategy\n"+
+		"cannot check update-item for conflicts: cannot resolve strategy")
+	assert.Nil(t, conflicts)
 }
 
 // TestCheckConflicts_PerNamespace is a regression for #441: two same-named
@@ -500,7 +583,8 @@ func TestCheckEntryAndTagConflicts_PerNamespace(t *testing.T) {
 		},
 	}
 
-	conflicts := staging.CheckEntryAndTagConflicts(t.Context(), resolve, entries, nil)
+	conflicts, err := staging.CheckEntryAndTagConflicts(t.Context(), resolve, entries, nil)
+	require.NoError(t, err)
 
 	// Only the "dev" entry conflicts, and the report carries its namespace.
 	assert.Len(t, conflicts, 1)
