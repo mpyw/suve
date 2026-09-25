@@ -8,6 +8,7 @@ package browser
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -232,15 +233,42 @@ func (m *Model) onNamespacesLoaded(msg namespacesLoadedMsg) {
 	// points at.
 	current := m.currentNamespace()
 	m.namespaces = namespaceOptions(msg.names)
+	m.selectNamespace(current)
+}
 
-	m.nsIndex = 0
-	for i, ns := range m.namespaces {
-		if ns == current {
-			m.nsIndex = i
-
-			break
-		}
+// selectLaunchNamespace starts the namespace filter on the launch namespace
+// (#992). The launch value uses the CLI's `--namespace` grammar: "*" selects
+// every namespace, and a literal (escapes decoded) selects that namespace, added
+// as an option even before any setting in it is discovered. The filter holds one
+// namespace or all of them, so an OR-list or a prefix wildcard, which it cannot
+// express, starts on all namespaces, a superset of what was asked for.
+func (m *Model) selectLaunchNamespace(raw string) {
+	if raw == "" {
+		return
 	}
+
+	literal, err := namespaces.Literal(raw)
+	if err != nil {
+		literal = namespaces.AllFilter
+	}
+
+	m.selectNamespace(literal)
+}
+
+// selectNamespace points the namespace filter at ns, inserting it before the
+// all-namespaces option when it is not one yet, so a selected namespace that has
+// no discovered settings (the launch namespace, or one emptied since) survives a
+// namespace reload instead of silently falling back to the null namespace.
+func (m *Model) selectNamespace(ns string) {
+	if i := slices.Index(m.namespaces, ns); i >= 0 {
+		m.nsIndex = i
+
+		return
+	}
+
+	all := len(m.namespaces) - 1
+	m.namespaces = slices.Insert(m.namespaces, all, ns)
+	m.nsIndex = all
 }
 
 // CapturesInput reports whether a header text input (prefix or filter) is

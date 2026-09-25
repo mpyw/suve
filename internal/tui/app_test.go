@@ -830,3 +830,28 @@ func TestUpdate_CloudShellRepaint_ClearsAndReschedules(t *testing.T) {
 	assert.True(t, sawClear, "a repaint tick must force a full ClearScreen")
 	assert.True(t, sawReschedule, "a repaint tick must arm the next tick")
 }
+
+// TestNewApp_LaunchNamespaceSeedsBrowser pins #992 at the shell: the launch App
+// Configuration namespace reaches the browser, whose first list shows only that
+// namespace's settings.
+func TestNewApp_LaunchNamespaceSeedsBrowser(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	scope := provider.AzureAppConfigScope("myapp-config")
+	scope.AppConfigNamespace = "staging"
+
+	m := newApp(config{scope: scope, sourceFor: sourceForShape("param", azureAppConfigSource(), nil)})
+	m = updateApp(t, m, tea.WindowSizeMsg{Width: 120, Height: 34})
+
+	for _, msg := range drainBatch(m.initialPageCmd()) {
+		if _, tick := msg.(spinner.TickMsg); !tick {
+			m = updateApp(t, m, msg)
+		}
+	}
+
+	out := m.View().Content
+	assert.Contains(t, out, "entries (1)", "only the launch namespace's setting is listed")
+	assert.Contains(t, out, "[staging]", "the listed setting is in the launch namespace")
+	assert.Contains(t, out, "app/FeatureX", "the launch namespace's setting is listed")
+	assert.NotContains(t, out, "app/Timeout", "a null-namespace setting is filtered out")
+}

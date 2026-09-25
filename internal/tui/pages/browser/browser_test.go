@@ -91,7 +91,7 @@ func newModel(t *testing.T, src *stubSource) *Model {
 func tokenModel(t *testing.T, token int, src *stubSource) *Model {
 	t.Helper()
 
-	m := New(context.Background(), token, src, nil, styles.New(), keys.Default())
+	m := New(context.Background(), token, src, nil, "", styles.New(), keys.Default())
 	m.width, m.height = 120, 30
 
 	return m
@@ -1082,6 +1082,73 @@ func TestOpenNewBlocksAllNamespaces(t *testing.T) {
 	form, ok := cmd().(nav.OpenEntryForm)
 	require.True(t, ok, "a concrete namespace opens the entry form")
 	assert.False(t, form.Edit, "openNew requests a create, not an edit")
+}
+
+// TestNew_LaunchNamespace pins #992: the App Configuration namespace filter
+// starts on the launch namespace (`--namespace` / AZURE_APPCONFIG_NAMESPACE),
+// so the first list, the header and the create form all use it.
+func TestNew_LaunchNamespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		launch  string
+		want    string
+		options []string
+	}{
+		{name: "no launch namespace keeps the null namespace", launch: "", want: "", options: []string{"", "*"}},
+		{name: "a literal is selected and added", launch: "dev", want: "dev", options: []string{"", "dev", "*"}},
+		{name: "an escaped literal is decoded", launch: `a\,b`, want: "a,b", options: []string{"", "a,b", "*"}},
+		{name: "the wildcard selects every namespace", launch: "*", want: "*", options: []string{"", "*"}},
+		{name: "a prefix wildcard falls back to every namespace", launch: "dev*", want: "*", options: []string{"", "*"}},
+		{name: "an OR-list falls back to every namespace", launch: "dev,prod", want: "*", options: []string{"", "*"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			m := New(context.Background(), 0, &stubSource{svcCap: appConfigCap()}, nil, tt.launch, styles.New(), keys.Default())
+
+			assert.Equal(t, tt.want, m.currentNamespace())
+			assert.Equal(t, tt.options, m.namespaces)
+			assert.Equal(t, tt.want, m.listParams().Namespace, "the first list uses the launch namespace")
+		})
+	}
+}
+
+// TestNew_LaunchNamespaceSurvivesNamespaceLoad pins that the launch namespace
+// stays selected when the discovered namespaces arrive, whether or not any
+// setting lives in it yet, and that `n` seeds the create form with it.
+func TestNew_LaunchNamespaceSurvivesNamespaceLoad(t *testing.T) {
+	t.Parallel()
+
+	for _, discovered := range [][]string{{"dev", "prod"}, {"prod"}} {
+		m := New(context.Background(), 0, &stubSource{svcCap: appConfigCap()}, nil, "dev", styles.New(), keys.Default())
+
+		m.onNamespacesLoaded(namespacesLoadedMsg{token: m.token, seq: m.nsSeq, names: discovered})
+
+		assert.Equal(t, "dev", m.currentNamespace(), "discovered %v", discovered)
+		assert.Contains(t, m.namespaces, "prod")
+		assert.Equal(t, namespaces.AllFilter, m.namespaces[len(m.namespaces)-1], "the all option stays last")
+
+		cmd := m.openNew()
+		require.NotNil(t, cmd)
+		form, ok := cmd().(nav.OpenEntryForm)
+		require.True(t, ok)
+		assert.Equal(t, "dev", form.Namespace, "the create form starts in the launch namespace")
+	}
+}
+
+// TestNew_LaunchNamespaceIgnoredWithoutNamespaceAxis pins that a service with no
+// namespace axis ignores the launch namespace.
+func TestNew_LaunchNamespaceIgnoredWithoutNamespaceAxis(t *testing.T) {
+	t.Parallel()
+
+	m := New(context.Background(), 0, &stubSource{svcCap: awsParamCap()}, nil, "dev", styles.New(), keys.Default())
+
+	assert.Empty(t, m.namespaces)
+	assert.Empty(t, m.currentNamespace())
 }
 
 // TestOpenEditNoDetailGuard pins that Edit is a no-op until a detail has loaded
