@@ -34,8 +34,9 @@ func scopeFromContext(ctx context.Context) scopeCtx {
 }
 
 // WithVaultName returns a context carrying the resolved Azure Key Vault name,
-// merged onto any base scope already present. The azure secret subgroup's
-// Before hook sets it (from --vault-name or its env fallback).
+// merged onto any base scope already present. The azure secret group's and the
+// azure stage command's Before hooks set it (from --vault-name or its env
+// fallback).
 func WithVaultName(ctx context.Context, vaultName string) context.Context {
 	sc := scopeFromContext(ctx)
 	sc.vaultName = vaultName
@@ -45,7 +46,8 @@ func WithVaultName(ctx context.Context, vaultName string) context.Context {
 
 // WithStoreName returns a context carrying the resolved Azure App Configuration
 // store name, merged onto any base scope already present. The azure param
-// subgroup's Before hook sets it (from --store-name or its env fallback).
+// group's and the azure stage command's Before hooks set it (from --store-name
+// or its env fallback).
 func WithStoreName(ctx context.Context, storeName string) context.Context {
 	sc := scopeFromContext(ctx)
 	sc.storeName = storeName

@@ -99,41 +99,28 @@ func appConfigStageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 	}
 }
 
-// keyVaultStageGroup is the "secret" staging subgroup (Key Vault). It owns the
-// --vault-name flag and resolves it into the context for the scope resolver.
+// keyVaultStageGroup is the "secret" staging subgroup (Key Vault). Its vault
+// comes from the parent stage command's --vault-name flag, which the subgroup
+// and its leaves inherit.
 func keyVaultStageGroup() *cli.Command {
 	return &cli.Command{
-		Name:    stageNounSecret,
-		Aliases: []string{"kv", "keyvault"},
-		Usage:   "Staging operations for Azure Key Vault secrets",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "vault-name",
-				Usage:   "Azure Key Vault name (defaults to $AZURE_KEYVAULT_NAME)",
-				Sources: cli.EnvVars("AZURE_KEYVAULT_NAME"),
-			},
-		},
-		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			return azureinternal.WithVaultName(ctx, cmd.String("vault-name")), nil
-		},
+		Name:            stageNounSecret,
+		Aliases:         []string{"kv", "keyvault"},
+		Usage:           "Staging operations for Azure Key Vault secrets",
 		Commands:        keyVaultStageSubcommands(keyVaultStageConfig()),
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }
 
 // appConfigStageGroup is the "param" staging subgroup (App Configuration). It
-// owns the --store-name flag and resolves it into the context.
+// owns the --namespace flag; its store comes from the parent stage command's
+// --store-name flag, which the subgroup and its leaves inherit.
 func appConfigStageGroup() *cli.Command {
 	return &cli.Command{
 		Name:    "param",
 		Aliases: []string{"appconfig", "ac", "appcfg"},
 		Usage:   "Staging operations for Azure App Configuration settings",
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "store-name",
-				Usage:   "Azure App Configuration store name (defaults to $AZURE_APPCONFIG_NAME)",
-				Sources: cli.EnvVars("AZURE_APPCONFIG_NAME"),
-			},
 			&cli.StringFlag{
 				Name:    "namespace",
 				Aliases: []string{"ns"},
@@ -144,7 +131,6 @@ func appConfigStageGroup() *cli.Command {
 			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			ctx = azureinternal.WithStoreName(ctx, cmd.String("store-name"))
 			ctx = azureinternal.WithAppConfigNamespace(ctx, cmd.String("namespace"))
 
 			return ctx, nil
@@ -180,9 +166,12 @@ EXAMPLES:
    suve azure stage status                   View all staged changes
    suve azure stage apply                    Apply all staged changes`
 
-// stageGlobalFlags are the resource-name flags the top-level global commands
-// need so each service's scope resolver can key its staging state. They mirror
-// the per-subgroup flags; the parent Before injects both into the context.
+// stageGlobalFlags are the resource-name flags every stage command needs so each
+// service's scope resolver can key its staging state. They are declared once, on
+// the parent stage command, and inherited by the subgroups and their leaves. A
+// subgroup must not redeclare them: urfave/cli resolves a name to the nearest
+// declaration, so a subgroup copy would read its env default and drop a value
+// given before the subgroup. The parent Before injects both into the context.
 func stageGlobalFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -244,10 +233,8 @@ func StageCommand() *cli.Command {
 		Description: stageDescription,
 		Flags:       stageGlobalFlags(),
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			// Inject both resource names so the global commands' per-service scope
-			// resolvers can key state. The per-service subgroups own the same flags
-			// and re-inject in their own Before, so subgroup invocations are
-			// unaffected.
+			// Inject both resource names so every per-service scope resolver can
+			// key state, for the global commands and the service subgroups alike.
 			ctx = azureinternal.WithStoreName(ctx, cmd.String("store-name"))
 			ctx = azureinternal.WithVaultName(ctx, cmd.String("vault-name"))
 
@@ -267,10 +254,10 @@ func StageCommand() *cli.Command {
 
 // FlatStageCommand returns the Azure stage command as a standalone top-level
 // command named `name` (e.g. "stage"). It carries the whole StageCommand tree:
-// the per-service secret/param subgroups (which own their own --vault-name /
-// --store-name flags and Before hooks) AND the provider-wide global commands
-// (status/diff/apply/reset), which rely on the parent command's global flags and
-// Before hook injecting both resource names into the context. Used for the flat
+// the per-service secret/param subgroups AND the provider-wide global commands
+// (status/diff/apply/reset), which all rely on the parent command's
+// --vault-name / --store-name flags and Before hook injecting both resource
+// names into the context. Used for the flat
 // `suve stage` alias when Azure is the uniquely active staging provider.
 func FlatStageCommand(name string) *cli.Command {
 	c := StageCommand()
