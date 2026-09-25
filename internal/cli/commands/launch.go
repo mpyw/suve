@@ -11,8 +11,8 @@ import (
 
 // LaunchMode describes a UI that the CLI launches from a flag: `suve tui` via
 // --tui and `suve gui` via --gui. RegisterLaunchMode attaches the flag the same
-// way for both, so the provider groups, the Azure service subgroups, and the
-// launch scope stay in step.
+// way for both, so the provider groups, the service subgroups, and the launch
+// scope stay in step.
 type LaunchMode struct {
 	// Flag is the launch flag name ("tui" or "gui").
 	Flag string
@@ -31,7 +31,8 @@ type LaunchMode struct {
 }
 
 // RegisterLaunchMode registers the mode's flag on the root command, each
-// provider group, and Azure's param/secret subgroups. It WRAPS (never
+// provider group, each group's param/secret subgroups, and each stage command
+// with its param/secret subgroups. It WRAPS (never
 // replaces) each command's Before hook, so it chains with the hooks already
 // installed (enableDebug on the root, and any mode registered earlier). The
 // launch is skipped during shell completion: urfave/cli runs Before hooks
@@ -50,20 +51,34 @@ func RegisterLaunchMode(m LaunchMode) {
 		}
 
 		attachLaunchFlag(m, group, p, "")
+		attachLaunchSubgroups(m, group, p)
+	}
+}
 
-		if p != provider.ProviderAzure {
+// attachLaunchSubgroups attaches the mode's flag to parent's service subgroups
+// (param/secret, with that service) and to its stage command and the stage's
+// own service subgroups. The flag then always resolves on the nearest command
+// that carries the scope flags the user typed, so `aws secret --tui` preselects
+// the secret tab and `azure stage param --store-name S --tui` keeps S.
+func attachLaunchSubgroups(m LaunchMode, parent *cli.Command, p provider.Provider) {
+	for _, sub := range parent.Commands {
+		// Key off the canonical subcommand name (kv/keyvault already
+		// resolved to "secret", store/appconfig to "param").
+		if svc := launchService(sub.Name); svc != "" {
+			attachLaunchFlag(m, sub, p, svc)
+
 			continue
 		}
 
-		for _, sub := range group.Commands {
-			// Key off the canonical subcommand name (kv/keyvault already
-			// resolved to "secret", store/appconfig to "param").
-			if svc := launchService(sub.Name); svc != "" {
-				attachLaunchFlag(m, sub, p, svc)
-			}
+		if sub.Name == launchStageCommand {
+			attachLaunchFlag(m, sub, p, "")
+			attachLaunchSubgroups(m, sub, p)
 		}
 	}
 }
+
+// launchStageCommand is the canonical name of each provider's stage command.
+const launchStageCommand = "stage"
 
 // attachLaunchFlag adds the mode's flag to a provider group or service
 // subgroup and launches with that provider, seeding the scope from the

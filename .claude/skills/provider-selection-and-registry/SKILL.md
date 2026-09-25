@@ -151,7 +151,9 @@ changes per scope under `~/.suve/staging/<scope key>/`.
 
 Both launch flags register through `RegisterLaunchMode`
 (`internal/cli/commands/launch.go`): the flag on the root, each provider group,
-and Azure's param/secret subgroups; the launch scope from `--project` /
+each group's param/secret subgroups (which carry the service), and each stage
+command with its param/secret subgroups (so the scope flags typed there reach
+the launch); the launch scope from `--project` /
 `--vault-name` / `--store-name` / `--namespace`. Env hydration is
 `detect.HydrateScope`. A bare `suve --tui` / `suve --gui` uses
 `detect.Result.UniqueProvider`: the sole provider active on any of the param,

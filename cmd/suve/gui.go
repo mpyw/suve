@@ -14,7 +14,7 @@ import (
 )
 
 // guiFlagName is the name of the --gui launch flag, attached to the root, each
-// provider group, and Azure's service subgroups.
+// provider group, and the service and stage subgroups (see RegisterLaunchMode).
 const guiFlagName = "gui"
 
 // launchGUI runs the GUI with the given initial scope + service and exits. It
