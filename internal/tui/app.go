@@ -191,10 +191,11 @@ type App struct {
 	// reported, totalled into the Staging tab's count badge.
 	stagedCounts map[string]int
 
-	// pageGen is a monotonic page-generation counter. Each browser page built by
-	// pageForTab is stamped with the next value so a superseded prior page's
-	// in-flight response — whose per-Model seq resets and can collide with the new
-	// page's — is dropped rather than spliced into the new tab (#746).
+	// pageGen is a monotonic page-generation counter. Each browser and staging
+	// page built by pageForTab is stamped with the next value so a superseded
+	// prior page's in-flight response — whose per-Model seq resets and can collide
+	// with the new page's — is dropped rather than spliced into the new tab (#746,
+	// #1011).
 	pageGen int
 }
 

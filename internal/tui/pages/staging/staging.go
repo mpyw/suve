@@ -98,6 +98,12 @@ type Model struct {
 	// a fetch is cancelled when the program exits.
 	ctx context.Context //nolint:containedctx // fetch commands need the Run context; mirrors the browser
 
+	// token is the page-generation identity the app assigns per page creation.
+	// Every async result carries it, so a result from a superseded staging page
+	// (whose per-section seq restarts and can collide with this page's) is
+	// dropped after a tab switch (#1011, the browser's #746 guard).
+	token int
+
 	sections []*section
 
 	styles styles.Styles
@@ -168,7 +174,9 @@ func idIndex(id, prefix string) (int, bool) {
 
 // New builds the staging page over the offered services' staging seams (param
 // and/or secret, in tab order). ctx is the Run context threaded through reads.
-func New(ctx context.Context, services []data.StagingService, st styles.Styles, km keys.Map) *Model {
+// token is the page-generation identity the app assigns per page creation so a
+// superseded prior page's in-flight result is dropped (#1011).
+func New(ctx context.Context, token int, services []data.StagingService, st styles.Styles, km keys.Map) *Model {
 	sections := make([]*section, 0, len(services))
 	for _, svc := range services {
 		sections = append(sections, &section{
@@ -181,6 +189,7 @@ func New(ctx context.Context, services []data.StagingService, st styles.Styles, 
 
 	return &Model{
 		ctx:      ctx,
+		token:    token,
 		sections: sections,
 		styles:   st,
 		keys:     km,
@@ -219,19 +228,22 @@ func (m *Model) reviewCmd(i int) tea.Cmd {
 	sec.loadSeq++
 	seq := sec.loadSeq
 	ctx := m.ctx
+	token := m.token
 	svc := sec.svc
 
 	return func() tea.Msg {
 		review, err := svc.Review(ctx)
 
-		return reviewLoadedMsg{section: i, seq: seq, review: review, err: err}
+		return reviewLoadedMsg{token: token, section: i, seq: seq, review: review, err: err}
 	}
 }
 
-// Async result messages. Each staged read carries the section index and the
+// Async result messages. Each carries the page token, so a superseded page's
+// result is dropped. Each staged read also carries the section index and the
 // sequence its fetch was issued with, so the reducer drops a stale response.
 type (
 	reviewLoadedMsg struct {
+		token   int
 		section int
 		seq     int
 		review  data.StagingReview
@@ -240,6 +252,7 @@ type (
 	// actionDoneMsg reports an inline row action (unstage / cancel-tag) finished;
 	// the page reloads on success or surfaces the error.
 	actionDoneMsg struct {
+		token   int
 		section int
 		err     error
 	}
@@ -248,29 +261,32 @@ type (
 // unstageCmd runs an unstage (entry + tags) for a row's item off the update loop.
 func (m *Model) unstageCmd(sectionIdx int, key data.StagedKey) tea.Cmd {
 	ctx := m.ctx
+	token := m.token
 	svc := m.sections[sectionIdx].svc
 
 	return func() tea.Msg {
-		return actionDoneMsg{section: sectionIdx, err: svc.Unstage(ctx, key)}
+		return actionDoneMsg{token: token, section: sectionIdx, err: svc.Unstage(ctx, key)}
 	}
 }
 
 // cancelAddTagCmd cancels one staged tag add.
 func (m *Model) cancelAddTagCmd(sectionIdx int, key data.StagedKey, tagKey string) tea.Cmd {
 	ctx := m.ctx
+	token := m.token
 	svc := m.sections[sectionIdx].svc
 
 	return func() tea.Msg {
-		return actionDoneMsg{section: sectionIdx, err: svc.CancelAddTag(ctx, key, tagKey)}
+		return actionDoneMsg{token: token, section: sectionIdx, err: svc.CancelAddTag(ctx, key, tagKey)}
 	}
 }
 
 // cancelRemoveTagCmd cancels one staged tag removal.
 func (m *Model) cancelRemoveTagCmd(sectionIdx int, key data.StagedKey, tagKey string) tea.Cmd {
 	ctx := m.ctx
+	token := m.token
 	svc := m.sections[sectionIdx].svc
 
 	return func() tea.Msg {
-		return actionDoneMsg{section: sectionIdx, err: svc.CancelRemoveTag(ctx, key, tagKey)}
+		return actionDoneMsg{token: token, section: sectionIdx, err: svc.CancelRemoveTag(ctx, key, tagKey)}
 	}
 }

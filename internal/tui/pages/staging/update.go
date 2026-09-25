@@ -46,8 +46,8 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 // separately). The browser's staged probe reports the same entries+tags total,
 // so the Staging tab badge reads one consistent count from either surface (#693).
 func (m *Model) onReviewLoaded(msg reviewLoadedMsg) tea.Cmd {
-	if msg.section >= len(m.sections) {
-		return nil
+	if msg.token != m.token || msg.section >= len(m.sections) {
+		return nil // a prior page's response after a tab switch (#1011)
 	}
 
 	sec := m.sections[msg.section]
@@ -76,6 +76,17 @@ func (m *Model) onReviewLoaded(msg reviewLoadedMsg) tea.Cmd {
 // onActionDone clears the busy guard and, on success, reloads so the section and
 // the badges reflect the change; an error is surfaced on the section line.
 func (m *Model) onActionDone(msg actionDoneMsg) tea.Cmd {
+	if msg.token != m.token {
+		// A prior page's action (#1011). This page never started it, so its busy
+		// flag and error line stay as they are. A successful write may have landed
+		// after this page's own review read, so reload to show it.
+		if msg.err == nil {
+			return m.reload()
+		}
+
+		return nil
+	}
+
 	m.actionBusy = false
 
 	if msg.err != nil {

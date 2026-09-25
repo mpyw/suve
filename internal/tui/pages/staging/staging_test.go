@@ -128,7 +128,7 @@ func newModel(t *testing.T, secs ...*stubService) *Model {
 		services[i] = s
 	}
 
-	m := New(context.Background(), services, styles.New(), keys.Default())
+	m := New(context.Background(), 0, services, styles.New(), keys.Default())
 
 	for i, s := range secs {
 		m, _ = m.Update(reviewLoadedMsg{section: i, seq: m.sections[i].loadSeq, review: s.review})
@@ -600,7 +600,7 @@ func TestUpdate_BadgeCountAuthoritative(t *testing.T) {
 		},
 	}
 
-	m := New(context.Background(), []data.StagingService{sec}, styles.New(), keys.Default())
+	m := New(context.Background(), 0, []data.StagingService{sec}, styles.New(), keys.Default())
 	_, cmd := m.Update(reviewLoadedMsg{section: 0, seq: m.sections[0].loadSeq, review: sec.review})
 
 	require.NotNil(t, cmd)
@@ -824,4 +824,40 @@ func TestHelp_AdaptsToSelectedRowKind(t *testing.T) {
 	assert.NotContains(t, full(), "edit", "the full help drops edit on a tag row")
 	assert.NotContains(t, full(), "detail", "the full help drops detail on a tag row")
 	assert.Contains(t, full(), "unstage", "the full help keeps unstage on a tag row")
+}
+
+// TestUpdate_DropsPriorPageResults pins #1011: a review or action result stamped
+// with another page's token (a superseded staging page after a tab switch, whose
+// seq can collide with this page's) is dropped.
+func TestUpdate_DropsPriorPageResults(t *testing.T) {
+	t.Parallel()
+
+	sec := &stubService{service: "param", label: "Param", svcCap: capFor("aws", "param")}
+	m := New(context.Background(), 2, []data.StagingService{sec}, styles.New(), keys.Default())
+	_ = m.Init()
+
+	stale := data.StagingReview{Entries: []data.StagedDiffRow{{Name: "/stale", Operation: "create", StagedValue: "v"}}}
+
+	m, cmd := m.Update(reviewLoadedMsg{token: 1, section: 0, seq: m.sections[0].loadSeq, review: stale})
+	assert.Nil(t, cmd)
+	assert.False(t, m.sections[0].loaded, "a prior page's review is not applied")
+	assert.Empty(t, m.rows)
+
+	m.actionBusy = true
+	m, cmd = m.Update(actionDoneMsg{token: 1, section: 0, err: assert.AnError})
+	assert.Nil(t, cmd)
+	assert.True(t, m.actionBusy, "a prior page's action does not end this page's action")
+	assert.Empty(t, m.sections[0].err, "a prior page's failure is not shown here")
+
+	// A prior page's successful write may postdate this page's review: reload.
+	seq := m.sections[0].loadSeq
+	m, cmd = m.Update(actionDoneMsg{token: 1, section: 0})
+	assert.NotNil(t, cmd, "a prior page's successful action reloads this page")
+	assert.True(t, m.actionBusy, "the reload leaves this page's busy flag alone")
+	assert.Equal(t, seq+1, m.sections[0].loadSeq)
+
+	// This page's own review still lands.
+	m, _ = m.Update(reviewLoadedMsg{token: 2, section: 0, seq: m.sections[0].loadSeq, review: stale})
+	assert.True(t, m.sections[0].loaded)
+	assert.Len(t, m.rows, 1)
 }
