@@ -91,9 +91,9 @@ func TestDeleteUseCase_Execute_Error(t *testing.T) {
 		},
 	}
 
-	uc := &param.DeleteUseCase{Store: store}
+	uc := &param.DeleteUseCase{Store: store, ItemNoun: "setting"}
 
 	_, err := uc.Execute(t.Context(), param.DeleteInput{Name: "/app/config"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to delete parameter")
+	assert.Contains(t, err.Error(), "failed to delete setting")
 }

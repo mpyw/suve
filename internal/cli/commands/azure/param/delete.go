@@ -64,7 +64,7 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	uc := &param.DeleteUseCase{Store: store}
+	uc := &param.DeleteUseCase{Store: store, ItemNoun: itemNoun()}
 
 	if !skipConfirm {
 		currentValue, _ := uc.GetCurrentValue(ctx, name)

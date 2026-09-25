@@ -19,8 +19,10 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/capability"
 	azureinternal "github.com/mpyw/suve/internal/cli/commands/azure/internal"
 	cliinternal "github.com/mpyw/suve/internal/cli/commands/internal"
+	"github.com/mpyw/suve/internal/provider"
 )
 
 // argsUsageKey is the ArgsUsage string shared by the single-key commands.
@@ -81,4 +83,14 @@ variable.`,
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}
+}
+
+// itemNoun names one App Configuration item ("setting") in the shared use
+// cases' error messages, from the capability matrix.
+//
+//declscope:package // create, update and delete pass it to their use cases
+func itemNoun() string {
+	sc, _ := capability.Service(provider.ProviderAzure, string(provider.KindParam))
+
+	return sc.ItemNoun
 }

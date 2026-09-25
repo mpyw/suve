@@ -35,6 +35,9 @@ type UpdateOutput struct {
 // UpdateUseCase executes update operations.
 type UpdateUseCase struct {
 	Store provider.Store
+	// ItemNoun names one item of the service in error messages ("parameter",
+	// "setting"; capability.ServiceCapability.ItemNoun). Empty means "entry".
+	ItemNoun string
 }
 
 // GetCurrentValue fetches the current parameter value for preview. A
@@ -54,14 +57,14 @@ func (u *UpdateUseCase) GetCurrentValue(ctx context.Context, name string) (strin
 }
 
 // Execute runs the update use case. It updates an existing parameter; if the
-// parameter doesn't exist it returns ErrParameterNotFound. A read failure other
+// parameter doesn't exist it returns a wrapped ErrNotFound. A read failure other
 // than not-found is propagated unchanged (never treated as "does not exist").
 func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*UpdateOutput, error) {
 	entry, err := u.Store.Get(ctx, input.Name, provider.VersionRef{})
 
 	switch {
 	case errors.Is(err, provider.ErrNotFound):
-		return nil, fmt.Errorf("%w: %s", ErrParameterNotFound, input.Name)
+		return nil, fmt.Errorf("%s %w: %s", errItemNoun(u.ItemNoun), ErrNotFound, input.Name)
 	case err != nil:
 		return nil, err
 	}
@@ -76,7 +79,7 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 
 	version, err := u.Store.Put(ctx, input.Name, input.Value, valueType, input.Description, input.Options...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update parameter: %w", err)
+		return nil, fmt.Errorf("failed to update %s: %w", errItemNoun(u.ItemNoun), err)
 	}
 
 	return &UpdateOutput{

@@ -128,6 +128,13 @@ func TestAzureAppConfig_FullWorkflow(t *testing.T) {
 		_, err = runAzureParam(t, "show", "--raw", name)
 		require.Error(t, err)
 	})
+
+	// #996: the shared param use case words its errors with App
+	// Configuration's item noun, not "parameter".
+	t.Run("update-missing-says-setting", func(t *testing.T) {
+		_, err := runAzureParam(t, "update", "--yes", name, "v")
+		require.EqualError(t, err, "setting not found: "+name)
+	})
 }
 
 // emulatorHonorsTagWrite reports whether the App Configuration emulator persists

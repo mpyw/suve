@@ -358,7 +358,7 @@ func (a *App) ParamSet(name, value, paramType, namespace, description string) (*
 	valueType := paramtype.Parse(paramType)
 
 	// Try to create first; if the parameter already exists, update it instead.
-	createUC := &param.CreateUseCase{Writer: store}
+	createUC := &param.CreateUseCase{Writer: store, ItemNoun: a.serviceCapability(provider.KindParam).ItemNoun}
 
 	createResult, err := createUC.Execute(a.ctx, param.CreateInput{
 		Name:        name,
@@ -378,7 +378,7 @@ func (a *App) ParamSet(name, value, paramType, namespace, description string) (*
 		return nil, err
 	}
 
-	updateUC := &param.UpdateUseCase{Store: store}
+	updateUC := &param.UpdateUseCase{Store: store, ItemNoun: a.serviceCapability(provider.KindParam).ItemNoun}
 
 	updateResult, err := updateUC.Execute(a.ctx, param.UpdateInput{
 		Name:        name,
@@ -407,7 +407,7 @@ func (a *App) ParamDelete(name, namespace string) (*ParamDeleteResult, error) {
 		return nil, err
 	}
 
-	uc := &param.DeleteUseCase{Store: store}
+	uc := &param.DeleteUseCase{Store: store, ItemNoun: a.serviceCapability(provider.KindParam).ItemNoun}
 
 	result, err := uc.Execute(a.ctx, param.DeleteInput{Name: name})
 	if err != nil {

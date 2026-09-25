@@ -213,7 +213,7 @@ func TestCreateRun(t *testing.T) {
 			var buf, errBuf bytes.Buffer
 
 			r := &cmdparam.CreateRunner{
-				UseCase: &param.CreateUseCase{Writer: tt.store},
+				UseCase: &param.CreateUseCase{Writer: tt.store, ItemNoun: "parameter"},
 				Stdout:  &buf,
 				Stderr:  &errBuf,
 			}

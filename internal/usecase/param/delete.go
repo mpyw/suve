@@ -21,6 +21,9 @@ type DeleteOutput struct {
 // DeleteUseCase executes delete operations.
 type DeleteUseCase struct {
 	Store provider.Store
+	// ItemNoun names one item of the service in error messages ("parameter",
+	// "setting"; capability.ServiceCapability.ItemNoun). Empty means "entry".
+	ItemNoun string
 }
 
 // GetCurrentValue fetches the current value for preview. A non-existent
@@ -42,7 +45,7 @@ func (u *DeleteUseCase) GetCurrentValue(ctx context.Context, name string) (strin
 // Execute runs the delete use case.
 func (u *DeleteUseCase) Execute(ctx context.Context, input DeleteInput) (*DeleteOutput, error) {
 	if err := u.Store.Delete(ctx, input.Name); err != nil {
-		return nil, fmt.Errorf("failed to delete parameter: %w", err)
+		return nil, fmt.Errorf("failed to delete %s: %w", errItemNoun(u.ItemNoun), err)
 	}
 
 	return &DeleteOutput{Name: input.Name}, nil

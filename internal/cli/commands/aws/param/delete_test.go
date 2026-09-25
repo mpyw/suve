@@ -70,7 +70,7 @@ func TestDeleteRun(t *testing.T) {
 			var buf, errBuf bytes.Buffer
 
 			r := &cmdparam.DeleteRunner{
-				UseCase: &param.DeleteUseCase{Store: tt.store},
+				UseCase: &param.DeleteUseCase{Store: tt.store, ItemNoun: "parameter"},
 				Stdout:  &buf,
 				Stderr:  &errBuf,
 			}

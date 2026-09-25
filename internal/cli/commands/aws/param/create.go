@@ -148,7 +148,7 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	r := &CreateRunner{
-		UseCase: &param.CreateUseCase{Writer: store},
+		UseCase: &param.CreateUseCase{Writer: store, ItemNoun: itemNoun()},
 		Stdout:  cmd.Root().Writer,
 		Stderr:  cmd.Root().ErrWriter,
 	}

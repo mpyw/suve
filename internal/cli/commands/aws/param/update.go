@@ -169,7 +169,7 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	uc := &param.UpdateUseCase{Store: store}
+	uc := &param.UpdateUseCase{Store: store, ItemNoun: itemNoun()}
 
 	// Fetch current value and show diff before confirming
 	if !skipConfirm {

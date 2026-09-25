@@ -89,7 +89,7 @@ func (m *paramMutator) Create(
 	// and the CLI (`param set`): try create first, and if the parameter already
 	// exists fall back to update instead of surfacing the raw ErrAlreadyExists.
 	// The staged branch above is untouched — stage-time add validation is unchanged.
-	createUC := &param.CreateUseCase{Writer: store}
+	createUC := &param.CreateUseCase{Writer: store, ItemNoun: m.svcCap.ItemNoun}
 
 	_, err = createUC.Execute(ctx, param.CreateInput{
 		Name: key.Name, Value: value, Type: valueType, Description: description,
@@ -102,7 +102,7 @@ func (m *paramMutator) Create(
 		return WriteOutcome{}, err
 	}
 
-	updateUC := &param.UpdateUseCase{Store: store}
+	updateUC := &param.UpdateUseCase{Store: store, ItemNoun: m.svcCap.ItemNoun}
 
 	_, err = updateUC.Execute(ctx, param.UpdateInput{
 		Name: key.Name, Value: value, Type: valueType, Description: description,
@@ -133,7 +133,7 @@ func (m *paramMutator) Update(
 		return WriteOutcome{}, err
 	}
 
-	uc := &param.UpdateUseCase{Store: store}
+	uc := &param.UpdateUseCase{Store: store, ItemNoun: m.svcCap.ItemNoun}
 
 	_, err = uc.Execute(ctx, param.UpdateInput{
 		Name: key.Name, Value: value, Type: paramtype.Parse(typeLabel), Description: description,
@@ -159,7 +159,7 @@ func (m *paramMutator) Delete(
 		return WriteOutcome{}, err
 	}
 
-	uc := &param.DeleteUseCase{Store: store}
+	uc := &param.DeleteUseCase{Store: store, ItemNoun: m.svcCap.ItemNoun}
 	_, err = uc.Execute(ctx, param.DeleteInput{Name: key.Name})
 
 	return WriteOutcome{}, err
