@@ -194,7 +194,9 @@ func TestStagingScope_NoLookupNeeded(t *testing.T) {
 			wantScope: provider.Scope{
 				Provider: provider.ProviderAzure, StoreName: "mystore", AppConfigNamespace: "dev",
 			},
-			wantTarget: "store mystore · namespace dev",
+			// The bucket holds every namespace, so the target names the store
+			// alone (#994).
+			wantTarget: "store mystore",
 		},
 		{
 			name:       "azure param without namespace",
