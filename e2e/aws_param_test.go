@@ -2366,6 +2366,49 @@ func TestAWSParam_ImportMerge(t *testing.T) {
 	assert.Contains(t, stdout, paramName2)
 }
 
+// TestAWSParam_ImportMergeDeleteDropsTags covers #1000: merging an exported
+// Delete over a working Update that has staged tags keeps the Delete but drops
+// the tags (with a warning), so apply deletes the parameter without then
+// failing a tag apply on it.
+func TestAWSParam_ImportMergeDeleteDropsTags(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-param-import-merge-delete/param"
+	exportPath := filepath.Join(t.TempDir(), "param.json")
+
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	})
+
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "v0")
+	require.NoError(t, err)
+
+	// Export a staged Delete (this clears the working area).
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "delete", paramName)
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "export", exportPath)
+	require.NoError(t, err)
+
+	// Working area: an Update with a staged tag on the same parameter.
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "edit", paramName, "v1")
+	require.NoError(t, err)
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "tag", paramName, "env=test")
+	require.NoError(t, err)
+
+	_, stderr, err := runSubCommand(t, aws.StageParamCommand(), "import", exportPath, "--merge")
+	require.NoError(t, err)
+	assert.Contains(t, stderr, "dropped the staged tag changes of "+paramName+": it is staged for deletion")
+
+	_, err = newStore().GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Deleted")
+}
+
 // TestAWSParam_ExportImportEncrypted tests a service-level encrypted round-trip via
 // --passphrase-stdin: the payload is encrypted on export and decrypted with the
 // same passphrase on import.

@@ -541,3 +541,71 @@ func TestImportError(t *testing.T) {
 		assert.ErrorIs(t, err, inner)
 	})
 }
+
+// TestImportUseCase_Execute_MergeDropsDeleteTags covers #1000: merging an
+// envelope whose Delete lands on a working entry with staged tags must not
+// leave a Delete that still carries tag changes (the reducer forbids that
+// state, and apply would fail the tag apply on the deleted resource). The
+// dropped tags are reported as a warning; tags of other keys are kept.
+func TestImportUseCase_Execute_MergeDropsDeleteTags(t *testing.T) {
+	t.Parallel()
+
+	deleted := staging.EntryKey{Name: "/app/a"}
+	other := staging.EntryKey{Name: "/app/b"}
+
+	source := staging.NewEmptyState()
+	source.Entries[staging.ServiceParam][deleted] = staging.Entry{Operation: staging.OperationDelete, StagedAt: time.Now()}
+	reader := &cannedReader{states: map[staging.Service]*staging.State{staging.ServiceParam: source}}
+
+	working := testutil.NewMockStore()
+	stageEntry(t, working, staging.ServiceParam, deleted.Name, "work")
+
+	for _, key := range []staging.EntryKey{deleted, other} {
+		require.NoError(t, working.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+			Add: map[string]string{"env": "prod"}, StagedAt: time.Now(),
+		}))
+	}
+
+	usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+
+	output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Mode: stagingusecase.ImportModeMerge})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"dropped the staged tag changes of /app/a: it is staged for deletion"}, output.Warnings)
+	assert.Equal(t, 1, output.TagCount)
+
+	entry, err := working.GetEntry(t.Context(), staging.ServiceParam, deleted)
+	require.NoError(t, err)
+	assert.Equal(t, staging.OperationDelete, entry.Operation)
+
+	_, err = working.GetTag(t.Context(), staging.ServiceParam, deleted)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	_, err = working.GetTag(t.Context(), staging.ServiceParam, other)
+	require.NoError(t, err)
+}
+
+// TestImportUseCase_Execute_MergeDropsTagsOverWorkingDelete is the reverse
+// case: imported tags for a key the working area stages for deletion.
+func TestImportUseCase_Execute_MergeDropsTagsOverWorkingDelete(t *testing.T) {
+	t.Parallel()
+
+	key := staging.EntryKey{Name: "my-secret"}
+
+	source := staging.NewEmptyState()
+	source.Tags[staging.ServiceSecret][key] = staging.TagEntry{Add: map[string]string{"env": "prod"}, StagedAt: time.Now()}
+	reader := &cannedReader{states: map[staging.Service]*staging.State{staging.ServiceSecret: source}}
+
+	working := testutil.NewMockStore()
+	require.NoError(t, working.StageEntry(t.Context(), staging.ServiceSecret, key, staging.Entry{
+		Operation: staging.OperationDelete, StagedAt: time.Now(),
+	}))
+
+	usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+
+	output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Mode: stagingusecase.ImportModeMerge})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"dropped the staged tag changes of my-secret: it is staged for deletion"}, output.Warnings)
+
+	_, err = working.GetTag(t.Context(), staging.ServiceSecret, key)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+}

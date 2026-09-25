@@ -239,9 +239,38 @@ func reconcileImport(workingState, sourceState *staging.State, input ImportInput
 		workingState.Merge(sourceState)
 	}
 
+	dropImportedDeleteTags(workingState, output)
+
 	output.Merged = merged
 	output.EntryCount = workingState.EntryCount()
 	output.TagCount = workingState.TagCount()
+}
+
+// dropImportedDeleteTags unstages the tag changes of every key whose entry ends
+// up a staged Delete, with a warning for each. Merge replaces an entry wholesale
+// but unions tags, so an imported Delete over a working entry with staged tags
+// (or imported tags over a working Delete) would stage both. The reducer never
+// allows that state: apply would delete the resource, then fail its tag apply
+// on every later apply until a reset.
+func dropImportedDeleteTags(state *staging.State, output *ImportOutput) {
+	for _, svc := range []staging.Service{staging.ServiceParam, staging.ServiceSecret} {
+		tags := state.Tags[svc]
+
+		for _, key := range staging.SortedEntryKeys(state.Entries[svc]) {
+			if state.Entries[svc][key].Operation != staging.OperationDelete {
+				continue
+			}
+
+			if _, ok := tags[key]; !ok {
+				continue
+			}
+
+			delete(tags, key)
+
+			output.Warnings = append(output.Warnings, fmt.Sprintf(
+				"dropped the staged tag changes of %s: it is staged for deletion", key.Label()))
+		}
+	}
 }
 
 // readSource reads the imported state. With a service filter it reads that one
