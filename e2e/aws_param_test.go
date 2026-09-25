@@ -833,6 +833,48 @@ func TestAWSParam_StagingReEditKeepsDescription(t *testing.T) {
 	assert.Equal(t, "staged description", lo.FromPtr(entry.Description))
 }
 
+// TestAWSParam_StagingDiffVanishedDiscardsTags covers #997: when a staged
+// update's parameter is deleted out of band, stage diff auto-unstages the
+// update together with its staged tags, so the next apply does not fail on a
+// tag change for a missing parameter.
+func TestAWSParam_StagingDiffVanishedDiscardsTags(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/diff-vanished-tags/param"
+
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	})
+
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "v0")
+	require.NoError(t, err)
+
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "edit", paramName, "v1")
+	require.NoError(t, err)
+
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "tag", paramName, "env=test")
+	require.NoError(t, err)
+
+	// Delete the parameter out of band.
+	_, _, err = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	require.NoError(t, err)
+
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "diff")
+	require.NoError(t, err)
+
+	store := newStore()
+	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "No Parameter Store changes staged.")
+}
+
 // TestAWSParam_StagingAddWithOptions tests stage add with description and stage tag for tags.
 func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 	setupEnv(t)
