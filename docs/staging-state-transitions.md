@@ -202,6 +202,8 @@ When applying changes, suve checks for conflicts by comparing the `BaseModifiedA
 | Update | Remote modified after staging |
 | Delete | Remote modified after staging |
 
+The base is recorded when an Update or Delete is first staged and kept while the entry stays staged: a later `edit`, a `delete` that turns an Update into a Delete, a repeated `delete`, and a `reset` restore (`reset NAME#VERSION`) all reuse the existing base. An out-of-band write made after the first staging is therefore still detected. Once the entry is unstaged (plain `reset`, or an `edit` back to the remote value), the next staging records a fresh base.
+
 Use `--ignore-conflicts` to force apply despite conflicts.
 
 > **Timestamp precision.** Update/Delete conflicts are detected only when the remote `LastModified` is *strictly after* the recorded `BaseModifiedAt`. On providers whose modified time is second-granular (notably Azure Key Vault), an out-of-band write that lands in the same wall-clock second as the recorded base compares as equal, so it is not flagged as a conflict and can be overwritten on apply. The window is narrow and inherent to the provider's timestamp precision.

@@ -148,6 +148,48 @@ func TestAzureKeyVaultStage_ConflictDetected(t *testing.T) {
 	assert.Equal(t, "external-value", got)
 }
 
+// TestAzureKeyVaultStage_DeleteOverUpdateKeepsConflictBase covers #983: turning a
+// staged edit into a staged delete keeps the edit's conflict base, so an
+// out-of-band write made between the edit and the delete is still reported as a
+// conflict and the newer remote value is not deleted.
+func TestAzureKeyVaultStage_DeleteOverUpdateKeepsConflictBase(t *testing.T) {
+	setupAzureKeyVault(t)
+	setAzureKeyVaultStagingKey(t)
+	setupTempHome(t)
+
+	const name = "suve-e2e-kv-conflict-delete-over-update"
+
+	cleanup := func() { _, _ = runAzureSecret(t, "delete", "--yes", name) }
+	cleanup()
+	t.Cleanup(cleanup)
+
+	_, err := runAzureSecret(t, "create", name, "original")
+	require.NoError(t, err)
+
+	_, err = runAzureStage(t, "secret", "edit", name, "staged-value")
+	require.NoError(t, err)
+
+	// Key Vault LastModified is second-granular; see TestAzureKeyVaultStage_ConflictDetected.
+	time.Sleep(1100 * time.Millisecond)
+
+	_, err = runAzureSecret(t, "update", "--yes", name, "external-value")
+	require.NoError(t, err)
+
+	// Convert the staged edit into a staged delete after the out-of-band write.
+	_, err = runAzureStage(t, "secret", "delete", name)
+	require.NoError(t, err)
+
+	_, stderr, err := runAzureStageCapture(t, "secret", "apply", "--yes")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflict")
+	assert.Contains(t, stderr, "conflict detected for "+name+":")
+
+	// The delete was blocked: the out-of-band value is still there.
+	got, err := runAzureSecret(t, "show", "--raw", name)
+	require.NoError(t, err)
+	assert.Equal(t, "external-value", got)
+}
+
 // TestAzureKeyVaultStage_IgnoreConflictsOverrides is the conflict scenario with
 // --ignore-conflicts: the same out-of-band modification is present, but apply
 // must skip the conflict check and force the staged value through.

@@ -450,3 +450,101 @@ func TestDeleteUseCase_Execute_UnstageTagError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unstage tag error")
 }
+
+// TestDeleteUseCase_Execute_KeepsStagedBase covers #983: turning a staged Update
+// into a Delete, or re-staging a Delete, keeps the original conflict base
+// instead of re-basing to the current remote time, so an out-of-band write made
+// since the first staging is still detected at apply time.
+func TestDeleteUseCase_Execute_KeepsStagedBase(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	remote := base.Add(time.Hour) // modified out-of-band after staging
+
+	tests := []struct {
+		name     string
+		existing staging.Entry
+	}{
+		{
+			name: "update to delete",
+			existing: staging.Entry{
+				Operation:      staging.OperationUpdate,
+				Value:          lo.ToPtr("updated-value"),
+				StagedAt:       base,
+				BaseModifiedAt: &base,
+			},
+		},
+		{
+			name: "delete re-staged",
+			existing: staging.Entry{
+				Operation:      staging.OperationDelete,
+				StagedAt:       base,
+				BaseModifiedAt: &base,
+				DeleteOptions:  &staging.DeleteOptions{RecoveryWindow: 30},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			key := staging.EntryKey{Name: "my-secret"}
+			store := testutil.NewMockStore()
+			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceSecret, key, tt.existing))
+
+			strategy := newMockDeleteStrategy(true)
+			strategy.mockServiceStrategy = newSecretStrategy()
+			strategy.lastModified = remote
+
+			uc := &usecasestaging.DeleteUseCase{Strategy: strategy, Store: store}
+
+			_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{Key: key, RecoveryWindow: 7})
+			require.NoError(t, err)
+
+			entry, err := store.GetEntry(t.Context(), staging.ServiceSecret, key)
+			require.NoError(t, err)
+			assert.Equal(t, staging.OperationDelete, entry.Operation)
+			require.NotNil(t, entry.BaseModifiedAt)
+			assert.True(t, base.Equal(*entry.BaseModifiedAt), "base must stay %v, got %v", base, *entry.BaseModifiedAt)
+			require.NotNil(t, entry.DeleteOptions)
+			assert.Equal(t, 7, entry.DeleteOptions.RecoveryWindow)
+
+			// The kept base still flags the out-of-band write as a conflict, so
+			// apply refuses to delete the newer remote value.
+			applyStrategy := newMockApplyStrategy()
+			applyStrategy.mockServiceStrategy = newSecretStrategy()
+			applyStrategy.lastModified[key.Name] = remote
+
+			applyUC := &usecasestaging.ApplyUseCase{Strategy: applyStrategy, Store: store}
+			output, err := applyUC.Execute(t.Context(), usecasestaging.ApplyInput{})
+			require.Error(t, err)
+			assert.Equal(t, []staging.EntryKey{key}, output.Conflicts)
+			assert.Empty(t, output.EntryResults)
+		})
+	}
+}
+
+// TestDeleteUseCase_Execute_UnbasedUpdateUsesRemote: a staged Update without a
+// base (the remote had no modification time at staging) takes the fetched one.
+func TestDeleteUseCase_Execute_UnbasedUpdateUsesRemote(t *testing.T) {
+	t.Parallel()
+
+	remote := time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC)
+	key := staging.EntryKey{Name: "/app/existing"}
+	store := testutil.NewMockStore()
+	stageEntry(t, store, staging.ServiceParam, key.Name, "updated-value")
+
+	strategy := newMockDeleteStrategy(false)
+	strategy.lastModified = remote
+
+	uc := &usecasestaging.DeleteUseCase{Strategy: strategy, Store: store}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.DeleteInput{Key: key})
+	require.NoError(t, err)
+
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, key)
+	require.NoError(t, err)
+	require.NotNil(t, entry.BaseModifiedAt)
+	assert.True(t, remote.Equal(*entry.BaseModifiedAt))
+}
