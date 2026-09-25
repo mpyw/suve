@@ -875,6 +875,41 @@ func TestAWSParam_StagingDiffVanishedDiscardsTags(t *testing.T) {
 	assert.Contains(t, stdout, "No Parameter Store changes staged.")
 }
 
+// TestAWSParam_StagingDiffVanishedDiscardsTagOnly pins #1055: a tag-only change
+// (no staged entry) on a parameter deleted out of band is discarded by stage
+// diff, so the next stage apply has no failing tag apply left.
+func TestAWSParam_StagingDiffVanishedDiscardsTagOnly(t *testing.T) {
+	setupEnv(t)
+	setupTempHome(t)
+
+	paramName := "/suve-e2e-staging/diff-vanished-tag-only/param"
+
+	_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	t.Cleanup(func() {
+		_, _, _ = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	})
+
+	_, _, err := runCommand(t, cmdparam.CreateCommand(), paramName, "v0")
+	require.NoError(t, err)
+
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "tag", paramName, "env=test")
+	require.NoError(t, err)
+
+	// Delete the parameter out of band.
+	_, _, err = runCommand(t, cmdparam.DeleteCommand(), "--yes", paramName)
+	require.NoError(t, err)
+
+	_, _, err = runSubCommand(t, aws.StageParamCommand(), "diff")
+	require.NoError(t, err)
+
+	_, err = newStore().GetTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: paramName})
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	stdout, _, err := runSubCommand(t, aws.StageParamCommand(), "apply", "--yes")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "No Parameter Store changes staged.")
+}
+
 // TestAWSParam_StagingAddWithOptions tests stage add with description and stage tag for tags.
 func TestAWSParam_StagingAddWithOptions(t *testing.T) {
 	setupEnv(t)

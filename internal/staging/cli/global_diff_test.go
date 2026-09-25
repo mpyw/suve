@@ -872,8 +872,8 @@ func TestGlobalDiff_TagOnlyDiff(t *testing.T) {
 
 	r := &stgcli.GlobalDiffRunner{
 		Services: []*stagingusecase.DiffUseCase{
-			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("no remote")), store),
-			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("no remote")), store),
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreWithTags()), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreWithTags()), store),
 		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
@@ -909,8 +909,8 @@ func TestGlobalDiff_TagOnlyRemovalsDiff(t *testing.T) {
 
 	r := &stgcli.GlobalDiffRunner{
 		Services: []*stagingusecase.DiffUseCase{
-			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("no remote")), store),
-			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("no remote")), store),
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreWithTags()), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreWithTags()), store),
 		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
@@ -946,8 +946,8 @@ func TestGlobalDiff_SecretTagDiff(t *testing.T) {
 
 	r := &stgcli.GlobalDiffRunner{
 		Services: []*stagingusecase.DiffUseCase{
-			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("no remote")), store),
-			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("no remote")), store),
+			globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreWithTags()), store),
+			globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreWithTags()), store),
 		},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
@@ -1132,7 +1132,7 @@ func TestGlobalDiff_ParamTagDiffAPIError(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stgcli.GlobalDiffRunner{
-		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetError("API error")), store)},
+		Services:      []*stagingusecase.DiffUseCase{globalDiffParam(staging.NewAWSParamStrategy(globalDiffStoreGetTransientError("API error")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
@@ -1163,7 +1163,7 @@ func TestGlobalDiff_SecretTagDiffAPIError(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	r := &stgcli.GlobalDiffRunner{
-		Services:      []*stagingusecase.DiffUseCase{globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetError("API error")), store)},
+		Services:      []*stagingusecase.DiffUseCase{globalDiffSecret(staging.NewAWSSecretStrategy(globalDiffStoreGetTransientError("API error")), store)},
 		ProviderLabel: "AWS",
 		Stdout:        &stdout,
 		Stderr:        &stderr,
