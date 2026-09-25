@@ -385,37 +385,17 @@ func (s *Store) Create(
 	return domain.Version{ID: aws.ToString(created.VersionId)}, nil
 }
 
-// Put creates the secret, or updates it (new version + metadata) if it already
-// exists. The valueType is ignored (Secrets Manager values are always secret).
-// On an existing secret the description is updated as well (via UpdateSecret),
-// unlike Create which is create-only.
+// Put updates the secret (new version + metadata) if it exists, or creates it
+// otherwise. The valueType is ignored (Secrets Manager values are always
+// secret). On an existing secret the description is updated as well (via
+// UpdateSecret), unlike Create which is create-only.
+//
+// UpdateSecret goes first so an update needs only secretsmanager:UpdateSecret:
+// IAM checks CreateSecret before the service checks existence, so a
+// create-first order would fail with AccessDenied for update-only principals.
 func (s *Store) Put(
-	ctx context.Context, name, value string, _ domain.ValueType, description string, opts ...provider.WriteOption,
+	ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
-	createInput := &secretsmanagersdk.CreateSecretInput{
-		Name:         aws.String(name),
-		SecretString: aws.String(value),
-	}
-	if description != "" {
-		createInput.Description = aws.String(description)
-	}
-
-	applyCreateOptions(createInput, opts)
-
-	created, err := s.client.CreateSecret(ctx, createInput)
-	if err == nil {
-		if err := s.applyRotation(ctx, name, opts); err != nil {
-			return domain.Version{}, err
-		}
-
-		return domain.Version{ID: aws.ToString(created.VersionId)}, nil
-	}
-
-	// Already exists: update the value (new version) and metadata in one call.
-	if _, ok := errors.AsType[*types.ResourceExistsException](err); !ok {
-		return domain.Version{}, fmt.Errorf("failed to create secret: %w", err)
-	}
-
 	updateInput := &secretsmanagersdk.UpdateSecretInput{
 		SecretId:     aws.String(name),
 		SecretString: aws.String(value),
@@ -428,6 +408,11 @@ func (s *Store) Put(
 
 	updated, err := s.client.UpdateSecret(ctx, updateInput)
 	if err != nil {
+		// Not found: create it (Create applies rotation itself).
+		if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
+			return s.Create(ctx, name, value, valueType, description, opts...)
+		}
+
 		return domain.Version{}, fmt.Errorf("failed to update secret: %w", err)
 	}
 

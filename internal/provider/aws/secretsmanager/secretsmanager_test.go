@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	secretsmanagersdk "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	"github.com/aws/smithy-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -477,6 +478,9 @@ func TestPut_CreateWhenNew(t *testing.T) {
 	var createIn *secretsmanagersdk.CreateSecretInput
 
 	store := secretsmanager.New(&mockClient{
+		updateSec: func(*secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error) {
+			return nil, &types.ResourceNotFoundException{Message: aws.String("nope")}
+		},
 		create: func(in *secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
 			createIn = in
 
@@ -484,6 +488,7 @@ func TestPut_CreateWhenNew(t *testing.T) {
 		},
 	})
 
+	// A missing secret falls back from UpdateSecret to CreateSecret.
 	v, err := store.Put(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "desc")
 	require.NoError(t, err)
 	assert.Equal(t, "new-id", v.ID)
@@ -497,9 +502,6 @@ func TestPut_UpdatesWhenExists(t *testing.T) {
 	var updateIn *secretsmanagersdk.UpdateSecretInput
 
 	store := secretsmanager.New(&mockClient{
-		create: func(_ *secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
-			return nil, &types.ResourceExistsException{Message: aws.String("exists")}
-		},
 		updateSec: func(in *secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error) {
 			updateIn = in
 
@@ -507,13 +509,66 @@ func TestPut_UpdatesWhenExists(t *testing.T) {
 		},
 	})
 
-	// Put on an existing secret updates both value and description in one call.
+	// Put on an existing secret updates both value and description in one call,
+	// without calling CreateSecret (the mock has no create func, so a call panics).
 	v, err := store.Put(t.Context(), "my-secret", "val", domain.ValueTypeSecret, "new desc")
 	require.NoError(t, err)
 	assert.Equal(t, "ver-2", v.ID)
 	require.NotNil(t, updateIn)
 	assert.Equal(t, "val", aws.ToString(updateIn.SecretString))
 	assert.Equal(t, "new desc", aws.ToString(updateIn.Description))
+}
+
+// TestPut_UpdateOnlyPrincipal is the #986 regression: a principal without
+// secretsmanager:CreateSecret gets AccessDenied from CreateSecret even for an
+// existing secret, so Put must never call CreateSecret on the update path, and
+// an UpdateSecret error other than not-found must surface without a create.
+func TestPut_UpdateOnlyPrincipal(t *testing.T) {
+	t.Parallel()
+
+	accessDenied := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "not authorized"}
+
+	t.Run("existing secret updates without CreateSecret", func(t *testing.T) {
+		t.Parallel()
+
+		created := false
+		store := secretsmanager.New(&mockClient{
+			create: func(*secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
+				created = true
+
+				return nil, accessDenied
+			},
+			updateSec: func(*secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error) {
+				return &secretsmanagersdk.UpdateSecretOutput{VersionId: aws.String("ver-2")}, nil
+			},
+		})
+
+		v, err := store.Put(t.Context(), "app/db", "x", domain.ValueTypeSecret, "")
+		require.NoError(t, err)
+		assert.Equal(t, "ver-2", v.ID)
+		assert.False(t, created, "Put must not call CreateSecret for an existing secret")
+	})
+
+	t.Run("update error other than not-found does not fall back to create", func(t *testing.T) {
+		t.Parallel()
+
+		created := false
+		store := secretsmanager.New(&mockClient{
+			create: func(*secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
+				created = true
+
+				return &secretsmanagersdk.CreateSecretOutput{}, nil
+			},
+			updateSec: func(*secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error) {
+				return nil, accessDenied
+			},
+		})
+
+		_, err := store.Put(t.Context(), "app/db", "x", domain.ValueTypeSecret, "")
+		require.ErrorIs(t, err, accessDenied)
+		require.ErrorContains(t, err, "failed to update secret")
+		assert.False(t, created)
+	})
 }
 
 func TestDelete(t *testing.T) {
@@ -596,9 +651,6 @@ func TestPut_UpdatesWhenExistsAppliesKMSKey(t *testing.T) {
 	var updateIn *secretsmanagersdk.UpdateSecretInput
 
 	store := secretsmanager.New(&mockClient{
-		create: func(*secretsmanagersdk.CreateSecretInput) (*secretsmanagersdk.CreateSecretOutput, error) {
-			return nil, &types.ResourceExistsException{Message: aws.String("exists")}
-		},
 		updateSec: func(in *secretsmanagersdk.UpdateSecretInput) (*secretsmanagersdk.UpdateSecretOutput, error) {
 			updateIn = in
 
