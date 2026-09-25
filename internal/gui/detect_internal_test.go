@@ -16,20 +16,21 @@ import (
 )
 
 // clearDetectEnv makes provider detection hermetic: it blanks every env var the
-// resolver reads and points the AWS shared-credentials path at a non-existent
-// file, so the ~/.aws/credentials fallback stays off regardless of the ambient
+// resolver reads and points the AWS shared credentials and config paths at
+// non-existent files, so the ~/.aws fallback stays off regardless of the ambient
 // machine. A subtest then sets only the vars its case needs.
 func clearDetectEnv(t *testing.T) {
 	t.Helper()
 
 	for _, k := range []string{
-		"AWS_ACCESS_KEY_ID", "AWS_VAULT", "AWS_PROFILE",
+		"AWS_ACCESS_KEY_ID", "AWS_VAULT", "AWS_PROFILE", "AWS_DEFAULT_PROFILE",
 		"GOOGLE_CLOUD_PROJECT", "AZURE_KEYVAULT_NAME", "AZURE_APPCONFIG_NAME",
 	} {
 		t.Setenv(k, "")
 	}
 
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", filepath.Join(t.TempDir(), "no-such-credentials"))
+	t.Setenv("AWS_CONFIG_FILE", filepath.Join(t.TempDir(), "no-such-config"))
 }
 
 // TestDetectProviders covers the DetectProviders binding (and detectedProviderStrings):

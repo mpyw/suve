@@ -9,7 +9,7 @@
 //
 //   - A provider is "active via env" when one of its address/identity/ambient
 //     env vars is set:
-//     AWS — AWS_ACCESS_KEY_ID | AWS_VAULT | AWS_PROFILE, or an ambient-credential
+//     AWS — AWS_ACCESS_KEY_ID | AWS_VAULT | AWS_PROFILE | AWS_DEFAULT_PROFILE, or an ambient-credential
 //     marker set by AWS-managed compute: AWS_CONTAINER_CREDENTIALS_FULL_URI
 //     (CloudShell, App Runner, EKS Pod Identity), AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 //     (ECS), or AWS_WEB_IDENTITY_TOKEN_FILE (IRSA / EKS). This is what makes the
@@ -20,8 +20,9 @@
 //     active for it. Zero or two-plus active means no alias — the user must use
 //     the explicit group (e.g. `suve aws secret`). There is no priority order.
 //   - AWS-only final fallback: when NO provider is active via env for any
-//     service, AWS is accepted via ~/.aws/credentials so the common "plain AWS"
-//     setup keeps working. If that file is absent too, nothing is aliased.
+//     service, AWS is accepted via ~/.aws/credentials or ~/.aws/config (an
+//     SSO-only setup has just the config file), so the common "plain AWS" setup
+//     keeps working. If both files are absent, nothing is aliased.
 //
 // Deliberately NOT detected: an EC2 instance profile with no credentials env var
 // and no shared file delivers credentials only through IMDS, which has no env
@@ -46,16 +47,16 @@ import (
 type Environment struct {
 	// Getenv reads an environment variable (os.Getenv in production).
 	Getenv func(string) string
-	// AWSCredentialsExist reports whether the AWS shared credentials file is
-	// present. It is only consulted for the final fallback, never eagerly.
-	AWSCredentialsExist func() bool
+	// AWSSharedFilesExist reports whether the AWS shared credentials or config
+	// file is present. It is only consulted for the final fallback, never eagerly.
+	AWSSharedFilesExist func() bool
 }
 
 // OSEnvironment returns an Environment backed by the real OS.
 func OSEnvironment() Environment {
 	return Environment{
 		Getenv:              os.Getenv,
-		AWSCredentialsExist: awsCredentialsExist,
+		AWSSharedFilesExist: awsSharedFilesExist,
 	}
 }
 
@@ -83,7 +84,8 @@ type Result struct {
 	StageActive []provider.Provider
 
 	// AWSViaFallback is true when AWS became active only through the
-	// ~/.aws/credentials fallback (no provider was active via env).
+	// ~/.aws/credentials or ~/.aws/config fallback (no provider was active via
+	// env).
 	AWSViaFallback bool
 }
 
@@ -106,6 +108,7 @@ func Resolve(env Environment) Result {
 	awsEnv := getenv("AWS_ACCESS_KEY_ID") != "" ||
 		getenv("AWS_VAULT") != "" ||
 		getenv("AWS_PROFILE") != "" ||
+		getenv("AWS_DEFAULT_PROFILE") != "" ||
 		// Ambient credentials from AWS-managed compute (no classic env var):
 		// CloudShell / App Runner / EKS Pod Identity, ECS, and IRSA / EKS.
 		getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI") != "" ||
@@ -120,7 +123,7 @@ func Resolve(env Environment) Result {
 	var res Result
 
 	awsActive := awsEnv
-	if !anyEnv && env.AWSCredentialsExist != nil && env.AWSCredentialsExist() {
+	if !anyEnv && env.AWSSharedFilesExist != nil && env.AWSSharedFilesExist() {
 		awsActive = true
 		res.AWSViaFallback = true
 	}
@@ -235,23 +238,31 @@ func unique(ps []provider.Provider) provider.Provider {
 	return ""
 }
 
-// awsCredentialsExist reports whether the AWS shared credentials file is
-// present, honoring AWS_SHARED_CREDENTIALS_FILE and falling back to
-// ~/.aws/credentials. Existence only — the file is not parsed.
-func awsCredentialsExist() bool {
-	path := os.Getenv("AWS_SHARED_CREDENTIALS_FILE")
+// awsSharedFilesExist reports whether the AWS shared credentials file or the
+// shared config file is present. It honors AWS_SHARED_CREDENTIALS_FILE and
+// AWS_CONFIG_FILE and falls back to ~/.aws/credentials and ~/.aws/config.
+// Existence only — the files are not parsed.
+func awsSharedFilesExist() bool {
+	return awsFileExists("AWS_SHARED_CREDENTIALS_FILE", "credentials") ||
+		awsFileExists("AWS_CONFIG_FILE", "config")
+}
+
+// awsFileExists reports whether the AWS shared file named by the envVar
+// override, or ~/.aws/<base> when it is unset, is a regular file.
+func awsFileExists(envVar, base string) bool {
+	path := os.Getenv(envVar)
 	if path == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return false
 		}
 
-		path = filepath.Join(home, ".aws", "credentials")
+		path = filepath.Join(home, ".aws", base)
 	}
 
-	// Path is the user's own AWS credentials location (AWS_SHARED_CREDENTIALS_FILE
-	// or ~/.aws/credentials); an existence check on it is intentional.
-	info, err := os.Stat(path) //nolint:gosec // user-controlled AWS credentials path by design
+	// Path is the user's own AWS shared-file location (the env override or
+	// ~/.aws/<base>); an existence check on it is intentional.
+	info, err := os.Stat(path) //nolint:gosec // user-controlled AWS shared-file path by design
 
 	return err == nil && !info.IsDir()
 }
