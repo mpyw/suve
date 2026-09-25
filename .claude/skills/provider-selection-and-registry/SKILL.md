@@ -33,7 +33,7 @@ Two ways to reach a provider coexist:
 
    | Provider | Service | Active when env set |
    |----------|---------|---------------------|
-   | AWS | param + secret | `AWS_ACCESS_KEY_ID` \| `AWS_VAULT` \| `AWS_PROFILE` (final fallback: `~/.aws/credentials` exists) |
+   | AWS | param + secret | `AWS_ACCESS_KEY_ID` \| `AWS_VAULT` \| `AWS_PROFILE` \| `AWS_DEFAULT_PROFILE` (final fallback: `~/.aws/credentials` or `~/.aws/config` exists) |
    | Google Cloud | secret | `GOOGLE_CLOUD_PROJECT` |
    | Azure | secret (Key Vault) | `AZURE_KEYVAULT_NAME` |
    | Azure | param (App Config) | `AZURE_APPCONFIG_NAME` |

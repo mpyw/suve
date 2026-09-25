@@ -207,11 +207,12 @@ func aliasTarget(p provider.Provider) string {
 }
 
 // fallbackNote annotates the debug alias summary when AWS became active only
-// through the ~/.aws/credentials fallback rather than an env signal.
+// through the ~/.aws/credentials or ~/.aws/config fallback rather than an env
+// signal.
 func fallbackNote(det detect.Result) string {
 	return lo.Ternary(
 		det.AWSViaFallback,
-		" (AWS via ~/.aws/credentials fallback)",
+		" (AWS via ~/.aws/credentials or ~/.aws/config fallback)",
 		"",
 	)
 }
@@ -286,7 +287,7 @@ func aliasDescription(det detect.Result) string {
 
 	via := lo.Ternary(
 		det.AWSViaFallback,
-		" (AWS via ~/.aws/credentials)",
+		" (AWS via ~/.aws/credentials or ~/.aws/config)",
 		" (from environment)",
 	)
 

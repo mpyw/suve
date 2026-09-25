@@ -684,7 +684,7 @@ suve aws param --tui       # a service subgroup preselects that tab (Parameter S
 suve azure secret --tui    # opens on the Key Vault tab
 ```
 
-- **Unique-provider rule:** bare `suve --tui` follows the same detection as the bare aliases — it launches only when exactly one provider is active across the union of the param/secret/stage axes (AWS is also accepted via `~/.aws/credentials`, or an ambient-credential variable in a cloud shell — see [Cloud Shell Support](#cloud-shell-support)). With two or more active, it lists the explicit `suve <group> --tui` forms instead; there is no silent priority.
+- **Unique-provider rule:** bare `suve --tui` follows the same detection as the bare aliases — it launches only when exactly one provider is active across the union of the param/secret/stage axes (AWS is also accepted via `~/.aws/credentials` or `~/.aws/config`, or an ambient-credential variable in a cloud shell — see [Cloud Shell Support](#cloud-shell-support)). With two or more active, it lists the explicit `suve <group> --tui` forms instead; there is no silent priority.
 - **Scope / env:** the TUI consumes the same scope inputs as the CLI — `GOOGLE_CLOUD_PROJECT` for Google Cloud, `--vault-name` / `AZURE_KEYVAULT_NAME` and `--store-name` / `AZURE_APPCONFIG_NAME` (plus `--namespace` / `AZURE_APPCONFIG_NAMESPACE`) for Azure. AWS uses the ambient shared config.
 - **Azure tab gating:** the App Configuration (param) and Key Vault (secret) tabs appear only for the services the launch scope resolves — set `--vault-name` for the Key Vault tab, `--store-name` for the App Configuration tab, either or both as needed. The Staging tab is always present.
 - **Shared staging area:** staged edits made in the TUI use the same per-scope staging store as the CLI/GUI, so `suve stage status` sees them and `stage apply` from either side applies the same working set.
@@ -852,19 +852,19 @@ For convenience, suve also exposes **bare top-level aliases** — `suve param`, 
 
    | Backend | Active when set |
    |---------|-----------------|
-   | AWS | `AWS_ACCESS_KEY_ID`, `AWS_VAULT`, `AWS_PROFILE`, or an ambient-credential variable from AWS-managed compute (CloudShell / ECS / IRSA — see [Cloud Shell Support](#cloud-shell-support)) |
+   | AWS | `AWS_ACCESS_KEY_ID`, `AWS_VAULT`, `AWS_PROFILE`, `AWS_DEFAULT_PROFILE`, or an ambient-credential variable from AWS-managed compute (CloudShell / ECS / IRSA — see [Cloud Shell Support](#cloud-shell-support)) |
    | Google Cloud | `GOOGLE_CLOUD_PROJECT` |
    | Azure Key Vault (secret) | `AZURE_KEYVAULT_NAME` |
    | Azure App Configuration (param) | `AZURE_APPCONFIG_NAME` |
 
 2. The bare alias for a service appears **only when exactly one backend is active** for it. Zero or two-plus active → no alias, use the explicit group. **There is no priority order** — ambiguity is never resolved silently.
-3. **AWS fallback:** if no backend is active via env at all, AWS is accepted via `~/.aws/credentials` (or `$AWS_SHARED_CREDENTIALS_FILE`). If that is also absent, there are no bare aliases.
+3. **AWS fallback:** if no backend is active via env at all, AWS is accepted when `~/.aws/credentials` (or `$AWS_SHARED_CREDENTIALS_FILE`) or `~/.aws/config` (or `$AWS_CONFIG_FILE`) exists. If both are absent, there are no bare aliases.
 
 Examples (`—` = alias not exposed):
 
 | Environment | `param` → | `secret` → | `stage` → |
 |-------------|-----------|------------|-----------|
-| nothing set, `~/.aws/credentials` present | `aws` | `aws` | `aws` |
+| nothing set, `~/.aws/credentials` or `~/.aws/config` present | `aws` | `aws` | `aws` |
 | `AWS_PROFILE` | `aws` | `aws` | `aws` |
 | AWS CloudShell (`AWS_CONTAINER_CREDENTIALS_FULL_URI`) | `aws` | `aws` | `aws` |
 | `GOOGLE_CLOUD_PROJECT` | — | `gcloud` | `gcloud` |
@@ -1061,7 +1061,7 @@ Each backend is selected and authenticated from its own environment variables (a
 | Variable | Description |
 |----------|-------------|
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | Static credentials |
-| `AWS_PROFILE` | Shared-config profile to load |
+| `AWS_PROFILE` / `AWS_DEFAULT_PROFILE` | Shared-config profile to load (`AWS_PROFILE` wins); either marks AWS active for the bare aliases |
 | `AWS_VAULT` | Set by [aws-vault](https://github.com/99designs/aws-vault); also marks AWS active for the bare aliases (see [Bare Aliases](#bare-aliases)) |
 | `AWS_CONTAINER_CREDENTIALS_FULL_URI` / `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` / `AWS_WEB_IDENTITY_TOKEN_FILE` | Ambient credentials on AWS-managed compute (CloudShell, ECS/App Runner, EKS/IRSA); also mark AWS active — see [Cloud Shell Support](#cloud-shell-support) |
 | `AWS_REGION` / `AWS_DEFAULT_REGION` | Region |

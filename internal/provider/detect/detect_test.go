@@ -14,7 +14,7 @@ import (
 func env(vars map[string]string, credsExist bool) detect.Environment {
 	return detect.Environment{
 		Getenv:              func(k string) string { return vars[k] },
-		AWSCredentialsExist: func() bool { return credsExist },
+		AWSSharedFilesExist: func() bool { return credsExist },
 	}
 }
 
@@ -222,6 +222,23 @@ func TestResolve(t *testing.T) {
 			assert.Equal(t, wantStage != "", got.FlatStage(), "FlatStage")
 		})
 	}
+}
+
+// TestResolve_AWSDefaultProfile is the #1015 regression: AWS_DEFAULT_PROFILE
+// (which the SDK honors) marks AWS active, so an SSO user who also has another
+// cloud's env var set keeps the AWS param alias (the file fallback is off then).
+func TestResolve_AWSDefaultProfile(t *testing.T) {
+	t.Parallel()
+
+	got := detect.Resolve(env(map[string]string{"AWS_DEFAULT_PROFILE": "dev"}, false))
+	assert.Equal(t, provider.ProviderAWS, got.Param)
+	assert.Equal(t, provider.ProviderAWS, got.Secret)
+	assert.False(t, got.AWSViaFallback)
+
+	got = detect.Resolve(env(map[string]string{"AWS_DEFAULT_PROFILE": "dev", "GOOGLE_CLOUD_PROJECT": "p"}, false))
+	assert.Equal(t, provider.ProviderAWS, got.Param)
+	assert.Empty(t, got.Secret)
+	assert.Equal(t, []provider.Provider{provider.ProviderAWS, provider.ProviderGoogleCloud}, got.SecretActive)
 }
 
 func TestResult_UniqueProvider(t *testing.T) {
