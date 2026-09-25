@@ -1269,6 +1269,10 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
         };
       },
       StagingDiff: async (service: string, _passphrase?: string) => {
+        calls.push('StagingDiff');
+        if (state.simulateError?.operation === 'StagingDiff') {
+          throw new Error(state.simulateError.message);
+        }
         const staged = service === 'param' ? currentBucket().param : currentBucket().secret;
         const tagStaged = service === 'param' ? currentBucket().paramTags : currentBucket().secretTags;
         return {
