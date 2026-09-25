@@ -121,7 +121,10 @@ network call. Each provider always lists the same labels: AWS
 profile/account/region, Google Cloud project, Azure vault/store (plus the
 namespace when one is selected). An AWS scope without account and region is
 `Pending`, and `binding.ResolveTarget` fills it from the STS caller identity
-(`provider.AWSTarget`).
+(`provider.AWSTarget`). The AWS profile segment is `AWS_PROFILE`, else
+`AWS_DEFAULT_PROFILE`, and empty when neither is set or when `AWS_ACCESS_KEY_ID`
+overrides any profile (`aws.activeProfile`); it is never guessed from
+`~/.aws/config`.
 
 | Consumer | Renders |
 |----------|---------|

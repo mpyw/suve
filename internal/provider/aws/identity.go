@@ -8,6 +8,7 @@ import (
 )
 
 // Identity contains the AWS account ID, region, and profile name of the caller.
+// Profile is "" when no profile env var names the one in use (see activeProfile).
 type Identity struct {
 	AccountID string
 	Region    string
@@ -33,6 +34,6 @@ func LoadIdentity(ctx context.Context) (*Identity, error) {
 	return &Identity{
 		AccountID: accountID,
 		Region:    cfg.Region,
-		Profile:   findProfileByAccountID(accountID),
+		Profile:   activeProfile(),
 	}, nil
 }
