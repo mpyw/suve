@@ -164,7 +164,7 @@ func (m *App) pageForTab(i int) (page, tea.Cmd) {
 	if m.sourceFor != nil {
 		if source, staging := m.sourceFor(tab.Service); source != nil {
 			m.pageGen++
-			p := newBrowserPage(m.runCtx, m.pageGen, source, staging, m.styles, m.keys)
+			p := newBrowserPage(m.runCtx, m.pageGen, source, staging, m.scope.AppConfigNamespace, m.styles, m.keys)
 
 			return p, p.Init()
 		}

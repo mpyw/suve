@@ -202,8 +202,12 @@ const (
 // through every fetch. staging may be nil when the service has no staging
 // workflow. token is the page-generation identity the app assigns per page
 // creation so a superseded prior page's in-flight response is dropped (#746).
+// namespace is the launch App Configuration namespace (`--namespace` /
+// AZURE_APPCONFIG_NAMESPACE) the namespace filter starts on; it is ignored by a
+// service without a namespace axis.
 func New(
-	ctx context.Context, token int, source data.Source, staging data.StagingProbe, st styles.Styles, km keys.Map,
+	ctx context.Context, token int, source data.Source, staging data.StagingProbe, namespace string,
+	st styles.Styles, km keys.Map,
 ) *Model {
 	prefix := textinput.New()
 	prefix.Prompt = ""
@@ -240,6 +244,7 @@ func New(
 		// Seed the namespace filter with the null and all-namespaces options; the
 		// discovered namespaces are inserted between them once loaded.
 		m.namespaces = []string{"", namespaces.AllFilter}
+		m.selectLaunchNamespace(namespace)
 	}
 
 	return m

@@ -493,6 +493,24 @@ func TestTUIAzureAppConfig_Namespaces(t *testing.T) {
 		assert.Contains(t, screen, "[dev]",
 			"the namespace badge column renders the dev badge for dev entries")
 	})
+
+	// #992: a launch namespace (--namespace / AZURE_APPCONFIG_NAMESPACE) is the
+	// browser's starting namespace filter, not the null namespace.
+	t.Run("launch-namespace-view", func(t *testing.T) {
+		scope := azureAppConfigTUIScope()
+		scope.AppConfigNamespace = "dev"
+
+		tm := teatest.NewTestModel(t, newAzureTUIModel(t, scope, string(staging.ServiceParam)),
+			teatest.WithInitialTermSize(tuiTermWidth, tuiTermHeight))
+
+		waitForScreen(t, tm, devOnly)
+
+		screen := finalScreen(t, tm)
+
+		assert.Contains(t, screen, "ns: dev", "the header shows the launch namespace filter")
+		assert.Contains(t, screen, "[dev]", "the launch view lists the dev settings")
+		assert.NotContains(t, screen, "[(NULL)]", "the launch view partitions OUT the null setting")
+	})
 }
 
 // TestAzureAppConfig_TUI_DetailNoHistory seeds a setting under the "dev"
