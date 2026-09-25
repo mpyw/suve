@@ -509,7 +509,8 @@ func TestResolve_ShiftListError(t *testing.T) {
 // timestamps are second-granular and the list-versions API returns versions
 // unordered, so two versions written in the same second are indistinguishable
 // by time. A deterministic version-id tie-break (descending) is applied, so the
-// ~N result no longer depends on the arbitrary API/input order.
+// ~N result no longer depends on the arbitrary API/input order. This is the
+// fallback when the service cannot say which version it serves (here a 403).
 func TestResolve_OrderingEqualTimestamps(t *testing.T) {
 	t.Parallel()
 
@@ -521,13 +522,80 @@ func TestResolve_OrderingEqualTimestamps(t *testing.T) {
 		{{"first", same}, {"second", same}},
 		{{"second", same}, {"first", same}},
 	} {
-		m := &mockClient{listVersFunc: versionsFixture(order...)}
+		m := &mockClient{
+			listVersFunc: versionsFixture(order...),
+			getFunc: func(context.Context, string, string) (azsecrets.GetSecretResponse, error) {
+				return azsecrets.GetSecretResponse{}, &azcore.ResponseError{StatusCode: http.StatusForbidden}
+			},
+		}
 		store := keyvault.New(m)
 
 		prev, err := store.Resolve(t.Context(), "my-secret", "~1")
 		require.NoError(t, err)
 		assert.Equal(t, "first", prev.ID(), "input order %v", order)
 	}
+}
+
+// TestSameSecondTieUsesServedVersion is the #991 regression: when the newest
+// versions share a creation second, the version the service serves (an
+// unversioned GetSecret) is current and ~1 is the other one, even when the id
+// tie-break would order them the other way round.
+func TestSameSecondTieUsesServedVersion(t *testing.T) {
+	t.Parallel()
+
+	same := at(5, 20)
+	served := "00000000000000000000000000000000"
+	other := "ffffffffffffffffffffffffffffffff"
+
+	newStore := func(getCalls *int) *keyvault.Store {
+		return keyvault.New(&mockClient{
+			listVersFunc: versionsFixture(verPair{"older", at(5, 19)}, verPair{other, same}, verPair{served, same}),
+			getFunc: func(_ context.Context, name, version string) (azsecrets.GetSecretResponse, error) {
+				*getCalls++
+
+				assert.Empty(t, version)
+
+				return azsecrets.GetSecretResponse{Secret: azsecrets.Secret{ID: secretID(name, served)}}, nil
+			},
+		})
+	}
+
+	t.Run("History marks the served version current", func(t *testing.T) {
+		t.Parallel()
+
+		var calls int
+
+		versions, err := newStore(&calls).History(t.Context(), "my-secret")
+		require.NoError(t, err)
+		assert.Equal(t, []string{served, other, "older"}, lo.Map(versions, func(v domain.Version, _ int) string {
+			return v.ID
+		}))
+		assert.True(t, versions[0].Current)
+		assert.False(t, versions[1].Current)
+		assert.Equal(t, 1, calls)
+	})
+
+	t.Run("~1 resolves to the unserved version", func(t *testing.T) {
+		t.Parallel()
+
+		var calls int
+
+		ref, err := newStore(&calls).Resolve(t.Context(), "my-secret", "~1")
+		require.NoError(t, err)
+		assert.Equal(t, other, ref.ID())
+	})
+
+	t.Run("no tie needs no GetSecret", func(t *testing.T) {
+		t.Parallel()
+
+		store := keyvault.New(&mockClient{
+			listVersFunc: versionsFixture(verPair{"v1", at(1, 1)}, verPair{"v2", at(2, 1)}),
+		})
+
+		versions, err := store.History(t.Context(), "my-secret")
+		require.NoError(t, err)
+		assert.Equal(t, "v2", versions[0].ID)
+	})
 }
 
 // TestHistory_NilCreatedSortsLast verifies versions with no Created timestamp
