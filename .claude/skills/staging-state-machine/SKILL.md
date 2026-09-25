@@ -23,6 +23,7 @@ it.
 |----------|--------------------|
 | What entry states exist and how add/edit/delete/reset move between them | Entry State Machine (states, diagram, transition rules) |
 | When an edit is silently dropped or reverts a staged change | Special Behaviors → Auto-Skip / Auto-Unstage |
+| Which staged options (value type, description) a re-stage keeps | Special Behaviors → Kept Staged Options |
 | Why deleting a `Create`-staged resource also drops its tag changes | Special Behaviors → Tag Cascade on Create Delete |
 | What existence checks gate add/delete/tag | Special Behaviors → Resource Existence Checks |
 | How tag additions/removals are tracked and reconciled | Tag State Machine (states, tracking, transition rules, delete-staged restriction) |

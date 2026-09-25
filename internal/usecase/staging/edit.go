@@ -107,13 +107,19 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 		valueType = stagedEntry.ValueType
 	}
 
+	// Likewise keep a previously staged description when the caller gives none
+	// (an edit without --description, or any GUI/TUI re-edit), so a pending
+	// description change is never silently dropped.
+	description := lo.EmptyableToPtr(input.Description)
+	if description == nil && stagedEntry != nil {
+		description = stagedEntry.Description
+	}
+
 	// Build options with metadata
 	opts := &transition.EntryExecutorOptions{
 		BaseModifiedAt: baseModifiedAt,
 		ValueType:      valueType,
-	}
-	if input.Description != "" {
-		opts.Description = &input.Description
+		Description:    description,
 	}
 
 	// Execute the transition

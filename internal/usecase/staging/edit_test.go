@@ -849,3 +849,35 @@ func TestEditUseCase_Baseline_GetEntryError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "storage unavailable")
 }
+
+// TestEditUseCase_Execute_PreservesStagedDescriptionWhenUnset covers #990: a
+// re-edit without --description (or any GUI/TUI re-edit, which never passes
+// one) keeps the pending description, and an explicit one replaces it.
+func TestEditUseCase_Execute_PreservesStagedDescriptionWhenUnset(t *testing.T) {
+	t.Parallel()
+
+	key := staging.EntryKey{Name: "/app/config"}
+	store := testutil.NewMockStore()
+	uc := &usecasestaging.EditUseCase{Strategy: newMockEditStrategy(), Store: store}
+
+	description := func() *string {
+		t.Helper()
+
+		entry, err := store.GetEntry(t.Context(), staging.ServiceParam, key)
+		require.NoError(t, err)
+
+		return entry.Description
+	}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.EditInput{Key: key, Value: "v1", Description: "new desc"})
+	require.NoError(t, err)
+	assert.Equal(t, lo.ToPtr("new desc"), description())
+
+	_, err = uc.Execute(t.Context(), usecasestaging.EditInput{Key: key, Value: "v2"})
+	require.NoError(t, err)
+	assert.Equal(t, lo.ToPtr("new desc"), description(), "a re-edit without a description keeps the staged one")
+
+	_, err = uc.Execute(t.Context(), usecasestaging.EditInput{Key: key, Value: "v3", Description: "newer desc"})
+	require.NoError(t, err)
+	assert.Equal(t, lo.ToPtr("newer desc"), description())
+}

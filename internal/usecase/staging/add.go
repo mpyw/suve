@@ -5,6 +5,8 @@ import (
 	"errors"
 	"unicode/utf8"
 
+	"github.com/samber/lo"
+
 	"github.com/mpyw/suve/internal/domain"
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store"
@@ -68,19 +70,24 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 
 	key := staging.EntryKey{Name: name, Namespace: input.Key.Namespace}
 
-	// Resolve the staged value type. When the caller specifies none, preserve a
-	// previously staged type so re-staging the create (e.g. re-editing the draft
-	// without --secure) never silently downgrades a SecureString to plain String.
-	valueType := input.ValueType
-	if valueType == "" {
-		existing, gerr := u.Store.GetEntry(ctx, service, key)
+	// Resolve the staged value type and description. When the caller specifies
+	// none, preserve the previously staged ones so re-staging the create (e.g.
+	// re-editing the draft without --secure or --description, or from the GUI)
+	// never silently downgrades a SecureString to plain String or drops a
+	// pending description.
+	existing, err := u.Store.GetEntry(ctx, service, key)
+	if err != nil && !errors.Is(err, staging.ErrNotStaged) {
+		return nil, err
+	}
 
-		switch {
-		case gerr == nil:
-			valueType = existing.ValueType
-		case !errors.Is(gerr, staging.ErrNotStaged):
-			return nil, gerr
-		}
+	valueType := input.ValueType
+	if valueType == "" && existing != nil {
+		valueType = existing.ValueType
+	}
+
+	description := lo.EmptyableToPtr(input.Description)
+	if description == nil && existing != nil {
+		description = existing.Description
 	}
 
 	// Load current state with the remote existence check
@@ -92,10 +99,7 @@ func (u *AddUseCase) Execute(ctx context.Context, input AddInput) (*AddOutput, e
 	// Execute the transition
 	executor := transition.NewExecutor(u.Store)
 
-	opts := &transition.EntryExecutorOptions{ValueType: valueType}
-	if input.Description != "" {
-		opts.Description = &input.Description
-	}
+	opts := &transition.EntryExecutorOptions{ValueType: valueType, Description: description}
 
 	_, err = executor.ExecuteEntry(ctx, service, key, entryState, transition.EntryActionAdd{Value: input.Value}, opts)
 	if err != nil {

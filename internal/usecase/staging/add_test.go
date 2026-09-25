@@ -452,3 +452,25 @@ func TestAddUseCase_Draft_GetEntryError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "storage unavailable")
 }
+
+// TestAddUseCase_Execute_PreservesStagedDescriptionWhenUnset covers #990 for a
+// staged create: re-adding the draft without a description keeps the pending
+// one.
+func TestAddUseCase_Execute_PreservesStagedDescriptionWhenUnset(t *testing.T) {
+	t.Parallel()
+
+	key := staging.EntryKey{Name: "/app/new"}
+	store := testutil.NewMockStore()
+	uc := &usecasestaging.AddUseCase{Strategy: newMockEditStrategyNotFound(), Store: store}
+
+	_, err := uc.Execute(t.Context(), usecasestaging.AddInput{Key: key, Value: "v1", Description: "new desc"})
+	require.NoError(t, err)
+
+	_, err = uc.Execute(t.Context(), usecasestaging.AddInput{Key: key, Value: "v2"})
+	require.NoError(t, err)
+
+	entry, err := store.GetEntry(t.Context(), staging.ServiceParam, key)
+	require.NoError(t, err)
+	assert.Equal(t, "v2", lo.FromPtr(entry.Value))
+	assert.Equal(t, lo.ToPtr("new desc"), entry.Description)
+}
