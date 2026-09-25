@@ -160,6 +160,10 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 	}
 
 	// Process entries
+	// gone collects the keys auto-unstaged because the remote no longer exists;
+	// their staged tag changes were discarded with them, so no tag row is shown.
+	gone := make(map[staging.EntryKey]struct{})
+
 	if len(entries) > 0 {
 		// Fetch all current values in parallel, each through the strategy scoped
 		// to its entry's namespace (App Configuration) or the single strategy.
@@ -176,7 +180,7 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 		for key, entry := range entries {
 			result := results[key]
 
-			diffEntry, err := u.processDiffResult(ctx, key, entry, result)
+			diffEntry, err := u.processDiffResult(ctx, key, entry, result, gone)
 			if err != nil {
 				return nil, err
 			}
@@ -187,6 +191,10 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 
 	// Process tag entries - fetch current values for removed tags
 	for key, tagEntry := range tagEntries {
+		if _, ok := gone[key]; ok {
+			continue
+		}
+
 		diffTagEntry := DiffTagEntry{
 			Name:      key.Name,
 			Namespace: key.Namespace,
@@ -226,11 +234,11 @@ func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput
 }
 
 //nolint:lll // function parameters are descriptive for clarity
-func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKey, entry staging.Entry, result *parallel.Result[*staging.FetchResult]) (DiffEntry, error) {
+func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKey, entry staging.Entry, result *parallel.Result[*staging.FetchResult], gone map[staging.EntryKey]struct{}) (DiffEntry, error) {
 	service := u.Strategy.Service()
 
 	if result.Err != nil {
-		return u.handleFetchError(ctx, key, entry, result.Err)
+		return u.handleFetchError(ctx, key, entry, result.Err, gone)
 	}
 
 	fetchResult := result.Value
@@ -274,7 +282,13 @@ func (u *DiffUseCase) processDiffResult(ctx context.Context, key staging.EntryKe
 	}, nil
 }
 
-func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey, entry staging.Entry, err error) (DiffEntry, error) {
+// handleFetchError turns a failed remote fetch into a diff row. A not-found
+// remote auto-unstages a staged Delete or Update together with its staged tag
+// changes (a tag apply on a missing resource would fail on every later apply)
+// and records the key in gone.
+//
+//nolint:lll // function parameters are descriptive for clarity
+func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey, entry staging.Entry, err error, gone map[staging.EntryKey]struct{}) (DiffEntry, error) {
 	service := u.Strategy.Service()
 
 	// Only a genuine "not found" justifies auto-unstaging a staged delete or
@@ -286,15 +300,16 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 	switch entry.Operation {
 	case staging.OperationDelete:
 		if notFound {
-			if uerr := u.Store.UnstageEntry(ctx, service, key); uerr != nil {
-				return DiffEntry{}, fmt.Errorf("failed to unstage %s: %w", key.Name, uerr)
+			note, uerr := u.unstageGone(ctx, service, key, gone)
+			if uerr != nil {
+				return DiffEntry{}, uerr
 			}
 
 			return DiffEntry{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
-				Warning:   "already deleted in " + u.remoteLabel(),
+				Warning:   "already deleted in " + u.remoteLabel() + note,
 			}, nil
 		}
 
@@ -314,15 +329,16 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 
 	case staging.OperationUpdate:
 		if notFound {
-			if uerr := u.Store.UnstageEntry(ctx, service, key); uerr != nil {
-				return DiffEntry{}, fmt.Errorf("failed to unstage %s: %w", key.Name, uerr)
+			note, uerr := u.unstageGone(ctx, service, key, gone)
+			if uerr != nil {
+				return DiffEntry{}, uerr
 			}
 
 			return DiffEntry{
 				Name:      key.Name,
 				Namespace: key.Namespace,
 				Type:      DiffEntryAutoUnstaged,
-				Warning:   "item no longer exists in " + u.remoteLabel(),
+				Warning:   "item no longer exists in " + u.remoteLabel() + note,
 			}, nil
 		}
 	}
@@ -333,4 +349,28 @@ func (u *DiffUseCase) handleFetchError(ctx context.Context, key staging.EntryKey
 		Type:      DiffEntryWarning,
 		Warning:   err.Error(),
 	}, nil
+}
+
+// unstageGone unstages the entry and any staged tag changes of a key whose
+// remote no longer exists, and records the key in gone. The tags must go too:
+// left behind, they would fail the tag apply on the missing resource on every
+// later apply until a manual reset (the reducer drops them for the same reason).
+// It returns a note for the warning when staged tag changes were discarded.
+//
+//nolint:lll // function parameters are descriptive for clarity
+func (u *DiffUseCase) unstageGone(ctx context.Context, service staging.Service, key staging.EntryKey, gone map[staging.EntryKey]struct{}) (string, error) {
+	if err := u.Store.UnstageEntry(ctx, service, key); err != nil {
+		return "", fmt.Errorf("failed to unstage %s: %w", key.Name, err)
+	}
+
+	gone[key] = struct{}{}
+
+	switch err := u.Store.UnstageTag(ctx, service, key); {
+	case errors.Is(err, staging.ErrNotStaged):
+		return "", nil
+	case err != nil:
+		return "", fmt.Errorf("failed to unstage tags of %s: %w", key.Name, err)
+	default:
+		return "; its staged tag changes were discarded", nil
+	}
 }

@@ -687,3 +687,102 @@ func TestDiffUseCase_Execute_PerNamespaceResolver(t *testing.T) {
 	assert.Equal(t, "prd-remote", byNamespace["prd"].RemoteValue)
 	assert.Equal(t, "dev-staged", byNamespace["dev"].StagedValue)
 }
+
+// TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteDiscardsTags covers #997: a
+// staged Update (or Delete) whose remote no longer exists is auto-unstaged
+// together with its staged tag changes, which would otherwise fail the tag
+// apply on every later apply. The discarded tags get no diff row. Tags of a
+// remote that still exists are untouched.
+func TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteDiscardsTags(t *testing.T) {
+	t.Parallel()
+
+	for _, op := range []staging.Operation{staging.OperationUpdate, staging.OperationDelete} {
+		t.Run(string(op), func(t *testing.T) {
+			t.Parallel()
+
+			gone := staging.EntryKey{Name: "/app/gone"}
+			kept := staging.EntryKey{Name: "/app/kept"}
+			store := testutil.NewMockStore()
+
+			entry := staging.Entry{Operation: op, StagedAt: time.Now()}
+			if op == staging.OperationUpdate {
+				entry.Value = lo.ToPtr("update-value")
+			}
+			require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, gone, entry))
+
+			for _, key := range []staging.EntryKey{gone, kept} {
+				require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+					Add:      map[string]string{"env": "prod"},
+					StagedAt: time.Now(),
+				}))
+			}
+
+			strategy := newMockDiffStrategy()
+			strategy.fetchErrors[gone.Name] = fmt.Errorf("%w: not found", provider.ErrNotFound)
+
+			uc := &usecasestaging.DiffUseCase{Strategy: strategy, Store: store}
+
+			output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+			require.NoError(t, err)
+			require.Len(t, output.Entries, 1)
+			assert.Equal(t, usecasestaging.DiffEntryAutoUnstaged, output.Entries[0].Type)
+			assert.Contains(t, output.Entries[0].Warning, "; its staged tag changes were discarded")
+
+			// Only the surviving resource's tags are shown and still staged.
+			require.Len(t, output.TagEntries, 1)
+			assert.Equal(t, kept.Name, output.TagEntries[0].Name)
+
+			_, err = store.GetTag(t.Context(), staging.ServiceParam, gone)
+			require.ErrorIs(t, err, staging.ErrNotStaged)
+
+			_, err = store.GetTag(t.Context(), staging.ServiceParam, kept)
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteKeepsOtherNamespaceTags:
+// discarding the tags of a vanished App Configuration setting leaves the tags
+// of the same name staged under another namespace.
+func TestDiffUseCase_Execute_AutoUnstage_VanishedRemoteKeepsOtherNamespaceTags(t *testing.T) {
+	t.Parallel()
+
+	gone := staging.EntryKey{Name: "app/db", Namespace: "dev"}
+	kept := staging.EntryKey{Name: "app/db", Namespace: "prd"}
+	store := testutil.NewMockStore()
+	require.NoError(t, store.StageEntry(t.Context(), staging.ServiceParam, gone, staging.Entry{
+		Operation: staging.OperationUpdate, Value: lo.ToPtr("v"), StagedAt: time.Now(),
+	}))
+
+	for _, key := range []staging.EntryKey{gone, kept} {
+		require.NoError(t, store.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
+			Add: map[string]string{"env": key.Namespace}, StagedAt: time.Now(),
+		}))
+	}
+
+	devStrategy := newMockDiffStrategy()
+	devStrategy.fetchErrors[gone.Name] = fmt.Errorf("%w: not found", provider.ErrNotFound)
+
+	uc := &usecasestaging.DiffUseCase{
+		Strategy: newMockDiffStrategy(),
+		Store:    store,
+		StrategyFor: func(namespace string) (staging.DiffStrategy, error) {
+			if namespace == gone.Namespace {
+				return devStrategy, nil
+			}
+
+			return newMockDiffStrategy(), nil
+		},
+	}
+
+	output, err := uc.Execute(t.Context(), usecasestaging.DiffInput{})
+	require.NoError(t, err)
+	require.Len(t, output.TagEntries, 1)
+	assert.Equal(t, kept.Namespace, output.TagEntries[0].Namespace)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, gone)
+	require.ErrorIs(t, err, staging.ErrNotStaged)
+
+	_, err = store.GetTag(t.Context(), staging.ServiceParam, kept)
+	require.NoError(t, err)
+}
