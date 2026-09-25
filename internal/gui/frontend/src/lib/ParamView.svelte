@@ -74,6 +74,8 @@
   let entries: gui.ParamListEntry[] = $state([]);
   let selectedParam: string | null = $state(null);
   let paramDetail: gui.ParamShowResult | null = $state(null);
+  // Monotonic id of the latest selection (see selectParam).
+  let detailSeq = 0;
   let paramLog: gui.ParamLogEntry[] = $state([]);
   let detailLoading = $state(false);
   let showValue = $state(false);
@@ -205,8 +207,14 @@
   }
 
   async function selectParam(name: string, namespace = '') {
+    // Only the latest selection may fill the detail pane: an earlier Show that
+    // resolves late, or a failed Show, must never leave another item's value
+    // under the new title, where Edit would prefill it (#981).
+    const seq = ++detailSeq;
     selectedParam = name;
     selectedEntryNamespace = namespace;
+    paramDetail = null;
+    paramLog = [];
     detailLoading = true;
     showValue = withValue;
     stagingStatus = null;
@@ -218,6 +226,7 @@
       ParamShow(name, namespace),
       historyEnabled ? ParamLog(name, 10, namespace) : Promise.resolve(null),
     ]);
+    if (seq !== detailSeq) return; // superseded by a newer selection
     if (detailResult.status === 'fulfilled') {
       paramDetail = detailResult.value;
     } else {
@@ -231,14 +240,17 @@
     // never break the detail pane.
     if (stagingEnabled) {
       try {
-        stagingStatus = await StagingCheckStatus('param', name, namespace);
+        const status = await StagingCheckStatus('param', name, namespace);
+        if (seq === detailSeq) stagingStatus = status;
       } catch {
-        stagingStatus = null;
+        if (seq === detailSeq) stagingStatus = null;
       }
     }
   }
 
   function closeDetail() {
+    detailSeq++; // drop any selection still loading
+    detailLoading = false;
     selectedParam = null;
     paramDetail = null;
     paramLog = [];
@@ -500,7 +512,7 @@
         <div class="detail-header">
           <h3 class="detail-title param">{selectedParam}</h3>
           <div class="detail-actions">
-            <button class="btn-action-sm" onclick={() => selectedParam && openSetModal(selectedParam)}>Edit</button>
+            <button class="btn-action-sm" onclick={() => selectedParam && openSetModal(selectedParam)} disabled={!paramDetail}>Edit</button>
             <button class="btn-action-sm btn-danger" onclick={() => selectedParam && openDeleteModal(selectedParam)}>Delete</button>
             {#if historyEnabled && paramLog.length >= 2}
               <button class="btn-action-sm" class:active={diffMode.active} onclick={diffMode.toggle}>
