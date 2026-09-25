@@ -10,7 +10,7 @@
   import StagingBanner from './StagingBanner.svelte';
   import TagList from './TagList.svelte';
   import { createDiffMode } from './useDiffMode.svelte';
-  import { createDebouncer, formatDate, formatJsonValue, maskValue, parseError } from './viewUtils';
+  import { capitalize, createDebouncer, formatDate, formatJsonValue, maskValue, parseError } from './viewUtils';
   import './common.css';
 
   interface Props {
@@ -27,6 +27,9 @@
   // Capability-driven visibility: App mounts this view only with the service's
   // capability, so every flag is read as-is.
   const stagingEnabled = $derived(capability.hasStaging);
+  // The word for one item ("secret") in titles and prompts.
+  const itemNoun = $derived(capability.itemNoun);
+  const ItemNoun = $derived(capitalize(capability.itemNoun));
   const tagsEnabled = $derived(capability.hasTags);
   // Azure Key Vault scopes tags per version: show them inside each Version
   // History entry (add/remove only on the latest) instead of one resource-level
@@ -454,7 +457,7 @@
     <div class="list-panel" class:collapsed={selectedSecret !== null}>
       {#if entries.length === 0 && !loading}
         <div class="empty-state">
-          No secrets found. Try adjusting the prefix filter.
+          No {itemNoun}s found. Try adjusting the prefix filter.
         </div>
       {:else}
         <ul class="item-list">
@@ -654,7 +657,7 @@
 </div>
 
 <!-- Create Modal -->
-<Modal title="New Secret" show={showCreateModal} onclose={() => showCreateModal = false}>
+<Modal title={`New ${ItemNoun}`} show={showCreateModal} onclose={() => showCreateModal = false}>
   <form class="modal-form" onsubmit={handleCreate}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -708,7 +711,7 @@
 </Modal>
 
 <!-- Edit Modal -->
-<Modal title="Edit Secret" show={showEditModal} onclose={() => showEditModal = false}>
+<Modal title={`Edit ${ItemNoun}`} show={showEditModal} onclose={() => showEditModal = false}>
   <form class="modal-form" onsubmit={handleEdit}>
     {#if modalError}
       <div class="modal-error">{modalError}</div>
@@ -761,12 +764,12 @@
 </Modal>
 
 <!-- Delete Modal -->
-<Modal title="Delete Secret" show={showDeleteModal} onclose={() => showDeleteModal = false}>
+<Modal title={`Delete ${ItemNoun}`} show={showDeleteModal} onclose={() => showDeleteModal = false}>
   <div class="modal-confirm">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
     {/if}
-    <p>Are you sure you want to delete this secret?</p>
+    <p>Are you sure you want to delete this {itemNoun}?</p>
     <code class="delete-target secret">{deleteTarget}</code>
     {#if forceDeleteEnabled}
       <label class="checkbox-label force-delete">
@@ -777,11 +780,11 @@
     <p class="warning">
       {#if immediate}
         {#if forceDelete}
-          This will permanently delete the secret immediately!
+          This will permanently delete the {itemNoun} immediately!
         {:else if recoveryWindowEnabled}
-          The secret will be scheduled for deletion with a recovery window.
+          The {itemNoun} will be scheduled for deletion with a recovery window.
         {:else}
-          This will delete the secret.
+          This will delete the {itemNoun}.
         {/if}
       {:else}
         This will stage a delete operation.
@@ -821,14 +824,14 @@
 </Modal>
 
 <!-- Restore Modal -->
-<Modal title="Restore Secret" show={showRestoreModal} onclose={() => showRestoreModal = false}>
+<Modal title={`Restore ${ItemNoun}`} show={showRestoreModal} onclose={() => showRestoreModal = false}>
   <div class="modal-form">
     {#if modalError}
       <div class="modal-error">{modalError}</div>
     {/if}
-    <p class="restore-info">Restore a previously deleted secret that is still within its recovery window.</p>
+    <p class="restore-info">Restore a previously deleted {itemNoun} that is still within its recovery window.</p>
     <div class="form-group">
-      <label for="restore-name">Secret Name</label>
+      <label for="restore-name">{ItemNoun} Name</label>
       <input
         id="restore-name"
         type="text"

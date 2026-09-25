@@ -11,6 +11,14 @@ export const NS_ALL = '*';
 /**
  * Mask sensitive values for display
  */
+/**
+ * Capitalize the first letter, for a capability itemNoun in a title
+ * ("setting" -> "Setting").
+ */
+export function capitalize(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
 export function maskValue(value: string): string {
   return '*'.repeat(Math.min(value.length, 32));
 }
