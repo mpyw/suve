@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Implementation notes
 
-This file provides guidance to Claude Code when working with code in this repository.
+This file records design decisions and implementation details. The short, always-loaded instructions are in [AGENTS.md](../AGENTS.md).
 
 ## Project Overview
 
@@ -81,7 +81,7 @@ The `declscope-adoption` skill is vendored from the declscope release and is ove
 
 ## Skills & docs
 
-Load the matching skill under `.claude/skills/` before non-trivial work; each holds the *why* so this file stays lean.
+Load the matching skill under `.agents/skills/` before non-trivial work; each holds the *why* so this file stays lean.
 
 - **provider-seam-invariants** — touching `internal/provider/**` or `internal/domain/**`: neutral model, opaque version refs, typed write/delete options, interface segregation, SDK confinement.
 - **provider-selection-and-registry** — wiring a top-level command group, adding a cloud, or touching `registry.go`/`detect/`/`internal/staging/binding`/`internal/cli/commands/launch.go`/`internal/cli/commands/internal/client.go`/`internal/cli/commands/<cloud>/internal`: how a provider is selected, how the registry composes backends and scopes, the shared staging binding, and the TUI/GUI launch scope.

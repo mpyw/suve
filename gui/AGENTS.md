@@ -5,7 +5,7 @@
 ```yaml
 path: gui
 type: wails-entry
-parent: ../CLAUDE.md
+parent: ../AGENTS.md
 ```
 
 ## Overview
