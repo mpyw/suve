@@ -3,14 +3,14 @@ name: declscope-adoption
 description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when clearing a declscope baseline, or when a declscope diagnostic is hard to act on. Covers reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence.
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.13.4
-x-embedded-at: "2026-09-25T07:47:08Z"
-x-embedded-digest: "sha256:96e921f88ee0ed82440857edeb63efeca7ae088bd2ef4c2705df1ea42056e94f"
+x-embedded-version: 0.14.0
+x-embedded-at: "2026-09-26T11:57:01Z"
+x-embedded-digest: "sha256:388a62bcce15dbe409b6dfffc830d7493070df24e53a02ee962efbc2074927fe"
 ---
 
 # Adopting declscope
 
-Written against **declscope 0.13.4**. Check the version first: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.14.0**. Check the version first: this describes how that release behaves, not how an older one does.
 
 ```bash
 declscope -V=full
@@ -20,15 +20,15 @@ declscope -V=full
 
 ## Check what is switched on
 
-Two of the three rules are off unless the repository asks for them. A count of zero may mean the code is clean, or it may mean nothing is being checked.
+The naming rule is off unless the repository asks for it. A count of zero may mean the code is clean, or it may mean nothing is being checked.
 
 | Setting | Default | |
 | --- | --- | --- |
 | `rules.naming.qualify` | `never` | The naming rule is **off** |
 | `rules.naming.exported` | `false` | Even when on, it skips exported declarations |
-| `rules.surplus` | `loose` | The surplus rule is **on**. `strict` also judges each declaration a directive widens; `off` turns it off |
-| `rules.boundary` | `on` | The boundary rule is **on**. `off` leaves only the naming rule |
-| `rules.unused` | `loose` | The unused rule is **on**. It reports an ignore that silenced nothing, and a scope directive no configuration could make bind. `strict` also reports one that restates the scope in force; `off` turns it off. Malformed directives are the `directive` rule's, which is always on |
+| `rules.surplus` | `strict` | The surplus rule is **on** and judges each declaration a directive widens. `loose` judges a directive as a whole; `off` turns it off |
+| `rules.boundary` | `on` | The boundary rule is **on**. `off` stops checking reach; set `surplus: off` alongside it |
+| `rules.unused` | `strict` | The unused rule is **on**. It reports an ignore that silenced nothing, and a scope directive that restates the scope in force. `loose` reports a scope directive only when no configuration could make it bind; `off` turns it off. Malformed directives are the `directive` rule's, which is always on |
 | `filter.only` | None | When set anywhere in the chain, files outside it are never read |
 
 The config is looked up from each analyzed package's directory **upwards**, so a subtree can carry its own and a repository can have several. Find them all, and do not read the root alone:
@@ -44,7 +44,7 @@ find . -name '.declscope.y*ml' -not -path './.git/*' \
   -exec sh -c 'echo "== $1"; cat "$1"' _ {} \;
 ```
 
-Finding none means the naming rule is off everywhere, and the other two are on. Finding one is not the answer on its own. A config that never sets `qualify` leaves that rule off, and one that sets `boundary: off` leaves off the rule this tool exists for.
+Finding none means the naming rule is off everywhere, and `boundary`, `surplus` and `unused` are on. Finding one is not the answer on its own. A config that never sets `qualify` leaves that rule off, and one that sets `boundary: off` leaves off the rule this tool exists for.
 
 **The files compose, so the nearest one does not tell you what applies.** Every file between the package and the module root is read, outermost first. A nearer file owns the keys it states and inherits the rest.
 
@@ -56,18 +56,17 @@ Each file's patterns are read against **its own** directory, and anchor there wh
 
 **The configuration is the repository owner's decision, not yours.** Ask, and wait for an answer, before writing a config file or changing any code.
 
-**The minimum is no config file at all.** `boundary` and `surplus` are on. Those two answer a question about the code, where the naming rule answers one about a convention. Most repositories report a handful. Adopting this much is a complete adoption.
+**The minimum is no config file at all.** `boundary`, `surplus: strict` and `unused: strict` are on. They check reach and whether directives still change anything; the naming rule checks a convention. Adopting this much is a complete adoption.
 
-**Once `boundary` is settled, recommend `rules.surplus: strict` where the repository can take it.** `loose` judges a `//declscope:package` as a whole, so one reached declaration keeps the whole directive quiet. `strict` also reports each declaration the directive widens for nothing, and one `declscope -fix` run inserts every `//declscope:private` it asks for. It adds reports that `loose` does not, so size it first, and ask before writing it, the same as any other config change:
+**Size the default `surplus` findings before changing code.** `loose` judges a `//declscope:package` as a whole, so one reached declaration keeps the whole directive quiet. The default `strict` also reports each declaration the directive widens for nothing, and one `declscope -fix` run inserts every `//declscope:private` it asks for. If the owner wants the narrower check, set `surplus: loose` explicitly.
 
 ```bash
-printf 'rules:\n  surplus: strict\n' > /tmp/s.yaml
-declscope survey -config /tmp/s.yaml -format=json ./... | jq .totals.surplus
+declscope survey -format=json ./... | jq .totals.surplus
 ```
 
-A throwaway `-config` replaces the repository's own config. Copy its keys in first, or the count is taken under the defaults.
+An explicit `-config` replaces the repository's own config. Copy its keys in first when measuring a different mode.
 
-**Offer `rules.unused: strict` the same way.** Under `loose`, a `//declscope:private` that names the scope `defaults.unexported` gives is kept, since another default could make it bind. `strict` reports it, and one `declscope -fix` run deletes it. Offer it only where `defaults.unexported` is settled. Under `strict`, a change of the default reports every directive that restates the new one. Size it the same way, with `jq .totals.unused`.
+**Size the default `unused` findings too.** Under `loose`, a `//declscope:private` that names the scope `defaults.unexported` gives is kept, since another default could make it bind. The default `strict` reports it, and one `declscope -fix` run deletes it. When changing `defaults.unexported`, expect reports for directives that restate the new default. If the owner wants to keep those explicit decisions, set `unused: loose`.
 
 **If the goal is a tidier codebase, offer the naming rule on top.** It is a convention. It fires where nothing is wrong, and it costs real work. Size it before offering, with a throwaway config rather than by counting message fragments:
 
@@ -86,7 +85,7 @@ rules:
 
 | | Measured |
 | --- | --- |
-| Default, no config | A handful in most repositories |
+| Default, no config | Measure in the repository being adopted |
 | `qualify: ondemand` | 89 in one repository whose boundary count was zero |
 | plus `exported: true` | 1008 in a large one |
 | `qualify: always` | More again, including single-unit packages where a prefix distinguishes nothing |
