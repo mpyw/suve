@@ -69,7 +69,7 @@ GOOS=windows GOFLAGS=-tags=production,e2e declscope ./...
 
 The script runs `declscope shrink` under every configuration before the analyzer. shrink reports the exported declarations that nothing outside their `internal/` package uses (`declscope shrink -fix ./...` unexports them), and an unexported declaration becomes private to its file, which only the analyzer checks. It judges only the `internal/` directories nested below the root one: the `gui/` module can import the root `internal/`, so shrink prints "not judged" for those packages. Silence a report with `//declscope:ignore overexported // <reason>`; a bare `//declscope:ignore` does not reach it.
 
-The `declscope-adoption` skill is vendored from the declscope release and is overwritten on each bump, so keep repository-specific notes here, not in that skill.
+The `declscope-authoring` and `declscope-adoption` skills are vendored from the declscope release and are overwritten on each bump, so keep repository-specific notes here, not in those skills.
 
 ## Testing
 
