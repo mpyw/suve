@@ -1,26 +1,24 @@
 ---
 name: declscope-adoption
-description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when clearing a declscope baseline, or when a declscope diagnostic is hard to act on. Covers reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence.
+description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when choosing its configuration, when running declscope shrink for the first time, or when clearing a declscope baseline. Covers sizing each rule before enabling it, reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence. For writing new code in a repository that already runs declscope, use declscope-authoring.
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.14.0
-x-embedded-at: "2026-09-26T11:57:01Z"
-x-embedded-digest: "sha256:388a62bcce15dbe409b6dfffc830d7493070df24e53a02ee962efbc2074927fe"
+x-embedded-version: 0.15.0
+x-embedded-at: "2026-09-29T00:38:54Z"
+x-embedded-digest: "sha256:e0b02287916f1caf95c2986d361eeede60e271837f0283996e9d1c49648fdab3"
 ---
 
 # Adopting declscope
 
-Written against **declscope 0.14.0**. Check the version first: this describes how that release behaves, not how an older one does.
-
-```bash
-declscope -V=full
-```
+Written against **declscope 0.15.0**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
 
 **Read [the README](https://github.com/mpyw/declscope#readme) before the first decision.** This skill covers what to do about the diagnostics. What each directive means, and what the config accepts, is there.
 
+This skill is for introducing declscope. Placing, scoping and naming individual declarations is [declscope-authoring](../declscope-authoring/SKILL.md), installed beside this one. Read it before step 3 of the [order of work](#order-of-work), and before any rename.
+
 ## Check what is switched on
 
-The naming rule is off unless the repository asks for it. A count of zero may mean the code is clean, or it may mean nothing is being checked.
+A count of zero may mean nothing is checked. These are the defaults:
 
 | Setting | Default | |
 | --- | --- | --- |
@@ -44,7 +42,7 @@ find . -name '.declscope.y*ml' -not -path './.git/*' \
   -exec sh -c 'echo "== $1"; cat "$1"' _ {} \;
 ```
 
-Finding none means the naming rule is off everywhere, and `boundary`, `surplus` and `unused` are on. Finding one is not the answer on its own. A config that never sets `qualify` leaves that rule off, and one that sets `boundary: off` leaves off the rule this tool exists for.
+Finding a config is not the answer on its own. One that never sets `qualify` leaves the naming rule off, and one that sets `boundary: off` leaves off the rule this tool exists for.
 
 **The files compose, so the nearest one does not tell you what applies.** Every file between the package and the module root is read, outermost first. A nearer file owns the keys it states and inherits the rest.
 
@@ -54,14 +52,14 @@ Each file's patterns are read against **its own** directory, and anchor there wh
 
 ### Start at the default, and offer the rest
 
-**The configuration is the repository owner's decision, not yours.** Ask, and wait for an answer, before writing a config file or changing any code.
+**Ask before any config change**, as [declscope-authoring](../declscope-authoring/SKILL.md#do-not-hide-a-report) says. That includes the first config file. Wait for an answer before changing any code, too.
 
 **The minimum is no config file at all.** `boundary`, `surplus: strict` and `unused: strict` are on. They check reach and whether directives still change anything; the naming rule checks a convention. Adopting this much is a complete adoption.
 
 **Size the default `surplus` findings before changing code.** `loose` judges a `//declscope:package` as a whole, so one reached declaration keeps the whole directive quiet. The default `strict` also reports each declaration the directive widens for nothing, and one `declscope -fix` run inserts every `//declscope:private` it asks for. If the owner wants the narrower check, set `surplus: loose` explicitly.
 
 ```bash
-declscope survey -format=json ./... | jq .totals.surplus
+declscope survey -format=json ./... | jq .totals.surplus.found
 ```
 
 An explicit `-config` replaces the repository's own config. Copy its keys in first when measuring a different mode.
@@ -72,9 +70,8 @@ An explicit `-config` replaces the repository's own config. Copy its keys in fir
 
 ```bash
 printf 'rules:\n  naming:\n    qualify: ondemand\n    exported: true\n' > /tmp/q.yaml
-declscope survey -config /tmp/q.yaml -format=json ./... | jq .totals.qualify
+declscope survey -config /tmp/q.yaml -format=json ./... | jq .totals.qualify.found
 ```
-
 
 ```yaml
 rules:
@@ -95,7 +92,7 @@ Put the numbers in front of the person deciding, rather than describing the sett
 ```bash
 for q in never ondemand always; do
   printf 'rules:\n  naming:\n    qualify: %s\n    exported: true\n' "$q" > /tmp/q.yaml
-  printf '%-9s %s\n' "$q" "$(declscope -config /tmp/q.yaml ./... 2>&1 | grep -c 'does not carry')"
+  printf '%-9s %s\n' "$q" "$(declscope survey -config /tmp/q.yaml -format=json ./... | jq .totals.qualify.found)"
 done
 ```
 
@@ -106,8 +103,6 @@ Every count in the rest of this skill assumes `qualify: ondemand` with `exported
 **`declscope shrink` reports the exported declarations of `internal/` packages that nothing outside their package uses.** With `-fix` it unexports them. The analyzer cannot answer this: it reads one package, and any importer might use an exported name. Inside `internal/`, Go limits the importers to one directory tree, so `shrink` loads the whole module and sees every one of them.
 
 An exported name inside `internal/` claims that another package depends on it. Where nothing does, the claim is false, and it hides the declaration from the rest of declscope. An exported declaration takes package scope by default, so no boundary is ever reported on it. Unexported, it takes `private`, and the analyzer checks who reaches it.
-
-**It is a subcommand, not a rule the analyzer runs.** `go vet` and golangci-lint never report it, and it has no config key. A clean `declscope ./...` says nothing about it.
 
 ### Run it before the analyzer
 
@@ -127,18 +122,7 @@ Ask before step 2, the same as any other change. The fix renames every identifie
 
 ### Reading what it reports
 
-| Report | What to do |
-| --- | --- |
-| `... uses it` and nothing more | The fix is offered. Apply it with `-fix` |
-| `... (no fix: <reason>)` | A use may exist that `shrink` cannot prove, or the rename is unsafe. **Do not unexport it by hand.** Read the reason first |
-| `... only the external tests of <pkg> use it` | Keep it exported. Add `//declscope:ignore overexported // <why>` when the tests use it on purpose |
-| `declscope shrink: not judged: <pkg>: <reason>` on stderr | That package was not checked. It is not clean |
-
-**A package not judged is not a package with nothing to report.**
-
-`shrink` stands down wherever an importer could be unseen. That is outside `internal/`, in `package main`, and beside assembly or cgo. It is also under an `internal/` that a nested module's path extends. The stderr line names each such package, and the exit status ignores it.
-
-Silence a report with `//declscope:ignore overexported` and a reason. A bare `//declscope:ignore` does not reach this rule. `shrink` reports an ignore that silenced nothing, as the analyzer does for its own.
+What each report asks of you, and where `shrink` stands down, is in [Reading what shrink reports](../declscope-authoring/SKILL.md#reading-what-shrink-reports). It is not a rule the analyzer runs, so `go vet` and golangci-lint never report it.
 
 **Deleting unused code is not `shrink`'s job.** Once a declaration is unexported, staticcheck's `unused` and gopls' `unusedfunc` report it when nothing uses it. Run them after `shrink`, not before.
 
@@ -151,13 +135,9 @@ Run it before the analyzer there too, so that a failure reads in the order it is
 - run: declscope ./...
 ```
 
-**Names written as strings are outside what `shrink` can see.**
-
-A template can name a field, and a constant can go to `reflect.Value.MethodByName`. A script can read the symbol table. Each uses a declaration by name. When the value reaches them through an interface, `shrink` already treats it as used. When it does not, add the ignore with the reason.
-
 ## The two kinds of report
 
-declscope reports two things. **Read them separately.**
+The analyzer reports two things, and `shrink` a third. **Read them separately.**
 
 | Rule | What it means |
 | --- | --- |
@@ -169,7 +149,7 @@ Boundary first. It is the one that points at structure.
 
 ## Measure before deciding
 
-A count is not a work list. Group it first — with two commands, not with `grep`.
+A count is not a work list. Group it first. Use two commands, not `grep`.
 
 ```bash
 declscope survey -format=json ./...           # which package to open first
@@ -178,13 +158,21 @@ declscope inspect -format=json <that package> # what shape it is in
 
 `-format` takes `markdown` (the default, readable in a terminal and paste-ready) or `json`. Read the JSON.
 
-Add `-test=false` once the first pass is read. In a large package most of what crosses is scaffolding — `export_test.go` reaching internals is what that file is for — and it outranks the crossings worth acting on.
+Add `-test=false` once the first pass is read. In a large package, most of what crosses is test scaffolding. `export_test.go` reaching internals is what that file is for. It sorts above the crossings worth acting on.
 
-**`survey` refuses to print a count it cannot stand behind.** It stops on a package that does not type-check, and it reports what was in force before anything else: which config governed which packages, whether each rule was on, and how many entries a baseline holds. A rule that was not asked prints `-`, never `0` — including a rule that stood itself down, as `surplus` does for a package holding assembly, cgo or a build-excluded file.
+**`survey` refuses to print a count it cannot stand behind.** It stops on a package that does not type-check.
+
+It reports what was in force before anything else:
+
+- which config governed which packages;
+- whether each rule was on;
+- how many entries a baseline holds.
+
+A rule that was not asked prints `-`, never `0`. That includes a rule that stood itself down. `surplus` does so for a package holding a generated, assembly, cgo or build-excluded file. It does so too under `-test=false` when the package has in-package tests.
 
 `-allow-errors` continues past a package that does not compile. It is named under `type check` and given no row, so nothing in the tables reads as a clean result for it.
 
-That removes three steps this skill used to require. Do **not** move the baseline aside to measure: `survey` reports `baselined` as its own column, so what is suppressed and what is left are visible at once. Do not count message fragments either; the wording of a diagnostic is not an interface, and the JSON is.
+Do **not** move the baseline aside to measure: `survey` reports `baselined` as its own column, so what is suppressed and what is left are visible at once. Do not count message fragments either; the wording of a diagnostic is not an interface, and the JSON is.
 
 | What you need | Where it is |
 | --- | --- |
@@ -195,21 +183,30 @@ That removes three steps this skill used to require. Do **not** move the baselin
 | Where the structure is | `inspect`'s `edges[]`, one row per declaration **and reaching namespace** |
 | Where a name is wrong | `inspect`'s `names[]`, with `fixable` saying whether `-fix` would rename it |
 
-**`clears` is the number the decision turns on.** A crossing's `reached` says how much of a namespace it touches; `clears` says how many findings would go away if the two became one namespace, which is less whenever a third namespace reaches the same declaration. Rank the work by `clears`, not by `reached` or `uses`.
+**`clears` is the number the decision turns on.** A crossing's `reached` says how much of a namespace it touches. `clears` says how many findings would go away if the two became one namespace. It is smaller whenever a third namespace reaches the same declaration. Rank the work by `clears`, not by `reached` or `uses`.
 
 **`edges[]` does not count findings.** One declaration reached from three namespaces is three rows and one finding, so the rows always outnumber `findings.boundary.reported`. Count distinct `declaration` values, or read `crossings[]`, or read the tally.
 
-A crossing's `state` is one of six. Three are outcomes of a finding — `reported`, `baselined`, `ignored` — and three say why there was no finding: `declared` (a `//declscope:package` says it is shared), `open` (package-scoped because nothing says otherwise, which is most exported API), and `unchecked` (`rules.boundary` is `off`).
+An edge's `state` (`edges[].state`) is one of six:
 
-**A package with nothing reported, much baselined and nothing declared has never been decided about.** It reads as clean under the analyzer alone, which is why `declared` is a column.
+| State | Meaning |
+| --- | --- |
+| `reported` | A finding, printed |
+| `baselined` | A finding, absorbed by the baseline |
+| `ignored` | A finding, silenced by an ignore |
+| `declared` | No finding: a `//declscope:package` says it is shared |
+| `open` | No finding: package-scoped because nothing says otherwise, which is most exported API |
+| `unchecked` | No finding: `rules.boundary` is `off` |
+
+**Nothing reported, much baselined and nothing declared means nobody has decided.** Such a package reads as clean under the analyzer alone. That is why `declared` is a column.
 
 Boundary violations cluster. Measured across eight repositories, one structural decision cleared between 10 and 100 entries every time. In one repository 34 of 35 sat in a single namespace.
 
-**Start where the count is concentrated, not where it is large.** The row order does not give you that: rows are sorted by how much is undecided, which is size. Concentration is the `largest crossing` column — a package with 12 findings spread over 6 namespaces sorts above one with 4 in a single crossing, and the second is the one where one decision clears the cluster.
+**Start where the count is concentrated, not where it is large.** The row order does not give you that. Rows are sorted by how much is undecided, which is size. Concentration is the `largest crossing` column. A package with 12 findings over 6 namespaces sorts above one with 4 in a single crossing. The second is where one decision clears the cluster.
 
 ### Reading a saturation
 
-**This needs the naming rule switched on.** At the configuration to start from it is off, so `qualifyTargets` is `0`, `names[]` is empty and every ratio prints `-`. Measure it with the throwaway config above before reading any of what follows.
+**This needs the naming rule switched on.** It is off at the default configuration. Then `qualifyTargets` is `0`, `names[]` is empty and every ratio prints `-`. Measure with the throwaway config above before reading what follows.
 
 `inspect` reports, per namespace, how many of the declarations the naming rule examines there fail it. The ratio says which thing is wrong, and the answer is rarely the rename the diagnostic suggests.
 
@@ -230,107 +227,22 @@ A baselined finding counts toward it: the baseline defers a decision rather than
 | A type's fields are read from four files | One type filed by concern | The files share a namespace, or join the core |
 | Calls run one way through three files | A pipeline, and the layers are real | Keep the files. Declare only what crosses, with the reason |
 | `pkg.Foo` is asked to become `pkg.PkgFoo` | The file is the package's API | `//declscope:core` |
-| One helper is used from several files | Shared on purpose | `//declscope:package // why` at the declaration |
+| One helper is used from several files | Shared on purpose | Move it to a file named for its concept, then `//declscope:package // why`. See [Where a new declaration goes](../declscope-authoring/SKILL.md#where-a-new-declaration-goes) |
 | A name reads badly with its namespace in it | Often the file name, not the declaration | Rename the file |
 
-**Two rows can fire on one cluster.** A mutual pair whose declarations are also read from four other namespaces matches both the second row and the third. Take the one with the larger `clears`: merging two namespaces settles only what no third namespace reaches, so the fan-in case is usually the smaller change and the core case the larger.
+**Two rows can fire on one cluster.** A mutual pair whose declarations four other namespaces also read matches both the second row and the third. Take the one with the larger `clears`. Merging two namespaces settles only what no third namespace reaches. So the fan-in case is usually the smaller change, and the core case the larger.
 
 That last row is worth its own note. In one repository a single file held three concerns, and splitting it into three cleared every entry in that cluster **without renaming a single declaration**. The file name was the thing that was wrong.
 
-## Shared structs: private fields
+## Scopes and names of single declarations
 
-When other namespaces use a struct, give each field the smallest scope it needs. The type states the widest one, and each field narrows it only where it can.
-
-| Declaration | Directive |
-| --- | --- |
-| The struct type, spelled from another namespace | `//declscope:package`. Its fields inherit it |
-| A field no other namespace reads | `//declscope:private`, after its doc comment and a `//` line |
-| A field another namespace reads | None |
-| An embedded field | None. It is not a target |
-
-**Do not restate the type's scope on a field.** A `//declscope:package` on a field under a `//declscope:package` type binds nothing. The same goes for any directive on an embedded field. Both are reported:
-
-```text
-unused //declscope:package on callee.shared: nothing it reaches takes a scope
-unused //declscope:private: no checked declaration carries it
-```
-
-**Put the private fields last.** The fields other stages read are the struct's interface, so they come first:
-
-```go
-// callee is a resolved call target.
-//
-//declscope:package
-type callee struct {
-	// obj is the declared function or method, when there is one.
-	obj *types.Func
-	// inputs are the values passed.
-	inputs []ssa.Value
-	// builtin is set for a call to a builtin function.
-	builtin *ssa.Builtin
-	// fn is the function called, when it is known statically.
-	//
-	//declscope:private
-	fn *ssa.Function
-}
-```
-
-> [!WARNING]
-> Do not reorder fields where the order is observable. Add the directives in place instead.
->
-> | Order is observable through | |
-> | --- | --- |
-> | Unkeyed composite literals | `callee{f, in, b, fn}` binds by position |
-> | Positional or binary encodings | The wire format follows the field order |
-> | `unsafe` offsets | `unsafe.Offsetof` changes |
-> | 64-bit atomics | They rely on first-word alignment on 32-bit platforms |
-
-To find which fields cross, let declscope tell you:
-
-1. Mark every field `//declscope:private`
-2. Run declscope
-3. Remove the directive from each field it reports as `declared private by //declscope:private, but is used from namespace ...`
-4. Move the fields that kept it to the bottom
-
-> [!TIP]
-> Under `rules.surplus: strict`, declscope reports these fields itself. It also reports each declaration under a file-level `//declscope:package` that no other namespace uses. One `declscope -fix` run inserts every `//declscope:private`. Step 4 stays manual, because the fix never moves a field.
-
-**A type nobody else spells needs no directive.** Sometimes callers only get it from a constructor, and never spell its name or its fields. Then `//declscope:package` on the type is reported as surplus:
-
-```text
-//declscope:package on hidden, hidden.a: no use from another namespace is visible to declscope
-```
-
-Keep that type and all its fields private. Expose small package-scoped functions or methods that return what the callers need.
-
-Do not reach for `//declscope:core` or a file-level `//declscope:package` to quiet these reports. Both hide the boundaries instead of stating them.
-
-## Naming
-
-The namespace may sit anywhere in the name and the right edge may fall inside a word. A prefix is one answer, not the answer.
-
-| Namespace | Carried by |
-| --- | --- |
-| `collect` | `collectFiles`, `addFuncToCollection`, `parseCollectedDecl` |
-| `parse` | `SpecifierParser` |
-| `store` | `storing`, `stored` |
-
-Prefer natural word order. A verb namespace makes a prefix read as an instruction: `collectAddFunc` is a command, `addFuncToCollection` is a name. Entry points are the exception, since `collectFiles` already reads as what it does.
-
-When the namespace is an inflected form, the stem is not derived from it. A `tracing.go` declaring `trace*` needs one line:
-
-```yaml
-rules:
-  naming:
-    vocabulary:
-      tracing: [trace]
-```
+Once the structure is settled, what is left is per declaration. Field scopes are in [Shared structs](../declscope-authoring/SKILL.md#shared-structs-private-fields), and names in [Naming](../declscope-authoring/SKILL.md#naming). During an adoption, one `declscope -fix` run under `surplus: strict` adds every field directive the structs need. Moving those fields to the end stays manual.
 
 ## Do not turn the check off
 
-**Never set `rules.boundary: off` to reach zero.** It silences the rule this tool exists for, and every count after it is meaningless. It is the repository owner's choice, for a repository that wants the ownership mark in a name without the scope behind it. It is never a step in an adoption. A baseline is one, because it records what the code already has and still reports what is new. Ask before writing it, the same as any other config change, and never propose it as a way past a diagnostic you could not resolve.
+**Never set `rules.boundary: off` to reach zero.** Every count after it is meaningless. It is the repository owner's choice, for a repository that wants the ownership mark in a name without the scope behind it. It is never a step in an adoption. A baseline is one, because it records what the code already has and still reports what is new. The other shortcuts are in [Do not hide a report](../declscope-authoring/SKILL.md#do-not-hide-a-report).
 
-`//declscope:core` exempts a file from the naming rule and merges it into one namespace. Marking every file in a package core means declscope checks nothing there.
+Marking every file in a package core leaves no boundary and no naming check there. What core does is in [Where a new declaration goes](../declscope-authoring/SKILL.md#where-a-new-declaration-goes).
 
 **Count it.** A package where every file is core needs a reason you can state in one sentence. There should be few of them.
 
@@ -354,36 +266,19 @@ If the goal is zero, delete the file rather than regenerating it. An empty basel
 
 These cost real time. Each was measured, not guessed.
 
-**A failed build reports zero diagnostics.** It looks exactly like success. `declscope survey` refuses instead of printing such a count, naming the packages that did not compile, so measure through it:
-
-```bash
-declscope survey ./...              # refuses on a package that does not type-check
-go build ./... && declscope ./...   # never read a bare count without this
-```
+**Measure through `declscope survey`.** Why a bare count misleads, and the bulk-rename trap, are in [Traps](../declscope-authoring/SKILL.md#traps).
 
 **A zero may be the filter, not the code.** A `filter.only` anywhere in the chain can leave a package with nothing to read. A package nothing was read from reports nothing. `declscope` says so only when a nested `only` was cancelled by one above it, so the quiet cases stay quiet. `declscope inspect` lists the files each namespace was built from (`namespaces[].files`); a package whose files are missing from it is one the filter removed.
 
-**A clean analyzer says nothing about `shrink`.** The analyzer never reports `overexported`, and `shrink` never reports what the analyzer does. Run both, `shrink` first.
-
 **A zero from `boundary` may be the switch, not the code.** `rules.boundary: off` silences the rule entirely, and the run looks like a clean repository. Read every config before reporting a count, the same way you would for `qualify`.
 
-**`-fix` widens; it does not draw boundaries.** On a codebase with boundary findings, `declscope -fix ./...` inserts `//declscope:package` above every crossed declaration — the wholesale widening step 2 of the order of work exists to avoid. Run `-fix -diff` first and read it. Its place in an adoption is renaming, after the structure is settled, and only where `names[].fixable` is true.
+**`-fix` widens**, as [declscope-authoring](../declscope-authoring/SKILL.md#acting-on-a-diagnostic-your-change-caused) explains. Over a whole codebase that is the wholesale widening step 3 of the order of work exists to avoid. In an adoption, use it only for renames after the structure is settled, where `names[].fixable` is true.
 
 **A dirty working tree poisons a comparison.** Measuring option A, then option B without reverting, measures A and B together. `git stash` leaves untracked files behind, so a new file from the previous attempt stays. Copy the tree instead:
 
 ```bash
 cp -r repo /tmp/try-a   # and measure there
 ```
-
-**A bulk rename reaches further than intended.** A `\bname\b` substitution across every `.go` file will hit `keys`, `named` and `check`. Those live in testdata and in unrelated packages too. Limit the paths, then read `git status` to see what actually changed.
-
-**A file created to satisfy a name is often a file too small to exist.** One rename produced a file of about twenty lines holding one constructor. It returned a type declared in the file beside it, and renaming the constructor where it already was turned out to be the answer. Before adding a file, ask whether renaming the declaration would do.
-
-**`//declscope:namespace` goes before the package clause.** Placed after it, the directive is silently inert and the diagnostics do not move. If a change makes no difference at all, check the placement first.
-
-## Known gaps
-
-[#64](https://github.com/mpyw/declscope/issues/64) is open. Inflections are generated only in the lengthening direction, so a `storing.go` is never carried by `store*`. The vocabulary entry above covers it in one line.
 
 ## Order of work
 
@@ -392,6 +287,6 @@ cp -r repo /tmp/try-a   # and measure there
 3. Clear `boundary` by moving the boundary, not by widening everything
 4. Re-measure with `survey`. Naming often falls with it, since merging two namespaces into one takes `ondemand` out of force
 5. Fix the file names that do not match their contents
-6. Rename what is left, in natural word order
+6. Rename what is left, following [Naming](../declscope-authoring/SKILL.md#naming)
 7. Delete the baseline
-8. Check the core count, and `go build`, `go test`, `declscope shrink` and `declscope` in that order
+8. Check the core count, and `go vet`, `go test`, `declscope shrink` and `declscope` in that order
