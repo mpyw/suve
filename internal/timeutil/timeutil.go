@@ -33,9 +33,9 @@ func loadLocation() *time.Location {
 	return loc
 }
 
-// GetLocation returns the timezone location based on TZ environment variable.
+// getLocation returns the timezone location based on TZ environment variable.
 // The result is cached after the first call.
-func GetLocation() *time.Location {
+func getLocation() *time.Location {
 	locationOnce.Do(func() {
 		locationCache = loadLocation()
 	})
@@ -46,19 +46,19 @@ func GetLocation() *time.Location {
 // FormatRFC3339 formats the given time in RFC3339 format using the
 // timezone from TZ environment variable.
 func FormatRFC3339(t time.Time) string {
-	return t.In(GetLocation()).Format(time.RFC3339)
+	return t.In(getLocation()).Format(time.RFC3339)
 }
 
 // FormatDate formats the given time as a YYYY-MM-DD date using the
 // timezone from TZ environment variable.
 func FormatDate(t time.Time) string {
-	return t.In(GetLocation()).Format("2006-01-02")
+	return t.In(getLocation()).Format("2006-01-02")
 }
 
 // FormatDateTime formats the given time as a YYYY-MM-DD HH:MM:SS datetime using
 // the timezone from TZ environment variable.
 func FormatDateTime(t time.Time) string {
-	return t.In(GetLocation()).Format("2006-01-02 15:04:05")
+	return t.In(getLocation()).Format("2006-01-02 15:04:05")
 }
 
 // ResetLocationCache resets the cached location.

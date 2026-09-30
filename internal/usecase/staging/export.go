@@ -13,9 +13,9 @@ type ExportOp string
 
 // Export error Op codes.
 const (
-	ExportOpLoad  ExportOp = "load"
-	ExportOpWrite ExportOp = "write"
-	ExportOpClear ExportOp = "clear"
+	exportOpLoad  ExportOp = "load"
+	exportOpWrite ExportOp = "write"
+	exportOpClear ExportOp = "clear"
 )
 
 // ExportInput holds input for the export use case.
@@ -52,7 +52,7 @@ func (u *ExportUseCase) Execute(ctx context.Context, input ExportInput) (*Export
 	// the write succeeded and --keep was not requested).
 	workingState, err := u.Working.Drain(ctx, "", true)
 	if err != nil {
-		return nil, &ExportError{Op: ExportOpLoad, Err: err}
+		return nil, &ExportError{Op: exportOpLoad, Err: err}
 	}
 
 	// Determine which services actually have data to export, along with their
@@ -67,7 +67,7 @@ func (u *ExportUseCase) Execute(ctx context.Context, input ExportInput) (*Export
 
 	for _, t := range targets {
 		if err := u.Target.WriteEnvelope(ctx, t.service, t.state); err != nil {
-			return nil, &ExportError{Op: ExportOpWrite, Err: err}
+			return nil, &ExportError{Op: exportOpWrite, Err: err}
 		}
 
 		output.EntryCount += t.state.EntryCount()
@@ -86,13 +86,13 @@ func (u *ExportUseCase) Execute(ctx context.Context, input ExportInput) (*Export
 		for _, t := range targets {
 			for key := range t.state.Entries[t.service] {
 				if err := u.Working.UnstageEntry(ctx, t.service, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
-					return output, &ExportError{Op: ExportOpClear, Err: err, NonFatal: true}
+					return output, &ExportError{Op: exportOpClear, Err: err, NonFatal: true}
 				}
 			}
 
 			for key := range t.state.Tags[t.service] {
 				if err := u.Working.UnstageTag(ctx, t.service, key); err != nil && !errors.Is(err, staging.ErrNotStaged) {
-					return output, &ExportError{Op: ExportOpClear, Err: err, NonFatal: true}
+					return output, &ExportError{Op: exportOpClear, Err: err, NonFatal: true}
 				}
 			}
 		}
@@ -144,11 +144,11 @@ type ExportError struct {
 
 func (e *ExportError) Error() string {
 	switch e.Op {
-	case ExportOpLoad:
+	case exportOpLoad:
 		return "failed to read the working staging area: " + e.Err.Error()
-	case ExportOpWrite:
+	case exportOpWrite:
 		return "failed to write export file: " + e.Err.Error()
-	case ExportOpClear:
+	case exportOpClear:
 		return "failed to clear the working staging area: " + e.Err.Error()
 	default:
 		return e.Err.Error()

@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	// ErrPassphraseMismatch is returned when confirmation doesn't match.
-	ErrPassphraseMismatch = errors.New("passphrases do not match")
+	// errPassphraseMismatch is returned when confirmation doesn't match.
+	errPassphraseMismatch = errors.New("passphrases do not match")
 	// ErrCancelled is returned when user cancels the operation.
 	ErrCancelled = errors.New("operation cancelled")
 )
@@ -73,7 +73,7 @@ func (p *Prompter) PromptForEncrypt() (string, error) {
 	output.Println(p.Stderr, "") // newline after password input
 
 	if pass != confirm {
-		return "", ErrPassphraseMismatch
+		return "", errPassphraseMismatch
 	}
 
 	return pass, nil

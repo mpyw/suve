@@ -8,8 +8,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
 )
 
 // testExistingValue is the remote value the reducer tests stage against.
@@ -52,7 +55,7 @@ func TestReduceEntry_Add(t *testing.T) {
 			},
 			action:    EntryActionAdd{Value: "new-value"},
 			wantState: EntryStagedStateUpdate{DraftValue: "updated"},
-			wantError: ErrCannotAddToUpdate,
+			wantError: errCannotAddToUpdate,
 		},
 		{
 			name: "Delete -> ERROR (inconsistent state: staged for delete but resource not on AWS)",
@@ -62,7 +65,7 @@ func TestReduceEntry_Add(t *testing.T) {
 			},
 			action:    EntryActionAdd{Value: "new-value"},
 			wantState: EntryStagedStateDelete{},
-			wantError: ErrCannotAddToDelete,
+			wantError: errCannotAddToDelete,
 		},
 		{
 			name: "ERROR when resource already exists on AWS",
@@ -84,7 +87,7 @@ func TestReduceEntry_Add(t *testing.T) {
 			},
 			action:    EntryActionAdd{Value: "new-value"},
 			wantState: EntryStagedStateDelete{},
-			wantError: ErrCannotAddToDelete,
+			wantError: errCannotAddToDelete,
 		},
 	}
 
@@ -379,7 +382,7 @@ func TestReduceTag_Tag(t *testing.T) {
 				CurrentRemoteTags: map[string]string{},
 			},
 			wantStagedTag: StagedTags{},
-			wantError:     ErrCannotTagDelete,
+			wantError:     errCannotTagDelete,
 		},
 		{
 			name:       "Allow tag when entry is Create",
@@ -445,7 +448,7 @@ func TestReduceTag_Tag(t *testing.T) {
 				CurrentRemoteTags: map[string]string{},
 			},
 			wantStagedTag: StagedTags{},
-			wantError:     ErrCannotTagNotFound,
+			wantError:     errCannotTagNotFound,
 		},
 	}
 
@@ -453,7 +456,7 @@ func TestReduceTag_Tag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := ReduceTag(tt.entryState, tt.stagedTags, tt.action)
+			result := reduceTagAction(tt.entryState, tt.stagedTags, tt.action)
 			assert.Equal(t, tt.wantStagedTag.ToSet, result.NewStagedTags.ToSet)
 			assert.Equal(t, tt.wantStagedTag.ToUnset.Values(), result.NewStagedTags.ToUnset.Values())
 			assert.Equal(t, tt.wantError, result.Error)
@@ -540,7 +543,7 @@ func TestReduceTag_Untag(t *testing.T) {
 				CurrentRemoteTagKeys: maputil.NewSet("env"),
 			},
 			wantStagedTag: StagedTags{},
-			wantError:     ErrCannotUntagDelete,
+			wantError:     errCannotUntagDelete,
 		},
 		{
 			name:       "Auto-skip also clears ToSet (cancel previous tag)",
@@ -580,7 +583,7 @@ func TestReduceTag_Untag(t *testing.T) {
 				CurrentRemoteTagKeys: maputil.NewSet("env"),
 			},
 			wantStagedTag: StagedTags{},
-			wantError:     ErrCannotUntagNotFound,
+			wantError:     errCannotUntagNotFound,
 		},
 	}
 
@@ -588,7 +591,7 @@ func TestReduceTag_Untag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := ReduceTag(tt.entryState, tt.stagedTags, tt.action)
+			result := reduceTagAction(tt.entryState, tt.stagedTags, tt.action)
 			assert.Equal(t, tt.wantStagedTag.ToSet, result.NewStagedTags.ToSet)
 			assert.Equal(t, tt.wantStagedTag.ToUnset.Values(), result.NewStagedTags.ToUnset.Values())
 			assert.Equal(t, tt.wantError, result.Error)
@@ -699,7 +702,7 @@ func TestReduceEntry_Delete_NotFound(t *testing.T) {
 		StagedState:  EntryStagedStateNotStaged{},
 	}
 	result := ReduceEntry(state, EntryActionDelete{})
-	assert.Equal(t, ErrCannotDeleteNotFound, result.Error)
+	assert.Equal(t, errCannotDeleteNotFound, result.Error)
 	assert.Equal(t, EntryStagedStateNotStaged{}, result.NewState.StagedState)
 }
 
@@ -714,7 +717,7 @@ func TestReduceEntry_Delete_StagedUpdateRemoteVanished(t *testing.T) {
 		StagedState:  EntryStagedStateUpdate{DraftValue: "v2"},
 	}
 	result := ReduceEntry(state, EntryActionDelete{})
-	assert.Equal(t, ErrCannotDeleteStagedUpdateNotFound, result.Error)
+	assert.Equal(t, errCannotDeleteStagedUpdateNotFound, result.Error)
 	assert.Contains(t, result.Error.Error(), "reset")
 	assert.Equal(t, EntryStagedStateUpdate{DraftValue: "v2"}, result.NewState.StagedState)
 }
@@ -730,6 +733,26 @@ func TestReduceEntry_Delete_InconsistentState(t *testing.T) {
 	}
 	result := ReduceEntry(state, EntryActionDelete{})
 	// This should still return error since the resource doesn't exist
-	assert.Equal(t, ErrCannotDeleteNotFound, result.Error)
+	assert.Equal(t, errCannotDeleteNotFound, result.Error)
 	assert.Equal(t, EntryStagedStateDelete{}, result.NewState.StagedState)
+}
+
+// ExecuteTag returns the reducer's error for a tag on an entry staged for
+// deletion.
+func TestExecuteTag_Error(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	executor := NewExecutor(store)
+
+	action := TagActionTag{
+		Tags: map[string]string{"env": "prod"},
+	}
+	existingValue := testExistingValue
+	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}}
+
+	// Tag on DELETE should error
+	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entryState, StagedTags{}, action, nil)
+	require.ErrorIs(t, err, errCannotTagDelete)
+	assert.Equal(t, errCannotTagDelete, result.Error)
 }

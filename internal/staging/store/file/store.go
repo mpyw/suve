@@ -1,6 +1,6 @@
 // The Store is the unit this package is named for (package file = the
 // file-based store); file.StoreSetWarnWriter-style prefixes would only stutter,
-// and EnvAllowPlaintext / SetWarnWriter are spelled from outside the package.
+// and SetWarnWriter is spelled from outside the package.
 //declscope:core
 
 // Package file provides file-based staging storage.
@@ -42,21 +42,21 @@ const (
 	baseDirName = ".suve"
 	stagingDir  = "staging"
 
-	// EnvAllowPlaintext names the env var that, when set to a truthy value, lets
+	// envAllowPlaintext names the env var that, when set to a truthy value, lets
 	// the working store write UNENCRYPTED staging state in a non-interactive
 	// session (see writeFile). It is the explicit opt-in for automation that
 	// genuinely cannot provide a key; SUVE_STAGING_KEY (which actually encrypts)
 	// is preferred.
-	EnvAllowPlaintext = "SUVE_STAGING_ALLOW_PLAINTEXT"
+	envAllowPlaintext = "SUVE_STAGING_ALLOW_PLAINTEXT"
 )
 
-// ErrPlaintextConsentRequired is returned when the working store would write
+// errPlaintextConsentRequired is returned when the working store would write
 // unencrypted staging state in a non-interactive session without the operator
 // having opted in. It is exported so callers can errors.Is against it.
-var ErrPlaintextConsentRequired = errors.New(
+var errPlaintextConsentRequired = errors.New(
 	"refusing to write unencrypted staging state in a non-interactive session: " +
 		"no staging encryption key is available. Set SUVE_STAGING_KEY (base64 32-byte key) " +
-		"to encrypt — recommended — or " + EnvAllowPlaintext + "=1 to store it unencrypted")
+		"to encrypt — recommended — or " + envAllowPlaintext + "=1 to store it unencrypted")
 
 // fileMu protects concurrent access to the state files within a process.
 //
@@ -169,11 +169,11 @@ func scopeDir(scope provider.Scope) (string, error) {
 	return filepath.Join(homeDir, baseDirName, stagingDir, scope.Key()), nil
 }
 
-// NewStore creates a new split (working) file Store for the given scope.
+// newStore creates a new split (working) file Store for the given scope.
 // State is stored under ~/.suve/staging/{scope.Key()}/ split into
 // param.json and secret.json. No encryption key is configured; use
 // NewWorkingStore for the encrypted working store.
-func NewStore(scope provider.Scope) (*Store, error) {
+func newStore(scope provider.Scope) (*Store, error) {
 	dir, err := scopeDir(scope)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func NewStore(scope provider.Scope) (*Store, error) {
 // (stage add/edit/delete/status/diff/apply/reset and the working side of
 // export/import).
 func NewWorkingStore(scope provider.Scope) (*Store, error) {
-	s, err := NewStore(scope)
+	s, err := newStore(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -361,12 +361,12 @@ func warnPlaintextWithKey(path string) {
 		"and discard them with `stage reset`\n", path)
 }
 
-// plaintextConsentGranted reports whether EnvAllowPlaintext opts the caller in
+// plaintextConsentGranted reports whether envAllowPlaintext opts the caller in
 // to unencrypted staging writes. Parsed leniently: unset/empty is false, a
 // parseable bool is honored (so "0"/"false" stay off), and any other non-empty
 // value counts as consent.
 func plaintextConsentGranted() bool {
-	v, ok := lookupEnvFunc(EnvAllowPlaintext)
+	v, ok := lookupEnvFunc(envAllowPlaintext)
 	if !ok || v == "" {
 		return false
 	}
@@ -384,10 +384,10 @@ func NewStoreWithPath(path string) *Store {
 	return &Store{stateFilePath: path}
 }
 
-// NewStoreWithPassphrase creates a new split (working) file Store for the given
+// newStoreWithPassphrase creates a new split (working) file Store for the given
 // scope with a passphrase for encryption. Primarily for testing.
-func NewStoreWithPassphrase(scope provider.Scope, passphrase string) (*Store, error) {
-	s, err := NewStore(scope)
+func newStoreWithPassphrase(scope provider.Scope, passphrase string) (*Store, error) {
+	s, err := newStore(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -627,8 +627,8 @@ func (s *Store) writeFile(path string, state *staging.State) error {
 		// A working store with no key, about to persist secrets UNENCRYPTED, in a
 		// non-interactive session (CI/pipes/GUI) without an explicit opt-in. An
 		// interactive run keeps the historical warn-and-proceed; automation must
-		// choose encryption (SUVE_STAGING_KEY) or consent (EnvAllowPlaintext).
-		return ErrPlaintextConsentRequired
+		// choose encryption (SUVE_STAGING_KEY) or consent (envAllowPlaintext).
+		return errPlaintextConsentRequired
 	}
 
 	if err := writeFileAtomic(path, data); err != nil {

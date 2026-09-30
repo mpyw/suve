@@ -14,23 +14,29 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// StatusRunner executes status operations using a usecase.
-type StatusRunner struct {
-	UseCase *stagingusecase.StatusUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// statusRunner executes status operations using a usecase.
+//
+//declscope:package // command.go and global_status.go build and run it
+type statusRunner struct {
+	useCase *stagingusecase.StatusUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// StatusOptions holds options for the status command.
-type StatusOptions struct {
-	Name    string
-	Verbose bool
+// statusOptions holds options for the status command.
+//
+//declscope:package // command.go fills it from the flags
+type statusOptions struct {
+	name    string
+	verbose bool
 }
 
-// Run executes the status command.
-func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
-	result, err := r.UseCase.Execute(ctx, stagingusecase.StatusInput{
-		Name: opts.Name,
+// run executes the status command.
+//
+//declscope:package // command.go runs it
+func (r *statusRunner) run(ctx context.Context, opts statusOptions) error {
+	result, err := r.useCase.Execute(ctx, stagingusecase.StatusInput{
+		Name: opts.name,
 	})
 	if err != nil {
 		return err
@@ -38,27 +44,27 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 
 	totalCount := len(result.Entries) + len(result.TagEntries)
 	if totalCount == 0 {
-		output.Info(r.Stdout, "No %s changes staged.", result.ServiceName)
+		output.Info(r.stdout, "No %s changes staged.", result.ServiceName)
 
 		return nil
 	}
 
 	// For single item query, just print the entry
-	if opts.Name != "" {
-		printer := &staging.EntryPrinter{Writer: r.Stdout}
+	if opts.name != "" {
+		printer := &staging.EntryPrinter{Writer: r.stdout}
 		for _, entry := range result.Entries {
 			key := staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}
-			printer.PrintEntry(key, stagingEntryFromStatus(entry), opts.Verbose, entry.ShowDeleteOptions)
+			printer.PrintEntry(key, stagingEntryFromStatus(entry), opts.verbose, entry.ShowDeleteOptions)
 		}
 
 		for _, tagEntry := range result.TagEntries {
-			r.printTagEntry(tagEntry, opts.Verbose)
+			r.printTagEntry(tagEntry, opts.verbose)
 		}
 
 		return nil
 	}
 
-	r.printService(result, opts.Verbose)
+	r.printService(result, opts.verbose)
 
 	return nil
 }
@@ -67,12 +73,12 @@ func (r *StatusRunner) Run(ctx context.Context, opts StatusOptions) error {
 // "Staged <service> changes (N):" header.
 //
 //declscope:package // the all-service status (global_status.go) renders through it
-func (r *StatusRunner) printService(result *stagingusecase.StatusOutput, verbose bool) {
-	output.Printf(r.Stdout, "%s (%d):\n",
-		colors.For(r.Stdout).Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)),
+func (r *statusRunner) printService(result *stagingusecase.StatusOutput, verbose bool) {
+	output.Printf(r.stdout, "%s (%d):\n",
+		colors.For(r.stdout).Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)),
 		len(result.Entries)+len(result.TagEntries))
 
-	printer := &staging.EntryPrinter{Writer: r.Stdout}
+	printer := &staging.EntryPrinter{Writer: r.stdout}
 
 	// Sort by (name, namespace): the same App Configuration key staged under
 	// several namespaces is several distinct entries, so we must print each one
@@ -108,7 +114,7 @@ func (r *StatusRunner) printService(result *stagingusecase.StatusOutput, verbose
 	}
 }
 
-func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bool) {
+func (r *statusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bool) {
 	parts := []string{}
 	if len(e.Add) > 0 {
 		parts = append(parts, fmt.Sprintf("+%d tag(s)", len(e.Add)))
@@ -124,18 +130,18 @@ func (r *StatusRunner) printTagEntry(e stagingusecase.StatusTagEntry, verbose bo
 	// so the same key tagged under several namespaces is unambiguous.
 	nameLabel := e.Name
 	if e.Namespace != "" {
-		nameLabel += " " + colors.For(r.Stdout).FieldLabel("["+e.Namespace+"]")
+		nameLabel += " " + colors.For(r.stdout).FieldLabel("["+e.Namespace+"]")
 	}
 
-	output.Printf(r.Stdout, "  %s %s [%s]\n", colors.For(r.Stdout).Info("T"), nameLabel, summary)
+	output.Printf(r.stdout, "  %s %s [%s]\n", colors.For(r.stdout).Info("T"), nameLabel, summary)
 
 	if verbose {
 		for key, value := range e.Add {
-			output.Printf(r.Stdout, "      + %s=%s\n", key, value)
+			output.Printf(r.stdout, "      + %s=%s\n", key, value)
 		}
 
 		for key := range e.Remove {
-			output.Printf(r.Stdout, "      - %s\n", key)
+			output.Printf(r.stdout, "      - %s\n", key)
 		}
 	}
 }

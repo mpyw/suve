@@ -6,12 +6,14 @@ import (
 	"embed"
 )
 
-// Assets contains the embedded frontend build artifacts.
+// assets contains the embedded frontend build artifacts.
 //
 //go:embed all:frontend/dist
-var Assets embed.FS
+//declscope:package // run.go serves it
+var assets embed.FS
 
-// IconAsset contains the embedded application icon.
+// iconAsset contains the embedded application icon.
 //
 //go:embed appicon.png
-var IconAsset []byte
+//declscope:package // run_linux.go sets the window icon with it
+var iconAsset []byte //nolint:unused // only run_linux.go uses it, so other hosts see no use

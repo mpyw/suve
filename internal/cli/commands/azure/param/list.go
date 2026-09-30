@@ -32,9 +32,9 @@ type NamespaceListSource interface {
 	ListWithNamespacesScoped(ctx context.Context) ([]appconfig.KeyNamespace, error)
 }
 
-// NewNamespaceLister adapts an App Configuration namespace listing to the use
+// newNamespaceLister adapts an App Configuration namespace listing to the use
 // case's neutral rows.
-func NewNamespaceLister(source NamespaceListSource) param.NamespacesLister {
+func newNamespaceLister(source NamespaceListSource) param.NamespacesLister {
 	return namespaceListAdapter{source: source}
 }
 
@@ -54,37 +54,37 @@ func (a namespaceListAdapter) ListNamespaces(ctx context.Context) ([]param.ListN
 	}), nil
 }
 
-// ListOptions holds the parsed flags for the App Configuration list command.
-type ListOptions struct {
-	Prefix string
-	Filter string
-	Show   bool
-	HideNS bool
-	Output output.Format
-	// Namespace is the raw --namespace value (the label axis). It is needed only
+// listOptions holds the parsed flags for the App Configuration list command.
+type listOptions struct {
+	prefix string
+	filter string
+	show   bool
+	hideNS bool
+	output output.Format
+	// namespace is the raw --namespace value (the label axis). It is needed only
 	// to tell a single literal namespace (per-key Get can fetch values) from a
 	// wildcard/OR/prefix one (it cannot — see runKeyOnly).
-	Namespace string
+	namespace string
 }
 
-// ListRunner renders the Azure App Configuration listing. When Namespace is set
+// listRunner renders the Azure App Configuration listing. When Namespace is set
 // (the App Configuration default) it prepends a NAMESPACE column; --hide-namespace
-// — or the absence of the App-Config extension — falls through to KeyOnly, the
+// — or the absence of the App-Config extension — falls through to keyOnly, the
 // neutral key-only listing shared with every other provider.
-type ListRunner struct {
-	// Namespace produces per-(key, namespace) rows for the NAMESPACE column. Nil
+type listRunner struct {
+	// namespace produces per-(key, namespace) rows for the NAMESPACE column. Nil
 	// when the resolved store is not Azure App Configuration.
-	Namespace *param.ListNamespacesUseCase
-	// KeyOnly produces the neutral, deduped key-only listing (the --hide-namespace
+	namespace *param.ListNamespacesUseCase
+	// keyOnly produces the neutral, deduped key-only listing (the --hide-namespace
 	// fallback), honoring the store's namespace filter via Reader.List.
-	KeyOnly *param.ListUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+	keyOnly *param.ListUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// Run executes the listing in the mode selected by opts.
-func (r *ListRunner) Run(ctx context.Context, opts ListOptions) error {
-	if opts.HideNS || r.Namespace == nil {
+// run executes the listing in the mode selected by opts.
+func (r *listRunner) run(ctx context.Context, opts listOptions) error {
+	if opts.hideNS || r.namespace == nil {
 		return r.runKeyOnly(ctx, opts)
 	}
 
@@ -93,12 +93,12 @@ func (r *ListRunner) Run(ctx context.Context, opts ListOptions) error {
 
 // runKeyOnly reuses the shared generic list renderer so --hide-namespace output
 // is byte-for-byte the neutral listing.
-func (r *ListRunner) runKeyOnly(ctx context.Context, opts ListOptions) error {
+func (r *listRunner) runKeyOnly(ctx context.Context, opts listOptions) error {
 	runner := &generic.ListRunner{
 		List:    r.keyOnlyEntries(opts),
-		Options: generic.ListOptions{Show: opts.Show, Output: opts.Output},
-		Stdout:  r.Stdout,
-		Stderr:  r.Stderr,
+		Options: generic.ListOptions{Show: opts.show, Output: opts.output},
+		Stdout:  r.stdout,
+		Stderr:  r.stderr,
 	}
 
 	return runner.Run(ctx)
@@ -110,9 +110,9 @@ func (r *ListRunner) runKeyOnly(ctx context.Context, opts ListOptions) error {
 // Get fails (Get cannot address all/multiple namespaces), so the whole listing
 // would be error rows. In that case source the values from the namespaced list
 // — whose response already carries them — and collapse it to key-only rows.
-func (r *ListRunner) keyOnlyEntries(opts ListOptions) func(context.Context) ([]generic.ListEntry, error) {
-	if opts.Show && r.Namespace != nil {
-		if _, err := namespaces.Literal(opts.Namespace); err != nil {
+func (r *listRunner) keyOnlyEntries(opts listOptions) func(context.Context) ([]generic.ListEntry, error) {
+	if opts.show && r.namespace != nil {
+		if _, err := namespaces.Literal(opts.namespace); err != nil {
 			return r.keyOnlyEntriesFromNamespaced(opts)
 		}
 	}
@@ -122,10 +122,10 @@ func (r *ListRunner) keyOnlyEntries(opts ListOptions) func(context.Context) ([]g
 
 // keyOnlyEntriesFromReader is the neutral path: keys (and, with --show, values)
 // come from the provider-neutral use case, byte-for-byte the shared listing.
-func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Context) ([]generic.ListEntry, error) {
+func (r *listRunner) keyOnlyEntriesFromReader(opts listOptions) func(context.Context) ([]generic.ListEntry, error) {
 	return func(ctx context.Context) ([]generic.ListEntry, error) {
-		result, err := r.KeyOnly.Execute(ctx, param.ListInput{
-			Prefix: opts.Prefix, PlainPrefix: true, Filter: opts.Filter, WithValue: opts.Show,
+		result, err := r.keyOnly.Execute(ctx, param.ListInput{
+			Prefix: opts.prefix, PlainPrefix: true, Filter: opts.filter, WithValue: opts.show,
 		})
 		if err != nil {
 			return nil, err
@@ -142,10 +142,10 @@ func (r *ListRunner) keyOnlyEntriesFromReader(opts ListOptions) func(context.Con
 // keyOnlyEntriesFromNamespaced sources values from the namespaced list (which
 // already carries them) and collapses the per-(key, namespace) rows to the
 // deduped key-only rows the --hide-namespace listing shows.
-func (r *ListRunner) keyOnlyEntriesFromNamespaced(opts ListOptions) func(context.Context) ([]generic.ListEntry, error) {
+func (r *listRunner) keyOnlyEntriesFromNamespaced(opts listOptions) func(context.Context) ([]generic.ListEntry, error) {
 	return func(ctx context.Context) ([]generic.ListEntry, error) {
-		result, err := r.Namespace.Execute(ctx, param.ListNamespacesInput{
-			Prefix: opts.Prefix, Filter: opts.Filter, WithValue: true,
+		result, err := r.namespace.Execute(ctx, param.ListNamespacesInput{
+			Prefix: opts.prefix, Filter: opts.filter, WithValue: true,
 		})
 		if err != nil {
 			return nil, err
@@ -203,20 +203,20 @@ var errAmbiguousListValue = errors.New("value differs across namespaces; drop --
 // runNamespaced renders the NAMESPACE column (text: <namespace>TAB<key>[TAB<value>];
 // json: {namespace, name, value?}). The null namespace shows as "(NULL)" in text
 // but stays "" in JSON so machine consumers see the raw label.
-func (r *ListRunner) runNamespaced(ctx context.Context, opts ListOptions) error {
-	result, err := r.Namespace.Execute(ctx, param.ListNamespacesInput{
-		Prefix: opts.Prefix, Filter: opts.Filter, WithValue: opts.Show,
+func (r *listRunner) runNamespaced(ctx context.Context, opts listOptions) error {
+	result, err := r.namespace.Execute(ctx, param.ListNamespacesInput{
+		Prefix: opts.prefix, Filter: opts.filter, WithValue: opts.show,
 	})
 	if err != nil {
 		return err
 	}
 
-	if opts.Output == output.FormatJSON {
+	if opts.output == output.FormatJSON {
 		items := lo.Map(result.Entries, func(e param.ListNamespacesEntry, _ int) namespaceListJSONItem {
 			return namespaceListJSONItem{Namespace: e.Namespace, Name: e.Name, Value: e.Value}
 		})
 
-		return output.WriteJSON(r.Stdout, items)
+		return output.WriteJSON(r.stdout, items)
 	}
 
 	for _, e := range result.Entries {
@@ -225,17 +225,17 @@ func (r *ListRunner) runNamespaced(ctx context.Context, opts ListOptions) error 
 			ns = namespaces.NullDisplay
 		}
 
-		if opts.Show {
-			output.Printf(r.Stdout, "%s\t%s\t%s\n", ns, e.Name, lo.FromPtr(e.Value))
+		if opts.show {
+			output.Printf(r.stdout, "%s\t%s\t%s\n", ns, e.Name, lo.FromPtr(e.Value))
 		} else {
-			output.Printf(r.Stdout, "%s\t%s\n", ns, e.Name)
+			output.Printf(r.stdout, "%s\t%s\n", ns, e.Name)
 		}
 	}
 
 	return nil
 }
 
-// ListCommand returns the Azure App Configuration list command.
+// listCommand returns the Azure App Configuration list command.
 //
 // Unlike the other providers it does NOT use the generic list scaffold: App
 // Configuration keys live in namespaces (the label axis), so by default the
@@ -243,7 +243,9 @@ func (r *ListRunner) runNamespaced(ctx context.Context, opts ListOptions) error 
 // namespace — matching the GUI's default filter — so every row reads "(NULL)"
 // until `--namespace "*"` (or a specific/OR filter) widens it. `--hide-namespace`
 // drops the column and falls back to the neutral key-only listing.
-func ListCommand() *cli.Command {
+//
+//declscope:package // command.go registers it
+func listCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "list",
 		Aliases:   []string{"ls"},
@@ -306,24 +308,24 @@ EXAMPLES:
 				return err
 			}
 
-			runner := &ListRunner{
-				KeyOnly: &param.ListUseCase{Reader: store},
-				Stdout:  cmd.Root().Writer,
-				Stderr:  cmd.Root().ErrWriter,
+			runner := &listRunner{
+				keyOnly: &param.ListUseCase{Reader: store},
+				stdout:  cmd.Root().Writer,
+				stderr:  cmd.Root().ErrWriter,
 			}
 			// Only the App Configuration store implements the namespace extension;
 			// a store that does not keep the NAMESPACE column off entirely.
 			if source, ok := store.(NamespaceListSource); ok {
-				runner.Namespace = &param.ListNamespacesUseCase{Lister: NewNamespaceLister(source)}
+				runner.namespace = &param.ListNamespacesUseCase{Lister: newNamespaceLister(source)}
 			}
 
-			return runner.Run(ctx, ListOptions{
-				Prefix:    cmd.Args().First(),
-				Filter:    cmd.String("filter"),
-				Show:      cmd.Bool("show"),
-				HideNS:    cmd.Bool("hide-namespace"),
-				Output:    outputFormat,
-				Namespace: azureinternal.AppConfigNamespace(ctx),
+			return runner.run(ctx, listOptions{
+				prefix:    cmd.Args().First(),
+				filter:    cmd.String("filter"),
+				show:      cmd.Bool("show"),
+				hideNS:    cmd.Bool("hide-namespace"),
+				output:    outputFormat,
+				namespace: azureinternal.AppConfigNamespace(ctx),
 			})
 		},
 	}

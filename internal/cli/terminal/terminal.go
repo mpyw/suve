@@ -9,8 +9,8 @@ import (
 	"golang.org/x/term"
 )
 
-// DefaultWidth is the default terminal width when detection fails.
-const DefaultWidth = 50
+// defaultWidth is the default terminal width when detection fails.
+const defaultWidth = 50
 
 // Fder is an interface for types that have a file descriptor.
 type Fder interface {
@@ -42,16 +42,16 @@ var GetSize = term.GetSize
 var IsTTY = isatty.IsTerminal
 
 // GetWidthFromWriter returns the terminal width for the given writer.
-// Returns DefaultWidth if detection fails or writer is not a terminal.
+// Returns defaultWidth if detection fails or writer is not a terminal.
 func GetWidthFromWriter(w io.Writer) int {
 	f, ok := w.(Fder)
 	if !ok || !IsTTY(f.Fd()) {
-		return DefaultWidth
+		return defaultWidth
 	}
 
 	width, _, err := GetSize(FdToInt(f.Fd()))
 	if err != nil || width <= 0 {
-		return DefaultWidth
+		return defaultWidth
 	}
 
 	return width

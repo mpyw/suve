@@ -13,9 +13,9 @@ type CreateInput struct {
 	Name        string
 	Value       string
 	Description string
-	// Options carries provider-specific write options (e.g. AWS Secrets Manager
+	// options carries provider-specific write options (e.g. AWS Secrets Manager
 	// KMS key). They are passed through to the provider unchanged.
-	Options []provider.WriteOption
+	options []provider.WriteOption
 }
 
 // CreateOutput holds the result of the create use case.
@@ -34,7 +34,7 @@ type CreateUseCase struct {
 // provider.ErrAlreadyExists and no overwrite occurs.
 func (u *CreateUseCase) Execute(ctx context.Context, input CreateInput) (*CreateOutput, error) {
 	version, err := u.Writer.Create(
-		ctx, input.Name, input.Value, domain.ValueTypeSecret, input.Description, input.Options...,
+		ctx, input.Name, input.Value, domain.ValueTypeSecret, input.Description, input.options...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secret: %w", err)

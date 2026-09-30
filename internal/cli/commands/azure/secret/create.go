@@ -13,21 +13,23 @@ import (
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
-// CreateRunner executes the create command.
-type CreateRunner struct {
-	UseCase *secret.CreateUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// createRunner executes the create command.
+type createRunner struct {
+	useCase *secret.CreateUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// CreateOptions holds the options for the create command.
-type CreateOptions struct {
-	Name  string
-	Value string
+// createOptions holds the options for the create command.
+type createOptions struct {
+	name  string
+	value string
 }
 
-// CreateCommand returns the Azure Key Vault create command.
-func CreateCommand() *cli.Command {
+// createCommand returns the Azure Key Vault create command.
+//
+//declscope:package // command.go registers it
+func createCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "create",
 		Usage:     "Create a new secret",
@@ -83,23 +85,23 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	r := &CreateRunner{
-		UseCase: &secret.CreateUseCase{Writer: store},
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &createRunner{
+		useCase: &secret.CreateUseCase{Writer: store},
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, CreateOptions{Name: args.Get(0), Value: value})
+	return r.run(ctx, createOptions{name: args.Get(0), value: value})
 }
 
-// Run executes the create command.
-func (r *CreateRunner) Run(ctx context.Context, opts CreateOptions) error {
-	result, err := r.UseCase.Execute(ctx, secret.CreateInput{Name: opts.Name, Value: opts.Value})
+// run executes the create command.
+func (r *createRunner) run(ctx context.Context, opts createOptions) error {
+	result, err := r.useCase.Execute(ctx, secret.CreateInput{Name: opts.name, Value: opts.value})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Created secret %s (version: %s)", result.Name, result.Version)
+	output.Success(r.stdout, "Created secret %s (version: %s)", result.Name, result.Version)
 
 	return nil
 }

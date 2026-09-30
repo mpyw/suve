@@ -47,7 +47,7 @@ func setAllowPlaintextEnv(t *testing.T, value string) {
 	orig := lookupEnvFunc
 
 	lookupEnvFunc = func(key string) (string, bool) {
-		if key == EnvAllowPlaintext {
+		if key == envAllowPlaintext {
 			if value == "" {
 				return "", false
 			}
@@ -101,7 +101,7 @@ func TestPlaintextGuard_Write(t *testing.T) {
 			err := store.WriteState(t.Context(), "", nonEmptyState())
 
 			if tt.wantBlocked {
-				require.ErrorIs(t, err, ErrPlaintextConsentRequired)
+				require.ErrorIs(t, err, errPlaintextConsentRequired)
 
 				_, statErr := os.Stat(path)
 				require.ErrorIs(t, statErr, os.ErrNotExist, "no state file must be written when the guard fires")

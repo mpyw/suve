@@ -74,7 +74,7 @@ func TestStageGlobalConfig(t *testing.T) {
 func TestStageHelpWording(t *testing.T) {
 	t.Parallel()
 
-	for path, text := range stageHelpTexts(StageCommand(), "suve azure stage") {
+	for path, text := range stageHelpTexts(stageCommand(), "suve azure stage") {
 		assert.NotContains(t, text, "AWS", path)
 		for _, m := range regexp.MustCompile(`suve (?:aws|gcloud|azure|param|secret|stage|stg)\b`).FindAllString(text, -1) {
 			assert.Equal(t, "suve azure", m, "%s: %q", path, text)
@@ -114,7 +114,7 @@ func stageScopeProbe(t *testing.T, args ...string) string {
 
 	var got string
 
-	stage := StageCommand()
+	stage := stageCommand()
 	for _, sub := range stage.Commands {
 		switch sub.Name {
 		case stageNounSecret:

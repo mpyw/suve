@@ -9,6 +9,6 @@ import (
 
 func applyPlatformRunOptions(opts *options.App) {
 	opts.Linux = &linux.Options{
-		Icon: IconAsset,
+		Icon: iconAsset,
 	}
 }

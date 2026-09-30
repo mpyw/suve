@@ -122,7 +122,7 @@ func (m *secretMutator) RemoveTag(
 func (m *secretMutator) Restore(ctx context.Context, name string) (WriteOutcome, error) {
 	restorer, ok := m.store.(provider.Restorer)
 	if !ok {
-		return WriteOutcome{}, ErrRestoreUnsupported
+		return WriteOutcome{}, errRestoreUnsupported
 	}
 
 	uc := &secret.RestoreUseCase{Restorer: restorer}

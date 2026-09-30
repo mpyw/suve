@@ -9,29 +9,35 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// DeleteRunner executes delete operations using a usecase.
-type DeleteRunner struct {
-	UseCase *stagingusecase.DeleteUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// deleteRunner executes delete operations using a usecase.
+//
+//declscope:package // command.go builds and runs it
+type deleteRunner struct {
+	useCase *stagingusecase.DeleteUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// DeleteOptions holds options for the delete command.
-type DeleteOptions struct {
-	Name           string
-	Force          bool // For Secrets Manager: force immediate deletion
-	RecoveryWindow int  // For Secrets Manager: days before permanent deletion (7-30)
-	// Namespace is the App Configuration namespace of the setting (empty for the
+// deleteOptions holds options for the delete command.
+//
+//declscope:package // command.go fills it from the flags
+type deleteOptions struct {
+	name           string
+	force          bool // For Secrets Manager: force immediate deletion
+	recoveryWindow int  // For Secrets Manager: days before permanent deletion (7-30)
+	// namespace is the App Configuration namespace of the setting (empty for the
 	// null/default namespace and every other provider).
-	Namespace string
+	namespace string
 }
 
-// Run executes the delete command.
-func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
-	result, err := r.UseCase.Execute(ctx, stagingusecase.DeleteInput{
-		Key:            staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
-		Force:          opts.Force,
-		RecoveryWindow: opts.RecoveryWindow,
+// run executes the delete command.
+//
+//declscope:package // command.go runs it
+func (r *deleteRunner) run(ctx context.Context, opts deleteOptions) error {
+	result, err := r.useCase.Execute(ctx, stagingusecase.DeleteInput{
+		Key:            staging.EntryKey{Name: opts.name, Namespace: opts.namespace},
+		Force:          opts.force,
+		RecoveryWindow: opts.recoveryWindow,
 	})
 	if err != nil {
 		return err
@@ -39,19 +45,19 @@ func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 
 	// Handle CREATE -> NotStaged (unstage instead of delete)
 	if result.Unstaged {
-		output.Success(r.Stdout, "Unstaged creation: %s", result.Name)
+		output.Success(r.stdout, "Unstaged creation: %s", result.Name)
 
 		return nil
 	}
 
 	if result.ShowDeleteOptions {
 		if result.Force {
-			output.Success(r.Stdout, "Staged for immediate deletion: %s", result.Name)
+			output.Success(r.stdout, "Staged for immediate deletion: %s", result.Name)
 		} else {
-			output.Success(r.Stdout, "Staged for deletion (%d-day recovery): %s", result.RecoveryWindow, result.Name)
+			output.Success(r.stdout, "Staged for deletion (%d-day recovery): %s", result.RecoveryWindow, result.Name)
 		}
 	} else {
-		output.Success(r.Stdout, "Staged for deletion: %s", result.Name)
+		output.Success(r.stdout, "Staged for deletion: %s", result.Name)
 	}
 
 	return nil

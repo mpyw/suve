@@ -19,16 +19,16 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// GlobalApplyRunner applies the staged changes of every service of one provider
+// globalApplyRunner applies the staged changes of every service of one provider
 // through the GlobalApplyUseCase and reports the results, each line prefixed
 // with its service name.
-type GlobalApplyRunner struct {
-	UseCase *stagingusecase.GlobalApplyUseCase
-	// ProviderLabel is the human-readable provider name (e.g. "AWS").
-	ProviderLabel   string
-	Stdout          io.Writer
-	Stderr          io.Writer
-	IgnoreConflicts bool
+type globalApplyRunner struct {
+	useCase *stagingusecase.GlobalApplyUseCase
+	// providerLabel is the human-readable provider name (e.g. "AWS").
+	providerLabel   string
+	stdout          io.Writer
+	stderr          io.Writer
+	ignoreConflicts bool
 }
 
 // NewGlobalApplyCommand creates the provider-wide `stage apply` command.
@@ -133,30 +133,30 @@ func globalApplyAction(ctx context.Context, cmd *cli.Command, gcfg GlobalConfig,
 		return nil
 	}
 
-	r := &GlobalApplyRunner{
-		UseCase:         useCase,
-		ProviderLabel:   gcfg.ProviderLabel,
-		Stdout:          cmd.Root().Writer,
-		Stderr:          cmd.Root().ErrWriter,
-		IgnoreConflicts: cmd.Bool("ignore-conflicts"),
+	r := &globalApplyRunner{
+		useCase:         useCase,
+		providerLabel:   gcfg.ProviderLabel,
+		stdout:          cmd.Root().Writer,
+		stderr:          cmd.Root().ErrWriter,
+		ignoreConflicts: cmd.Bool("ignore-conflicts"),
 	}
 
-	return r.Run(ctx)
+	return r.run(ctx)
 }
 
-// Run applies every service's staged changes and reports the results: value
+// run applies every service's staged changes and reports the results: value
 // changes service by service, then tag changes service by service, each in the
 // usecase's (name, namespace) order.
-func (r *GlobalApplyRunner) Run(ctx context.Context) error {
-	result, err := r.UseCase.Execute(ctx, stagingusecase.GlobalApplyInput{IgnoreConflicts: r.IgnoreConflicts})
+func (r *globalApplyRunner) run(ctx context.Context) error {
+	result, err := r.useCase.Execute(ctx, stagingusecase.GlobalApplyInput{IgnoreConflicts: r.ignoreConflicts})
 	if result == nil {
 		return err
 	}
 
 	if len(result.Conflicts) > 0 {
 		for _, c := range result.Conflicts {
-			output.Warning(r.Stderr, "conflict detected for %s (%s): %s was modified after staging",
-				c.Key.Label(), c.ServiceName, r.ProviderLabel)
+			output.Warning(r.stderr, "conflict detected for %s (%s): %s was modified after staging",
+				c.Key.Label(), c.ServiceName, r.providerLabel)
 		}
 
 		return fmt.Errorf("apply rejected: %d conflict(s) detected (use --ignore-conflicts to force)", len(result.Conflicts))
@@ -164,14 +164,14 @@ func (r *GlobalApplyRunner) Run(ctx context.Context) error {
 
 	for _, svc := range result.Services {
 		if len(svc.EntryResults) > 0 {
-			output.Info(r.Stdout, "Applying %s...", svc.ServiceName)
+			output.Info(r.stdout, "Applying %s...", svc.ServiceName)
 			r.printEntryResults(svc)
 		}
 	}
 
 	for _, svc := range result.Services {
 		if len(svc.TagResults) > 0 {
-			output.Info(r.Stdout, "Applying %s tags...", svc.ServiceName)
+			output.Info(r.stdout, "Applying %s tags...", svc.ServiceName)
 			r.printTagResults(svc)
 		}
 	}
@@ -179,47 +179,47 @@ func (r *GlobalApplyRunner) Run(ctx context.Context) error {
 	return err
 }
 
-func (r *GlobalApplyRunner) printEntryResults(svc *stagingusecase.ApplyOutput) {
+func (r *globalApplyRunner) printEntryResults(svc *stagingusecase.ApplyOutput) {
 	for _, entry := range svc.EntryResults {
 		label := staging.EntryKey{Name: entry.Name, Namespace: entry.Namespace}.Label()
 
 		if entry.Error != nil {
-			output.Failed(r.Stderr, svc.ServiceName+": "+label, entry.Error)
+			output.Failed(r.stderr, svc.ServiceName+": "+label, entry.Error)
 
 			continue
 		}
 
 		switch entry.Status {
 		case stagingusecase.ApplyResultCreated:
-			output.Success(r.Stdout, "%s: Created %s", svc.ServiceName, label)
+			output.Success(r.stdout, "%s: Created %s", svc.ServiceName, label)
 		case stagingusecase.ApplyResultUpdated:
-			output.Success(r.Stdout, "%s: Updated %s", svc.ServiceName, label)
+			output.Success(r.stdout, "%s: Updated %s", svc.ServiceName, label)
 		case stagingusecase.ApplyResultDeleted:
-			output.Success(r.Stdout, "%s: Deleted %s", svc.ServiceName, label)
+			output.Success(r.stdout, "%s: Deleted %s", svc.ServiceName, label)
 		case stagingusecase.ApplyResultFailed:
 			// Unreachable: a Failed status always carries an Error (handled above).
 		}
 
 		if entry.UnstageError != nil {
-			output.Warning(r.Stderr, "failed to clear staging for %s: %v", label, entry.UnstageError)
+			output.Warning(r.stderr, "failed to clear staging for %s: %v", label, entry.UnstageError)
 		}
 	}
 }
 
-func (r *GlobalApplyRunner) printTagResults(svc *stagingusecase.ApplyOutput) {
+func (r *globalApplyRunner) printTagResults(svc *stagingusecase.ApplyOutput) {
 	for _, tag := range svc.TagResults {
 		label := staging.EntryKey{Name: tag.Name, Namespace: tag.Namespace}.Label()
 
 		if tag.Error != nil {
-			output.Failed(r.Stderr, svc.ServiceName+": "+label+" (tags)", tag.Error)
+			output.Failed(r.stderr, svc.ServiceName+": "+label+" (tags)", tag.Error)
 
 			continue
 		}
 
-		output.Success(r.Stdout, "%s: Tagged %s%s", svc.ServiceName, label, FormatTagApplySummary(tag))
+		output.Success(r.stdout, "%s: Tagged %s%s", svc.ServiceName, label, formatTagApplySummary(tag))
 
 		if tag.UnstageError != nil {
-			output.Warning(r.Stderr, "failed to clear staging for %s tags: %v", label, tag.UnstageError)
+			output.Warning(r.stderr, "failed to clear staging for %s tags: %v", label, tag.UnstageError)
 		}
 	}
 }

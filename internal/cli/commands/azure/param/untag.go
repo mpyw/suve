@@ -6,8 +6,10 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/generic"
 )
 
-// UntagCommand returns the Azure App Configuration untag command.
-func UntagCommand() *cli.Command {
+// untagCommand returns the Azure App Configuration untag command.
+//
+//declscope:package // command.go registers it
+func untagCommand() *cli.Command {
 	return generic.UntagCommand(generic.TagConfig{
 		Usage:     "Remove tags from a setting",
 		ArgsUsage: "<key> <key>...",

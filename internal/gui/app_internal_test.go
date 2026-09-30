@@ -45,14 +45,14 @@ func appWithProvider(p provider.Provider) *App {
 	return &App{scope: provider.Scope{Provider: p}}
 }
 
-// newTestApp builds an App for a known launch scope, failing the test if NewApp
+// newTestApp builds an App for a known launch scope, failing the test if newApp
 // rejects it.
 //
 //declscope:package // shared with the staging binding tests
 func newTestApp(t *testing.T, initial provider.Scope, service string) *App {
 	t.Helper()
 
-	app, err := NewApp(initial, service)
+	app, err := newApp(initial, service)
 	require.NoError(t, err)
 
 	return app
@@ -79,7 +79,7 @@ func TestNewApp_NoProviderLeavesScopeUnselected(t *testing.T) {
 func TestNewApp_UnknownProviderFails(t *testing.T) {
 	t.Parallel()
 
-	app, err := NewApp(provider.Scope{Provider: provider.Provider("oracle")}, "")
+	app, err := newApp(provider.Scope{Provider: provider.Provider("oracle")}, "")
 	require.ErrorIs(t, err, errInvalidProvider)
 	assert.Nil(t, app)
 }

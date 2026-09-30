@@ -1,4 +1,4 @@
-package staging_test
+package staging
 
 import (
 	"context"
@@ -11,17 +11,16 @@ import (
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
-	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // recordingWriter is a fake EnvelopeWriter that records the states it is asked
 // to write, keyed by service. An optional err forces a write failure.
-type recordingWriter struct {
+type exportRecordingWriter struct {
 	written map[staging.Service]*staging.State
 	err     error
 }
 
-func (w *recordingWriter) WriteEnvelope(_ context.Context, svc staging.Service, state *staging.State) error {
+func (w *exportRecordingWriter) WriteEnvelope(_ context.Context, svc staging.Service, state *staging.State) error {
 	if w.err != nil {
 		return w.err
 	}
@@ -38,14 +37,14 @@ func (w *recordingWriter) WriteEnvelope(_ context.Context, svc staging.Service, 
 // concurrentStager is an EnvelopeWriter that, on its first write, stages an
 // extra entry into the working store — standing in for another process staging
 // during the slow envelope encryption/write window (the export TOCTOU).
-type concurrentStager struct {
+type exportConcurrentStager struct {
 	working *testutil.MockStore
 	svc     staging.Service
 	key     staging.EntryKey
 	staged  bool
 }
 
-func (w *concurrentStager) WriteEnvelope(ctx context.Context, _ staging.Service, _ *staging.State) error {
+func (w *exportConcurrentStager) WriteEnvelope(ctx context.Context, _ staging.Service, _ *staging.State) error {
 	if w.staged {
 		return nil
 	}
@@ -66,17 +65,17 @@ func TestExportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/exported", "v")
+		doublesStageEntry(t, working, staging.ServiceParam, "/exported", "v")
 
 		// The concurrent entry is staged mid-export, inside WriteEnvelope.
-		writer := &concurrentStager{
+		writer := &exportConcurrentStager{
 			working: working,
 			svc:     staging.ServiceParam,
 			key:     staging.EntryKey{Name: "/late"},
 		}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{Service: staging.ServiceParam})
+		_, err := usecase.Execute(t.Context(), ExportInput{Service: staging.ServiceParam})
 		require.NoError(t, err)
 
 		// The exported key is cleared (per-key unstage)...
@@ -93,12 +92,12 @@ func TestExportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		writer := &recordingWriter{}
+		writer := &exportRecordingWriter{}
 
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{})
-		require.ErrorIs(t, err, stagingusecase.ErrNothingToExport)
+		_, err := usecase.Execute(t.Context(), ExportInput{})
+		require.ErrorIs(t, err, ErrNothingToExport)
 		assert.Empty(t, writer.written)
 	})
 
@@ -106,13 +105,13 @@ func TestExportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceSecret, "my-secret", "v")
+		doublesStageEntry(t, working, staging.ServiceSecret, "my-secret", "v")
 
-		writer := &recordingWriter{}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		writer := &exportRecordingWriter{}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{Service: staging.ServiceParam})
-		require.ErrorIs(t, err, stagingusecase.ErrNothingToExport)
+		_, err := usecase.Execute(t.Context(), ExportInput{Service: staging.ServiceParam})
+		require.ErrorIs(t, err, ErrNothingToExport)
 		assert.Empty(t, writer.written)
 	})
 
@@ -120,13 +119,13 @@ func TestExportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/config", "p")
-		stageEntry(t, working, staging.ServiceSecret, "my-secret", "s")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/config", "p")
+		doublesStageEntry(t, working, staging.ServiceSecret, "my-secret", "s")
 
-		writer := &recordingWriter{}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		writer := &exportRecordingWriter{}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{})
+		output, err := usecase.Execute(t.Context(), ExportInput{})
 		require.NoError(t, err)
 		assert.Equal(t, 2, output.EntryCount)
 		assert.Equal(t, 0, output.TagCount)
@@ -153,12 +152,12 @@ func TestExportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/config", "p")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/config", "p")
 
-		writer := &recordingWriter{}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		writer := &exportRecordingWriter{}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{})
+		_, err := usecase.Execute(t.Context(), ExportInput{})
 		require.NoError(t, err)
 
 		assert.Contains(t, writer.written, staging.ServiceParam)
@@ -169,12 +168,12 @@ func TestExportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/config", "p")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/config", "p")
 
-		writer := &recordingWriter{}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		writer := &exportRecordingWriter{}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{Keep: true})
+		_, err := usecase.Execute(t.Context(), ExportInput{Keep: true})
 		require.NoError(t, err)
 
 		// Working still holds the entry.
@@ -186,13 +185,13 @@ func TestExportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/config", "p")
-		stageEntry(t, working, staging.ServiceSecret, "my-secret", "s")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/config", "p")
+		doublesStageEntry(t, working, staging.ServiceSecret, "my-secret", "s")
 
-		writer := &recordingWriter{}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		writer := &exportRecordingWriter{}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{Service: staging.ServiceParam})
+		output, err := usecase.Execute(t.Context(), ExportInput{Service: staging.ServiceParam})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.EntryCount)
 
@@ -210,17 +209,17 @@ func TestExportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/config", "p")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/config", "p")
 
 		require.NoError(t, working.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
 			Add:      map[string]string{"env": "prod"},
 			StagedAt: time.Now(),
 		}))
 
-		writer := &recordingWriter{}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		writer := &exportRecordingWriter{}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{Keep: true})
+		output, err := usecase.Execute(t.Context(), ExportInput{Keep: true})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.EntryCount)
 		assert.Equal(t, 1, output.TagCount)
@@ -236,29 +235,29 @@ func TestExportUseCase_Execute_Errors(t *testing.T) {
 		working := testutil.NewMockStore()
 		working.DrainErr = errors.New("read error")
 
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: &recordingWriter{}}
+		usecase := &ExportUseCase{Working: working, Target: &exportRecordingWriter{}}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{})
+		_, err := usecase.Execute(t.Context(), ExportInput{})
 
-		var exportErr *stagingusecase.ExportError
+		var exportErr *ExportError
 		require.ErrorAs(t, err, &exportErr)
-		assert.Equal(t, stagingusecase.ExportOpLoad, exportErr.Op)
+		assert.Equal(t, exportOpLoad, exportErr.Op)
 	})
 
 	t.Run("error on target write", func(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/config", "p")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/config", "p")
 
-		writer := &recordingWriter{err: errors.New("write error")}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		writer := &exportRecordingWriter{err: errors.New("write error")}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{})
+		_, err := usecase.Execute(t.Context(), ExportInput{})
 
-		var exportErr *stagingusecase.ExportError
+		var exportErr *ExportError
 		require.ErrorAs(t, err, &exportErr)
-		assert.Equal(t, stagingusecase.ExportOpWrite, exportErr.Op)
+		assert.Equal(t, exportOpWrite, exportErr.Op)
 
 		// Working must not have been cleared: the export failed.
 		_, err = working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
@@ -269,22 +268,22 @@ func TestExportUseCase_Execute_Errors(t *testing.T) {
 		t.Parallel()
 
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/config", "p")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/config", "p")
 
-		writer := &recordingWriter{}
-		usecase := &stagingusecase.ExportUseCase{Working: working, Target: writer}
+		writer := &exportRecordingWriter{}
+		usecase := &ExportUseCase{Working: working, Target: writer}
 
 		// The export write succeeds; only the working-area clear fails. Clearing
 		// now unstages each exported key individually, so inject the failure there.
 		working.UnstageEntryErr = errors.New("clear error")
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ExportInput{})
+		output, err := usecase.Execute(t.Context(), ExportInput{})
 		require.NotNil(t, output)
 		assert.Equal(t, 1, output.EntryCount)
 
-		var exportErr *stagingusecase.ExportError
+		var exportErr *ExportError
 		require.ErrorAs(t, err, &exportErr)
-		assert.Equal(t, stagingusecase.ExportOpClear, exportErr.Op)
+		assert.Equal(t, exportOpClear, exportErr.Op)
 		assert.True(t, exportErr.NonFatal)
 
 		// The state was still exported.
@@ -298,7 +297,7 @@ func TestExportError(t *testing.T) {
 	t.Run("error message - load", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOpLoad, Err: errors.New("boom")}
+		err := &ExportError{Op: exportOpLoad, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to read the working staging area")
 		assert.Contains(t, err.Error(), "boom")
 	})
@@ -306,14 +305,14 @@ func TestExportError(t *testing.T) {
 	t.Run("error message - write", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOpWrite, Err: errors.New("boom")}
+		err := &ExportError{Op: exportOpWrite, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to write export file")
 	})
 
 	t.Run("error message - clear", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOpClear, Err: errors.New("boom")}
+		err := &ExportError{Op: exportOpClear, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to clear the working staging area")
 	})
 
@@ -321,7 +320,7 @@ func TestExportError(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("something went wrong")
-		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOp("unknown"), Err: inner}
+		err := &ExportError{Op: ExportOp("unknown"), Err: inner}
 		assert.Equal(t, "something went wrong", err.Error())
 	})
 
@@ -329,7 +328,7 @@ func TestExportError(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("inner")
-		err := &stagingusecase.ExportError{Op: stagingusecase.ExportOpLoad, Err: inner}
+		err := &ExportError{Op: exportOpLoad, Err: inner}
 		assert.ErrorIs(t, err, inner)
 	})
 }

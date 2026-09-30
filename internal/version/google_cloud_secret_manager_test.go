@@ -227,7 +227,7 @@ func TestSecretManagerParse_LabelErrorMessage(t *testing.T) {
 
 // TestParse_LabelAfterVersionRejected exercises the ':' reject path reached
 // AFTER a valid '#' specifier: parseAbsolute advances past "#3" and then hits
-// ':', invoking the label parser's Apply (which returns ErrLabelUnsupported).
+// ':', invoking the label parser's apply (which returns ErrLabelUnsupported).
 func TestSecretManagerParse_LabelAfterVersionRejected(t *testing.T) {
 	t.Parallel()
 

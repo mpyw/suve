@@ -16,23 +16,23 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// GlobalDiffRunner diffs the staged changes of every service of one provider:
+// globalDiffRunner diffs the staged changes of every service of one provider:
 // all services' value entries first, then all services' tag changes.
-type GlobalDiffRunner struct {
-	// Services lists one per-service diff use case per service with staged
+type globalDiffRunner struct {
+	// services lists one per-service diff use case per service with staged
 	// changes, in stable display order.
-	Services []*stagingusecase.DiffUseCase
-	// ProviderLabel is the human-readable provider name (e.g. "AWS") that
+	services []*stagingusecase.DiffUseCase
+	// providerLabel is the human-readable provider name (e.g. "AWS") that
 	// labels the remote side of every diff and warning.
-	ProviderLabel string
-	Stdout        io.Writer
-	Stderr        io.Writer
+	providerLabel string
+	stdout        io.Writer
+	stderr        io.Writer
 }
 
-// GlobalDiffOptions holds options for the all-service diff command.
-type GlobalDiffOptions struct {
-	ParseJSON bool
-	NoPager   bool
+// globalDiffOptions holds options for the all-service diff command.
+type globalDiffOptions struct {
+	parseJSON bool
+	noPager   bool
 }
 
 // NewGlobalDiffCommand creates the provider-wide `stage diff` command.
@@ -99,9 +99,9 @@ func globalDiffUseCases(
 }
 
 func globalDiffAction(ctx context.Context, cmd *cli.Command, gcfg GlobalConfig, resolve globalStoreResolver) error {
-	opts := GlobalDiffOptions{
-		ParseJSON: cmd.Bool("parse-json"),
-		NoPager:   cmd.Bool("no-pager"),
+	opts := globalDiffOptions{
+		parseJSON: cmd.Bool("parse-json"),
+		noPager:   cmd.Bool("no-pager"),
 	}
 
 	useCases, err := globalDiffUseCases(ctx, gcfg, resolve)
@@ -115,26 +115,26 @@ func globalDiffAction(ctx context.Context, cmd *cli.Command, gcfg GlobalConfig, 
 		return nil
 	}
 
-	r := &GlobalDiffRunner{
-		Services:      useCases,
-		ProviderLabel: gcfg.ProviderLabel,
-		Stderr:        cmd.Root().ErrWriter,
+	r := &globalDiffRunner{
+		services:      useCases,
+		providerLabel: gcfg.ProviderLabel,
+		stderr:        cmd.Root().ErrWriter,
 	}
 
-	return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
-		r.Stdout = w
+	return pager.WithPagerWriter(cmd.Root().Writer, opts.noPager, func(w io.Writer) error {
+		r.stdout = w
 
-		return r.Run(ctx, opts)
+		return r.run(ctx, opts)
 	})
 }
 
-// Run executes the all-service diff: each service is diffed through its own
+// run executes the all-service diff: each service is diffed through its own
 // DiffUseCase (which auto-unstages no-op and vanished entries), then rendered
-// by the per-service DiffRunner with the provider as the remote label.
-func (r *GlobalDiffRunner) Run(ctx context.Context, opts GlobalDiffOptions) error {
-	results := make([]*stagingusecase.DiffOutput, 0, len(r.Services))
+// by the per-service diffRunner with the provider as the remote label.
+func (r *globalDiffRunner) run(ctx context.Context, opts globalDiffOptions) error {
+	results := make([]*stagingusecase.DiffOutput, 0, len(r.services))
 
-	for _, useCase := range r.Services {
+	for _, useCase := range r.services {
 		result, err := useCase.Execute(ctx, stagingusecase.DiffInput{})
 		if err != nil {
 			return err
@@ -143,13 +143,13 @@ func (r *GlobalDiffRunner) Run(ctx context.Context, opts GlobalDiffOptions) erro
 		results = append(results, result)
 	}
 
-	presenter := &DiffRunner{
-		Stdout:             r.Stdout,
-		Stderr:             r.Stderr,
-		RemoteLabel:        r.ProviderLabel,
+	presenter := &diffRunner{
+		stdout:             r.stdout,
+		stderr:             r.stderr,
+		providerLabel:      r.providerLabel,
 		keptStagedWarnings: true,
 	}
-	diffOpts := DiffOptions{ParseJSON: opts.ParseJSON, NoPager: opts.NoPager}
+	diffOpts := diffOptions{parseJSON: opts.parseJSON, noPager: opts.noPager}
 	first := true
 
 	for _, result := range results {

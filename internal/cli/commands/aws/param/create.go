@@ -14,22 +14,22 @@ import (
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
-// CreateRunner executes the create command.
-type CreateRunner struct {
-	UseCase *param.CreateUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// createRunner executes the create command.
+type createRunner struct {
+	useCase *param.CreateUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// CreateOptions holds the options for the create command.
-type CreateOptions struct {
-	Name        string
-	Value       string
-	Type        string
-	Description string
-	// ParamOpts holds the raw AWS-specific option flag values (tier, data
+// createOptions holds the options for the create command.
+type createOptions struct {
+	name        string
+	value       string
+	paramType   string
+	description string
+	// paramOpts holds the raw AWS-specific option flag values (tier, data
 	// type, allowed pattern, policies). Empty fields contribute no option.
-	ParamOpts WriteOptionFlags
+	paramOpts writeOptionFlags
 }
 
 // CreateCommand returns the create command.
@@ -147,40 +147,40 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	r := &CreateRunner{
-		UseCase: &param.CreateUseCase{Writer: store, ItemNoun: itemNoun()},
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &createRunner{
+		useCase: &param.CreateUseCase{Writer: store, ItemNoun: itemNoun()},
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, CreateOptions{
-		Name:        args.Get(0),
-		Value:       value,
-		Type:        paramType,
-		Description: cmd.String("description"),
-		ParamOpts: WriteOptionFlags{
-			Tier:           cmd.String("tier"),
-			DataType:       cmd.String("data-type"),
-			AllowedPattern: cmd.String("allowed-pattern"),
-			Policies:       cmd.String("policies"),
+	return r.run(ctx, createOptions{
+		name:        args.Get(0),
+		value:       value,
+		paramType:   paramType,
+		description: cmd.String("description"),
+		paramOpts: writeOptionFlags{
+			tier:           cmd.String("tier"),
+			dataType:       cmd.String("data-type"),
+			allowedPattern: cmd.String("allowed-pattern"),
+			policies:       cmd.String("policies"),
 		},
 	})
 }
 
-// Run executes the create command.
-func (r *CreateRunner) Run(ctx context.Context, opts CreateOptions) error {
-	result, err := r.UseCase.Execute(ctx, param.CreateInput{
-		Name:        opts.Name,
-		Value:       opts.Value,
-		Type:        paramtype.Parse(opts.Type),
-		Description: opts.Description,
-		Options:     buildWriteOptions(opts.ParamOpts),
+// run executes the create command.
+func (r *createRunner) run(ctx context.Context, opts createOptions) error {
+	result, err := r.useCase.Execute(ctx, param.CreateInput{
+		Name:        opts.name,
+		Value:       opts.value,
+		Type:        paramtype.Parse(opts.paramType),
+		Description: opts.description,
+		Options:     buildWriteOptions(opts.paramOpts),
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Created parameter %s (version: %s)", result.Name, result.Version)
+	output.Success(r.stdout, "Created parameter %s (version: %s)", result.Name, result.Version)
 
 	return nil
 }

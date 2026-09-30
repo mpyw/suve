@@ -18,15 +18,15 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// GlobalResetRunner unstages every service of one provider.
-type GlobalResetRunner struct {
-	// Services lists the provider services in stable display order.
-	Services []GlobalServiceSpec
-	// Store, when set, is used for every service (a test seam). When nil each
+// globalResetRunner unstages every service of one provider.
+type globalResetRunner struct {
+	// services lists the provider services in stable display order.
+	services []GlobalServiceSpec
+	// store, when set, is used for every service (a test seam). When nil each
 	// service resolves its own working store via its spec's ScopeResolver.
-	Store  store.ReadWriteOperator
-	Stdout io.Writer
-	Stderr io.Writer
+	store  store.ReadWriteOperator
+	stdout io.Writer
+	stderr io.Writer
 }
 
 // NewGlobalResetCommand creates the provider-wide `stage reset` command.
@@ -58,22 +58,22 @@ EXAMPLES:
 				return nil
 			}
 
-			r := &GlobalResetRunner{
-				Services: gcfg.Services,
-				Stdout:   cmd.Root().Writer,
-				Stderr:   cmd.Root().ErrWriter,
+			r := &globalResetRunner{
+				services: gcfg.Services,
+				stdout:   cmd.Root().Writer,
+				stderr:   cmd.Root().ErrWriter,
 			}
 
-			return r.Run(ctx)
+			return r.run(ctx)
 		},
 	}
 }
 
-// Run executes the all-service reset command. Each configured service is reset
+// run executes the all-service reset command. Each configured service is reset
 // in its OWN store through the per-service ResetUseCase; a service whose scope
 // is not configured is skipped (it can hold no staged state).
-func (r *GlobalResetRunner) Run(ctx context.Context) error {
-	services, err := gatherGlobalServices(ctx, r.Services, globalStoreFor(r.Store))
+func (r *globalResetRunner) run(ctx context.Context) error {
+	services, err := gatherGlobalServices(ctx, r.services, globalStoreFor(r.store))
 	if err != nil {
 		return err
 	}
@@ -97,12 +97,12 @@ func (r *GlobalResetRunner) Run(ctx context.Context) error {
 	}
 
 	if totalCount == 0 {
-		output.Info(r.Stdout, "No changes staged.")
+		output.Info(r.stdout, "No changes staged.")
 
 		return nil
 	}
 
-	output.Success(r.Stdout, "Unstaged all changes (%s)", strings.Join(summaries, ", "))
+	output.Success(r.stdout, "Unstaged all changes (%s)", strings.Join(summaries, ", "))
 
 	return nil
 }

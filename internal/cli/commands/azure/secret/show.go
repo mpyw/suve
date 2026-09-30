@@ -34,8 +34,8 @@ type showPresenter struct {
 	result *secret.ShowOutput
 }
 
-// NewShowPresenter builds an Azure Key Vault show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *version.OpaqueSpec) generic.ShowPresenter {
+// newShowPresenter builds an Azure Key Vault show presenter over the given reader and spec.
+func newShowPresenter(reader provider.Reader, spec *version.OpaqueSpec) generic.ShowPresenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -111,8 +111,10 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 	return output.WriteJSON(stdout, jsonOut)
 }
 
-// ShowCommand returns the Azure Key Vault show command.
-func ShowCommand() *cli.Command {
+// showCommand returns the Azure Key Vault show command.
+//
+//declscope:package // command.go registers it
+func showCommand() *cli.Command {
 	return generic.ShowCommand(generic.ShowConfig[*version.OpaqueSpec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
@@ -139,7 +141,7 @@ EXAMPLES:
 				return nil, err
 			}
 
-			return NewShowPresenter(store, spec), nil
+			return newShowPresenter(store, spec), nil
 		},
 	})
 }

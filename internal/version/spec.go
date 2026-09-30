@@ -27,8 +27,10 @@ import (
 	"strconv"
 )
 
-// ErrEmptySpec is returned for an empty or whitespace-only specification.
-var ErrEmptySpec = errors.New("empty specification")
+// errEmptySpec is returned for an empty or whitespace-only specification.
+//
+//declscope:package // bare.go and parse.go reject an empty spec with it
+var errEmptySpec = errors.New("empty specification")
 
 // Spec represents a parsed version specification.
 // The type parameter A holds grammar-specific absolute version info

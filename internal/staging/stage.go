@@ -249,7 +249,7 @@ func (s *State) UnmarshalJSON(data []byte) error {
 		// check (see file.ReadEnvelopeFile).
 		return fmt.Errorf(
 			"%w: on-disk state is version %d but this build only supports version %d",
-			ErrStateVersionTooNew, head.Version, stateVersion,
+			errStateVersionTooNew, head.Version, stateVersion,
 		)
 	}
 
@@ -268,7 +268,7 @@ func (s *State) UnmarshalJSON(data []byte) error {
 			key := EntryKey{Name: rec.Name, Namespace: rec.Namespace}
 			if _, dup := m[key]; dup {
 				return fmt.Errorf(
-					"%w: entry %s appears more than once in service %q", ErrDuplicateRecord, key.Label(), svc)
+					"%w: entry %s appears more than once in service %q", errDuplicateRecord, key.Label(), svc)
 			}
 
 			m[key] = rec.Entry
@@ -283,7 +283,7 @@ func (s *State) UnmarshalJSON(data []byte) error {
 			key := EntryKey{Name: rec.Name, Namespace: rec.Namespace}
 			if _, dup := m[key]; dup {
 				return fmt.Errorf(
-					"%w: tag change for %s appears more than once in service %q", ErrDuplicateRecord, key.Label(), svc)
+					"%w: tag change for %s appears more than once in service %q", errDuplicateRecord, key.Label(), svc)
 			}
 
 			m[key] = rec.TagEntry
@@ -547,19 +547,19 @@ func (e *ResourceNotFoundError) Unwrap() error {
 var (
 	// ErrNotStaged is returned when a parameter/secret is not staged.
 	ErrNotStaged = errors.New("not staged")
-	// ErrStateVersionTooNew is returned by UnmarshalJSON when the on-disk staging
+	// errStateVersionTooNew is returned by UnmarshalJSON when the on-disk staging
 	// state was written by a newer suve than this build can read. The caller must
 	// upgrade suve; the state is left untouched rather than rewritten as an older
 	// version.
-	ErrStateVersionTooNew = errors.New("staging state was written by a newer suve; upgrade suve")
+	errStateVersionTooNew = errors.New("staging state was written by a newer suve; upgrade suve")
 	// ErrStateVersionTooOld is returned by UnmarshalJSON when the state was
 	// written by an older suve whose on-disk layout this build does not migrate.
 	// The state decodes as empty (its records are dropped), but the error makes
 	// that drop explicit so an importer can report it instead of silently
 	// importing nothing. The working store treats it as a benign reset.
 	ErrStateVersionTooOld = errors.New("staging state was written by an older suve and cannot be read; its records were dropped")
-	// ErrDuplicateRecord is returned by UnmarshalJSON when a payload carries two
+	// errDuplicateRecord is returned by UnmarshalJSON when a payload carries two
 	// records for the same (name, namespace). Silently keeping the last one would
 	// hide the ambiguity, so the state is rejected instead.
-	ErrDuplicateRecord = errors.New("duplicate staged record")
+	errDuplicateRecord = errors.New("duplicate staged record")
 )

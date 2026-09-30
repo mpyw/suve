@@ -33,8 +33,8 @@ type showPresenter struct {
 	result *param.ShowOutput
 }
 
-// NewShowPresenter builds an Azure App Configuration show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *version.BareSpec) generic.ShowPresenter {
+// newShowPresenter builds an Azure App Configuration show presenter over the given reader and spec.
+func newShowPresenter(reader provider.Reader, spec *version.BareSpec) generic.ShowPresenter {
 	return &showPresenter{uc: &param.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -101,8 +101,10 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 	return output.WriteJSON(stdout, jsonOut)
 }
 
-// ShowCommand returns the Azure App Configuration show command.
-func ShowCommand() *cli.Command {
+// showCommand returns the Azure App Configuration show command.
+//
+//declscope:package // command.go registers it
+func showCommand() *cli.Command {
 	return generic.ShowCommand(generic.ShowConfig[*version.BareSpec]{
 		Usage:     "Show setting value with metadata",
 		ArgsUsage: argsUsageKey,
@@ -126,7 +128,7 @@ EXAMPLES:
 				return nil, err
 			}
 
-			return NewShowPresenter(store, spec), nil
+			return newShowPresenter(store, spec), nil
 		},
 	})
 }

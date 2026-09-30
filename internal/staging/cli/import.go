@@ -89,72 +89,72 @@ func importMutuallyExclusiveFlags() []cli.MutuallyExclusiveFlags {
 	}
 }
 
-// ImportModeInput holds the inputs to import-mode selection.
-type ImportModeInput struct {
-	MergeFlag     bool
-	OverwriteFlag bool
-	// SkipPrompt (--yes) accepts the default (Merge) without the interactive
+// importModeInput holds the inputs to import-mode selection.
+type importModeInput struct {
+	mergeFlag     bool
+	overwriteFlag bool
+	// skipPrompt (--yes) accepts the default (Merge) without the interactive
 	// Merge/Overwrite/Cancel prompt, for scripts/automation.
-	SkipPrompt bool
-	// PassphraseStdin (--passphrase-stdin) means stdin carries the passphrase, not
+	skipPrompt bool
+	// passphraseStdin (--passphrase-stdin) means stdin carries the passphrase, not
 	// an interactive answer. Prompting would double-buffer/EOF against the
 	// passphrase read (#472), so the mode is resolved from flags only (default
 	// Merge) without prompting.
-	PassphraseStdin bool
-	HasChanges      bool
-	ItemCount       int
-	IsTTY           bool
+	passphraseStdin bool
+	hasChanges      bool
+	itemCount       int
+	isTTY           bool
 }
 
-// ImportModeResult holds the outcome of import-mode selection.
-type ImportModeResult struct {
-	Mode      usestaging.ImportMode
-	Cancelled bool
+// importModeResult holds the outcome of import-mode selection.
+type importModeResult struct {
+	mode      usestaging.ImportMode
+	cancelled bool
 }
 
-// ImportModeChooser resolves the reconciliation mode for the working staging
+// importModeChooser resolves the reconciliation mode for the working staging
 // area, mirroring the former stash-pop chooser: an explicit flag wins; otherwise
 // a Merge/Overwrite/Cancel prompt appears only when the working area already
 // holds changes and a TTY is available; the default is Merge.
-type ImportModeChooser struct {
-	Prompter *confirm.Prompter
-	Stderr   io.Writer
-	Stdout   io.Writer
+type importModeChooser struct {
+	prompter *confirm.Prompter
+	stderr   io.Writer
+	stdout   io.Writer
 }
 
-// ChooseMode determines the import mode, prompting interactively if needed.
-func (c *ImportModeChooser) ChooseMode(input ImportModeInput) (ImportModeResult, error) {
-	if input.OverwriteFlag {
-		return ImportModeResult{Mode: usestaging.ImportModeOverwrite}, nil
+// chooseMode determines the import mode, prompting interactively if needed.
+func (c *importModeChooser) chooseMode(input importModeInput) (importModeResult, error) {
+	if input.overwriteFlag {
+		return importModeResult{mode: usestaging.ImportModeOverwrite}, nil
 	}
 
-	if input.MergeFlag {
-		return ImportModeResult{Mode: usestaging.ImportModeMerge}, nil
+	if input.mergeFlag {
+		return importModeResult{mode: usestaging.ImportModeMerge}, nil
 	}
 
-	if input.HasChanges && input.IsTTY && !input.SkipPrompt && !input.PassphraseStdin {
-		output.Warning(c.Stderr, "Working staging area already has %d staged change(s).", input.ItemCount)
+	if input.hasChanges && input.isTTY && !input.skipPrompt && !input.passphraseStdin {
+		output.Warning(c.stderr, "Working staging area already has %d staged change(s).", input.itemCount)
 
-		choice, err := c.Prompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
+		choice, err := c.prompter.ConfirmChoice("How do you want to proceed?", []confirm.Choice{
 			{Label: "Merge", Description: "combine imported changes with existing"},
 			{Label: "Overwrite", Description: "replace existing with imported changes"},
 			{Label: "Cancel", Description: "abort operation"},
 		})
 		if err != nil {
-			return ImportModeResult{}, fmt.Errorf("failed to get confirmation: %w", err)
+			return importModeResult{}, fmt.Errorf("failed to get confirmation: %w", err)
 		}
 
 		switch choice {
 		case 0: // Merge
-			return ImportModeResult{Mode: usestaging.ImportModeMerge}, nil
+			return importModeResult{mode: usestaging.ImportModeMerge}, nil
 		case 1: // Overwrite
-			return ImportModeResult{Mode: usestaging.ImportModeOverwrite}, nil
+			return importModeResult{mode: usestaging.ImportModeOverwrite}, nil
 		default: // Cancel or error
-			return ImportModeResult{Cancelled: true}, nil
+			return importModeResult{cancelled: true}, nil
 		}
 	}
 
-	return ImportModeResult{Mode: usestaging.ImportModeMerge}, nil
+	return importModeResult{mode: usestaging.ImportModeMerge}, nil
 }
 
 // presentImportEnvelope pairs a validated source envelope with the service it holds.
@@ -417,35 +417,35 @@ func importAction(
 			return fmt.Errorf("failed to check the working staging area: %w", err)
 		}
 
-		chooser := &ImportModeChooser{
-			Prompter: &confirm.Prompter{
+		chooser := &importModeChooser{
+			prompter: &confirm.Prompter{
 				Stdin:     cmd.Root().Reader,
 				Stdout:    cmd.Root().Writer,
 				Stderr:    cmd.Root().ErrWriter,
 				Target:    resolved.Target.String(),
 				BufReader: stdin,
 			},
-			Stderr: cmd.Root().ErrWriter,
-			Stdout: cmd.Root().Writer,
+			stderr: cmd.Root().ErrWriter,
+			stdout: cmd.Root().Writer,
 		}
 
-		mode, err := chooser.ChooseMode(ImportModeInput{
-			MergeFlag:       cmd.Bool(flagMerge),
-			OverwriteFlag:   cmd.Bool(flagOverwrite),
-			SkipPrompt:      cmd.Bool(flagYes),
-			PassphraseStdin: cmd.Bool(flagPassphraseStdin),
-			HasChanges:      !existing.IsEmpty(),
-			ItemCount:       existing.TotalCount(),
+		mode, err := chooser.chooseMode(importModeInput{
+			mergeFlag:       cmd.Bool(flagMerge),
+			overwriteFlag:   cmd.Bool(flagOverwrite),
+			skipPrompt:      cmd.Bool(flagYes),
+			passphraseStdin: cmd.Bool(flagPassphraseStdin),
+			hasChanges:      !existing.IsEmpty(),
+			itemCount:       existing.TotalCount(),
 			// Interactive only when there is both a terminal to draw the prompt on
 			// and a terminal to read the answer from; a piped stdin must not be
 			// consumed as the Merge/Overwrite reply.
-			IsTTY: terminal.IsTerminalWriter(cmd.Root().ErrWriter) && terminal.IsTerminalReader(cmd.Root().Reader),
+			isTTY: terminal.IsTerminalWriter(cmd.Root().ErrWriter) && terminal.IsTerminalReader(cmd.Root().Reader),
 		})
 		if err != nil {
 			return err
 		}
 
-		if mode.Cancelled {
+		if mode.cancelled {
 			output.Info(cmd.Root().Writer, "Operation cancelled.")
 
 			return nil
@@ -473,7 +473,7 @@ func importAction(
 			uc.ReAnchor = newImportReAnchorResolver(ctx, reAnchorSpecs)
 		}
 
-		result, err := uc.Execute(ctx, usestaging.ImportInput{Service: service, Mode: mode.Mode, ReAnchor: reAnchor})
+		result, err := uc.Execute(ctx, usestaging.ImportInput{Service: service, Mode: mode.mode, ReAnchor: reAnchor})
 		if err != nil {
 			if errors.Is(err, usestaging.ErrNothingToImport) {
 				output.Info(cmd.Root().Writer, "No staged changes to import.")

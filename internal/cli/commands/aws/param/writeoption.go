@@ -33,37 +33,39 @@ func validateWriteOptionTier(tier string) error {
 		tier, writeOptionTierStandard, writeOptionTierAdvanced, writeOptionTierIntelligentTiering)
 }
 
-// WriteOptionFlags holds the raw flag values for the provider-specific param options.
-type WriteOptionFlags struct {
-	Tier           string
-	DataType       string
-	AllowedPattern string
-	Policies       string
+// writeOptionFlags holds the raw flag values for the provider-specific param options.
+//
+//declscope:package // create.go and update.go fill it from the flags
+type writeOptionFlags struct {
+	tier           string
+	dataType       string
+	allowedPattern string
+	policies       string
 }
 
 // buildWriteOptions converts the set (non-empty) flag values into
 // provider.WriteOptions. Empty values contribute no option, so passing an
-// all-empty WriteOptionFlags yields nil and preserves the exact behavior of the
+// all-empty writeOptionFlags yields nil and preserves the exact behavior of the
 // command when no flags are set.
 //
 //declscope:package // create.go and update.go build their write options with it
-func buildWriteOptions(v WriteOptionFlags) []provider.WriteOption {
+func buildWriteOptions(v writeOptionFlags) []provider.WriteOption {
 	var opts []provider.WriteOption
 
-	if v.Tier != "" {
-		opts = append(opts, parameterstore.Tier{Value: v.Tier})
+	if v.tier != "" {
+		opts = append(opts, parameterstore.Tier{Value: v.tier})
 	}
 
-	if v.DataType != "" {
-		opts = append(opts, parameterstore.DataType{Value: v.DataType})
+	if v.dataType != "" {
+		opts = append(opts, parameterstore.DataType{Value: v.dataType})
 	}
 
-	if v.AllowedPattern != "" {
-		opts = append(opts, parameterstore.AllowedPattern{Value: v.AllowedPattern})
+	if v.allowedPattern != "" {
+		opts = append(opts, parameterstore.AllowedPattern{Value: v.allowedPattern})
 	}
 
-	if v.Policies != "" {
-		opts = append(opts, parameterstore.Policies{JSON: v.Policies})
+	if v.policies != "" {
+		opts = append(opts, parameterstore.Policies{JSON: v.policies})
 	}
 
 	return opts

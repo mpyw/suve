@@ -17,14 +17,14 @@ import (
 const (
 	String       = "String"
 	SecureString = "SecureString"
-	StringList   = "StringList"
+	stringList   = "StringList"
 )
 
 // Options returns the SSM parameter type display names in their canonical
 // order. It is the single source of truth for the set of selectable parameter
 // types (e.g. the GUI type dropdown), so callers never hardcode the list.
 func Options() []string {
-	return []string{String, SecureString, StringList}
+	return []string{String, SecureString, stringList}
 }
 
 // Display maps a domain.ValueType to its SSM type name for output. It preserves
@@ -37,7 +37,7 @@ func Display(t domain.ValueType) string {
 	case domain.ValueTypeSecret:
 		return SecureString
 	case domain.ValueTypeList:
-		return StringList
+		return stringList
 	case domain.ValueTypePlaintext:
 		return String
 	default:
@@ -52,7 +52,7 @@ func Display(t domain.ValueType) string {
 // would otherwise silently store a value the user meant to encrypt as plaintext.
 func Validate(s string) error {
 	switch s {
-	case "", String, SecureString, StringList:
+	case "", String, SecureString, stringList:
 		return nil
 	default:
 		return fmt.Errorf("invalid --type %q: must be one of %s", s, strings.Join(Options(), ", "))
@@ -66,7 +66,7 @@ func Parse(s string) domain.ValueType {
 	switch s {
 	case SecureString:
 		return domain.ValueTypeSecret
-	case StringList:
+	case stringList:
 		return domain.ValueTypeList
 	case String:
 		return domain.ValueTypePlaintext

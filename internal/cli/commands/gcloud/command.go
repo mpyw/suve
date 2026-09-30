@@ -46,7 +46,7 @@ environment variable. Authentication uses Application Default Credentials.`,
 		Before: resolveProject,
 		Commands: []*cli.Command{
 			secret.Command(),
-			StageCommand(),
+			stageCommand(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

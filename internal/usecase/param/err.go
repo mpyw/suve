@@ -7,9 +7,11 @@ import (
 )
 
 var (
-	// ErrNotFound is returned (wrapped with the item noun and name, e.g.
+	// errNotFound is returned (wrapped with the item noun and name, e.g.
 	// "setting not found: key") when the item to update does not exist.
-	ErrNotFound = errors.New("not found")
+	//
+	//declscope:package // update.go wraps it
+	errNotFound = errors.New("not found")
 )
 
 // errItemNoun returns the noun that names one item in error messages: the

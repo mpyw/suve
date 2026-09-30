@@ -43,9 +43,9 @@ type StatusTagEntry struct {
 
 // StatusOutput holds the result of the status use case.
 type StatusOutput struct {
-	Service     staging.Service
+	service     staging.Service
 	ServiceName string
-	ItemName    string
+	itemName    string
 	Entries     []StatusEntry
 	TagEntries  []StatusTagEntry
 }
@@ -64,9 +64,9 @@ func (u *StatusUseCase) Execute(ctx context.Context, input StatusInput) (*Status
 	showDeleteOptions := u.Strategy.HasDeleteOptions()
 
 	output := &StatusOutput{
-		Service:     service,
+		service:     service,
 		ServiceName: serviceName,
-		ItemName:    itemName,
+		itemName:    itemName,
 	}
 
 	// Get all entries and tags, then (if a name was given) filter by the decoded

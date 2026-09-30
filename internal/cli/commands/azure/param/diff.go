@@ -36,8 +36,8 @@ type diffPresenter struct {
 	result *param.DiffOutput
 }
 
-// NewDiffPresenter builds an Azure App Configuration diff presenter over the given reader and specs.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.BareSpec) generic.DiffPresenter {
+// newDiffPresenter builds an Azure App Configuration diff presenter over the given reader and specs.
+func newDiffPresenter(reader provider.Reader, spec1, spec2 *version.BareSpec) generic.DiffPresenter {
 	return &diffPresenter{uc: &param.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
@@ -81,8 +81,10 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 	output.Hint(stderr, "App Configuration is unversioned; compare two distinct keys, e.g.: suve azure param diff key-a key-b")
 }
 
-// DiffCommand returns the Azure App Configuration diff command.
-func DiffCommand() *cli.Command {
+// diffCommand returns the Azure App Configuration diff command.
+//
+//declscope:package // command.go registers it
+func diffCommand() *cli.Command {
 	return generic.DiffCommand(generic.DiffConfig[*version.BareSpec]{
 		Usage:     "Show diff between two settings",
 		ArgsUsage: "<key1> [key2]",
@@ -102,7 +104,7 @@ EXAMPLES:
 				return nil, err
 			}
 
-			return NewDiffPresenter(store, spec1, spec2), nil
+			return newDiffPresenter(store, spec1, spec2), nil
 		},
 	})
 }

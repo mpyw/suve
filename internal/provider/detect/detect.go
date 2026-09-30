@@ -45,18 +45,18 @@ import (
 // Environment abstracts the inputs the resolver reads, so it can be tested
 // without mutating the real process environment or filesystem.
 type Environment struct {
-	// Getenv reads an environment variable (os.Getenv in production).
-	Getenv func(string) string
-	// AWSSharedFilesExist reports whether the AWS shared credentials or config
+	// getenv reads an environment variable (os.Getenv in production).
+	getenv func(string) string
+	// awsSharedFilesExist reports whether the AWS shared credentials or config
 	// file is present. It is only consulted for the final fallback, never eagerly.
-	AWSSharedFilesExist func() bool
+	awsSharedFilesExist func() bool
 }
 
 // OSEnvironment returns an Environment backed by the real OS.
 func OSEnvironment() Environment {
 	return Environment{
-		Getenv:              os.Getenv,
-		AWSSharedFilesExist: awsSharedFilesExist,
+		getenv:              os.Getenv,
+		awsSharedFilesExist: awsSharedFilesExist,
 	}
 }
 
@@ -100,7 +100,7 @@ func (r Result) FlatStage() bool { return r.Stage != "" }
 
 // Resolve computes the alias targets from the given environment.
 func Resolve(env Environment) Result {
-	getenv := env.Getenv
+	getenv := env.getenv
 	if getenv == nil {
 		getenv = func(string) string { return "" }
 	}
@@ -123,7 +123,7 @@ func Resolve(env Environment) Result {
 	var res Result
 
 	awsActive := awsEnv
-	if !anyEnv && env.AWSSharedFilesExist != nil && env.AWSSharedFilesExist() {
+	if !anyEnv && env.awsSharedFilesExist != nil && env.awsSharedFilesExist() {
 		awsActive = true
 		res.AWSViaFallback = true
 	}
@@ -198,7 +198,7 @@ func (r Result) UniqueProvider() provider.Provider {
 // AZURE_APPCONFIG_NAMESPACE. AWS carries no resource field (the region comes
 // from the ambient AWS config). An unknown provider is an error.
 func HydrateScope(env Environment, s provider.Scope) (provider.Scope, error) {
-	getenv := env.Getenv
+	getenv := env.getenv
 	if getenv == nil {
 		getenv = func(string) string { return "" }
 	}
@@ -219,15 +219,15 @@ func HydrateScope(env Environment, s provider.Scope) (provider.Scope, error) {
 	case provider.ProviderAWS:
 		// The region comes from the ambient AWS config; nothing to hydrate.
 	default:
-		return provider.Scope{}, fmt.Errorf("%w %q", ErrUnknownProvider, s.Provider)
+		return provider.Scope{}, fmt.Errorf("%w %q", errUnknownProvider, s.Provider)
 	}
 
 	return s, nil
 }
 
-// ErrUnknownProvider is returned by HydrateScope for an unknown or empty
+// errUnknownProvider is returned by HydrateScope for an unknown or empty
 // provider.
-var ErrUnknownProvider = errors.New("unknown provider")
+var errUnknownProvider = errors.New("unknown provider")
 
 // unique returns the sole element of ps, or "" when ps has zero or 2+ elements.
 func unique(ps []provider.Provider) provider.Provider {

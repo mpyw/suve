@@ -31,10 +31,12 @@ type NumericSpec = Spec[NumericAbsolute]
 // NumericGrammar parses integer versions (#VERSION) plus ~SHIFT, the grammar
 // of services whose versions count up from 1.
 type NumericGrammar struct {
-	// LabelError, when set, rejects every ':' with this error, for a service
+	// labelError, when set, rejects every ':' with this error, for a service
 	// whose names never contain ':' and that has no staging labels. When nil,
 	// ':' is part of the name.
-	LabelError error
+	//
+	//declscope:package // products.go defines each product's grammar with it
+	labelError error
 }
 
 // Parse parses a version specification string.
@@ -47,11 +49,11 @@ type NumericGrammar struct {
 func (g NumericGrammar) Parse(input string) (*NumericSpec, error) {
 	parsers := []specifierParser[NumericAbsolute]{
 		{
-			PrefixChar: '#',
-			IsChar:     isDigitChar,
-			Error:      ErrInvalidNumericVersion,
-			Duplicated: NumericAbsolute.IsSet,
-			Apply: func(value string, abs NumericAbsolute) (NumericAbsolute, error) {
+			prefixChar:        '#',
+			isChar:            isDigitChar,
+			invalidValueError: ErrInvalidNumericVersion,
+			duplicated:        NumericAbsolute.IsSet,
+			apply: func(value string, abs NumericAbsolute) (NumericAbsolute, error) {
 				v, err := strconv.ParseInt(value, 10, 64)
 				if err != nil {
 					return abs, err
@@ -63,13 +65,13 @@ func (g NumericGrammar) Parse(input string) (*NumericSpec, error) {
 			},
 		},
 	}
-	if g.LabelError != nil {
-		parsers = append(parsers, rejectingLabelParser[NumericAbsolute](g.LabelError))
+	if g.labelError != nil {
+		parsers = append(parsers, rejectingLabelParser[NumericAbsolute](g.labelError))
 	}
 
 	return parseSpec(input, absoluteParser[NumericAbsolute]{
-		Parsers: parsers,
-		Zero:    func() NumericAbsolute { return NumericAbsolute{} },
+		parsers: parsers,
+		zero:    func() NumericAbsolute { return NumericAbsolute{} },
 	})
 }
 

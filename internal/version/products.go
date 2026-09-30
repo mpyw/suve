@@ -11,21 +11,21 @@ import (
 
 // Product-specific errors.
 var (
-	// ErrInvalidAWSSecretsManagerID is returned when # is not followed by an AWS
+	// errInvalidAWSSecretsManagerID is returned when # is not followed by an AWS
 	// Secrets Manager version ID.
-	ErrInvalidAWSSecretsManagerID = errors.New("# must be followed by a version ID")
-	// ErrInvalidAWSSecretsManagerLabel is returned when : is not followed by an AWS
+	errInvalidAWSSecretsManagerID = errors.New("# must be followed by a version ID")
+	// errInvalidAWSSecretsManagerLabel is returned when : is not followed by an AWS
 	// Secrets Manager staging label.
-	ErrInvalidAWSSecretsManagerLabel = errors.New(": must be followed by a label")
+	errInvalidAWSSecretsManagerLabel = errors.New(": must be followed by a label")
 	// ErrGoogleCloudSecretManagerLabelUnsupported is returned when a :LABEL specifier is
 	// used for Google Cloud Secret Manager, which has no staging labels.
 	ErrGoogleCloudSecretManagerLabelUnsupported = errors.New(
 		": staging labels are not supported for Google Cloud Secret Manager " +
 			"(versions are integers or \"latest\")",
 	)
-	// ErrInvalidAzureKeyVaultID is returned when # is not followed by an Azure Key
+	// errInvalidAzureKeyVaultID is returned when # is not followed by an Azure Key
 	// Vault version id.
-	ErrInvalidAzureKeyVaultID = errors.New("# must be followed by a version id")
+	errInvalidAzureKeyVaultID = errors.New("# must be followed by a version id")
 	// ErrAzureKeyVaultLabelUnsupported is returned when a :LABEL specifier is used
 	// for Azure Key Vault, which has no staging labels.
 	ErrAzureKeyVaultLabelUnsupported = errors.New(
@@ -45,24 +45,24 @@ var (
 	// AWSSecretsManager is the AWS Secrets Manager grammar: opaque version ids
 	// plus staging labels, name#VERSION / name:LABEL, then ~SHIFT.
 	AWSSecretsManager = OpaqueGrammar{
-		IsIDChar:       isAWSSecretsManagerIDChar,
-		InvalidIDError: ErrInvalidAWSSecretsManagerID,
-		Labels:         true,
-		LabelError:     ErrInvalidAWSSecretsManagerLabel,
+		isIDChar:       isAWSSecretsManagerIDChar,
+		invalidIDError: errInvalidAWSSecretsManagerID,
+		labels:         true,
+		labelError:     errInvalidAWSSecretsManagerLabel,
 	}
 
 	// GoogleCloudSecretManager is the Google Cloud Secret Manager grammar: integer
 	// versions ("latest" is the zero spec) and no staging labels, so a ':'
 	// specifier is rejected before any API call.
-	GoogleCloudSecretManager = NumericGrammar{LabelError: ErrGoogleCloudSecretManagerLabelUnsupported}
+	GoogleCloudSecretManager = NumericGrammar{labelError: ErrGoogleCloudSecretManagerLabelUnsupported}
 
 	// AzureKeyVault is the Azure Key Vault grammar: opaque 32-character hex version
 	// ids and no staging labels, so a ':' specifier is rejected before any API
 	// call.
 	AzureKeyVault = OpaqueGrammar{
-		IsIDChar:       isAzureKeyVaultIDChar,
-		InvalidIDError: ErrInvalidAzureKeyVaultID,
-		LabelError:     ErrAzureKeyVaultLabelUnsupported,
+		isIDChar:       isAzureKeyVaultIDChar,
+		invalidIDError: errInvalidAzureKeyVaultID,
+		labelError:     ErrAzureKeyVaultLabelUnsupported,
 	}
 
 	// AzureAppConfiguration is the Azure App Configuration grammar. The service is

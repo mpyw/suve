@@ -1,0 +1,485 @@
+// The all-service command tests share one namespace with their fixtures in
+// global_test.go.
+//declscope:namespace global
+
+package cli
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/maputil"
+	"github.com/mpyw/suve/internal/staging"
+	"github.com/mpyw/suve/internal/staging/store/testutil"
+)
+
+func TestGlobalStatus_NoStagedChanges(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "No changes staged")
+}
+
+func TestGlobalStatus_ShowParamChangesOnly(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     new("value1"),
+		StagedAt:  now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Staged Parameter Store changes")
+	assert.Contains(t, output, "/app/config")
+	assert.NotContains(t, output, "Staged Secrets Manager changes")
+}
+
+func TestGlobalStatus_ShowSecretChangesOnly(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     new("secret-value"),
+		StagedAt:  now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Staged Secrets Manager changes")
+	assert.Contains(t, output, "my-secret")
+	assert.NotContains(t, output, "Staged Parameter Store changes")
+}
+
+func TestGlobalStatus_ShowBothParamAndSecretChanges(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     new("param-value"),
+		StagedAt:  now,
+	})
+
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Staged Parameter Store changes")
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "M")
+	assert.Contains(t, output, "Staged Secrets Manager changes")
+	assert.Contains(t, output, "my-secret")
+	assert.Contains(t, output, "D")
+}
+
+func TestGlobalStatus_VerboseOutput(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     new("test-value"),
+		StagedAt:  now,
+	})
+
+	_ = store.StageEntry(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     new("secret-value"),
+		StagedAt:  now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{verbose: true})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Staged:")
+	assert.Contains(t, output, "Value:")
+	assert.Contains(t, output, "test-value")
+	assert.Contains(t, output, "secret-value")
+}
+
+func TestGlobalStatus_VerboseWithDelete(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
+		Operation: staging.OperationDelete,
+		StagedAt:  now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{verbose: true})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "Staged:")
+	assert.NotContains(t, output, "Value:")
+}
+
+func TestGlobalStatus_VerboseTruncatesLongValue(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	longValue := "this is a very long value that exceeds one hundred characters and should be truncated in verbose mode output display"
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     new(longValue),
+		StagedAt:  now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{verbose: true})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "...")
+	assert.NotContains(t, output, "display")
+}
+
+func TestGlobalStatusCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	stdout, _, err := exportRunLeafCmd(t, NewGlobalStatusCommand(globalAWSConfig()), nil, "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "staged changes")
+}
+
+func TestGlobalStatus_StoreError(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+	store.ListEntriesErr = errors.New("mock store error")
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mock store error")
+}
+
+func TestGlobalStatus_ShowParamTagChangesOnly(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "api"},
+		StagedAt: now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Staged Parameter Store changes")
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "T")
+	assert.Contains(t, output, "+2 tag(s)")
+	assert.NotContains(t, output, "Staged Secrets Manager changes")
+}
+
+func TestGlobalStatus_ShowSecretTagChangesOnly(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	_ = store.StageTag(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		Remove:   maputil.NewSet("deprecated"),
+		StagedAt: now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Staged Secrets Manager changes")
+	assert.Contains(t, output, "my-secret")
+	assert.Contains(t, output, "T")
+	assert.Contains(t, output, "+1 tag(s)")
+	assert.Contains(t, output, "-1 tag(s)")
+	assert.NotContains(t, output, "Staged Parameter Store changes")
+}
+
+func TestGlobalStatus_ShowMixedEntryAndTagChanges(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	// Entry change
+	_ = store.StageEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.Entry{
+		Operation: staging.OperationUpdate,
+		Value:     new("new-value"),
+		StagedAt:  now,
+	})
+
+	// Tag change (different resource)
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/other"}, staging.TagEntry{
+		Add:      map[string]string{"env": "prod"},
+		StagedAt: now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Staged Parameter Store changes (2)")
+	assert.Contains(t, output, "/app/config")
+	assert.Contains(t, output, "M")
+	assert.Contains(t, output, "/app/other")
+	assert.Contains(t, output, "T")
+}
+
+func TestGlobalStatus_TagChangesVerbose(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, staging.TagEntry{
+		Add:      map[string]string{"env": "prod", "team": "api"},
+		Remove:   maputil.NewSet("deprecated", "old"),
+		StagedAt: now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{verbose: true})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "T")
+	assert.Contains(t, output, "/app/config")
+	// Verbose output should show individual tags
+	assert.Contains(t, output, "+ env=prod")
+	assert.Contains(t, output, "+ team=api")
+	assert.Contains(t, output, "- deprecated")
+	assert.Contains(t, output, "- old")
+}
+
+func TestGlobalStatus_TagOnlyChangesNoEntries(t *testing.T) {
+	t.Parallel()
+
+	store := testutil.NewMockStore()
+
+	now := time.Now()
+	// Only tag changes, no entry changes
+	_ = store.StageTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/param"}, staging.TagEntry{
+		Add:      map[string]string{"key": "value"},
+		StagedAt: now,
+	})
+
+	_ = store.StageTag(t.Context(), staging.ServiceSecret, staging.EntryKey{Name: "my-secret"}, staging.TagEntry{
+		Remove:   maputil.NewSet("old-tag"),
+		StagedAt: now,
+	})
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		store:    store,
+		services: globalAWSServices(),
+		stdout:   &buf,
+		stderr:   &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "Staged Parameter Store changes (1)")
+	assert.Contains(t, output, "/app/param")
+	assert.Contains(t, output, "Staged Secrets Manager changes (1)")
+	assert.Contains(t, output, "my-secret")
+	assert.NotContains(t, output, "No changes staged")
+}
+
+// TestGlobalStatus_SkipUnconfiguredService verifies that a service whose scope is not
+// configured is skipped (an unconfigured service can hold no staged state), so a
+// provider like Azure with only one of Key Vault / App Configuration connected
+// reports no error. Store is nil so each spec resolves via its ScopeResolver.
+func TestGlobalStatus_SkipUnconfiguredService(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		services: []GlobalServiceSpec{
+			{Service: staging.ServiceParam, ParserFactory: staging.AWSParamParserFactory, ScopeResolver: globalNotConfiguredResolver},
+			{Service: staging.ServiceSecret, ParserFactory: staging.AWSSecretParserFactory, ScopeResolver: globalNotConfiguredResolver},
+		},
+		stdout: &buf,
+		stderr: &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "No changes staged")
+}
+
+// TestGlobalStatus_ResolverErrorPropagates verifies a non-sentinel resolver error is not
+// swallowed by the skip path.
+func TestGlobalStatus_ResolverErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("boom")
+
+	var buf bytes.Buffer
+
+	r := &globalStatusRunner{
+		services: []GlobalServiceSpec{
+			{
+				Service:       staging.ServiceParam,
+				ParserFactory: staging.AWSParamParserFactory,
+				ScopeResolver: func(_ context.Context) (staging.ResolvedScope, error) {
+					return staging.ResolvedScope{}, wantErr
+				},
+			},
+		},
+		stdout: &buf,
+		stderr: &bytes.Buffer{},
+	}
+
+	err := r.run(t.Context(), globalStatusOptions{})
+	require.ErrorIs(t, err, wantErr)
+}

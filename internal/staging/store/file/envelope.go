@@ -15,13 +15,13 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
 
-// EnvelopeVersion is the current export/import envelope schema version.
+// envelopeVersion is the current export/import envelope schema version.
 //
 // v2 binds the plaintext header (version/provider/scope/service) to the
 // encrypted payload as AES-GCM associated data (AAD). This is a breaking
 // change: v1 files (no AAD binding) are rejected on import and must be
 // re-created with `stage export`.
-const EnvelopeVersion = 2
+const envelopeVersion = 2
 
 // Envelope is the on-disk format for `stage export` / `stage import` files.
 //
@@ -32,7 +32,7 @@ const EnvelopeVersion = 2
 // Exactly one service lives in a single envelope file (per-service files mirror
 // the working store's param.json / secret.json split).
 type Envelope struct {
-	// Version is the envelope schema version (EnvelopeVersion).
+	// Version is the envelope schema version (envelopeVersion).
 	Version int `json:"version"`
 	// Provider is the scope provider string, e.g. "aws"/"googlecloud"/"azure".
 	Provider string `json:"provider"`
@@ -51,11 +51,11 @@ type Envelope struct {
 }
 
 var (
-	// ErrInvalidEnvelope is returned when a file is not a valid export envelope
+	// errInvalidEnvelope is returned when a file is not a valid export envelope
 	// (bad JSON, missing required fields, or corrupted base64 payload).
-	ErrInvalidEnvelope = errors.New("invalid export file")
-	// ErrUnsupportedEnvelopeVersion is returned for an unknown envelope version.
-	ErrUnsupportedEnvelopeVersion = errors.New("unsupported export file version")
+	errInvalidEnvelope = errors.New("invalid export file")
+	// errUnsupportedEnvelopeVersion is returned for an unknown envelope version.
+	errUnsupportedEnvelopeVersion = errors.New("unsupported export file version")
 )
 
 // envelopeAADDomain is a domain-separation prefix for the envelope AAD, so the bound
@@ -124,7 +124,7 @@ func encodeEnvelopePayload(state *staging.State, passphrase string, aad []byte) 
 // only); callers must warn the user first.
 func WriteEnvelopeFile(path string, scope provider.Scope, svc staging.Service, state *staging.State, passphrase string) error {
 	env := Envelope{
-		Version:  EnvelopeVersion,
+		Version:  envelopeVersion,
 		Provider: string(scope.Provider),
 		Scope:    scope.Key(),
 		Service:  string(svc),
@@ -166,29 +166,29 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 
 	var env Envelope
 	if err := json.Unmarshal(data, &env); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrInvalidEnvelope, err.Error())
+		return nil, fmt.Errorf("%w: %s", errInvalidEnvelope, err.Error())
 	}
 
-	if env.Version < EnvelopeVersion {
+	if env.Version < envelopeVersion {
 		// An older envelope: its format is gone from this build, so re-export it
 		// from a still-staged source with the current suve.
 		return nil, fmt.Errorf(
 			"%w: file is version %d, but this build only reads version %d; re-create it with `stage export`",
-			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
+			errUnsupportedEnvelopeVersion, env.Version, envelopeVersion,
 		)
 	}
 
-	if env.Version > EnvelopeVersion {
+	if env.Version > envelopeVersion {
 		// A newer envelope: this build cannot know its format, so upgrading suve
 		// is the fix rather than re-exporting.
 		return nil, fmt.Errorf(
 			"%w: file is version %d, but this build only reads version %d; it was written by a newer suve, upgrade suve",
-			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
+			errUnsupportedEnvelopeVersion, env.Version, envelopeVersion,
 		)
 	}
 
 	if env.Provider == "" || env.Scope == "" || env.Service == "" || env.Payload == "" {
-		return nil, ErrInvalidEnvelope
+		return nil, errInvalidEnvelope
 	}
 
 	return &env, nil
@@ -199,7 +199,7 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 func (e *Envelope) decodedPayload() ([]byte, error) {
 	raw, err := base64.StdEncoding.DecodeString(e.Payload)
 	if err != nil {
-		return nil, fmt.Errorf("%w: corrupted payload encoding", ErrInvalidEnvelope)
+		return nil, fmt.Errorf("%w: corrupted payload encoding", errInvalidEnvelope)
 	}
 
 	return raw, nil
@@ -239,7 +239,7 @@ func (e *Envelope) DecodeState(passphrase string) (*staging.State, error) {
 
 	var state staging.State
 	if err := json.Unmarshal(raw, &state); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrInvalidEnvelope, err.Error())
+		return nil, fmt.Errorf("%w: %s", errInvalidEnvelope, err.Error())
 	}
 
 	// The payload is untrusted input, so keep only the service the (plaintext)
@@ -257,7 +257,7 @@ func (e *Envelope) DecodeState(passphrase string) (*staging.State, error) {
 		if key, found := envelopeFirstNamespacedKey(scoped); found {
 			return nil, fmt.Errorf(
 				"%w: provider %q is namespace-agnostic but the payload carries item %q under namespace %q",
-				ErrInvalidEnvelope, e.Provider, key.Name, key.Namespace)
+				errInvalidEnvelope, e.Provider, key.Name, key.Namespace)
 		}
 	}
 

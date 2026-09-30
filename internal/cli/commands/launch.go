@@ -17,18 +17,28 @@ import (
 // scope stay in step.
 type LaunchMode struct {
 	// Flag is the launch flag name ("tui" or "gui").
+	//
+	//declscope:ignore overexported // cmd/suve/gui.go sets it behind production || dev
 	Flag string
 	// RootUsage is the root flag's usage text.
+	//
+	//declscope:ignore overexported // cmd/suve/gui.go sets it behind production || dev
 	RootUsage string
 	// GroupUsage is the usage text on each provider group and service subgroup.
+	//
+	//declscope:ignore overexported // cmd/suve/gui.go sets it behind production || dev
 	GroupUsage string
 	// Bare launches from the root flag (`suve --<flag>`). It resolves the
 	// provider from the environment itself.
+	//
+	//declscope:ignore overexported // cmd/suve/gui.go sets it behind production || dev
 	Bare func(ctx context.Context) (context.Context, error)
 	// Launch launches from a provider group or service subgroup. scope carries
 	// the provider and the scope flags given on that command (not yet hydrated
 	// from the environment; see detect.HydrateScope). service is "param" or
 	// "secret" for a service subgroup, or "" for a group.
+	//
+	//declscope:ignore overexported // cmd/suve/gui.go sets it behind production || dev
 	Launch func(ctx context.Context, scope provider.Scope, service string) (context.Context, error)
 }
 

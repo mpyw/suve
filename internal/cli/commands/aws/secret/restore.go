@@ -13,16 +13,16 @@ import (
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
-// RestoreRunner executes the restore command.
-type RestoreRunner struct {
-	UseCase *secret.RestoreUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// restoreRunner executes the restore command.
+type restoreRunner struct {
+	useCase *secret.RestoreUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// RestoreOptions holds the options for the restore command.
-type RestoreOptions struct {
-	Name string
+// restoreOptions holds the options for the restore command.
+type restoreOptions struct {
+	name string
 }
 
 // RestoreCommand returns the restore command.
@@ -58,27 +58,27 @@ func restoreAction(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("restore is not supported by this provider")
 	}
 
-	r := &RestoreRunner{
-		UseCase: &secret.RestoreUseCase{Restorer: restorer},
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &restoreRunner{
+		useCase: &secret.RestoreUseCase{Restorer: restorer},
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, RestoreOptions{
-		Name: cmd.Args().First(),
+	return r.run(ctx, restoreOptions{
+		name: cmd.Args().First(),
 	})
 }
 
-// Run executes the restore command.
-func (r *RestoreRunner) Run(ctx context.Context, opts RestoreOptions) error {
-	result, err := r.UseCase.Execute(ctx, secret.RestoreInput{
-		Name: opts.Name,
+// run executes the restore command.
+func (r *restoreRunner) run(ctx context.Context, opts restoreOptions) error {
+	result, err := r.useCase.Execute(ctx, secret.RestoreInput{
+		Name: opts.name,
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Restored secret %s", result.Name)
+	output.Success(r.stdout, "Restored secret %s", result.Name)
 
 	return nil
 }

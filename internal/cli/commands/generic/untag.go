@@ -9,15 +9,15 @@ import (
 	"github.com/mpyw/suve/internal/cli/output"
 )
 
-// RunUntag removes the tags with the given keys from the named resource.
-func (r *TagRunner) RunUntag(ctx context.Context, name string, keys []string) error {
+// runUntag removes the tags with the given keys from the named resource.
+func (r *tagRunner) runUntag(ctx context.Context, name string, keys []string) error {
 	if len(keys) > 0 {
-		if err := r.Tagger.Untag(ctx, name, keys); err != nil {
+		if err := r.tagger.Untag(ctx, name, keys); err != nil {
 			return fmt.Errorf("failed to remove tags: %w", err)
 		}
 	}
 
-	output.Success(r.Stdout, "Untagged %s %s (%d key(s))", r.Noun, name, len(keys))
+	output.Success(r.stdout, "Untagged %s %s (%d key(s))", r.noun, name, len(keys))
 
 	return nil
 }
@@ -42,9 +42,9 @@ func UntagCommand(cfg TagConfig) *cli.Command {
 				return err
 			}
 
-			r := &TagRunner{Tagger: tagger, Noun: cfg.Noun, Stdout: cmd.Root().Writer}
+			r := &tagRunner{tagger: tagger, noun: cfg.Noun, stdout: cmd.Root().Writer}
 
-			return r.RunUntag(ctx, name, keys)
+			return r.runUntag(ctx, name, keys)
 		},
 	}
 }

@@ -32,7 +32,7 @@ var _ provider.Factory = Factory{}
 // Store builds a Store for the given scope and kind. It returns
 // provider.ErrUnsupportedKind for kinds AWS does not offer.
 func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Kind) (provider.Store, error) {
-	cfg, err := LoadConfig(ctx)
+	cfg, err := loadConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}

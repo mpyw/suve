@@ -17,7 +17,7 @@ func (a OpaqueAbsolute) IsSet() bool {
 //
 // Grammar: <name>[#<id> | :<label>]<shift>*
 //   - #<id>    optional version ID (0 or 1, mutually exclusive with :LABEL)
-//   - :<label> optional staging label, only where the grammar has Labels
+//   - :<label> optional staging label, only where the grammar has labels
 //   - <shift>  ~ or ~<N>, repeatable (0 or more, cumulative)
 //
 // Examples: my-secret, my-secret#abc123, my-secret:AWSCURRENT, my-secret~1.
@@ -27,15 +27,23 @@ type OpaqueSpec = Spec[OpaqueAbsolute]
 // (:LABEL), and ~SHIFT, the grammar of services whose version ids carry no
 // order.
 type OpaqueGrammar struct {
-	// IsIDChar reports whether c is valid within a version id.
-	IsIDChar func(c byte) bool
-	// InvalidIDError is returned when # is not followed by a version id.
-	InvalidIDError error
-	// Labels accepts a :LABEL specifier.
-	Labels bool
-	// LabelError is returned when ':' does not start a valid label. Without
-	// Labels, every ':' is rejected with it.
-	LabelError error
+	// isIDChar reports whether c is valid within a version id.
+	//
+	//declscope:package // products.go defines each product's grammar with it
+	isIDChar func(c byte) bool
+	// invalidIDError is returned when # is not followed by a version id.
+	//
+	//declscope:package // products.go defines each product's grammar with it
+	invalidIDError error
+	// labels accepts a :LABEL specifier.
+	//
+	//declscope:package // products.go defines each product's grammar with it
+	labels bool
+	// labelError is returned when ':' does not start a valid label. Without
+	// labels, every ':' is rejected with it.
+	//
+	//declscope:package // products.go defines each product's grammar with it
+	labelError error
 }
 
 // Parse parses a version specification string.
@@ -48,11 +56,11 @@ type OpaqueGrammar struct {
 func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
 	parsers := []specifierParser[OpaqueAbsolute]{
 		{
-			PrefixChar: '#',
-			IsChar:     g.IsIDChar,
-			Error:      g.InvalidIDError,
-			Duplicated: OpaqueAbsolute.IsSet,
-			Apply: func(value string, abs OpaqueAbsolute) (OpaqueAbsolute, error) {
+			prefixChar:        '#',
+			isChar:            g.isIDChar,
+			invalidValueError: g.invalidIDError,
+			duplicated:        OpaqueAbsolute.IsSet,
+			apply: func(value string, abs OpaqueAbsolute) (OpaqueAbsolute, error) {
 				abs.ID = new(value)
 
 				return abs, nil
@@ -60,25 +68,25 @@ func (g OpaqueGrammar) Parse(input string) (*OpaqueSpec, error) {
 		},
 	}
 
-	if g.Labels {
+	if g.labels {
 		parsers = append(parsers, specifierParser[OpaqueAbsolute]{
-			PrefixChar: ':',
-			IsChar:     isOpaqueLabelChar,
-			Error:      g.LabelError,
-			Duplicated: OpaqueAbsolute.IsSet,
-			Apply: func(value string, abs OpaqueAbsolute) (OpaqueAbsolute, error) {
+			prefixChar:        ':',
+			isChar:            isOpaqueLabelChar,
+			invalidValueError: g.labelError,
+			duplicated:        OpaqueAbsolute.IsSet,
+			apply: func(value string, abs OpaqueAbsolute) (OpaqueAbsolute, error) {
 				abs.Label = new(value)
 
 				return abs, nil
 			},
 		})
-	} else if g.LabelError != nil {
-		parsers = append(parsers, rejectingLabelParser[OpaqueAbsolute](g.LabelError))
+	} else if g.labelError != nil {
+		parsers = append(parsers, rejectingLabelParser[OpaqueAbsolute](g.labelError))
 	}
 
 	return parseSpec(input, absoluteParser[OpaqueAbsolute]{
-		Parsers: parsers,
-		Zero:    func() OpaqueAbsolute { return OpaqueAbsolute{} },
+		parsers: parsers,
+		zero:    func() OpaqueAbsolute { return OpaqueAbsolute{} },
 	})
 }
 

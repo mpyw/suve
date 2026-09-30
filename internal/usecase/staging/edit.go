@@ -48,7 +48,7 @@ func (u *EditUseCase) Execute(ctx context.Context, input EditInput) (*EditOutput
 
 	// Reject non-UTF-8 values at ingestion (argv, $EDITOR, provider prefill)
 	if !utf8.ValidString(input.Value) {
-		return nil, ErrValueNotUTF8
+		return nil, errValueNotUTF8
 	}
 
 	// Parse and validate name up front (like add/tag); rejects version

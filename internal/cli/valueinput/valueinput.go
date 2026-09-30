@@ -26,14 +26,14 @@ var ErrValueRequired = errors.New(
 		", or run interactively to edit it in $EDITOR",
 )
 
-// ErrValueStdinNeedsYes is returned when the value was read from stdin via
+// errValueStdinNeedsYes is returned when the value was read from stdin via
 // --value-stdin but a confirmation prompt would still run afterwards. The
 // prompt reads from the same stdin, which has already been consumed, so it
 // would immediately hit EOF. Rather than fail cryptically, we detect this up
 // front and tell the user to re-run with --yes. We intentionally neither imply
 // --yes nor read the confirmation from /dev/tty, so the acknowledgement stays
 // explicit.
-var ErrValueStdinNeedsYes = errors.New(
+var errValueStdinNeedsYes = errors.New(
 	"--" + FlagValueStdin + " consumes stdin, so the confirmation prompt cannot be read; " +
 		"re-run with --yes to acknowledge the update",
 )
@@ -92,7 +92,7 @@ type ValueSource struct {
 	// ConfirmRequired is true when the command would prompt for confirmation on
 	// the same stdin after resolving the value (i.e. an update without --yes).
 	// Combined with FromStdin this is the double-consume case, so ResolveValue
-	// fails with ErrValueStdinNeedsYes instead of letting the later prompt hit
+	// fails with errValueStdinNeedsYes instead of letting the later prompt hit
 	// EOF.
 	ConfirmRequired bool
 }
@@ -111,7 +111,7 @@ type ValueSource struct {
 // are explicit.
 //
 // When ConfirmRequired is set alongside --value-stdin, ResolveValue returns
-// ErrValueStdinNeedsYes instead of reading stdin, because the later
+// errValueStdinNeedsYes instead of reading stdin, because the later
 // confirmation prompt would find stdin already consumed.
 func ResolveValue(ctx context.Context, src ValueSource) (value string, proceed bool, err error) {
 	switch {
@@ -121,7 +121,7 @@ func ResolveValue(ctx context.Context, src ValueSource) (value string, proceed b
 		}
 
 		if src.ConfirmRequired {
-			return "", false, ErrValueStdinNeedsYes
+			return "", false, errValueStdinNeedsYes
 		}
 
 		reader := src.Stdin

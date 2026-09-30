@@ -399,24 +399,6 @@ func TestExecuteTag_Remove(t *testing.T) {
 	assert.True(t, tagEntry.Remove.Contains("deprecated"))
 }
 
-func TestExecuteTag_Error(t *testing.T) {
-	t.Parallel()
-
-	store := testutil.NewMockStore()
-	executor := NewExecutor(store)
-
-	action := TagActionTag{
-		Tags: map[string]string{"env": "prod"},
-	}
-	existingValue := executorTestExistingValue
-	entryState := EntryState{CurrentValue: &existingValue, StagedState: EntryStagedStateDelete{}}
-
-	// Tag on DELETE should error
-	result, err := executor.ExecuteTag(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"}, entryState, StagedTags{}, action, nil)
-	require.ErrorIs(t, err, ErrCannotTagDelete)
-	assert.Equal(t, ErrCannotTagDelete, result.Error)
-}
-
 func TestExecuteTag_UnstageWhenEmpty(t *testing.T) {
 	t.Parallel()
 

@@ -84,14 +84,16 @@ type App struct {
 	stagingStoreMu sync.Mutex // protects stagingStore + stagingStores
 }
 
-// NewApp creates a new App with the given initial launch scope and service.
+// newApp creates a new App with the given initial launch scope and service.
 // Empty resource fields on the scope are hydrated from the ambient environment,
 // so an explicit selection (e.g. from a --project / --vault-name / --store-name
 // flag) wins, while an unset one still falls back to env. A zero Provider means
 // no provider is selected yet: the scope stays zero until SelectScope. An
 // unknown provider is an error. service is the launch service
 // ("param"/"secret", or "" for none) surfaced via InitialService.
-func NewApp(initial provider.Scope, service string) (*App, error) {
+//
+//declscope:package // run.go builds the app with it
+func newApp(initial provider.Scope, service string) (*App, error) {
 	scope := initial
 	if initial.Provider != "" {
 		var err error

@@ -17,8 +17,10 @@ func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return azureinternal.KeyVaultStore(ctx)
 }
 
-// TagCommand returns the Azure Key Vault tag command.
-func TagCommand() *cli.Command {
+// tagCommand returns the Azure Key Vault tag command.
+//
+//declscope:package // command.go registers it
+func tagCommand() *cli.Command {
 	return generic.TagCommand(generic.TagConfig{
 		Usage:     "Add or update tags on a secret",
 		ArgsUsage: "<name> <key=value>...",

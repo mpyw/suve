@@ -17,8 +17,10 @@ func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return gcloudinternal.SecretStore(ctx)
 }
 
-// TagCommand returns the Google Cloud Secret Manager tag command.
-func TagCommand() *cli.Command {
+// tagCommand returns the Google Cloud Secret Manager tag command.
+//
+//declscope:package // command.go registers it
+func tagCommand() *cli.Command {
 	return generic.TagCommand(generic.TagConfig{
 		Usage:     `Add or update tags on a secret (Google Cloud calls these "labels")`,
 		ArgsUsage: "<name> <key=value>...",

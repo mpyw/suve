@@ -175,7 +175,7 @@ func TestNewWorkingStore_Plaintext_EncryptedStateExists_Fatal(t *testing.T) {
 	scope := provider.AWSScope("123456789012", "ap-northeast-1")
 
 	// Seed an ENCRYPTED param.json under the scope directory.
-	seed, err := NewStore(scope)
+	seed, err := newStore(scope)
 	require.NoError(t, err)
 
 	seed.key = newTestKey()
@@ -263,7 +263,7 @@ func TestNewWorkingStore_KeychainError_EncryptedStateExists_Fatal(t *testing.T) 
 	scope := provider.AWSScope("123456789012", "ap-northeast-1")
 
 	// Seed an ENCRYPTED param.json under the scope directory.
-	seed, err := NewStore(scope)
+	seed, err := newStore(scope)
 	require.NoError(t, err)
 
 	seed.key = newTestKey()
@@ -344,7 +344,7 @@ func TestNewWorkingStore_NeedsMint_EncryptedStateExists_Fatal(t *testing.T) {
 
 	// Seed an ENCRYPTED param.json under the scope directory, as if written
 	// earlier with a now-lost key.
-	seed, err := NewStore(scope)
+	seed, err := newStore(scope)
 	require.NoError(t, err)
 
 	seed.key = newTestKey()
@@ -404,7 +404,7 @@ func TestWriteFileAtomic(t *testing.T) {
 func TestLockPath(t *testing.T) {
 	t.Parallel()
 
-	split, err := NewStore(provider.AWSScope("123456789012", "ap-northeast-1"))
+	split, err := newStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(split.stateDir, ".lock"), split.lockPath())
 
@@ -515,7 +515,7 @@ func TestStore_KeyBindsScopeAndService(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("copied to another scope", func(t *testing.T) {
-		dst, err := NewStore(provider.AWSScope("210987654321", "ap-northeast-1"))
+		dst, err := newStore(provider.AWSScope("210987654321", "ap-northeast-1"))
 		require.NoError(t, err)
 
 		dst.key = src.key
