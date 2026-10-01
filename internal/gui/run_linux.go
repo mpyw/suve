@@ -9,14 +9,14 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
 )
 
-// iconAsset is the embedded application icon. Only the Linux backend sets a
+// runWindowIcon is the embedded application icon. Only the Linux backend sets a
 // window icon, so only the Linux build embeds it.
 //
 //go:embed appicon.png
-var iconAsset []byte
+var runWindowIcon []byte
 
 func applyPlatformRunOptions(opts *options.App) {
 	opts.Linux = &linux.Options{
-		Icon: iconAsset,
+		Icon: runWindowIcon,
 	}
 }
