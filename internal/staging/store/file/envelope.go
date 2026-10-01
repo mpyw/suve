@@ -50,12 +50,13 @@ type Envelope struct {
 	Payload string `json:"payload"`
 }
 
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
-	// errInvalidEnvelope is returned when a file is not a valid export envelope
+	// ErrInvalidEnvelope is returned when a file is not a valid export envelope
 	// (bad JSON, missing required fields, or corrupted base64 payload).
-	errInvalidEnvelope = errors.New("invalid export file")
-	// errUnsupportedEnvelopeVersion is returned for an unknown envelope version.
-	errUnsupportedEnvelopeVersion = errors.New("unsupported export file version")
+	ErrInvalidEnvelope = errors.New("invalid export file")
+	// ErrUnsupportedEnvelopeVersion is returned for an unknown envelope version.
+	ErrUnsupportedEnvelopeVersion = errors.New("unsupported export file version")
 )
 
 // envelopeAADDomain is a domain-separation prefix for the envelope AAD, so the bound
@@ -166,7 +167,7 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 
 	var env Envelope
 	if err := json.Unmarshal(data, &env); err != nil {
-		return nil, fmt.Errorf("%w: %s", errInvalidEnvelope, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrInvalidEnvelope, err.Error())
 	}
 
 	if env.Version < envelopeVersion {
@@ -174,7 +175,7 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 		// from a still-staged source with the current suve.
 		return nil, fmt.Errorf(
 			"%w: file is version %d, but this build only reads version %d; re-create it with `stage export`",
-			errUnsupportedEnvelopeVersion, env.Version, envelopeVersion,
+			ErrUnsupportedEnvelopeVersion, env.Version, envelopeVersion,
 		)
 	}
 
@@ -183,12 +184,12 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 		// is the fix rather than re-exporting.
 		return nil, fmt.Errorf(
 			"%w: file is version %d, but this build only reads version %d; it was written by a newer suve, upgrade suve",
-			errUnsupportedEnvelopeVersion, env.Version, envelopeVersion,
+			ErrUnsupportedEnvelopeVersion, env.Version, envelopeVersion,
 		)
 	}
 
 	if env.Provider == "" || env.Scope == "" || env.Service == "" || env.Payload == "" {
-		return nil, errInvalidEnvelope
+		return nil, ErrInvalidEnvelope
 	}
 
 	return &env, nil
@@ -199,7 +200,7 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 func (e *Envelope) decodedPayload() ([]byte, error) {
 	raw, err := base64.StdEncoding.DecodeString(e.Payload)
 	if err != nil {
-		return nil, fmt.Errorf("%w: corrupted payload encoding", errInvalidEnvelope)
+		return nil, fmt.Errorf("%w: corrupted payload encoding", ErrInvalidEnvelope)
 	}
 
 	return raw, nil
@@ -239,7 +240,7 @@ func (e *Envelope) DecodeState(passphrase string) (*staging.State, error) {
 
 	var state staging.State
 	if err := json.Unmarshal(raw, &state); err != nil {
-		return nil, fmt.Errorf("%w: %s", errInvalidEnvelope, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrInvalidEnvelope, err.Error())
 	}
 
 	// The payload is untrusted input, so keep only the service the (plaintext)
@@ -257,7 +258,7 @@ func (e *Envelope) DecodeState(passphrase string) (*staging.State, error) {
 		if key, found := envelopeFirstNamespacedKey(scoped); found {
 			return nil, fmt.Errorf(
 				"%w: provider %q is namespace-agnostic but the payload carries item %q under namespace %q",
-				errInvalidEnvelope, e.Provider, key.Name, key.Namespace)
+				ErrInvalidEnvelope, e.Provider, key.Name, key.Namespace)
 		}
 	}
 

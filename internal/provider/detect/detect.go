@@ -219,15 +219,17 @@ func HydrateScope(env Environment, s provider.Scope) (provider.Scope, error) {
 	case provider.ProviderAWS:
 		// The region comes from the ambient AWS config; nothing to hydrate.
 	default:
-		return provider.Scope{}, fmt.Errorf("%w %q", errUnknownProvider, s.Provider)
+		return provider.Scope{}, fmt.Errorf("%w %q", ErrUnknownProvider, s.Provider)
 	}
 
 	return s, nil
 }
 
-// errUnknownProvider is returned by HydrateScope for an unknown or empty
+// ErrUnknownProvider is returned by HydrateScope for an unknown or empty
 // provider.
-var errUnknownProvider = errors.New("unknown provider")
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
+var ErrUnknownProvider = errors.New("unknown provider")
 
 // unique returns the sole element of ps, or "" when ps has zero or 2+ elements.
 func unique(ps []provider.Provider) provider.Provider {

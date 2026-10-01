@@ -294,11 +294,11 @@ type WriteOutcome struct {
 	Updated  bool
 }
 
-// errRestoreUnsupported is returned by Restore when the resolved store does not
+// ErrRestoreUnsupported is returned by Restore when the resolved store does not
 // implement provider.Restorer (the capability gate should prevent reaching it).
 //
-//declscope:package // mutator_param.go and mutator_secret.go return it
-var errRestoreUnsupported = stringError("restore is not supported by this provider")
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
+var ErrRestoreUnsupported = stringError("restore is not supported by this provider")
 
 // stringError is a small sentinel error type for the data seam.
 type stringError string

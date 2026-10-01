@@ -80,7 +80,7 @@ type absoluteParser[A any] struct {
 func parseSpec[A any](input string, parser absoluteParser[A]) (*Spec[A], error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return nil, errEmptySpec
+		return nil, ErrEmptySpec
 	}
 
 	// Step 1: Find where name ends and specifiers begin.

@@ -47,7 +47,7 @@ func TestPrompter_PromptForEncrypt_Mismatch(t *testing.T) {
 	}
 
 	_, err := p.PromptForEncrypt()
-	assert.ErrorIs(t, err, errPassphraseMismatch)
+	assert.ErrorIs(t, err, ErrPassphraseMismatch)
 }
 
 func TestPrompter_PromptForEncrypt_EmptyConfirmed(t *testing.T) {

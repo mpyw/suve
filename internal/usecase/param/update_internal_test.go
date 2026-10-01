@@ -208,7 +208,7 @@ func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 			Value: "value",
 			Type:  domain.ValueTypePlaintext,
 		})
-		require.ErrorIs(t, err, errNotFound)
+		require.ErrorIs(t, err, ErrNotFound)
 		require.EqualError(t, err, tc.want)
 	}
 }
@@ -233,7 +233,7 @@ func TestUpdateUseCase_Execute_ReadError(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.ErrorIs(t, err, errHelperAWS)
-	assert.NotErrorIs(t, err, errNotFound)
+	assert.NotErrorIs(t, err, ErrNotFound)
 }
 
 func TestUpdateUseCase_Execute_PutError(t *testing.T) {

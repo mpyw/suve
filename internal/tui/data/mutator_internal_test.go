@@ -474,14 +474,14 @@ func TestParamMutator_RemoveTag(t *testing.T) {
 }
 
 // TestParamMutator_RestoreUnsupported pins that the param mutator never restores:
-// SSM has no soft-delete/restore, so Restore always reports errRestoreUnsupported.
+// SSM has no soft-delete/restore, so Restore always reports ErrRestoreUnsupported.
 //
 //nolint:paralleltest // symmetrical with the other mutator tests
 func TestParamMutator_RestoreUnsupported(t *testing.T) {
 	mut, _ := newParamMutator(t, &providermock.Store{})
 
 	_, err := mut.Restore(context.Background(), mutatorExistingParamName)
-	require.ErrorIs(t, err, errRestoreUnsupported, "param restore is always unsupported")
+	require.ErrorIs(t, err, ErrRestoreUnsupported, "param restore is always unsupported")
 }
 
 // TestMutators_StrategyBuildErrorPropagates pins that a staged write fails with

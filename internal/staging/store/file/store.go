@@ -50,10 +50,12 @@ const (
 	envAllowPlaintext = "SUVE_STAGING_ALLOW_PLAINTEXT"
 )
 
-// errPlaintextConsentRequired is returned when the working store would write
+// ErrPlaintextConsentRequired is returned when the working store would write
 // unencrypted staging state in a non-interactive session without the operator
 // having opted in. It is exported so callers can errors.Is against it.
-var errPlaintextConsentRequired = errors.New(
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
+var ErrPlaintextConsentRequired = errors.New(
 	"refusing to write unencrypted staging state in a non-interactive session: " +
 		"no staging encryption key is available. Set SUVE_STAGING_KEY (base64 32-byte key) " +
 		"to encrypt — recommended — or " + envAllowPlaintext + "=1 to store it unencrypted")
@@ -628,7 +630,7 @@ func (s *Store) writeFile(path string, state *staging.State) error {
 		// non-interactive session (CI/pipes/GUI) without an explicit opt-in. An
 		// interactive run keeps the historical warn-and-proceed; automation must
 		// choose encryption (SUVE_STAGING_KEY) or consent (envAllowPlaintext).
-		return errPlaintextConsentRequired
+		return ErrPlaintextConsentRequired
 	}
 
 	if err := writeFileAtomic(path, data); err != nil {

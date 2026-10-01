@@ -489,5 +489,5 @@ func TestSecretsManagerSplit(t *testing.T) {
 	assert.Equal(t, ":AWSCURRENT~1", suffix)
 
 	_, _, err = AWSSecretsManager.Split("")
-	require.ErrorIs(t, err, errEmptySpec)
+	require.ErrorIs(t, err, ErrEmptySpec)
 }

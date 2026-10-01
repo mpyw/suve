@@ -263,7 +263,7 @@ func TestState_UnmarshalJSON_Version(t *testing.T) {
 
 		err := json.Unmarshal([]byte(`{"version":2}`), &state)
 		require.ErrorIs(t, err, ErrStateVersionTooOld)
-		require.NotErrorIs(t, err, errStateVersionTooNew)
+		require.NotErrorIs(t, err, ErrStateVersionTooNew)
 		assert.True(t, state.IsEmpty())
 	})
 
@@ -274,7 +274,7 @@ func TestState_UnmarshalJSON_Version(t *testing.T) {
 
 		err := json.Unmarshal([]byte(`{"version":4}`), &state)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, errStateVersionTooNew)
+		assert.ErrorIs(t, err, ErrStateVersionTooNew)
 	})
 }
 
@@ -292,7 +292,7 @@ func TestState_UnmarshalJSON_Duplicate(t *testing.T) {
 
 		err := json.Unmarshal([]byte(data), &state)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, errDuplicateRecord)
+		assert.ErrorIs(t, err, ErrDuplicateRecord)
 	})
 
 	t.Run("duplicate tag records are rejected", func(t *testing.T) {
@@ -306,7 +306,7 @@ func TestState_UnmarshalJSON_Duplicate(t *testing.T) {
 
 		err := json.Unmarshal([]byte(data), &state)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, errDuplicateRecord)
+		assert.ErrorIs(t, err, ErrDuplicateRecord)
 	})
 
 	t.Run("same name under distinct namespaces is not a duplicate", func(t *testing.T) {

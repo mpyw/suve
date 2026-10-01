@@ -104,7 +104,7 @@ func TestDecodeState_EncryptedDecryptsToInvalidJSON(t *testing.T) {
 	env.Payload = base64.StdEncoding.EncodeToString(blob)
 
 	_, err = env.DecodeState("pw")
-	require.ErrorIs(t, err, errInvalidEnvelope)
+	require.ErrorIs(t, err, ErrInvalidEnvelope)
 }
 
 // paramState builds a single-service (param) state with one create entry.
@@ -294,7 +294,7 @@ func TestDecodeState_RejectsNamespaceForAgnosticProvider(t *testing.T) {
 	}
 
 	_, err = env.DecodeState("")
-	require.ErrorIs(t, err, errInvalidEnvelope)
+	require.ErrorIs(t, err, ErrInvalidEnvelope)
 	assert.Contains(t, err.Error(), "namespace")
 }
 
@@ -410,7 +410,7 @@ func TestReadEnvelopeFile_Errors(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("not json"), 0o600))
 
 		_, err := ReadEnvelopeFile(path)
-		require.ErrorIs(t, err, errInvalidEnvelope)
+		require.ErrorIs(t, err, ErrInvalidEnvelope)
 	})
 
 	t.Run("unsupported version", func(t *testing.T) {
@@ -438,7 +438,7 @@ func TestReadEnvelopeFile_Errors(t *testing.T) {
 			require.NoError(t, os.WriteFile(path, data, 0o600))
 
 			_, err = ReadEnvelopeFile(path)
-			require.ErrorIs(t, err, errUnsupportedEnvelopeVersion)
+			require.ErrorIs(t, err, ErrUnsupportedEnvelopeVersion)
 			// The error must guide the user to the right remedy for the direction.
 			assert.Contains(t, err.Error(), tc.want)
 		}
@@ -463,7 +463,7 @@ func TestReadEnvelopeFile_Errors(t *testing.T) {
 				require.NoError(t, os.WriteFile(path, data, 0o600))
 
 				_, err = ReadEnvelopeFile(path)
-				require.ErrorIs(t, err, errInvalidEnvelope)
+				require.ErrorIs(t, err, ErrInvalidEnvelope)
 			})
 		}
 	})
@@ -486,7 +486,7 @@ func TestDecodeState_CorruptedPayload(t *testing.T) {
 		env.Payload = "!!!not-base64!!!"
 
 		_, err := env.DecodeState("")
-		require.ErrorIs(t, err, errInvalidEnvelope)
+		require.ErrorIs(t, err, ErrInvalidEnvelope)
 	})
 
 	t.Run("plaintext payload with invalid json", func(t *testing.T) {
@@ -496,7 +496,7 @@ func TestDecodeState_CorruptedPayload(t *testing.T) {
 		env.Payload = base64.StdEncoding.EncodeToString([]byte("not json"))
 
 		_, err := env.DecodeState("")
-		require.ErrorIs(t, err, errInvalidEnvelope)
+		require.ErrorIs(t, err, ErrInvalidEnvelope)
 	})
 
 	// The "encrypted payload decrypts to invalid json" case needs the exact AAD
@@ -509,7 +509,7 @@ func TestIsEncryptedPayload_BadBase64(t *testing.T) {
 	env := &Envelope{Payload: "!!!not-base64!!!"}
 
 	_, err := env.IsEncryptedPayload()
-	require.ErrorIs(t, err, errInvalidEnvelope)
+	require.ErrorIs(t, err, ErrInvalidEnvelope)
 }
 
 func TestWriteEnvelope_ProviderScopeFields(t *testing.T) {

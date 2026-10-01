@@ -108,7 +108,7 @@ func TestEditUseCase_Execute_RejectsNonUTF8Value(t *testing.T) {
 		Key:   staging.EntryKey{Name: "/app/config"},
 		Value: "\xff\xfe",
 	})
-	require.ErrorIs(t, err, errValueNotUTF8)
+	require.ErrorIs(t, err, ErrValueNotUTF8)
 
 	// Nothing should have been staged
 	_, err = store.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config", Namespace: ""})

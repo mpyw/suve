@@ -14,9 +14,10 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 )
 
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
-	// errPassphraseMismatch is returned when confirmation doesn't match.
-	errPassphraseMismatch = errors.New("passphrases do not match")
+	// ErrPassphraseMismatch is returned when confirmation doesn't match.
+	ErrPassphraseMismatch = errors.New("passphrases do not match")
 	// ErrCancelled is returned when user cancels the operation.
 	ErrCancelled = errors.New("operation cancelled")
 )
@@ -73,7 +74,7 @@ func (p *Prompter) PromptForEncrypt() (string, error) {
 	output.Println(p.Stderr, "") // newline after password input
 
 	if pass != confirm {
-		return "", errPassphraseMismatch
+		return "", ErrPassphraseMismatch
 	}
 
 	return pass, nil

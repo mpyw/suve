@@ -110,7 +110,7 @@ func TestResolveValue_FromStdin(t *testing.T) {
 			ConfirmRequired: true,
 			Stdin:           reader,
 		})
-		require.ErrorIs(t, err, errValueStdinNeedsYes)
+		require.ErrorIs(t, err, ErrValueStdinNeedsYes)
 		assert.False(t, proceed)
 		// Stdin must be left untouched so the value is never silently consumed.
 		rest, rerr := io.ReadAll(reader)

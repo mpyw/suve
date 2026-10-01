@@ -2,7 +2,7 @@
 // provider interfaces (Reader/Writer/Tagger/Store) for use in unit tests.
 //
 // Each method delegates to an optional function field; when a field is nil the
-// method returns errNotConfigured so that tests fail loudly if they exercise an
+// method returns ErrNotConfigured so that tests fail loudly if they exercise an
 // unset path.
 package providermock
 
@@ -14,8 +14,10 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 )
 
-// errNotConfigured is returned by a mock method whose function field is nil.
-var errNotConfigured = errors.New("providermock: method not configured")
+// ErrNotConfigured is returned by a mock method whose function field is nil.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
+var ErrNotConfigured = errors.New("providermock: method not configured")
 
 // Store is a configurable mock of provider.Store (Reader + Writer + Tagger).
 type Store struct {
@@ -44,7 +46,7 @@ var (
 // Resolve delegates to ResolveFunc.
 func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.VersionRef, error) {
 	if s.ResolveFunc == nil {
-		return provider.VersionRef{}, errNotConfigured
+		return provider.VersionRef{}, ErrNotConfigured
 	}
 
 	return s.ResolveFunc(ctx, name, spec)
@@ -53,7 +55,7 @@ func (s *Store) Resolve(ctx context.Context, name, spec string) (provider.Versio
 // Get delegates to GetFunc.
 func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (*domain.Entry, error) {
 	if s.GetFunc == nil {
-		return nil, errNotConfigured
+		return nil, ErrNotConfigured
 	}
 
 	return s.GetFunc(ctx, name, ref)
@@ -62,7 +64,7 @@ func (s *Store) Get(ctx context.Context, name string, ref provider.VersionRef) (
 // History delegates to HistoryFunc.
 func (s *Store) History(ctx context.Context, name string) ([]domain.Version, error) {
 	if s.HistoryFunc == nil {
-		return nil, errNotConfigured
+		return nil, ErrNotConfigured
 	}
 
 	return s.HistoryFunc(ctx, name)
@@ -71,7 +73,7 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 // List delegates to ListFunc.
 func (s *Store) List(ctx context.Context) ([]string, error) {
 	if s.ListFunc == nil {
-		return nil, errNotConfigured
+		return nil, ErrNotConfigured
 	}
 
 	return s.ListFunc(ctx)
@@ -82,7 +84,7 @@ func (s *Store) Create(
 	ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
 	if s.CreateFunc == nil {
-		return domain.Version{}, errNotConfigured
+		return domain.Version{}, ErrNotConfigured
 	}
 
 	return s.CreateFunc(ctx, name, value, valueType, description, opts...)
@@ -93,7 +95,7 @@ func (s *Store) Put(
 	ctx context.Context, name, value string, valueType domain.ValueType, description string, opts ...provider.WriteOption,
 ) (domain.Version, error) {
 	if s.PutFunc == nil {
-		return domain.Version{}, errNotConfigured
+		return domain.Version{}, ErrNotConfigured
 	}
 
 	return s.PutFunc(ctx, name, value, valueType, description, opts...)
@@ -102,7 +104,7 @@ func (s *Store) Put(
 // Delete delegates to DeleteFunc.
 func (s *Store) Delete(ctx context.Context, name string, opts ...provider.DeleteOption) error {
 	if s.DeleteFunc == nil {
-		return errNotConfigured
+		return ErrNotConfigured
 	}
 
 	return s.DeleteFunc(ctx, name, opts...)
@@ -111,7 +113,7 @@ func (s *Store) Delete(ctx context.Context, name string, opts ...provider.Delete
 // Tag delegates to TagFunc.
 func (s *Store) Tag(ctx context.Context, name string, add map[string]string) error {
 	if s.TagFunc == nil {
-		return errNotConfigured
+		return ErrNotConfigured
 	}
 
 	return s.TagFunc(ctx, name, add)
@@ -120,7 +122,7 @@ func (s *Store) Tag(ctx context.Context, name string, add map[string]string) err
 // Untag delegates to UntagFunc.
 func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	if s.UntagFunc == nil {
-		return errNotConfigured
+		return ErrNotConfigured
 	}
 
 	return s.UntagFunc(ctx, name, keys)
@@ -129,7 +131,7 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 // Restore delegates to RestoreFunc.
 func (s *Store) Restore(ctx context.Context, name string) error {
 	if s.RestoreFunc == nil {
-		return errNotConfigured
+		return ErrNotConfigured
 	}
 
 	return s.RestoreFunc(ctx, name)

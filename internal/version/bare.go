@@ -19,11 +19,11 @@ type BareGrammar struct{}
 
 // Parse takes the entire (whitespace-trimmed) input as the name; no version
 // specifier is split off, so ':' / '#' / '~' are preserved verbatim. Empty
-// input yields errEmptySpec.
+// input yields ErrEmptySpec.
 func (BareGrammar) Parse(input string) (*BareSpec, error) {
 	name := strings.TrimSpace(input)
 	if name == "" {
-		return nil, errEmptySpec
+		return nil, ErrEmptySpec
 	}
 
 	return &BareSpec{Name: name}, nil

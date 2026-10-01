@@ -10,22 +10,24 @@ import (
 )
 
 // Product-specific errors.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
-	// errInvalidAWSSecretsManagerID is returned when # is not followed by an AWS
+	// ErrInvalidAWSSecretsManagerID is returned when # is not followed by an AWS
 	// Secrets Manager version ID.
-	errInvalidAWSSecretsManagerID = errors.New("# must be followed by a version ID")
-	// errInvalidAWSSecretsManagerLabel is returned when : is not followed by an AWS
+	ErrInvalidAWSSecretsManagerID = errors.New("# must be followed by a version ID")
+	// ErrInvalidAWSSecretsManagerLabel is returned when : is not followed by an AWS
 	// Secrets Manager staging label.
-	errInvalidAWSSecretsManagerLabel = errors.New(": must be followed by a label")
+	ErrInvalidAWSSecretsManagerLabel = errors.New(": must be followed by a label")
 	// ErrGoogleCloudSecretManagerLabelUnsupported is returned when a :LABEL specifier is
 	// used for Google Cloud Secret Manager, which has no staging labels.
 	ErrGoogleCloudSecretManagerLabelUnsupported = errors.New(
 		": staging labels are not supported for Google Cloud Secret Manager " +
 			"(versions are integers or \"latest\")",
 	)
-	// errInvalidAzureKeyVaultID is returned when # is not followed by an Azure Key
+	// ErrInvalidAzureKeyVaultID is returned when # is not followed by an Azure Key
 	// Vault version id.
-	errInvalidAzureKeyVaultID = errors.New("# must be followed by a version id")
+	ErrInvalidAzureKeyVaultID = errors.New("# must be followed by a version id")
 	// ErrAzureKeyVaultLabelUnsupported is returned when a :LABEL specifier is used
 	// for Azure Key Vault, which has no staging labels.
 	ErrAzureKeyVaultLabelUnsupported = errors.New(
@@ -46,9 +48,9 @@ var (
 	// plus staging labels, name#VERSION / name:LABEL, then ~SHIFT.
 	AWSSecretsManager = OpaqueGrammar{
 		isIDChar:       isAWSSecretsManagerIDChar,
-		invalidIDError: errInvalidAWSSecretsManagerID,
+		invalidIDError: ErrInvalidAWSSecretsManagerID,
 		labels:         true,
-		labelError:     errInvalidAWSSecretsManagerLabel,
+		labelError:     ErrInvalidAWSSecretsManagerLabel,
 	}
 
 	// GoogleCloudSecretManager is the Google Cloud Secret Manager grammar: integer
@@ -61,7 +63,7 @@ var (
 	// call.
 	AzureKeyVault = OpaqueGrammar{
 		isIDChar:       isAzureKeyVaultIDChar,
-		invalidIDError: errInvalidAzureKeyVaultID,
+		invalidIDError: ErrInvalidAzureKeyVaultID,
 		labelError:     ErrAzureKeyVaultLabelUnsupported,
 	}
 

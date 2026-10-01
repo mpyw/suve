@@ -304,7 +304,7 @@ func TestSecretMutator_ImmediateRouting(t *testing.T) {
 
 // TestSecretMutator_Restore covers both restore outcomes: a provider that
 // implements provider.Restorer restores via the use case, while a store that
-// does NOT implement it yields errRestoreUnsupported before any call.
+// does NOT implement it yields ErrRestoreUnsupported before any call.
 //
 //nolint:paralleltest // sets HOME / SUVE_STAGING_KEY via t.Setenv
 func TestSecretMutator_Restore(t *testing.T) {
@@ -343,7 +343,7 @@ func TestSecretMutator_Restore(t *testing.T) {
 		mut, _ := newSecretMutator(t, mutatorStoreWithoutRestore{Store: &providermock.Store{}})
 
 		_, err := mut.Restore(ctx, mutatorExistingSecretName)
-		require.ErrorIs(t, err, errRestoreUnsupported)
+		require.ErrorIs(t, err, ErrRestoreUnsupported)
 		assert.Equal(t, "restore is not supported by this provider", err.Error(), "stringError renders its message")
 	})
 }

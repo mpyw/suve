@@ -84,14 +84,14 @@ func TestParse(t *testing.T) {
 		t.Parallel()
 
 		_, err := parseSpec("", parser)
-		assert.ErrorIs(t, err, errEmptySpec)
+		assert.ErrorIs(t, err, ErrEmptySpec)
 	})
 
 	t.Run("whitespace only", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := parseSpec("   ", parser)
-		assert.ErrorIs(t, err, errEmptySpec)
+		assert.ErrorIs(t, err, ErrEmptySpec)
 	})
 
 	t.Run("empty name with specifier", func(t *testing.T) {

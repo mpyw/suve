@@ -164,5 +164,5 @@ func TestAppConfigurationSplit(t *testing.T) {
 	assert.Empty(t, suffix, "an unversioned service has no suffix")
 
 	_, _, err = AzureAppConfiguration.Split("  ")
-	require.ErrorIs(t, err, errEmptySpec)
+	require.ErrorIs(t, err, ErrEmptySpec)
 }

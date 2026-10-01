@@ -423,6 +423,6 @@ func TestHydrateScope(t *testing.T) {
 	// An unknown or empty provider is an error, never a silent default.
 	for _, p := range []provider.Provider{"", "oracle"} {
 		_, err := HydrateScope(hydrateEnv, provider.Scope{Provider: p})
-		require.ErrorIs(t, err, errUnknownProvider, "provider %q", p)
+		require.ErrorIs(t, err, ErrUnknownProvider, "provider %q", p)
 	}
 }

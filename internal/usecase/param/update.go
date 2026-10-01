@@ -64,7 +64,7 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 
 	switch {
 	case errors.Is(err, provider.ErrNotFound):
-		return nil, fmt.Errorf("%s %w: %s", errItemNoun(u.ItemNoun), errNotFound, input.Name)
+		return nil, fmt.Errorf("%s %w: %s", errItemNoun(u.ItemNoun), ErrNotFound, input.Name)
 	case err != nil:
 		return nil, err
 	}

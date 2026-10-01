@@ -210,7 +210,7 @@ func (m *paramMutator) RemoveTag(
 }
 
 func (m *paramMutator) Restore(context.Context, string) (WriteOutcome, error) {
-	return WriteOutcome{}, errRestoreUnsupported
+	return WriteOutcome{}, ErrRestoreUnsupported
 }
 
 // stageStrategy resolves the staged-write strategy and store for a namespace.

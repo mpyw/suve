@@ -101,7 +101,7 @@ func TestPlaintextGuard_Write(t *testing.T) {
 			err := store.WriteState(t.Context(), "", nonEmptyState())
 
 			if tt.wantBlocked {
-				require.ErrorIs(t, err, errPlaintextConsentRequired)
+				require.ErrorIs(t, err, ErrPlaintextConsentRequired)
 
 				_, statErr := os.Stat(path)
 				require.ErrorIs(t, statErr, os.ErrNotExist, "no state file must be written when the guard fires")

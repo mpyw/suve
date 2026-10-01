@@ -8,21 +8,23 @@ package transition
 import "errors"
 
 // Error definitions for transition failures.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
-	errCannotAddToUpdate    = errors.New("cannot add: already staged for update")
-	errCannotAddToDelete    = errors.New("cannot add: already staged for deletion, reset first")
+	ErrCannotAddToUpdate    = errors.New("cannot add: already staged for update")
+	ErrCannotAddToDelete    = errors.New("cannot add: already staged for deletion, reset first")
 	ErrCannotAddToExisting  = errors.New("cannot add: resource already exists, use edit instead")
 	ErrCannotEditDelete     = errors.New("cannot edit: staged for deletion, reset first")
-	errCannotDeleteNotFound = errors.New("cannot delete: resource not found")
-	// errCannotDeleteStagedUpdateNotFound is returned when a staged Update points
+	ErrCannotDeleteNotFound = errors.New("cannot delete: resource not found")
+	// ErrCannotDeleteStagedUpdateNotFound is returned when a staged Update points
 	// at a remote that was deleted out-of-band. The Update can never apply and
 	// delete cannot help, so the message names reset as the way out instead of a
 	// generic not-found that dead-ends the user.
-	errCannotDeleteStagedUpdateNotFound = errors.New("cannot delete: staged update targets a resource that no longer exists; use reset to discard it")
-	errCannotTagNotFound                = errors.New("cannot tag: resource not found")
-	errCannotTagDelete                  = errors.New("cannot tag: resource staged for deletion")
-	errCannotUntagNotFound              = errors.New("cannot untag: resource not found")
-	errCannotUntagDelete                = errors.New("cannot untag: resource staged for deletion")
+	ErrCannotDeleteStagedUpdateNotFound = errors.New("cannot delete: staged update targets a resource that no longer exists; use reset to discard it")
+	ErrCannotTagNotFound                = errors.New("cannot tag: resource not found")
+	ErrCannotTagDelete                  = errors.New("cannot tag: resource staged for deletion")
+	ErrCannotUntagNotFound              = errors.New("cannot untag: resource not found")
+	ErrCannotUntagDelete                = errors.New("cannot untag: resource staged for deletion")
 )
 
 // EntryTransitionResult holds the result of an entry state transition.
@@ -88,7 +90,7 @@ func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 	// but editing a staged delete is refused too. Surface the accurate remedy
 	// (reset first) regardless of whether the remote still exists.
 	if _, isDelete := state.StagedState.(EntryStagedStateDelete); isDelete {
-		return EntryTransitionResult{NewState: state, Error: errCannotAddToDelete}
+		return EntryTransitionResult{NewState: state, Error: ErrCannotAddToDelete}
 	}
 
 	// Check if resource already exists remotely
@@ -100,9 +102,9 @@ func reduceAdd(state EntryState, action EntryActionAdd) EntryTransitionResult {
 	case EntryStagedStateNotStaged, EntryStagedStateCreate:
 		state.StagedState = EntryStagedStateCreate{DraftValue: action.Value}
 	case EntryStagedStateUpdate:
-		err = errCannotAddToUpdate
+		err = ErrCannotAddToUpdate
 	case EntryStagedStateDelete:
-		err = errCannotAddToDelete
+		err = ErrCannotAddToDelete
 	}
 
 	return EntryTransitionResult{NewState: state, Error: err}
@@ -167,10 +169,10 @@ func reduceDelete(state EntryState) EntryTransitionResult {
 		// point the user at reset rather than a generic not-found so they aren't
 		// dead-ended (delete refuses, apply keeps failing).
 		if _, isUpdate := state.StagedState.(EntryStagedStateUpdate); isUpdate {
-			return EntryTransitionResult{NewState: state, Error: errCannotDeleteStagedUpdateNotFound}
+			return EntryTransitionResult{NewState: state, Error: ErrCannotDeleteStagedUpdateNotFound}
 		}
 
-		return EntryTransitionResult{NewState: state, Error: errCannotDeleteNotFound}
+		return EntryTransitionResult{NewState: state, Error: ErrCannotDeleteNotFound}
 	}
 
 	switch state.StagedState.(type) {
@@ -217,7 +219,7 @@ func reduceTag(entryState EntryState, stagedTags StagedTags, action TagActionTag
 	if _, isDelete := entryState.StagedState.(EntryStagedStateDelete); isDelete {
 		return TagTransitionResult{
 			NewStagedTags: stagedTags,
-			Error:         errCannotTagDelete,
+			Error:         ErrCannotTagDelete,
 		}
 	}
 
@@ -226,7 +228,7 @@ func reduceTag(entryState EntryState, stagedTags StagedTags, action TagActionTag
 	if entryState.CurrentValue == nil && isNotStaged {
 		return TagTransitionResult{
 			NewStagedTags: stagedTags,
-			Error:         errCannotTagNotFound,
+			Error:         ErrCannotTagNotFound,
 		}
 	}
 
@@ -265,7 +267,7 @@ func reduceUntag(entryState EntryState, stagedTags StagedTags, action TagActionU
 	if _, isDelete := entryState.StagedState.(EntryStagedStateDelete); isDelete {
 		return TagTransitionResult{
 			NewStagedTags: stagedTags,
-			Error:         errCannotUntagDelete,
+			Error:         ErrCannotUntagDelete,
 		}
 	}
 
@@ -274,7 +276,7 @@ func reduceUntag(entryState EntryState, stagedTags StagedTags, action TagActionU
 	if entryState.CurrentValue == nil && isNotStaged {
 		return TagTransitionResult{
 			NewStagedTags: stagedTags,
-			Error:         errCannotUntagNotFound,
+			Error:         ErrCannotUntagNotFound,
 		}
 	}
 
