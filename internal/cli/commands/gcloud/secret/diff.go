@@ -35,8 +35,8 @@ type diffPresenter struct {
 	result *secret.DiffOutput
 }
 
-// NewDiffPresenter builds a Google Cloud diff presenter over the given reader and specs.
-func NewDiffPresenter(reader provider.Reader, spec1, spec2 *version.NumericSpec) generic.DiffPresenter {
+// newDiffPresenter builds a Google Cloud diff presenter over the given reader and specs.
+func newDiffPresenter(reader provider.Reader, spec1, spec2 *version.NumericSpec) generic.DiffPresenter {
 	return &diffPresenter{uc: &secret.DiffUseCase{Reader: reader}, spec1: spec1, spec2: spec2}
 }
 
@@ -81,8 +81,10 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 	output.Hint(stderr, "To compare with the previous version, use: suve gcloud secret diff %s~1", p.result.OldName)
 }
 
-// DiffCommand returns the Google Cloud Secret Manager diff command.
-func DiffCommand() *cli.Command {
+// diffCommand returns the Google Cloud Secret Manager diff command.
+//
+//declscope:package // command.go registers it
+func diffCommand() *cli.Command {
 	return generic.DiffCommand(generic.DiffConfig[*version.NumericSpec]{
 		Usage:     "Show diff between two versions",
 		ArgsUsage: "<spec1> [spec2] | <name> #<version1> [#<version2>]",
@@ -105,7 +107,7 @@ EXAMPLES:
 				return nil, err
 			}
 
-			return NewDiffPresenter(store, spec1, spec2), nil
+			return newDiffPresenter(store, spec1, spec2), nil
 		},
 	})
 }

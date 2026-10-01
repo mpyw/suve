@@ -118,12 +118,12 @@ type Choice struct {
 type ChoiceResult int
 
 const (
-	// ChoiceCancelled indicates the user cancelled the prompt.
-	ChoiceCancelled ChoiceResult = -1
+	// choiceCancelled indicates the user cancelled the prompt.
+	choiceCancelled ChoiceResult = -1
 )
 
 // ConfirmChoice displays a multiple choice prompt and returns the selected index.
-// Returns ChoiceCancelled (-1) if the user cancels or selects cancel option.
+// Returns choiceCancelled (-1) if the user cancels or selects cancel option.
 // The first choice (index 0) is the default when user just presses Enter.
 func (p *Prompter) ConfirmChoice(message string, choices []Choice) (ChoiceResult, error) {
 	p.printTargetInfo()
@@ -141,7 +141,7 @@ func (p *Prompter) ConfirmChoice(message string, choices []Choice) (ChoiceResult
 
 	response, err := p.reader().ReadString('\n')
 	if err != nil {
-		return ChoiceCancelled, fmt.Errorf("failed to read response: %w", err)
+		return choiceCancelled, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	response = strings.TrimSpace(response)
@@ -154,12 +154,12 @@ func (p *Prompter) ConfirmChoice(message string, choices []Choice) (ChoiceResult
 	// Parse as number
 	var choice int
 	if _, err := fmt.Sscanf(response, "%d", &choice); err != nil {
-		return ChoiceCancelled, nil //nolint:nilerr // Invalid input is intentionally treated as cancel, not error
+		return choiceCancelled, nil //nolint:nilerr // Invalid input is intentionally treated as cancel, not error
 	}
 
 	// Validate range
 	if choice < 1 || choice > len(choices) {
-		return ChoiceCancelled, nil // Out of range treated as cancel
+		return choiceCancelled, nil // Out of range treated as cancel
 	}
 
 	return ChoiceResult(choice - 1), nil

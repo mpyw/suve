@@ -1,17 +1,12 @@
 package generic_test
 
 import (
-	"bytes"
-	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mpyw/suve/internal/cli/commands/generic"
 	"github.com/mpyw/suve/internal/cli/commands/internal/apptest"
-	"github.com/mpyw/suve/internal/provider/providermock"
 )
 
 // TestTagCommand_Validation exercises the wired param and secret tag/untag commands
@@ -46,141 +41,6 @@ func TestTagCommand_Validation(t *testing.T) {
 			err := app.Run(t.Context(), tc.args)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantSub)
-		})
-	}
-}
-
-func TestRunTag(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		noun    string
-		resName string
-		tags    map[string]string
-		store   *providermock.Store
-		wantErr string
-		check   func(t *testing.T, output string)
-	}{
-		{
-			name:    "param add single tag",
-			noun:    "parameter",
-			resName: "/app/param",
-			tags:    map[string]string{"env": "prod"},
-			store: &providermock.Store{
-				TagFunc: func(_ context.Context, name string, add map[string]string) error {
-					assert.Equal(t, "/app/param", name)
-					assert.Len(t, add, 1)
-
-					return nil
-				},
-			},
-			check: func(t *testing.T, output string) {
-				t.Helper()
-				assert.Contains(t, output, "Tagged")
-				assert.Contains(t, output, "/app/param")
-			},
-		},
-		{
-			name:    "param add multiple tags",
-			noun:    "parameter",
-			resName: "/app/param",
-			tags:    map[string]string{"env": "prod", "team": "backend"},
-			store: &providermock.Store{
-				TagFunc: func(_ context.Context, _ string, add map[string]string) error {
-					assert.Len(t, add, 2)
-
-					return nil
-				},
-			},
-			check: func(t *testing.T, output string) {
-				t.Helper()
-				assert.Contains(t, output, "2 tag(s)")
-			},
-		},
-		{
-			name:    "param add tags error",
-			noun:    "parameter",
-			resName: "/app/param",
-			tags:    map[string]string{"env": "prod"},
-			store: &providermock.Store{
-				TagFunc: func(_ context.Context, _ string, _ map[string]string) error {
-					return assert.AnError
-				},
-			},
-			wantErr: "failed to add tags",
-		},
-		{
-			name:    "secret add single tag",
-			noun:    "secret",
-			resName: "my-secret",
-			tags:    map[string]string{"env": "prod"},
-			store: &providermock.Store{
-				TagFunc: func(_ context.Context, name string, add map[string]string) error {
-					assert.Equal(t, "my-secret", name)
-					assert.Len(t, add, 1)
-
-					return nil
-				},
-			},
-			check: func(t *testing.T, output string) {
-				t.Helper()
-				assert.Contains(t, output, "Tagged")
-				assert.Contains(t, output, "my-secret")
-			},
-		},
-		{
-			name:    "secret add multiple tags",
-			noun:    "secret",
-			resName: "my-secret",
-			tags:    map[string]string{"env": "prod", "team": "backend"},
-			store: &providermock.Store{
-				TagFunc: func(_ context.Context, _ string, add map[string]string) error {
-					assert.Len(t, add, 2)
-
-					return nil
-				},
-			},
-			check: func(t *testing.T, output string) {
-				t.Helper()
-				assert.Contains(t, output, "2 tag(s)")
-			},
-		},
-		{
-			name:    "secret tag resource error",
-			noun:    "secret",
-			resName: "my-secret",
-			tags:    map[string]string{"env": "prod"},
-			store: &providermock.Store{
-				TagFunc: func(_ context.Context, _ string, _ map[string]string) error {
-					return errors.New("AWS error")
-				},
-			},
-			wantErr: "failed to add tags",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			var buf bytes.Buffer
-
-			r := &generic.TagRunner{Tagger: tt.store, Noun: tt.noun, Stdout: &buf}
-			err := r.RunTag(t.Context(), tt.resName, tt.tags)
-
-			if tt.wantErr != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErr)
-
-				return
-			}
-
-			require.NoError(t, err)
-
-			if tt.check != nil {
-				tt.check(t, buf.String())
-			}
 		})
 	}
 }

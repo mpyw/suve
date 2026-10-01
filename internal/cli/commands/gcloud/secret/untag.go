@@ -6,8 +6,10 @@ import (
 	"github.com/mpyw/suve/internal/cli/commands/generic"
 )
 
-// UntagCommand returns the Google Cloud Secret Manager untag command.
-func UntagCommand() *cli.Command {
+// untagCommand returns the Google Cloud Secret Manager untag command.
+//
+//declscope:package // command.go registers it
+func untagCommand() *cli.Command {
 	return generic.UntagCommand(generic.TagConfig{
 		Usage:     `Remove tags from a secret (Google Cloud calls these "labels")`,
 		ArgsUsage: "<name> <key>...",

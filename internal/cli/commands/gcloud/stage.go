@@ -68,8 +68,10 @@ func stageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 	}
 }
 
-// StageCommand returns the "gcloud stage" subcommand group.
-func StageCommand() *cli.Command {
+// stageCommand returns the "gcloud stage" subcommand group.
+//
+//declscope:package // command.go registers it
+func stageCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "stage",
 		Aliases:         []string{"stg"},

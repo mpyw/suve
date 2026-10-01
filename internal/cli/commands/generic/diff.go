@@ -27,8 +27,9 @@ import (
 
 // DiffOptions holds the shared diff options.
 type DiffOptions struct {
+	//declscope:ignore overexported // diff_test.go runs the diff with the AWS presenters, which import this package
 	ParseJSON bool
-	NoPager   bool
+	noPager   bool
 	Output    output.Format
 }
 
@@ -173,12 +174,12 @@ func DiffCommand[S any](cfg DiffConfig[S]) *cli.Command {
 
 			opts := DiffOptions{
 				ParseJSON: cmd.Bool("parse-json"),
-				NoPager:   cmd.Bool("no-pager"),
+				noPager:   cmd.Bool("no-pager"),
 				Output:    outputFormat,
 			}
 
 			// JSON output disables pager
-			noPager := opts.NoPager || opts.Output == output.FormatJSON
+			noPager := opts.noPager || opts.Output == output.FormatJSON
 
 			return internal.WithPager(cmd, noPager, func(stdout, stderr io.Writer) error {
 				r := &DiffRunner{Presenter: presenter, Options: opts, Stdout: stdout, Stderr: stderr}

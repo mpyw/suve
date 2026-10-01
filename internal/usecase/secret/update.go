@@ -14,9 +14,9 @@ type UpdateInput struct {
 	Name        string
 	Value       string
 	Description string
-	// Options carries provider-specific write options (e.g. AWS Secrets Manager
+	// options carries provider-specific write options (e.g. AWS Secrets Manager
 	// KMS key, rotation). They are passed through to the provider unchanged.
-	Options []provider.WriteOption
+	options []provider.WriteOption
 }
 
 // UpdateOutput holds the result of the update use case.
@@ -60,7 +60,7 @@ func (u *UpdateUseCase) Execute(ctx context.Context, input UpdateInput) (*Update
 		return nil, err
 	}
 
-	version, err := u.Store.Put(ctx, input.Name, input.Value, domain.ValueTypeSecret, input.Description, input.Options...)
+	version, err := u.Store.Put(ctx, input.Name, input.Value, domain.ValueTypeSecret, input.Description, input.options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update secret: %w", err)
 	}

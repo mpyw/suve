@@ -206,7 +206,7 @@ func TestKeyVaultParse_LabelErrorMessage(t *testing.T) {
 
 // TestParse_LabelAfterVersionRejected exercises the ':' reject path reached
 // AFTER a valid '#' specifier: parseAbsolute advances past "#abc" and then hits
-// ':', invoking the label parser's Apply (which returns ErrLabelUnsupported).
+// ':', invoking the label parser's apply (which returns ErrLabelUnsupported).
 func TestKeyVaultParse_LabelAfterVersionRejected(t *testing.T) {
 	t.Parallel()
 

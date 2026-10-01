@@ -33,6 +33,8 @@ var ErrValueRequired = errors.New(
 // front and tell the user to re-run with --yes. We intentionally neither imply
 // --yes nor read the confirmation from /dev/tty, so the acknowledgement stays
 // explicit.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var ErrValueStdinNeedsYes = errors.New(
 	"--" + FlagValueStdin + " consumes stdin, so the confirmation prompt cannot be read; " +
 		"re-run with --yes to acknowledge the update",

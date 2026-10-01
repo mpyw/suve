@@ -3,7 +3,7 @@
 // suite, so the whole file is declared package-wide.
 //declscope:package
 
-package cli_test
+package cli
 
 import (
 	"bytes"
@@ -21,7 +21,6 @@ import (
 
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/staging"
-	stgcli "github.com/mpyw/suve/internal/staging/cli"
 	"github.com/mpyw/suve/internal/staging/store/file"
 )
 
@@ -41,7 +40,7 @@ func setupExportImportEnv(t *testing.T) provider.Scope {
 }
 
 // fixedResolver returns a ScopeResolver that always resolves to scope.
-func fixedResolver(scope provider.Scope) staging.ScopeResolver {
+func exportFixedResolver(scope provider.Scope) staging.ScopeResolver {
 	return func(context.Context) (staging.ResolvedScope, error) {
 		return staging.ResolvedScope{Scope: scope, Target: scope.Target()}, nil
 	}
@@ -49,13 +48,13 @@ func fixedResolver(scope provider.Scope) staging.ScopeResolver {
 
 // globalExportCmd builds the global export command for a fixed scope.
 func globalExportCmd(scope provider.Scope) *cli.Command {
-	return stgcli.NewGlobalExportCommand(stgcli.GlobalConfig{ScopeResolver: fixedResolver(scope)})
+	return NewGlobalExportCommand(GlobalConfig{ScopeResolver: exportFixedResolver(scope)})
 }
 
 // paramExportImportConfig builds a service-specific param CommandConfig bound to
 // the given resolver.
-func paramExportImportConfig(resolver staging.ScopeResolver) stgcli.CommandConfig {
-	return stgcli.CommandConfig{
+func paramExportImportConfig(resolver staging.ScopeResolver) CommandConfig {
+	return CommandConfig{
 		CommandName:   "param",
 		ItemName:      "parameter",
 		ParserFactory: staging.AWSParamParserFactory,
@@ -65,8 +64,8 @@ func paramExportImportConfig(resolver staging.ScopeResolver) stgcli.CommandConfi
 
 // secretExportImportConfig builds a service-specific secret CommandConfig bound
 // to the given resolver.
-func secretExportImportConfig(resolver staging.ScopeResolver) stgcli.CommandConfig {
-	return stgcli.CommandConfig{
+func secretExportImportConfig(resolver staging.ScopeResolver) CommandConfig {
+	return CommandConfig{
 		CommandName:   "secret",
 		ItemName:      "secret",
 		ParserFactory: staging.AWSSecretParserFactory,
@@ -76,7 +75,7 @@ func secretExportImportConfig(resolver staging.ScopeResolver) stgcli.CommandConf
 
 // runLeafCmd runs a leaf command (export/import) through a minimal app harness,
 // returning stdout, stderr and the run error. stdin may be nil.
-func runLeafCmd(t *testing.T, cmd *cli.Command, stdin io.Reader, args ...string) (stdout, stderr string, err error) {
+func exportRunLeafCmd(t *testing.T, cmd *cli.Command, stdin io.Reader, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
 	var outBuf, errBuf bytes.Buffer
@@ -96,7 +95,7 @@ func runLeafCmd(t *testing.T, cmd *cli.Command, stdin io.Reader, args ...string)
 }
 
 // stageEntry stages a single entry in the working store for scope.
-func stageEntry(t *testing.T, scope provider.Scope, svc staging.Service, name, value string) {
+func exportStageEntry(t *testing.T, scope provider.Scope, svc staging.Service, name, value string) {
 	t.Helper()
 
 	store, err := file.NewWorkingStore(scope)
@@ -109,7 +108,7 @@ func stageEntry(t *testing.T, scope provider.Scope, svc staging.Service, name, v
 }
 
 // workingState reads the current working state for scope (keep=true).
-func workingState(t *testing.T, scope provider.Scope) *staging.State {
+func exportWorkingState(t *testing.T, scope provider.Scope) *staging.State {
 	t.Helper()
 
 	store, err := file.NewWorkingStore(scope)
@@ -129,11 +128,11 @@ func workingState(t *testing.T, scope provider.Scope) *staging.State {
 func TestGlobalExport(t *testing.T) {
 	t.Run("global export writes only non-empty services and clears working", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
-		stdout, stderr, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
+		stdout, stderr, err := exportRunLeafCmd(t, globalExportCmd(scope), nil, dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "exported")
 		// Plaintext (non-TTY, no passphrase) → warning.
@@ -146,17 +145,17 @@ func TestGlobalExport(t *testing.T) {
 		assert.True(t, os.IsNotExist(err))
 
 		// Working area cleared.
-		assert.True(t, workingState(t, scope).IsEmpty())
+		assert.True(t, exportWorkingState(t, scope).IsEmpty())
 	})
 
 	t.Run("global export both services", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
-		stageEntry(t, scope, staging.ServiceSecret, "my-secret", "sval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceSecret, "my-secret", "sval")
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
-		_, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
+		_, _, err := exportRunLeafCmd(t, globalExportCmd(scope), nil, dir)
 		require.NoError(t, err)
 
 		_, err = os.Stat(filepath.Join(dir, "param.json"))
@@ -167,25 +166,25 @@ func TestGlobalExport(t *testing.T) {
 
 	t.Run("--keep preserves the working area", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
-		stdout, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir, "--keep")
+		stdout, _, err := exportRunLeafCmd(t, globalExportCmd(scope), nil, dir, "--keep")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "kept in the working staging area")
 
-		assert.False(t, workingState(t, scope).IsEmpty())
+		assert.False(t, exportWorkingState(t, scope).IsEmpty())
 	})
 
 	t.Run("encrypted via --passphrase-stdin", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
 		stdin := bytes.NewBufferString("pw123\n")
-		stdout, stderr, err := runLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin")
+		stdout, stderr, err := exportRunLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "encrypted")
 		assert.NotContains(t, stderr, "plain text")
@@ -202,7 +201,7 @@ func TestGlobalExport(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "backup")
 
-		stdout, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
+		stdout, _, err := exportRunLeafCmd(t, globalExportCmd(scope), nil, dir)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No staged changes to export.")
 
@@ -213,31 +212,31 @@ func TestGlobalExport(t *testing.T) {
 	t.Run("missing dir argument", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
 
-		_, _, err := runLeafCmd(t, globalExportCmd(scope), nil)
+		_, _, err := exportRunLeafCmd(t, globalExportCmd(scope), nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage")
 	})
 
 	t.Run("overwrite refused in non-TTY without --yes", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
 
-		_, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir)
+		_, _, err := exportRunLeafCmd(t, globalExportCmd(scope), nil, dir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exist")
 	})
 
 	t.Run("overwrite allowed with --yes", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
 
-		_, _, err := runLeafCmd(t, globalExportCmd(scope), nil, dir, "--yes")
+		_, _, err := exportRunLeafCmd(t, globalExportCmd(scope), nil, dir, "--yes")
 		require.NoError(t, err)
 
 		env, err := file.ReadEnvelopeFile(filepath.Join(dir, "param.json"))
@@ -251,17 +250,17 @@ func TestGlobalExport(t *testing.T) {
 	for name, input := range map[string]string{"EOF": "", "empty line": "\n"} {
 		t.Run("--passphrase-stdin with empty passphrase errors ("+name+")", func(t *testing.T) {
 			scope := setupExportImportEnv(t)
-			stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+			exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 			dir := filepath.Join(t.TempDir(), "backup")
 
-			stdout, _, err := runLeafCmd(t, globalExportCmd(scope), bytes.NewBufferString(input), dir, "--passphrase-stdin")
+			stdout, _, err := exportRunLeafCmd(t, globalExportCmd(scope), bytes.NewBufferString(input), dir, "--passphrase-stdin")
 			require.ErrorContains(t, err, "empty passphrase read from stdin")
 			assert.NotContains(t, stdout, "exported")
 
 			_, err = os.Stat(filepath.Join(dir, "param.json"))
 			assert.True(t, os.IsNotExist(err), "no export file must be written")
-			assert.False(t, workingState(t, scope).IsEmpty(), "working area must be kept")
+			assert.False(t, exportWorkingState(t, scope).IsEmpty(), "working area must be kept")
 		})
 	}
 
@@ -271,13 +270,13 @@ func TestGlobalExport(t *testing.T) {
 	// line is never consumed as a confirmation.
 	t.Run("--passphrase-stdin against existing target errors instead of silently cancelling", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
 
 		stdin := bytes.NewBufferString("pw123\n")
-		stdout, _, err := runLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin")
+		stdout, _, err := exportRunLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exist")
 		assert.Contains(t, err.Error(), "--yes")
@@ -290,13 +289,13 @@ func TestGlobalExport(t *testing.T) {
 	// encrypted envelope.
 	t.Run("--passphrase-stdin with --yes overwrites and encrypts using the stdin passphrase", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
 
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "param.json"), []byte("{}"), 0o600))
 
 		stdin := bytes.NewBufferString("pw123\n")
-		stdout, _, err := runLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin", "--yes")
+		stdout, _, err := exportRunLeafCmd(t, globalExportCmd(scope), stdin, dir, "--passphrase-stdin", "--yes")
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "encrypted")
 
@@ -312,13 +311,13 @@ func TestGlobalExport(t *testing.T) {
 func TestServiceExport(t *testing.T) {
 	t.Run("service-specific export to a file", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
-		stageEntry(t, scope, staging.ServiceSecret, "my-secret", "sval")
+		exportStageEntry(t, scope, staging.ServiceParam, "/app/config", "pval")
+		exportStageEntry(t, scope, staging.ServiceSecret, "my-secret", "sval")
 
 		fpath := filepath.Join(t.TempDir(), "out", "param.json")
 
-		cmd := stgcli.NewExportCommand(paramExportImportConfig(fixedResolver(scope)))
-		_, _, err := runLeafCmd(t, cmd, nil, fpath)
+		cmd := NewExportCommand(paramExportImportConfig(exportFixedResolver(scope)))
+		_, _, err := exportRunLeafCmd(t, cmd, nil, fpath)
 		require.NoError(t, err)
 
 		env, err := file.ReadEnvelopeFile(fpath)
@@ -326,19 +325,19 @@ func TestServiceExport(t *testing.T) {
 		assert.Equal(t, "param", env.Service)
 
 		// Only the param service was cleared; the secret remains.
-		state := workingState(t, scope)
+		state := exportWorkingState(t, scope)
 		assert.True(t, state.ExtractService(staging.ServiceParam).IsEmpty())
 		assert.False(t, state.ExtractService(staging.ServiceSecret).IsEmpty())
 	})
 
 	t.Run("nothing to export for this service", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
-		stageEntry(t, scope, staging.ServiceSecret, "my-secret", "sval")
+		exportStageEntry(t, scope, staging.ServiceSecret, "my-secret", "sval")
 
 		fpath := filepath.Join(t.TempDir(), "param.json")
 
-		cmd := stgcli.NewExportCommand(paramExportImportConfig(fixedResolver(scope)))
-		stdout, _, err := runLeafCmd(t, cmd, nil, fpath)
+		cmd := NewExportCommand(paramExportImportConfig(exportFixedResolver(scope)))
+		stdout, _, err := exportRunLeafCmd(t, cmd, nil, fpath)
 		require.NoError(t, err)
 		assert.Contains(t, stdout, "No staged changes to export.")
 
@@ -349,8 +348,8 @@ func TestServiceExport(t *testing.T) {
 	t.Run("missing file argument", func(t *testing.T) {
 		scope := setupExportImportEnv(t)
 
-		cmd := stgcli.NewExportCommand(paramExportImportConfig(fixedResolver(scope)))
-		_, _, err := runLeafCmd(t, cmd, nil)
+		cmd := NewExportCommand(paramExportImportConfig(exportFixedResolver(scope)))
+		_, _, err := exportRunLeafCmd(t, cmd, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "usage")
 	})

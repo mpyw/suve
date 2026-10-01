@@ -8,8 +8,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// DefaultLimit is the default concurrency limit for parallel operations.
-const DefaultLimit = 10
+// defaultLimit is the default concurrency limit for parallel operations.
+const defaultLimit = 10
 
 // Result holds the result of a parallel operation.
 type Result[T any] struct {
@@ -25,21 +25,21 @@ func ExecuteMap[K comparable, V any, R any](
 	entries map[K]V,
 	fn func(ctx context.Context, key K, value V) (R, error),
 ) map[K]*Result[R] {
-	return ExecuteMapWithLimit(ctx, entries, DefaultLimit, fn)
+	return executeMapWithLimit(ctx, entries, defaultLimit, fn)
 }
 
-// ExecuteMapWithLimit is like ExecuteMap but with a custom concurrency limit. A
-// non-positive limit falls back to DefaultLimit: errgroup.SetLimit(0) uses a
+// executeMapWithLimit is like ExecuteMap but with a custom concurrency limit. A
+// non-positive limit falls back to defaultLimit: errgroup.SetLimit(0) uses a
 // zero-capacity semaphore that would block the first g.Go forever (a deadlock),
 // so it is never passed through.
-func ExecuteMapWithLimit[K comparable, V any, R any](
+func executeMapWithLimit[K comparable, V any, R any](
 	ctx context.Context,
 	entries map[K]V,
 	limit int,
 	fn func(ctx context.Context, key K, value V) (R, error),
 ) map[K]*Result[R] {
 	if limit <= 0 {
-		limit = DefaultLimit
+		limit = defaultLimit
 	}
 
 	results := make(map[K]*Result[R], len(entries))

@@ -22,8 +22,8 @@ type logPresenter struct {
 	req generic.LogRequest
 }
 
-// NewLogPresenter builds an Azure App Configuration log presenter over the given reader and request.
-func NewLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
+// newLogPresenter builds an Azure App Configuration log presenter over the given reader and request.
+func newLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
 	return &logPresenter{uc: &param.LogUseCase{Reader: reader}, req: req}
 }
 
@@ -51,10 +51,12 @@ func (p *logPresenter) RenderValue(_ io.Writer, _, _ int)   {}
 
 func (p *logPresenter) RenderPatch(_, _ io.Writer, _ int, _, _ bool) {}
 
-// LogCommand returns the Azure App Configuration log command. Because App
+// logCommand returns the Azure App Configuration log command. Because App
 // Configuration is unversioned, running it produces a clear error (it never
 // crashes).
-func LogCommand() *cli.Command {
+//
+//declscope:package // command.go registers it
+func logCommand() *cli.Command {
 	return generic.LogCommand(generic.LogConfig{
 		Usage:     "Show setting version history (unsupported)",
 		ArgsUsage: argsUsageKey,
@@ -114,7 +116,7 @@ EXAMPLES:
 				return nil, err
 			}
 
-			return NewLogPresenter(store, req), nil
+			return newLogPresenter(store, req), nil
 		},
 	})
 }

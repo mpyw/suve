@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,7 +13,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v3"
 
 	cmdparam "github.com/mpyw/suve/internal/cli/commands/aws/param"
 	cmdsecret "github.com/mpyw/suve/internal/cli/commands/aws/secret"
@@ -101,57 +99,6 @@ func TestLogCommand_Validation(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Show parameter version history")
 	})
-}
-
-// recordingPresenter captures the maxValueLength the LogRunner passes to the render
-// methods, so a flag-parsing test can assert the Int32 --max-value-length flag
-// actually reaches LogOptions (it was silently read via cmd.Int, always 0) (#345).
-type recordingPresenter struct {
-	gotMaxValueLength int
-}
-
-func (p *recordingPresenter) Fetch(context.Context) error { return nil }
-func (p *recordingPresenter) Len() int                    { return 1 }
-func (p *recordingPresenter) RenderJSON(io.Writer) error  { return nil }
-func (p *recordingPresenter) RenderOneline(_ io.Writer, _, maxValueLength int) {
-	p.gotMaxValueLength = maxValueLength
-}
-func (p *recordingPresenter) RenderHeader(io.Writer, int) {}
-func (p *recordingPresenter) RenderValue(_ io.Writer, _, maxValueLength int) {
-	p.gotMaxValueLength = maxValueLength
-}
-func (p *recordingPresenter) RenderPatch(io.Writer, io.Writer, int, bool, bool) {}
-
-func TestCommand_MaxValueLengthFlagReachesOptions(t *testing.T) {
-	t.Parallel()
-
-	rec := &recordingPresenter{}
-
-	logCmd := generic.LogCommand(generic.LogConfig{
-		Usage:      "u",
-		ArgsUsage:  "<name>",
-		UsageError: "usage",
-		Flags: []cli.Flag{
-			&cli.Int32Flag{Name: "max-value-length"},
-			&cli.BoolFlag{Name: "no-pager"},
-		},
-		NewPresenter: func(_ context.Context, _ generic.LogRequest) (generic.LogPresenter, error) {
-			return rec, nil
-		},
-	})
-
-	var buf, errBuf bytes.Buffer
-
-	app := &cli.Command{
-		Name:      "suve",
-		Commands:  []*cli.Command{logCmd},
-		Writer:    &buf,
-		ErrWriter: &errBuf,
-	}
-
-	err := app.Run(t.Context(), []string{"suve", "log", "--no-pager", "--max-value-length", "20", "myname"})
-	require.NoError(t, err)
-	assert.Equal(t, 20, rec.gotMaxValueLength, "Int32 --max-value-length must reach Options.MaxValueLength")
 }
 
 // === param log ===

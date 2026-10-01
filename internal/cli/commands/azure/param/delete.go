@@ -14,20 +14,22 @@ import (
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
-// DeleteRunner executes the delete command.
-type DeleteRunner struct {
-	UseCase *param.DeleteUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// deleteRunner executes the delete command.
+type deleteRunner struct {
+	useCase *param.DeleteUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// DeleteOptions holds the options for the delete command.
-type DeleteOptions struct {
-	Name string
+// deleteOptions holds the options for the delete command.
+type deleteOptions struct {
+	name string
 }
 
-// DeleteCommand returns the Azure App Configuration delete command.
-func DeleteCommand() *cli.Command {
+// deleteCommand returns the Azure App Configuration delete command.
+//
+//declscope:package // command.go registers it
+func deleteCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "delete",
 		Aliases:   []string{"rm"},
@@ -92,23 +94,23 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	r := &DeleteRunner{
-		UseCase: uc,
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &deleteRunner{
+		useCase: uc,
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, DeleteOptions{Name: name})
+	return r.run(ctx, deleteOptions{name: name})
 }
 
-// Run executes the delete command.
-func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
-	result, err := r.UseCase.Execute(ctx, param.DeleteInput{Name: opts.Name})
+// run executes the delete command.
+func (r *deleteRunner) run(ctx context.Context, opts deleteOptions) error {
+	result, err := r.useCase.Execute(ctx, param.DeleteInput{Name: opts.name})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Deleted setting %s", result.Name)
+	output.Success(r.stdout, "Deleted setting %s", result.Name)
 
 	return nil
 }

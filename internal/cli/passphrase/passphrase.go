@@ -14,6 +14,7 @@ import (
 	"github.com/mpyw/suve/internal/cli/terminal"
 )
 
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
 	// ErrPassphraseMismatch is returned when confirmation doesn't match.
 	ErrPassphraseMismatch = errors.New("passphrases do not match")

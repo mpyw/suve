@@ -344,8 +344,8 @@ func TestParseFormat(t *testing.T) {
 		wantErr  bool
 	}{
 		{input: "json", expected: FormatJSON},
-		{input: "text", expected: FormatText},
-		{input: "", expected: FormatText},
+		{input: "text", expected: formatText},
+		{input: "", expected: formatText},
 		{input: "JSON", wantErr: true}, // not case-insensitive
 		{input: "invalid", wantErr: true},
 		{input: "jsonn", wantErr: true}, // the #349 typo

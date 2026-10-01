@@ -15,13 +15,13 @@ import (
 	"github.com/mpyw/suve/internal/staging/store/file/internal/crypt"
 )
 
-// EnvelopeVersion is the current export/import envelope schema version.
+// envelopeVersion is the current export/import envelope schema version.
 //
 // v2 binds the plaintext header (version/provider/scope/service) to the
 // encrypted payload as AES-GCM associated data (AAD). This is a breaking
 // change: v1 files (no AAD binding) are rejected on import and must be
 // re-created with `stage export`.
-const EnvelopeVersion = 2
+const envelopeVersion = 2
 
 // Envelope is the on-disk format for `stage export` / `stage import` files.
 //
@@ -32,7 +32,7 @@ const EnvelopeVersion = 2
 // Exactly one service lives in a single envelope file (per-service files mirror
 // the working store's param.json / secret.json split).
 type Envelope struct {
-	// Version is the envelope schema version (EnvelopeVersion).
+	// Version is the envelope schema version (envelopeVersion).
 	Version int `json:"version"`
 	// Provider is the scope provider string, e.g. "aws"/"googlecloud"/"azure".
 	Provider string `json:"provider"`
@@ -50,6 +50,7 @@ type Envelope struct {
 	Payload string `json:"payload"`
 }
 
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
 	// ErrInvalidEnvelope is returned when a file is not a valid export envelope
 	// (bad JSON, missing required fields, or corrupted base64 payload).
@@ -124,7 +125,7 @@ func encodeEnvelopePayload(state *staging.State, passphrase string, aad []byte) 
 // only); callers must warn the user first.
 func WriteEnvelopeFile(path string, scope provider.Scope, svc staging.Service, state *staging.State, passphrase string) error {
 	env := Envelope{
-		Version:  EnvelopeVersion,
+		Version:  envelopeVersion,
 		Provider: string(scope.Provider),
 		Scope:    scope.Key(),
 		Service:  string(svc),
@@ -169,21 +170,21 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 		return nil, fmt.Errorf("%w: %s", ErrInvalidEnvelope, err.Error())
 	}
 
-	if env.Version < EnvelopeVersion {
+	if env.Version < envelopeVersion {
 		// An older envelope: its format is gone from this build, so re-export it
 		// from a still-staged source with the current suve.
 		return nil, fmt.Errorf(
 			"%w: file is version %d, but this build only reads version %d; re-create it with `stage export`",
-			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
+			ErrUnsupportedEnvelopeVersion, env.Version, envelopeVersion,
 		)
 	}
 
-	if env.Version > EnvelopeVersion {
+	if env.Version > envelopeVersion {
 		// A newer envelope: this build cannot know its format, so upgrading suve
 		// is the fix rather than re-exporting.
 		return nil, fmt.Errorf(
 			"%w: file is version %d, but this build only reads version %d; it was written by a newer suve, upgrade suve",
-			ErrUnsupportedEnvelopeVersion, env.Version, EnvelopeVersion,
+			ErrUnsupportedEnvelopeVersion, env.Version, envelopeVersion,
 		)
 	}
 

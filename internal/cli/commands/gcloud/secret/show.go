@@ -35,8 +35,8 @@ type showPresenter struct {
 	result *secret.ShowOutput
 }
 
-// NewShowPresenter builds a Google Cloud show presenter over the given reader and spec.
-func NewShowPresenter(reader provider.Reader, spec *version.NumericSpec) generic.ShowPresenter {
+// newShowPresenter builds a Google Cloud show presenter over the given reader and spec.
+func newShowPresenter(reader provider.Reader, spec *version.NumericSpec) generic.ShowPresenter {
 	return &showPresenter{uc: &secret.ShowUseCase{Reader: reader}, spec: spec}
 }
 
@@ -117,8 +117,10 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 	return output.WriteJSON(stdout, jsonOut)
 }
 
-// ShowCommand returns the Google Cloud Secret Manager show command.
-func ShowCommand() *cli.Command {
+// showCommand returns the Google Cloud Secret Manager show command.
+//
+//declscope:package // command.go registers it
+func showCommand() *cli.Command {
 	return generic.ShowCommand(generic.ShowConfig[*version.NumericSpec]{
 		Usage:     "Show secret value with metadata",
 		ArgsUsage: "<name[#VERSION][~SHIFT]*>",
@@ -145,7 +147,7 @@ EXAMPLES:
 				return nil, err
 			}
 
-			return NewShowPresenter(store, spec), nil
+			return newShowPresenter(store, spec), nil
 		},
 	})
 }

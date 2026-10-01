@@ -15,21 +15,23 @@ import (
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
-// UpdateRunner executes the update command.
-type UpdateRunner struct {
-	UseCase *param.UpdateUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// updateRunner executes the update command.
+type updateRunner struct {
+	useCase *param.UpdateUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// UpdateOptions holds the options for the update command.
-type UpdateOptions struct {
-	Name  string
-	Value string
+// updateOptions holds the options for the update command.
+type updateOptions struct {
+	name  string
+	value string
 }
 
-// UpdateCommand returns the Azure App Configuration update command.
-func UpdateCommand() *cli.Command {
+// updateCommand returns the Azure App Configuration update command.
+//
+//declscope:package // command.go registers it
+func updateCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "update",
 		Usage:     "Update a setting value",
@@ -120,27 +122,27 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	r := &UpdateRunner{
-		UseCase: uc,
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &updateRunner{
+		useCase: uc,
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, UpdateOptions{Name: name, Value: newValue})
+	return r.run(ctx, updateOptions{name: name, value: newValue})
 }
 
-// Run executes the update command.
-func (r *UpdateRunner) Run(ctx context.Context, opts UpdateOptions) error {
-	result, err := r.UseCase.Execute(ctx, param.UpdateInput{
-		Name:  opts.Name,
-		Value: opts.Value,
+// run executes the update command.
+func (r *updateRunner) run(ctx context.Context, opts updateOptions) error {
+	result, err := r.useCase.Execute(ctx, param.UpdateInput{
+		Name:  opts.name,
+		Value: opts.value,
 		Type:  domain.ValueTypePlaintext,
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Updated setting %s", result.Name)
+	output.Success(r.stdout, "Updated setting %s", result.Name)
 
 	return nil
 }

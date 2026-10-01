@@ -18,7 +18,7 @@ type BaselineInput struct {
 // BaselineOutput holds the baseline value for editing.
 type BaselineOutput struct {
 	Value        string
-	IsStagedEdit bool // True if the baseline is from a staged edit (not the remote store)
+	isStagedEdit bool // True if the baseline is from a staged edit (not the remote store)
 }
 
 // Baseline returns the baseline value for editing (staged value if exists, otherwise from the remote store).
@@ -36,7 +36,7 @@ func (u *EditUseCase) Baseline(ctx context.Context, input BaselineInput) (*Basel
 		case staging.OperationCreate, staging.OperationUpdate:
 			return &BaselineOutput{
 				Value:        lo.FromPtr(stagedEntry.Value),
-				IsStagedEdit: true,
+				isStagedEdit: true,
 			}, nil
 		case staging.OperationDelete:
 			// BLOCKED: Cannot edit something staged for deletion

@@ -38,8 +38,8 @@ type logPresenter struct {
 	values map[string]string
 }
 
-// NewLogPresenter builds an Azure Key Vault log presenter over the given reader and request.
-func NewLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
+// newLogPresenter builds an Azure Key Vault log presenter over the given reader and request.
+func newLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
 	return &logPresenter{uc: &secret.LogUseCase{Reader: reader}, req: req}
 }
 
@@ -197,8 +197,10 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 	}
 }
 
-// LogCommand returns the Azure Key Vault log command.
-func LogCommand() *cli.Command {
+// logCommand returns the Azure Key Vault log command.
+//
+//declscope:package // command.go registers it
+func logCommand() *cli.Command {
 	return generic.LogCommand(generic.LogConfig{
 		Usage:     "Show secret version history",
 		ArgsUsage: argsUsageName,
@@ -265,7 +267,7 @@ EXAMPLES:
 				return nil, err
 			}
 
-			return NewLogPresenter(store, req), nil
+			return newLogPresenter(store, req), nil
 		},
 	})
 }

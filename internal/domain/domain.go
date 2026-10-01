@@ -82,12 +82,12 @@ type Field struct {
 	Value string
 }
 
-// TagChange describes staged tag mutations (add/update + remove-by-key).
-type TagChange struct {
-	// Add holds tags to create or update, keyed by tag key.
-	Add map[string]string
-	// Remove holds tag keys to delete.
-	Remove []string
+// tagChange describes staged tag mutations (add/update + remove-by-key).
+type tagChange struct {
+	// add holds tags to create or update, keyed by tag key.
+	add map[string]string
+	// remove holds tag keys to delete.
+	remove []string
 }
 
 // Entry is a provider-neutral retrieved parameter/secret. It carries only

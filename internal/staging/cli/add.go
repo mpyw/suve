@@ -12,49 +12,56 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// AddRunner executes add operations using a usecase.
-type AddRunner struct {
-	UseCase *stagingusecase.AddUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
-	// Stdin is read for --value-stdin and decides whether the $EDITOR fallback
+// addRunner executes add operations using a usecase.
+//
+//declscope:package // command.go builds and runs it
+type addRunner struct {
+	useCase *stagingusecase.AddUseCase
+	stdout  io.Writer
+	stderr  io.Writer
+	// stdin is read for --value-stdin and decides whether the $EDITOR fallback
 	// may run (only on a terminal). Nil is treated as a non-interactive stdin.
-	Stdin      io.Reader
-	OpenEditor editor.OpenFunc // Optional: defaults to editor.Open (TTY only) if nil
+	stdin io.Reader
+	//declscope:private // only add.go opens the editor
+	openEditor editor.OpenFunc // Optional: defaults to editor.Open (TTY only) if nil
 }
 
-// AddOptions holds options for the add command.
-type AddOptions struct {
-	Name string
-	// Value is the explicit value; it is used only when HasValue is set.
-	Value string
-	// HasValue reports that a value argument was given, even an empty one.
-	HasValue bool
-	// ValueFromStdin reads the value from Stdin (--value-stdin).
-	ValueFromStdin bool
-	Description    string
-	// Namespace is the App Configuration namespace to stage under (empty for the
+// addOptions holds options for the add command.
+//
+//declscope:package // command.go fills it from the flags
+type addOptions struct {
+	name string
+	// value is the explicit value; it is used only when hasValue is set.
+	value string
+	// hasValue reports that a value argument was given, even an empty one.
+	hasValue bool
+	// valueFromStdin reads the value from Stdin (--value-stdin).
+	valueFromStdin bool
+	description    string
+	// namespace is the App Configuration namespace to stage under (empty for the
 	// null/default namespace and every other provider).
-	Namespace string
-	// ValueType is the provider-neutral value type to record on the staged entry
+	namespace string
+	// valueType is the provider-neutral value type to record on the staged entry
 	// (AWS Parameter Store axis). Empty for providers without a type axis.
-	ValueType domain.ValueType
+	valueType domain.ValueType
 }
 
-// Run executes the add command.
-func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
+// run executes the add command.
+//
+//declscope:package // command.go runs it
+func (r *addRunner) run(ctx context.Context, opts addOptions) error {
 	// Get draft (existing staged create value) for re-editing
-	draft, err := r.UseCase.Draft(ctx, stagingusecase.DraftInput{Key: staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace}})
+	draft, err := r.useCase.Draft(ctx, stagingusecase.DraftInput{Key: staging.EntryKey{Name: opts.name, Namespace: opts.namespace}})
 	if err != nil {
 		return err
 	}
 
 	newValue, proceed, err := valueinput.ResolveValue(ctx, valueinput.ValueSource{
-		FromStdin:     opts.ValueFromStdin,
-		HasArg:        opts.HasValue,
-		Arg:           opts.Value,
-		Stdin:         r.Stdin,
-		OpenEditor:    r.OpenEditor,
+		FromStdin:     opts.valueFromStdin,
+		HasArg:        opts.hasValue,
+		Arg:           opts.value,
+		Stdin:         r.stdin,
+		OpenEditor:    r.openEditor,
 		EditorInitial: draft.Value,
 	})
 	if err != nil {
@@ -63,34 +70,34 @@ func (r *AddRunner) Run(ctx context.Context, opts AddOptions) error {
 
 	// An explicit value (argument or stdin) is staged as given. Only the
 	// editor result is checked for a cancel or a no-op.
-	if !opts.ValueFromStdin && !opts.HasValue {
+	if !opts.valueFromStdin && !opts.hasValue {
 		// Check if value is empty (canceled)
 		if !proceed {
-			output.Info(r.Stdout, "Empty value, not staged.")
+			output.Info(r.stdout, "Empty value, not staged.")
 
 			return nil
 		}
 
 		// Check if unchanged from staged value
 		if draft.IsStaged && newValue == draft.Value {
-			output.Info(r.Stdout, "No changes made.")
+			output.Info(r.stdout, "No changes made.")
 
 			return nil
 		}
 	}
 
 	// Execute the add use case
-	result, err := r.UseCase.Execute(ctx, stagingusecase.AddInput{
-		Key:         staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
+	result, err := r.useCase.Execute(ctx, stagingusecase.AddInput{
+		Key:         staging.EntryKey{Name: opts.name, Namespace: opts.namespace},
 		Value:       newValue,
-		Description: opts.Description,
-		ValueType:   opts.ValueType,
+		Description: opts.description,
+		ValueType:   opts.valueType,
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Staged for creation: %s", result.Name)
+	output.Success(r.stdout, "Staged for creation: %s", result.Name)
 
 	return nil
 }

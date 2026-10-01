@@ -21,9 +21,11 @@ import (
 )
 
 // ShowOptions holds the shared show options.
+//
+//declscope:ignore overexported // show_test.go runs it with the AWS presenters, which import this package
 type ShowOptions struct {
 	ParseJSON bool
-	NoPager   bool
+	noPager   bool
 	Raw       bool
 	Output    output.Format
 }
@@ -44,6 +46,8 @@ type ShowPresenter interface {
 }
 
 // ShowRunner executes the show command over a provider ShowPresenter.
+//
+//declscope:ignore overexported // show_test.go runs it with the AWS presenters, which import this package
 type ShowRunner struct {
 	Presenter ShowPresenter
 	Options   ShowOptions
@@ -52,6 +56,8 @@ type ShowRunner struct {
 }
 
 // Run executes the show command.
+//
+//declscope:ignore overexported // show_test.go runs it with the AWS presenters, which import this package
 func (r *ShowRunner) Run(ctx context.Context) error {
 	if err := r.Presenter.Fetch(ctx); err != nil {
 		return err
@@ -149,13 +155,13 @@ func ShowCommand[S any](cfg ShowConfig[S]) *cli.Command {
 
 			opts := ShowOptions{
 				ParseJSON: cmd.Bool("parse-json"),
-				NoPager:   cmd.Bool("no-pager"),
+				noPager:   cmd.Bool("no-pager"),
 				Raw:       raw,
 				Output:    outputFormat,
 			}
 
 			// Raw mode and JSON output disable pager
-			noPager := opts.NoPager || opts.Raw || opts.Output == output.FormatJSON
+			noPager := opts.noPager || opts.Raw || opts.Output == output.FormatJSON
 
 			return internal.WithPager(cmd, noPager, func(stdout, stderr io.Writer) error {
 				r := &ShowRunner{Presenter: presenter, Options: opts, Stdout: stdout, Stderr: stderr}

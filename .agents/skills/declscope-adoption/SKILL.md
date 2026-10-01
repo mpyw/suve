@@ -3,14 +3,14 @@ name: declscope-adoption
 description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when choosing its configuration, when running declscope shrink for the first time, or when clearing a declscope baseline. Covers sizing each rule before enabling it, reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence. For writing new code in a repository that already runs declscope, use declscope-authoring.
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.15.0
-x-embedded-at: "2026-09-29T00:38:54Z"
-x-embedded-digest: "sha256:e0b02287916f1caf95c2986d361eeede60e271837f0283996e9d1c49648fdab3"
+x-embedded-version: 0.17.1
+x-embedded-at: "2026-10-01T02:00:24Z"
+x-embedded-digest: "sha256:14781decfa4294942dc712b659bcfa0954f1bdf9e36a9f9734c37278d0be92a2"
 ---
 
 # Adopting declscope
 
-Written against **declscope 0.15.0**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.17.1**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
 
 **Read [the README](https://github.com/mpyw/declscope#readme) before the first decision.** This skill covers what to do about the diagnostics. What each directive means, and what the config accepts, is there.
 
@@ -119,6 +119,8 @@ This happened when declscope held itself to `shrink`. The fix unexported twelve 
 | 5. State or move each new crossing | See [What each shape means](#what-each-shape-means) |
 
 Ask before step 2, the same as any other change. The fix renames every identifier naming the declaration, all inside its own package, and the doc comment that opens with the name.
+
+**When the owner cannot settle `shrink` yet, baseline it.** `declscope baseline ./...` records `shrink`'s reports with the analyzer's, and `shrink` then passes on them in CI. It is the same deferral as any baseline, and [the same rules](#a-baseline-is-for-arriving-not-for-staying) apply. A repository that does not run `shrink` passes `-shrink=false`, which skips the extra load.
 
 ### Reading what it reports
 

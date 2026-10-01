@@ -18,7 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 
+	"github.com/mpyw/suve/internal/cli/confirm"
 	"github.com/mpyw/suve/internal/staging"
+	usestaging "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // =============================================================================
@@ -186,5 +188,118 @@ func TestNewReAnchorResolver(t *testing.T) {
 		_, err = resolver(staging.ServiceParam, "")
 		require.ErrorIs(t, err, sentinel)
 		assert.Equal(t, 2, calls)
+	})
+}
+
+func TestImportModeChooser_ChooseMode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("overwrite flag takes precedence", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &importModeChooser{stderr: &bytes.Buffer{}, stdout: &bytes.Buffer{}}
+		result, err := chooser.chooseMode(importModeInput{overwriteFlag: true, mergeFlag: true, hasChanges: true, isTTY: true})
+		require.NoError(t, err)
+		assert.False(t, result.cancelled)
+		assert.Equal(t, usestaging.ImportModeOverwrite, result.mode)
+	})
+
+	t.Run("merge flag takes precedence over prompt", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &importModeChooser{stderr: &bytes.Buffer{}, stdout: &bytes.Buffer{}}
+		result, err := chooser.chooseMode(importModeInput{mergeFlag: true, hasChanges: true, isTTY: true})
+		require.NoError(t, err)
+		assert.Equal(t, usestaging.ImportModeMerge, result.mode)
+	})
+
+	t.Run("defaults to merge with no changes", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &importModeChooser{stderr: &bytes.Buffer{}, stdout: &bytes.Buffer{}}
+		result, err := chooser.chooseMode(importModeInput{hasChanges: false, isTTY: true})
+		require.NoError(t, err)
+		assert.Equal(t, usestaging.ImportModeMerge, result.mode)
+	})
+
+	t.Run("defaults to merge in non-TTY", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &importModeChooser{stderr: &bytes.Buffer{}, stdout: &bytes.Buffer{}}
+		result, err := chooser.chooseMode(importModeInput{hasChanges: true, itemCount: 5, isTTY: false})
+		require.NoError(t, err)
+		assert.Equal(t, usestaging.ImportModeMerge, result.mode)
+	})
+
+	t.Run("--yes skips the prompt and defaults to merge", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &importModeChooser{stderr: &bytes.Buffer{}, stdout: &bytes.Buffer{}}
+		result, err := chooser.chooseMode(importModeInput{skipPrompt: true, hasChanges: true, itemCount: 2, isTTY: true})
+		require.NoError(t, err)
+		assert.False(t, result.cancelled)
+		assert.Equal(t, usestaging.ImportModeMerge, result.mode)
+	})
+
+	// Regression for #472: with --passphrase-stdin, stdin carries the passphrase,
+	// not an interactive answer. The mode must resolve to the default (Merge)
+	// without prompting, so the passphrase read and a would-be confirmation prompt
+	// never contend over the same stdin.
+	t.Run("--passphrase-stdin skips the prompt and defaults to merge", func(t *testing.T) {
+		t.Parallel()
+
+		stderr := &bytes.Buffer{}
+		// A Prompter whose stdin would error if read, proving no prompt occurs.
+		chooser := &importModeChooser{
+			prompter: &confirm.Prompter{Stdin: bytes.NewBufferString(""), Stdout: &bytes.Buffer{}, Stderr: stderr},
+			stderr:   stderr,
+			stdout:   &bytes.Buffer{},
+		}
+		result, err := chooser.chooseMode(importModeInput{passphraseStdin: true, hasChanges: true, itemCount: 2, isTTY: true})
+		require.NoError(t, err)
+		assert.False(t, result.cancelled)
+		assert.Equal(t, usestaging.ImportModeMerge, result.mode)
+		assert.NotContains(t, stderr.String(), "How do you want to proceed?")
+	})
+
+	t.Run("prompt selects merge", func(t *testing.T) {
+		t.Parallel()
+
+		stderr := &bytes.Buffer{}
+		chooser := &importModeChooser{
+			prompter: &confirm.Prompter{Stdin: bytes.NewBufferString("1\n"), Stdout: &bytes.Buffer{}, Stderr: stderr},
+			stderr:   stderr,
+			stdout:   &bytes.Buffer{},
+		}
+		result, err := chooser.chooseMode(importModeInput{hasChanges: true, itemCount: 3, isTTY: true})
+		require.NoError(t, err)
+		assert.Equal(t, usestaging.ImportModeMerge, result.mode)
+		assert.Contains(t, stderr.String(), "3 staged change(s)")
+	})
+
+	t.Run("prompt selects overwrite", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &importModeChooser{
+			prompter: &confirm.Prompter{Stdin: bytes.NewBufferString("2\n"), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}},
+			stderr:   &bytes.Buffer{},
+			stdout:   &bytes.Buffer{},
+		}
+		result, err := chooser.chooseMode(importModeInput{hasChanges: true, itemCount: 3, isTTY: true})
+		require.NoError(t, err)
+		assert.Equal(t, usestaging.ImportModeOverwrite, result.mode)
+	})
+
+	t.Run("prompt selects cancel", func(t *testing.T) {
+		t.Parallel()
+
+		chooser := &importModeChooser{
+			prompter: &confirm.Prompter{Stdin: bytes.NewBufferString("3\n"), Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}},
+			stderr:   &bytes.Buffer{},
+			stdout:   &bytes.Buffer{},
+		}
+		result, err := chooser.chooseMode(importModeInput{hasChanges: true, itemCount: 3, isTTY: true})
+		require.NoError(t, err)
+		assert.True(t, result.cancelled)
 	})
 }

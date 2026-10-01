@@ -19,8 +19,10 @@ func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return azureinternal.AppConfigStore(ctx)
 }
 
-// TagCommand returns the Azure App Configuration tag command.
-func TagCommand() *cli.Command {
+// tagCommand returns the Azure App Configuration tag command.
+//
+//declscope:package // command.go registers it
+func tagCommand() *cli.Command {
 	return generic.TagCommand(generic.TagConfig{
 		Usage:     "Add or update tags on a setting",
 		ArgsUsage: "<key> <key=value>...",

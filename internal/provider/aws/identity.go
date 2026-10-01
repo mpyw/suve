@@ -17,7 +17,7 @@ type Identity struct {
 
 // LoadIdentity retrieves the current AWS account ID, region, and profile name.
 func LoadIdentity(ctx context.Context) (*Identity, error) {
-	cfg, err := LoadConfig(ctx)
+	cfg, err := loadConfig(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -15,26 +15,26 @@ import (
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
-// UpdateRunner executes the update command.
-type UpdateRunner struct {
-	UseCase *param.UpdateUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// updateRunner executes the update command.
+type updateRunner struct {
+	useCase *param.UpdateUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// UpdateOptions holds the options for the update command.
-type UpdateOptions struct {
-	Name        string
-	Value       string
-	Type        string
-	Description string
-	// PreserveType keeps the parameter's existing type when neither --type nor
+// updateOptions holds the options for the update command.
+type updateOptions struct {
+	name        string
+	value       string
+	paramType   string
+	description string
+	// preserveType keeps the parameter's existing type when neither --type nor
 	// --secure was given, so a value-only update never downgrades a
-	// SecureString/StringList to String. When true, Type is ignored.
-	PreserveType bool
-	// ParamOpts holds the raw AWS-specific option flag values (tier, data
+	// SecureString/StringList to String. When true, paramType is ignored.
+	preserveType bool
+	// paramOpts holds the raw AWS-specific option flag values (tier, data
 	// type, allowed pattern, policies). Empty fields contribute no option.
-	ParamOpts WriteOptionFlags
+	paramOpts writeOptionFlags
 }
 
 // UpdateCommand returns the update command.
@@ -199,42 +199,42 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	r := &UpdateRunner{
-		UseCase: uc,
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &updateRunner{
+		useCase: uc,
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, UpdateOptions{
-		Name:         name,
-		Value:        newValue,
-		Type:         paramType,
-		PreserveType: preserveType,
-		Description:  cmd.String("description"),
-		ParamOpts: WriteOptionFlags{
-			Tier:           cmd.String("tier"),
-			DataType:       cmd.String("data-type"),
-			AllowedPattern: cmd.String("allowed-pattern"),
-			Policies:       cmd.String("policies"),
+	return r.run(ctx, updateOptions{
+		name:         name,
+		value:        newValue,
+		paramType:    paramType,
+		preserveType: preserveType,
+		description:  cmd.String("description"),
+		paramOpts: writeOptionFlags{
+			tier:           cmd.String("tier"),
+			dataType:       cmd.String("data-type"),
+			allowedPattern: cmd.String("allowed-pattern"),
+			policies:       cmd.String("policies"),
 		},
 	})
 }
 
-// Run executes the update command.
-func (r *UpdateRunner) Run(ctx context.Context, opts UpdateOptions) error {
-	result, err := r.UseCase.Execute(ctx, param.UpdateInput{
-		Name:         opts.Name,
-		Value:        opts.Value,
-		Type:         paramtype.Parse(opts.Type),
-		PreserveType: opts.PreserveType,
-		Description:  opts.Description,
-		Options:      buildWriteOptions(opts.ParamOpts),
+// run executes the update command.
+func (r *updateRunner) run(ctx context.Context, opts updateOptions) error {
+	result, err := r.useCase.Execute(ctx, param.UpdateInput{
+		Name:         opts.name,
+		Value:        opts.value,
+		Type:         paramtype.Parse(opts.paramType),
+		PreserveType: opts.preserveType,
+		Description:  opts.description,
+		Options:      buildWriteOptions(opts.paramOpts),
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Updated parameter %s (version: %s)", result.Name, result.Version)
+	output.Success(r.stdout, "Updated parameter %s (version: %s)", result.Name, result.Version)
 
 	return nil
 }

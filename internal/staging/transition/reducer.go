@@ -8,6 +8,8 @@ package transition
 import "errors"
 
 // Error definitions for transition failures.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
 	ErrCannotAddToUpdate    = errors.New("cannot add: already staged for update")
 	ErrCannotAddToDelete    = errors.New("cannot add: already staged for deletion, reset first")
@@ -56,8 +58,10 @@ func ReduceEntry(state EntryState, action EntryAction) EntryTransitionResult {
 	return result
 }
 
-// ReduceTag applies a tag action to produce new staged tags.
-func ReduceTag(entryState EntryState, stagedTags StagedTags, action TagAction) TagTransitionResult {
+// reduceTagAction applies a tag action to produce new staged tags.
+//
+//declscope:package // executor.go applies tag actions with it
+func reduceTagAction(entryState EntryState, stagedTags StagedTags, action TagAction) TagTransitionResult {
 	var result TagTransitionResult
 
 	switch a := action.(type) {

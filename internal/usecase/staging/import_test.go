@@ -1,4 +1,4 @@
-package staging_test
+package staging
 
 import (
 	"context"
@@ -12,18 +12,17 @@ import (
 
 	"github.com/mpyw/suve/internal/staging"
 	"github.com/mpyw/suve/internal/staging/store/testutil"
-	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
 // cannedReader is a fake EnvelopeReader returning pre-seeded per-service states.
 // A missing service returns an empty state with a nil error (mirroring an absent
 // per-service file in the directory case). An optional err forces a read failure.
-type cannedReader struct {
+type importCannedReader struct {
 	states map[staging.Service]*staging.State
 	err    error
 }
 
-func (r *cannedReader) ReadState(_ context.Context, svc staging.Service) (*staging.State, error) {
+func (r *importCannedReader) ReadState(_ context.Context, svc staging.Service) (*staging.State, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -37,7 +36,7 @@ func (r *cannedReader) ReadState(_ context.Context, svc staging.Service) (*stagi
 
 // sourceState builds a single-service state carrying one entry, for seeding a
 // cannedReader.
-func sourceState(svc staging.Service, name, value string) *staging.State {
+func importSourceState(svc staging.Service, name, value string) *staging.State {
 	s := staging.NewEmptyState()
 	s.Entries[svc][staging.EntryKey{Name: name}] = staging.Entry{
 		Operation: staging.OperationUpdate,
@@ -51,7 +50,7 @@ func sourceState(svc staging.Service, name, value string) *staging.State {
 // reAnchorSourceState builds a ServiceParam state carrying one Update entry and
 // one tag change, both anchored to foreignBase (the source scope's timeline), so
 // a re-anchor test can assert the base is rewritten.
-func reAnchorSourceState(name string, foreignBase time.Time) *staging.State {
+func importReAnchorSourceState(name string, foreignBase time.Time) *staging.State {
 	s := staging.NewEmptyState()
 	s.Entries[staging.ServiceParam][staging.EntryKey{Name: name}] = staging.Entry{
 		Operation:      staging.OperationUpdate,
@@ -79,15 +78,15 @@ func TestImportUseCase_ReAnchor(t *testing.T) {
 
 		targetBase := time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: reAnchorSourceState(name, foreignBase),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importReAnchorSourceState(name, foreignBase),
 		}}
 		working := testutil.NewMockStore()
 
-		strategy := newMockApplyStrategy()
+		strategy := doublesNewMockApplyStrategy()
 		strategy.lastModified[name] = targetBase
 
-		usecase := &stagingusecase.ImportUseCase{
+		usecase := &ImportUseCase{
 			Source:  reader,
 			Working: working,
 			ReAnchor: func(_ staging.Service, _ string) (staging.ApplyStrategy, error) {
@@ -95,7 +94,7 @@ func TestImportUseCase_ReAnchor(t *testing.T) {
 			},
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{ReAnchor: true})
+		output, err := usecase.Execute(t.Context(), ImportInput{ReAnchor: true})
 		require.NoError(t, err)
 		assert.Empty(t, output.Warnings)
 
@@ -113,15 +112,15 @@ func TestImportUseCase_ReAnchor(t *testing.T) {
 	t.Run("missing target resource leaves the item unanchored without a warning", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: reAnchorSourceState(name, foreignBase),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importReAnchorSourceState(name, foreignBase),
 		}}
 		working := testutil.NewMockStore()
 
-		strategy := newMockApplyStrategy()
+		strategy := doublesNewMockApplyStrategy()
 		strategy.fetchModifiedErr = &staging.ResourceNotFoundError{}
 
-		usecase := &stagingusecase.ImportUseCase{
+		usecase := &ImportUseCase{
 			Source:  reader,
 			Working: working,
 			ReAnchor: func(_ staging.Service, _ string) (staging.ApplyStrategy, error) {
@@ -129,7 +128,7 @@ func TestImportUseCase_ReAnchor(t *testing.T) {
 			},
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{ReAnchor: true})
+		output, err := usecase.Execute(t.Context(), ImportInput{ReAnchor: true})
 		require.NoError(t, err)
 		assert.Empty(t, output.Warnings)
 
@@ -141,15 +140,15 @@ func TestImportUseCase_ReAnchor(t *testing.T) {
 	t.Run("fetch failure warns and leaves the item unanchored", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: reAnchorSourceState(name, foreignBase),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importReAnchorSourceState(name, foreignBase),
 		}}
 		working := testutil.NewMockStore()
 
-		strategy := newMockApplyStrategy()
+		strategy := doublesNewMockApplyStrategy()
 		strategy.fetchModifiedErr = errors.New("network down")
 
-		usecase := &stagingusecase.ImportUseCase{
+		usecase := &ImportUseCase{
 			Source:  reader,
 			Working: working,
 			ReAnchor: func(_ staging.Service, _ string) (staging.ApplyStrategy, error) {
@@ -157,7 +156,7 @@ func TestImportUseCase_ReAnchor(t *testing.T) {
 			},
 		}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{ReAnchor: true})
+		output, err := usecase.Execute(t.Context(), ImportInput{ReAnchor: true})
 		require.NoError(t, err)
 		assert.NotEmpty(t, output.Warnings)
 
@@ -169,15 +168,15 @@ func TestImportUseCase_ReAnchor(t *testing.T) {
 	t.Run("without ReAnchor input the foreign base is kept", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: reAnchorSourceState(name, foreignBase),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importReAnchorSourceState(name, foreignBase),
 		}}
 		working := testutil.NewMockStore()
 
-		strategy := newMockApplyStrategy()
+		strategy := doublesNewMockApplyStrategy()
 		strategy.lastModified[name] = time.Now()
 
-		usecase := &stagingusecase.ImportUseCase{
+		usecase := &ImportUseCase{
 			Source:  reader,
 			Working: working,
 			ReAnchor: func(_ staging.Service, _ string) (staging.ApplyStrategy, error) {
@@ -187,7 +186,7 @@ func TestImportUseCase_ReAnchor(t *testing.T) {
 
 		// ReAnchor is false: the resolver must not be consulted and the foreign
 		// base survives untouched.
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{})
+		_, err := usecase.Execute(t.Context(), ImportInput{})
 		require.NoError(t, err)
 
 		entry, err := working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: name})
@@ -204,14 +203,14 @@ func TestImportUseCase_Execute(t *testing.T) {
 	t.Run("import into empty working - not merged", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/config", "v"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/config", "v"),
 		}}
 		working := testutil.NewMockStore()
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{})
+		output, err := usecase.Execute(t.Context(), ImportInput{})
 		require.NoError(t, err)
 		assert.Equal(t, 1, output.EntryCount)
 		assert.False(t, output.Merged)
@@ -224,15 +223,15 @@ func TestImportUseCase_Execute(t *testing.T) {
 	t.Run("import merge into non-empty working - merged", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/new", "file"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/new", "file"),
 		}}
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/existing", "work")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/existing", "work")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Mode: stagingusecase.ImportModeMerge})
+		output, err := usecase.Execute(t.Context(), ImportInput{Mode: ImportModeMerge})
 		require.NoError(t, err)
 		assert.True(t, output.Merged)
 
@@ -245,15 +244,15 @@ func TestImportUseCase_Execute(t *testing.T) {
 	t.Run("import overwrite replaces working", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/config", "file"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/config", "file"),
 		}}
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/existing", "work")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/existing", "work")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Mode: stagingusecase.ImportModeOverwrite})
+		output, err := usecase.Execute(t.Context(), ImportInput{Mode: ImportModeOverwrite})
 		require.NoError(t, err)
 		assert.False(t, output.Merged)
 
@@ -268,16 +267,16 @@ func TestImportUseCase_Execute(t *testing.T) {
 		t.Parallel()
 
 		// Source has only param (e.g. a directory where secret.json is absent).
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/config", "file"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/config", "file"),
 		}}
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/existing", "old-param")
-		stageEntry(t, working, staging.ServiceSecret, "my-secret", "keep-me")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/existing", "old-param")
+		doublesStageEntry(t, working, staging.ServiceSecret, "my-secret", "keep-me")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Mode: stagingusecase.ImportModeOverwrite})
+		_, err := usecase.Execute(t.Context(), ImportInput{Mode: ImportModeOverwrite})
 		require.NoError(t, err)
 
 		// Param replaced by source.
@@ -294,15 +293,15 @@ func TestImportUseCase_Execute(t *testing.T) {
 	t.Run("import merge conflict - source wins", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/config", "file"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/config", "file"),
 		}}
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/config", "work")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/config", "work")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Mode: stagingusecase.ImportModeMerge})
+		_, err := usecase.Execute(t.Context(), ImportInput{Mode: ImportModeMerge})
 		require.NoError(t, err)
 
 		entry, err := working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
@@ -313,42 +312,42 @@ func TestImportUseCase_Execute(t *testing.T) {
 	t.Run("nothing to import when source empty", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{}
+		reader := &importCannedReader{}
 		working := testutil.NewMockStore()
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{})
-		require.ErrorIs(t, err, stagingusecase.ErrNothingToImport)
+		_, err := usecase.Execute(t.Context(), ImportInput{})
+		require.ErrorIs(t, err, ErrNothingToImport)
 	})
 
 	t.Run("nothing to import when filtered service empty", func(t *testing.T) {
 		t.Parallel()
 
 		// Source only holds secret, but we ask to import param.
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceSecret: sourceState(staging.ServiceSecret, "my-secret", "s"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceSecret: importSourceState(staging.ServiceSecret, "my-secret", "s"),
 		}}
 		working := testutil.NewMockStore()
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Service: staging.ServiceParam})
-		require.ErrorIs(t, err, stagingusecase.ErrNothingToImport)
+		_, err := usecase.Execute(t.Context(), ImportInput{Service: staging.ServiceParam})
+		require.ErrorIs(t, err, ErrNothingToImport)
 	})
 
 	t.Run("global import merges both services", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam:  sourceState(staging.ServiceParam, "/app/config", "p"),
-			staging.ServiceSecret: sourceState(staging.ServiceSecret, "my-secret", "s"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam:  importSourceState(staging.ServiceParam, "/app/config", "p"),
+			staging.ServiceSecret: importSourceState(staging.ServiceSecret, "my-secret", "s"),
 		}}
 		working := testutil.NewMockStore()
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{})
+		output, err := usecase.Execute(t.Context(), ImportInput{})
 		require.NoError(t, err)
 		assert.Equal(t, 2, output.EntryCount)
 
@@ -361,15 +360,15 @@ func TestImportUseCase_Execute(t *testing.T) {
 	t.Run("service-specific import preserves other services in working", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/config", "p"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/config", "p"),
 		}}
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceSecret, "my-secret", "s")
+		doublesStageEntry(t, working, staging.ServiceSecret, "my-secret", "s")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Service: staging.ServiceParam})
+		output, err := usecase.Execute(t.Context(), ImportInput{Service: staging.ServiceParam})
 		require.NoError(t, err)
 		// Working had no param before, so this service-level import is not "merged".
 		assert.False(t, output.Merged)
@@ -383,15 +382,15 @@ func TestImportUseCase_Execute(t *testing.T) {
 	t.Run("service-specific import into non-empty service - merged", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/new", "p"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/new", "p"),
 		}}
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/existing", "old")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/existing", "old")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Service: staging.ServiceParam})
+		output, err := usecase.Execute(t.Context(), ImportInput{Service: staging.ServiceParam})
 		require.NoError(t, err)
 		assert.True(t, output.Merged)
 	})
@@ -399,18 +398,18 @@ func TestImportUseCase_Execute(t *testing.T) {
 	t.Run("service-specific overwrite replaces only that service", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/new", "p"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/new", "p"),
 		}}
 		working := testutil.NewMockStore()
-		stageEntry(t, working, staging.ServiceParam, "/app/existing", "old")
-		stageEntry(t, working, staging.ServiceSecret, "my-secret", "s")
+		doublesStageEntry(t, working, staging.ServiceParam, "/app/existing", "old")
+		doublesStageEntry(t, working, staging.ServiceSecret, "my-secret", "s")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{
+		output, err := usecase.Execute(t.Context(), ImportInput{
 			Service: staging.ServiceParam,
-			Mode:    stagingusecase.ImportModeOverwrite,
+			Mode:    ImportModeOverwrite,
 		})
 		require.NoError(t, err)
 		assert.False(t, output.Merged)
@@ -431,50 +430,50 @@ func TestImportUseCase_Execute_Errors(t *testing.T) {
 	t.Run("error on source read", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{err: errors.New("corrupt file")}
+		reader := &importCannedReader{err: errors.New("corrupt file")}
 		working := testutil.NewMockStore()
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Service: staging.ServiceParam})
+		_, err := usecase.Execute(t.Context(), ImportInput{Service: staging.ServiceParam})
 
-		var importErr *stagingusecase.ImportError
+		var importErr *ImportError
 		require.ErrorAs(t, err, &importErr)
-		assert.Equal(t, stagingusecase.ImportOpLoad, importErr.Op)
+		assert.Equal(t, importOpLoad, importErr.Op)
 	})
 
 	t.Run("error on global source read", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{err: errors.New("corrupt file")}
+		reader := &importCannedReader{err: errors.New("corrupt file")}
 		working := testutil.NewMockStore()
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
 		// Global import reads each service; the loop must propagate the read error.
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{})
+		_, err := usecase.Execute(t.Context(), ImportInput{})
 
-		var importErr *stagingusecase.ImportError
+		var importErr *ImportError
 		require.ErrorAs(t, err, &importErr)
-		assert.Equal(t, stagingusecase.ImportOpLoad, importErr.Op)
+		assert.Equal(t, importOpLoad, importErr.Op)
 	})
 
 	t.Run("error on working read", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/config", "v"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/config", "v"),
 		}}
 		working := testutil.NewMockStore()
 		working.DrainErr = errors.New("read error")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{})
+		_, err := usecase.Execute(t.Context(), ImportInput{})
 
-		var importErr *stagingusecase.ImportError
+		var importErr *ImportError
 		require.ErrorAs(t, err, &importErr)
-		assert.Equal(t, stagingusecase.ImportOpReadWorking, importErr.Op)
+		assert.Equal(t, importOpReadWorking, importErr.Op)
 
 		// Working must not have been written.
 		_, err = working.GetEntry(t.Context(), staging.ServiceParam, staging.EntryKey{Name: "/app/config"})
@@ -484,19 +483,19 @@ func TestImportUseCase_Execute_Errors(t *testing.T) {
 	t.Run("error on working write", func(t *testing.T) {
 		t.Parallel()
 
-		reader := &cannedReader{states: map[staging.Service]*staging.State{
-			staging.ServiceParam: sourceState(staging.ServiceParam, "/app/config", "v"),
+		reader := &importCannedReader{states: map[staging.Service]*staging.State{
+			staging.ServiceParam: importSourceState(staging.ServiceParam, "/app/config", "v"),
 		}}
 		working := testutil.NewMockStore()
 		working.WriteStateErr = errors.New("write error")
 
-		usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+		usecase := &ImportUseCase{Source: reader, Working: working}
 
-		_, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{})
+		_, err := usecase.Execute(t.Context(), ImportInput{})
 
-		var importErr *stagingusecase.ImportError
+		var importErr *ImportError
 		require.ErrorAs(t, err, &importErr)
-		assert.Equal(t, stagingusecase.ImportOpWrite, importErr.Op)
+		assert.Equal(t, importOpWrite, importErr.Op)
 	})
 }
 
@@ -506,7 +505,7 @@ func TestImportError(t *testing.T) {
 	t.Run("error message - load", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOpLoad, Err: errors.New("boom")}
+		err := &ImportError{Op: importOpLoad, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to read export file")
 		assert.Contains(t, err.Error(), "boom")
 	})
@@ -514,14 +513,14 @@ func TestImportError(t *testing.T) {
 	t.Run("error message - write", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOpWrite, Err: errors.New("boom")}
+		err := &ImportError{Op: importOpWrite, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to write the working staging area")
 	})
 
 	t.Run("error message - read-working", func(t *testing.T) {
 		t.Parallel()
 
-		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOpReadWorking, Err: errors.New("boom")}
+		err := &ImportError{Op: importOpReadWorking, Err: errors.New("boom")}
 		assert.Contains(t, err.Error(), "failed to read the working staging area")
 	})
 
@@ -529,7 +528,7 @@ func TestImportError(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("something went wrong")
-		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOp("unknown"), Err: inner}
+		err := &ImportError{Op: ImportOp("unknown"), Err: inner}
 		assert.Equal(t, "something went wrong", err.Error())
 	})
 
@@ -537,7 +536,7 @@ func TestImportError(t *testing.T) {
 		t.Parallel()
 
 		inner := errors.New("inner")
-		err := &stagingusecase.ImportError{Op: stagingusecase.ImportOpLoad, Err: inner}
+		err := &ImportError{Op: importOpLoad, Err: inner}
 		assert.ErrorIs(t, err, inner)
 	})
 }
@@ -555,10 +554,10 @@ func TestImportUseCase_Execute_MergeDropsDeleteTags(t *testing.T) {
 
 	source := staging.NewEmptyState()
 	source.Entries[staging.ServiceParam][deleted] = staging.Entry{Operation: staging.OperationDelete, StagedAt: time.Now()}
-	reader := &cannedReader{states: map[staging.Service]*staging.State{staging.ServiceParam: source}}
+	reader := &importCannedReader{states: map[staging.Service]*staging.State{staging.ServiceParam: source}}
 
 	working := testutil.NewMockStore()
-	stageEntry(t, working, staging.ServiceParam, deleted.Name, "work")
+	doublesStageEntry(t, working, staging.ServiceParam, deleted.Name, "work")
 
 	for _, key := range []staging.EntryKey{deleted, other} {
 		require.NoError(t, working.StageTag(t.Context(), staging.ServiceParam, key, staging.TagEntry{
@@ -566,9 +565,9 @@ func TestImportUseCase_Execute_MergeDropsDeleteTags(t *testing.T) {
 		}))
 	}
 
-	usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+	usecase := &ImportUseCase{Source: reader, Working: working}
 
-	output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Mode: stagingusecase.ImportModeMerge})
+	output, err := usecase.Execute(t.Context(), ImportInput{Mode: ImportModeMerge})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"dropped the staged tag changes of /app/a: it is staged for deletion"}, output.Warnings)
 	assert.Equal(t, 1, output.TagCount)
@@ -593,16 +592,16 @@ func TestImportUseCase_Execute_MergeDropsTagsOverWorkingDelete(t *testing.T) {
 
 	source := staging.NewEmptyState()
 	source.Tags[staging.ServiceSecret][key] = staging.TagEntry{Add: map[string]string{"env": "prod"}, StagedAt: time.Now()}
-	reader := &cannedReader{states: map[staging.Service]*staging.State{staging.ServiceSecret: source}}
+	reader := &importCannedReader{states: map[staging.Service]*staging.State{staging.ServiceSecret: source}}
 
 	working := testutil.NewMockStore()
 	require.NoError(t, working.StageEntry(t.Context(), staging.ServiceSecret, key, staging.Entry{
 		Operation: staging.OperationDelete, StagedAt: time.Now(),
 	}))
 
-	usecase := &stagingusecase.ImportUseCase{Source: reader, Working: working}
+	usecase := &ImportUseCase{Source: reader, Working: working}
 
-	output, err := usecase.Execute(t.Context(), stagingusecase.ImportInput{Mode: stagingusecase.ImportModeMerge})
+	output, err := usecase.Execute(t.Context(), ImportInput{Mode: ImportModeMerge})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"dropped the staged tag changes of my-secret: it is staged for deletion"}, output.Warnings)
 

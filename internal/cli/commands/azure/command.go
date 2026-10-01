@@ -46,7 +46,7 @@ resource group is required.`,
 		Commands: []*cli.Command{
 			secret.Command(),
 			param.Command(),
-			StageCommand(),
+			stageCommand(),
 		},
 		CommandNotFound: cliinternal.CommandNotFound,
 	}

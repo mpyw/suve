@@ -16,7 +16,7 @@ import (
 // it. service ("param"/"secret", or "" for none) is the launched service the
 // frontend opens on.
 func Run(initial provider.Scope, service string) error {
-	app, err := NewApp(initial, service)
+	app, err := newApp(initial, service)
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,7 @@ func Run(initial provider.Scope, service string) error {
 		Width:  1024, //nolint:mnd
 		Height: 768,  //nolint:mnd
 		AssetServer: &assetserver.Options{
-			Assets: Assets,
+			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1}, //nolint:mnd
 		OnStartup:        app.Startup,

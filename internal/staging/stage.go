@@ -544,6 +544,7 @@ func (e *ResourceNotFoundError) Unwrap() error {
 	return e.Err
 }
 
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
 	// ErrNotStaged is returned when a parameter/secret is not staged.
 	ErrNotStaged = errors.New("not staged")

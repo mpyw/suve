@@ -18,47 +18,47 @@ var errParseTestMustHaveNumber = errors.New("# must be followed by a number")
 
 // parseTestAbsolute is a simple test struct for absolute specifiers.
 type parseTestAbsolute struct {
-	Number *int
-	Label  string
+	number *int
+	label  string
 }
 
 // testParser creates a test parser for testing purposes.
 func testParser() absoluteParser[parseTestAbsolute] {
 	return absoluteParser[parseTestAbsolute]{
-		Parsers: []specifierParser[parseTestAbsolute]{
+		parsers: []specifierParser[parseTestAbsolute]{
 			{
-				PrefixChar: '#',
-				IsChar:     isDigitChar,
-				Error:      errParseTestMustHaveNumber,
-				Duplicated: func(abs parseTestAbsolute) bool {
-					return abs.Number != nil
+				prefixChar:        '#',
+				isChar:            isDigitChar,
+				invalidValueError: errParseTestMustHaveNumber,
+				duplicated: func(abs parseTestAbsolute) bool {
+					return abs.number != nil
 				},
-				Apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
+				apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
 					n := 0
 					for _, c := range value {
 						n = n*10 + int(c-'0')
 					}
 
-					abs.Number = &n
+					abs.number = &n
 
 					return abs, nil
 				},
 			},
 			{
-				PrefixChar: ':',
-				IsChar:     isLetterChar,
-				Error:      nil, // No error, treat as part of name if not followed by letter
-				Duplicated: func(abs parseTestAbsolute) bool {
-					return abs.Label != ""
+				prefixChar:        ':',
+				isChar:            isLetterChar,
+				invalidValueError: nil, // No error, treat as part of name if not followed by letter
+				duplicated: func(abs parseTestAbsolute) bool {
+					return abs.label != ""
 				},
-				Apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
-					abs.Label = value
+				apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
+					abs.label = value
 
 					return abs, nil
 				},
 			},
 		},
-		Zero: func() parseTestAbsolute {
+		zero: func() parseTestAbsolute {
 			return parseTestAbsolute{}
 		},
 	}
@@ -75,8 +75,8 @@ func TestParse(t *testing.T) {
 		spec, err := parseSpec("/my/param", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "/my/param", spec.Name)
-		assert.Nil(t, spec.Absolute.Number)
-		assert.Empty(t, spec.Absolute.Label)
+		assert.Nil(t, spec.Absolute.number)
+		assert.Empty(t, spec.Absolute.label)
 		assert.Equal(t, 0, spec.Shift)
 	})
 
@@ -114,8 +114,8 @@ func TestParse(t *testing.T) {
 		spec, err := parseSpec("/my/param#123", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "/my/param", spec.Name)
-		require.NotNil(t, spec.Absolute.Number)
-		assert.Equal(t, 123, *spec.Absolute.Number)
+		require.NotNil(t, spec.Absolute.number)
+		assert.Equal(t, 123, *spec.Absolute.number)
 	})
 
 	t.Run("with label specifier", func(t *testing.T) {
@@ -124,7 +124,7 @@ func TestParse(t *testing.T) {
 		spec, err := parseSpec("secret:CURRENT", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "secret", spec.Name)
-		assert.Equal(t, "CURRENT", spec.Absolute.Label)
+		assert.Equal(t, "CURRENT", spec.Absolute.label)
 	})
 
 	t.Run("with shift only", func(t *testing.T) {
@@ -142,8 +142,8 @@ func TestParse(t *testing.T) {
 		spec, err := parseSpec("/my/param#5~2", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "/my/param", spec.Name)
-		require.NotNil(t, spec.Absolute.Number)
-		assert.Equal(t, 5, *spec.Absolute.Number)
+		require.NotNil(t, spec.Absolute.number)
+		assert.Equal(t, 5, *spec.Absolute.number)
 		assert.Equal(t, 2, spec.Shift)
 	})
 
@@ -153,7 +153,7 @@ func TestParse(t *testing.T) {
 		spec, err := parseSpec("secret:CURRENT~1", parser)
 		require.NoError(t, err)
 		assert.Equal(t, "secret", spec.Name)
-		assert.Equal(t, "CURRENT", spec.Absolute.Label)
+		assert.Equal(t, "CURRENT", spec.Absolute.label)
 		assert.Equal(t, 1, spec.Shift)
 	})
 
@@ -243,7 +243,7 @@ func TestParse(t *testing.T) {
 		// : without Error set, not followed by valid char, treated as part of name
 		spec, err := parseSpec("secret:123", parser)
 		require.NoError(t, err)
-		// Since IsChar for : is IsLetter, and 123 starts with digit, : is part of name
+		// Since isChar for : is IsLetter, and 123 starts with digit, : is part of name
 		assert.Equal(t, "secret:123", spec.Name)
 	})
 
@@ -261,19 +261,19 @@ var errParseTestApplyFailed = errors.New("apply failed")
 func TestParse_ApplyError(t *testing.T) {
 	t.Parallel()
 
-	// Create parser with Apply that returns error
+	// Create parser with apply that returns error
 	parser := absoluteParser[parseTestAbsolute]{
-		Parsers: []specifierParser[parseTestAbsolute]{
+		parsers: []specifierParser[parseTestAbsolute]{
 			{
-				PrefixChar: '#',
-				IsChar:     isDigitChar,
-				Error:      errParseTestMustHaveNumber,
-				Apply: func(_ string, _ parseTestAbsolute) (parseTestAbsolute, error) {
+				prefixChar:        '#',
+				isChar:            isDigitChar,
+				invalidValueError: errParseTestMustHaveNumber,
+				apply: func(_ string, _ parseTestAbsolute) (parseTestAbsolute, error) {
 					return parseTestAbsolute{}, errParseTestApplyFailed
 				},
 			},
 		},
-		Zero: func() parseTestAbsolute {
+		zero: func() parseTestAbsolute {
 			return parseTestAbsolute{}
 		},
 	}
@@ -286,27 +286,27 @@ func TestParse_ApplyError(t *testing.T) {
 func TestParse_NoDuplicatedCheck(t *testing.T) {
 	t.Parallel()
 
-	// Create parser with Duplicated as nil
+	// Create parser with duplicated as nil
 	parser := absoluteParser[parseTestAbsolute]{
-		Parsers: []specifierParser[parseTestAbsolute]{
+		parsers: []specifierParser[parseTestAbsolute]{
 			{
-				PrefixChar: '#',
-				IsChar:     isDigitChar,
-				Error:      nil,
-				Duplicated: nil, // No duplicate check
-				Apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
+				prefixChar:        '#',
+				isChar:            isDigitChar,
+				invalidValueError: nil,
+				duplicated:        nil, // No duplicate check
+				apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
 					n := 0
 					for _, c := range value {
 						n = n*10 + int(c-'0')
 					}
 
-					abs.Number = &n
+					abs.number = &n
 
 					return abs, nil
 				},
 			},
 		},
-		Zero: func() parseTestAbsolute {
+		zero: func() parseTestAbsolute {
 			return parseTestAbsolute{}
 		},
 	}
@@ -314,8 +314,8 @@ func TestParse_NoDuplicatedCheck(t *testing.T) {
 	// With no duplicate check, multiple # should work (last one wins)
 	spec, err := parseSpec("name#1#2", parser)
 	require.NoError(t, err)
-	require.NotNil(t, spec.Absolute.Number)
-	assert.Equal(t, 2, *spec.Absolute.Number)
+	require.NotNil(t, spec.Absolute.number)
+	assert.Equal(t, 2, *spec.Absolute.number)
 }
 
 func TestParse_InvalidShiftAfterAbsolute(t *testing.T) {
@@ -335,27 +335,27 @@ func TestParse_UnknownCharAfterAbsolute(t *testing.T) {
 
 	// Create a parser that only accepts # followed by digits
 	parser := absoluteParser[parseTestAbsolute]{
-		Parsers: []specifierParser[parseTestAbsolute]{
+		parsers: []specifierParser[parseTestAbsolute]{
 			{
-				PrefixChar: '#',
-				IsChar:     isDigitChar,
-				Error:      errParseTestMustHaveNumber,
-				Duplicated: func(abs parseTestAbsolute) bool {
-					return abs.Number != nil
+				prefixChar:        '#',
+				isChar:            isDigitChar,
+				invalidValueError: errParseTestMustHaveNumber,
+				duplicated: func(abs parseTestAbsolute) bool {
+					return abs.number != nil
 				},
-				Apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
+				apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
 					n := 0
 					for _, c := range value {
 						n = n*10 + int(c-'0')
 					}
 
-					abs.Number = &n
+					abs.number = &n
 
 					return abs, nil
 				},
 			},
 		},
-		Zero: func() parseTestAbsolute {
+		zero: func() parseTestAbsolute {
 			return parseTestAbsolute{}
 		},
 	}
@@ -374,8 +374,8 @@ func TestParse_EmptyParsers(t *testing.T) {
 
 	// Create a parser with no specifier parsers
 	parser := absoluteParser[parseTestAbsolute]{
-		Parsers: []specifierParser[parseTestAbsolute]{},
-		Zero: func() parseTestAbsolute {
+		parsers: []specifierParser[parseTestAbsolute]{},
+		zero: func() parseTestAbsolute {
 			return parseTestAbsolute{}
 		},
 	}
@@ -393,24 +393,24 @@ func TestParse_MatchParserNoMatch(t *testing.T) {
 
 	// Parser only handles '#', test with a character it doesn't know
 	parser := absoluteParser[parseTestAbsolute]{
-		Parsers: []specifierParser[parseTestAbsolute]{
+		parsers: []specifierParser[parseTestAbsolute]{
 			{
-				PrefixChar: '#',
-				IsChar:     isDigitChar,
-				Error:      errParseTestMustHaveNumber,
-				Apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
+				prefixChar:        '#',
+				isChar:            isDigitChar,
+				invalidValueError: errParseTestMustHaveNumber,
+				apply: func(value string, abs parseTestAbsolute) (parseTestAbsolute, error) {
 					n := 0
 					for _, c := range value {
 						n = n*10 + int(c-'0')
 					}
 
-					abs.Number = &n
+					abs.number = &n
 
 					return abs, nil
 				},
 			},
 		},
-		Zero: func() parseTestAbsolute {
+		zero: func() parseTestAbsolute {
 			return parseTestAbsolute{}
 		},
 	}

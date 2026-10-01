@@ -61,7 +61,7 @@ internal/staging/store/file/internal/crypt/crypt.go: unreachable func: resetCiph
 # explicit path / passphrase for tests, bypassing the OS keychain resolution the
 # production constructor performs.
 internal/staging/store/file/store.go: unreachable func: NewStoreWithPath
-internal/staging/store/file/store.go: unreachable func: NewStoreWithPassphrase
+internal/staging/store/file/store.go: unreachable func: newStoreWithPassphrase
 
 # timeutil.ResetLocationCache: test seam that clears the cached time.Location so
 # tests can re-exercise the lazy-load path.

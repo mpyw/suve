@@ -46,18 +46,18 @@ func validateDeleteFlags(force bool, recoveryWindow int) error {
 	return nil
 }
 
-// DeleteRunner executes the delete command.
-type DeleteRunner struct {
-	UseCase *secret.DeleteUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// deleteRunner executes the delete command.
+type deleteRunner struct {
+	useCase *secret.DeleteUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// DeleteOptions holds the options for the delete command.
-type DeleteOptions struct {
-	Name           string
-	Force          bool
-	RecoveryWindow int
+// deleteOptions holds the options for the delete command.
+type deleteOptions struct {
+	name           string
+	force          bool
+	recoveryWindow int
 }
 
 // DeleteCommand returns the delete command.
@@ -173,40 +173,40 @@ func deleteAction(ctx context.Context, cmd *cli.Command) error {
 		return nil
 	}
 
-	r := &DeleteRunner{
-		UseCase: uc,
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &deleteRunner{
+		useCase: uc,
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, DeleteOptions{
-		Name:           name,
-		Force:          force,
-		RecoveryWindow: recoveryWindow,
+	return r.run(ctx, deleteOptions{
+		name:           name,
+		force:          force,
+		recoveryWindow: recoveryWindow,
 	})
 }
 
-// Run executes the delete command.
-func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
+// run executes the delete command.
+func (r *deleteRunner) run(ctx context.Context, opts deleteOptions) error {
 	var options []provider.DeleteOption
 
 	switch {
-	case opts.Force:
+	case opts.force:
 		options = append(options, provider.ForceDelete{})
-	case opts.RecoveryWindow > 0:
-		options = append(options, secretsmanager.RecoveryWindow{Days: int64(opts.RecoveryWindow)})
+	case opts.recoveryWindow > 0:
+		options = append(options, secretsmanager.RecoveryWindow{Days: int64(opts.recoveryWindow)})
 	}
 
-	result, err := r.UseCase.Execute(ctx, secret.DeleteInput{
-		Name:    opts.Name,
+	result, err := r.useCase.Execute(ctx, secret.DeleteInput{
+		Name:    opts.name,
 		Options: options,
 	})
 	if err != nil {
 		return err
 	}
 
-	if opts.Force {
-		output.Success(r.Stdout, "Permanently deleted secret %s", result.Name)
+	if opts.force {
+		output.Success(r.stdout, "Permanently deleted secret %s", result.Name)
 
 		return nil
 	}
@@ -214,14 +214,14 @@ func (r *DeleteRunner) Run(ctx context.Context, opts DeleteOptions) error {
 	// The provider Delete returns only an error, so the scheduled deletion date
 	// is computed client-side (now + recovery window) — the same calendar date
 	// AWS itself schedules.
-	window := opts.RecoveryWindow
+	window := opts.recoveryWindow
 	if window <= 0 {
 		window = defaultDeleteRecoveryWindow
 	}
 
 	deletionDate := time.Now().AddDate(0, 0, window)
 
-	output.Success(r.Stdout, "Scheduled deletion of secret %s (deletion date: %s)",
+	output.Success(r.stdout, "Scheduled deletion of secret %s (deletion date: %s)",
 		result.Name,
 		timeutil.FormatDate(deletionDate),
 	)

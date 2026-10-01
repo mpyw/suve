@@ -69,7 +69,7 @@ func (e *Executor) ExecuteTag(
 	action TagAction,
 	baseModifiedAt *time.Time,
 ) (TagTransitionResult, error) {
-	result := ReduceTag(entryState, stagedTags, action)
+	result := reduceTagAction(entryState, stagedTags, action)
 	if result.Error != nil {
 		return result, result.Error
 	}

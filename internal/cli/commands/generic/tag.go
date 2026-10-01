@@ -1,5 +1,5 @@
 // tag.go provides the generic tag command shared by every provider; untag.go
-// holds its untag counterpart over the same TagConfig and TagRunner.
+// holds its untag counterpart over the same TagConfig and tagRunner.
 //
 // The command scaffolding (argument validation, tag parsing, provider wiring)
 // lives here and is identical across providers; only the small per-provider
@@ -35,22 +35,24 @@ type TagConfig struct {
 	NewTagger func(ctx context.Context) (provider.Tagger, error)
 }
 
-// TagRunner executes the tag/untag commands over a provider.Tagger.
-type TagRunner struct {
-	Tagger provider.Tagger
-	Noun   string
-	Stdout io.Writer
+// tagRunner executes the tag/untag commands over a provider.Tagger.
+//
+//declscope:package // untag.go builds it and adds runUntag
+type tagRunner struct {
+	tagger provider.Tagger
+	noun   string
+	stdout io.Writer
 }
 
-// RunTag adds or updates the given tags on the named resource.
-func (r *TagRunner) RunTag(ctx context.Context, name string, tags map[string]string) error {
+// runTag adds or updates the given tags on the named resource.
+func (r *tagRunner) runTag(ctx context.Context, name string, tags map[string]string) error {
 	if len(tags) > 0 {
-		if err := r.Tagger.Tag(ctx, name, tags); err != nil {
+		if err := r.tagger.Tag(ctx, name, tags); err != nil {
 			return fmt.Errorf("failed to add tags: %w", err)
 		}
 	}
 
-	output.Success(r.Stdout, "Tagged %s %s (%d tag(s))", r.Noun, name, len(tags))
+	output.Success(r.stdout, "Tagged %s %s (%d tag(s))", r.noun, name, len(tags))
 
 	return nil
 }
@@ -79,9 +81,9 @@ func TagCommand(cfg TagConfig) *cli.Command {
 				return err
 			}
 
-			r := &TagRunner{Tagger: tagger, Noun: cfg.Noun, Stdout: cmd.Root().Writer}
+			r := &tagRunner{tagger: tagger, noun: cfg.Noun, stdout: cmd.Root().Writer}
 
-			return r.RunTag(ctx, name, tags)
+			return r.runTag(ctx, name, tags)
 		},
 	}
 }

@@ -47,7 +47,7 @@ func setAllowPlaintextEnv(t *testing.T, value string) {
 	orig := lookupEnvFunc
 
 	lookupEnvFunc = func(key string) (string, bool) {
-		if key == EnvAllowPlaintext {
+		if key == envAllowPlaintext {
 			if value == "" {
 				return "", false
 			}

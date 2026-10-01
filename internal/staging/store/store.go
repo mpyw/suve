@@ -23,8 +23,8 @@ type ReadOperator interface {
 	ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.TagEntry, error)
 }
 
-// WriteOperator provides write access to individual staging entries.
-type WriteOperator interface {
+// writeOperator provides write access to individual staging entries.
+type writeOperator interface {
 	// StageEntry adds or updates the staged entry identified by key.
 	StageEntry(ctx context.Context, service staging.Service, key staging.EntryKey, entry staging.Entry) error
 	// StageTag adds or updates the staged tag changes identified by key.
@@ -40,39 +40,39 @@ type WriteOperator interface {
 // ReadWriteOperator combines read and write access to staging entries.
 type ReadWriteOperator interface {
 	ReadOperator
-	WriteOperator
+	writeOperator
 }
 
-// Drainer provides bulk read access to staging state (for drain command).
-type Drainer interface {
+// drainer provides bulk read access to staging state (for drain command).
+type drainer interface {
 	// Drain retrieves the entire state from storage.
 	// If service is empty, returns all services; otherwise filters to the specified service.
 	// If keep is false, the source storage is cleared after reading.
 	Drain(ctx context.Context, service staging.Service, keep bool) (*staging.State, error)
 }
 
-// Writer provides bulk write access to staging state.
-type Writer interface {
+// writer provides bulk write access to staging state.
+type writer interface {
 	// WriteState writes the entire state to storage.
 	// If service is empty, writes all services; otherwise writes only the specified service.
 	WriteState(ctx context.Context, service staging.Service, state *staging.State) error
 }
 
-// Updater performs an atomic read-modify-write of the whole staging state under
+// updater performs an atomic read-modify-write of the whole staging state under
 // a single lock hold: it reads the current state fresh, hands it to fn to mutate
 // in place, then writes it back — without releasing the lock in between. This
 // closes the read-then-write race a separate Drain + WriteState leaves open,
 // where a concurrent StageEntry landing between the two is clobbered by the
 // stale snapshot. fn must confine itself to mutating the passed state and must
 // not call back into the store (the lock is not reentrant).
-type Updater interface {
+type updater interface {
 	Update(ctx context.Context, service staging.Service, fn func(*staging.State) error) error
 }
 
 // FileStore combines drain and write operations for file storage.
 type FileStore interface {
-	Drainer
-	Writer
+	drainer
+	writer
 }
 
 // WorkingStore is the working-area surface the export and import use cases rely
@@ -81,7 +81,7 @@ type FileStore interface {
 // read-modify-write used to reconcile an import without clobbering a concurrent
 // stage.
 type WorkingStore interface {
-	Drainer
-	WriteOperator
-	Updater
+	drainer
+	writeOperator
+	updater
 }

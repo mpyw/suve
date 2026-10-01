@@ -10,33 +10,39 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// UntagRunner executes untag staging operations using a usecase.
-type UntagRunner struct {
-	UseCase *stagingusecase.TagUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// untagRunner executes untag staging operations using a usecase.
+//
+//declscope:package // command.go builds and runs it
+type untagRunner struct {
+	useCase *stagingusecase.TagUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// UntagOptions holds options for the untag command.
-type UntagOptions struct {
-	Name string
-	// Namespace is the App Configuration namespace of the resource (empty for the
+// untagOptions holds options for the untag command.
+//
+//declscope:package // command.go fills it from the flags
+type untagOptions struct {
+	name string
+	// namespace is the App Configuration namespace of the resource (empty for the
 	// null/default namespace and every other provider).
-	Namespace string
-	Keys      []string // tag keys to remove
+	namespace string
+	keys      []string // tag keys to remove
 }
 
-// Run executes the untag command.
-func (r *UntagRunner) Run(ctx context.Context, opts UntagOptions) error {
-	result, err := r.UseCase.Untag(ctx, stagingusecase.UntagInput{
-		Key:     staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
-		TagKeys: maputil.NewSet(opts.Keys...),
+// run executes the untag command.
+//
+//declscope:package // command.go runs it
+func (r *untagRunner) run(ctx context.Context, opts untagOptions) error {
+	result, err := r.useCase.Untag(ctx, stagingusecase.UntagInput{
+		Key:     staging.EntryKey{Name: opts.name, Namespace: opts.namespace},
+		TagKeys: maputil.NewSet(opts.keys...),
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Staged tag removal for: %s", result.Name)
+	output.Success(r.stdout, "Staged tag removal for: %s", result.Name)
 
 	return nil
 }

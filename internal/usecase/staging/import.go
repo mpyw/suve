@@ -15,9 +15,9 @@ type ImportOp string
 
 // Import error Op codes.
 const (
-	ImportOpLoad        ImportOp = "load"
-	ImportOpWrite       ImportOp = "write"
-	ImportOpReadWorking ImportOp = "read-working"
+	importOpLoad        ImportOp = "load"
+	importOpWrite       ImportOp = "write"
+	importOpReadWorking ImportOp = "read-working"
 )
 
 // ImportMode determines how to reconcile imported state with the existing
@@ -56,8 +56,12 @@ type ImportOutput struct {
 	// working state.
 	Merged bool
 	// EntryCount is the number of entries in the final working state.
+	//
+	//declscope:ignore overexported // internal/gui/staging_transfer.go reads it behind production || dev
 	EntryCount int
 	// TagCount is the number of tag entries in the final working state.
+	//
+	//declscope:ignore overexported // internal/gui/staging_transfer.go reads it behind production || dev
 	TagCount int
 	// Warnings holds non-fatal diagnostics produced during import, e.g. an item
 	// left unanchored because its LastModified could not be fetched from the
@@ -86,7 +90,7 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 	// Read the imported state from the source (read-only; never mutated).
 	sourceState, err := u.readSource(ctx, input.Service)
 	if err != nil {
-		return nil, &ImportError{Op: ImportOpLoad, Err: err}
+		return nil, &ImportError{Op: importOpLoad, Err: err}
 	}
 
 	if sourceState.IsEmpty() {
@@ -122,10 +126,10 @@ func (u *ImportUseCase) Execute(ctx context.Context, input ImportInput) (*Import
 		// fn (reconcileImport) runs only after a successful read, so if it never
 		// ran the read failed; otherwise the write-back did.
 		if !reconciled {
-			return nil, &ImportError{Op: ImportOpReadWorking, Err: err}
+			return nil, &ImportError{Op: importOpReadWorking, Err: err}
 		}
 
-		return nil, &ImportError{Op: ImportOpWrite, Err: err}
+		return nil, &ImportError{Op: importOpWrite, Err: err}
 	}
 
 	return output, nil
@@ -308,11 +312,11 @@ type ImportError struct {
 
 func (e *ImportError) Error() string {
 	switch e.Op {
-	case ImportOpLoad:
+	case importOpLoad:
 		return "failed to read export file: " + e.Err.Error()
-	case ImportOpWrite:
+	case importOpWrite:
 		return "failed to write the working staging area: " + e.Err.Error()
-	case ImportOpReadWorking:
+	case importOpReadWorking:
 		return "failed to read the working staging area: " + e.Err.Error()
 	default:
 		return e.Err.Error()

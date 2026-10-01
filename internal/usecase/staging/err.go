@@ -7,4 +7,6 @@ import "errors"
 // refuses to format invalid UTF-8 to avoid U+FFFD coercion), so binary values
 // cannot be staged. This covers every ingestion path: positional argv, the
 // $EDITOR fallback, and provider prefill.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var ErrValueNotUTF8 = errors.New("value is not valid UTF-8: binary values cannot be staged")

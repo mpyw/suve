@@ -221,10 +221,12 @@ func stageGlobalConfig(paramCfg, secretCfg stgcli.CommandConfig) stgcli.GlobalCo
 	}
 }
 
-// StageCommand returns the "azure stage" command with the secret (Key Vault) and
+// stageCommand returns the "azure stage" command with the secret (Key Vault) and
 // param (App Configuration) staging subgroups plus the provider-wide global
 // commands (status / diff / apply / reset) spanning both services.
-func StageCommand() *cli.Command {
+//
+//declscope:package // command.go registers it
+func stageCommand() *cli.Command {
 	gcfg := stageGlobalConfig(appConfigStageConfig(), keyVaultStageConfig())
 
 	return &cli.Command{
@@ -254,14 +256,14 @@ func StageCommand() *cli.Command {
 }
 
 // FlatStageCommand returns the Azure stage command as a standalone top-level
-// command named `name` (e.g. "stage"). It carries the whole StageCommand tree:
+// command named `name` (e.g. "stage"). It carries the whole stageCommand tree:
 // the per-service secret/param subgroups AND the provider-wide global commands
 // (status/diff/apply/reset), which all rely on the parent command's
 // --vault-name / --store-name flags and Before hook injecting both resource
 // names into the context. Used for the flat
 // `suve stage` alias when Azure is the uniquely active staging provider.
 func FlatStageCommand(name string) *cli.Command {
-	c := StageCommand()
+	c := stageCommand()
 	c.Name = name
 
 	return c

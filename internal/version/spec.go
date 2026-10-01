@@ -28,6 +28,8 @@ import (
 )
 
 // ErrEmptySpec is returned for an empty or whitespace-only specification.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var ErrEmptySpec = errors.New("empty specification")
 
 // Spec represents a parsed version specification.

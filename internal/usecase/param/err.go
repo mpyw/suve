@@ -6,6 +6,7 @@ import (
 	"github.com/samber/lo"
 )
 
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
 	// ErrNotFound is returned (wrapped with the item noun and name, e.g.
 	// "setting not found: key") when the item to update does not exist.

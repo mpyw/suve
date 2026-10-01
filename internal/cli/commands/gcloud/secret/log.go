@@ -35,8 +35,8 @@ type logPresenter struct {
 	values map[string]string
 }
 
-// NewLogPresenter builds a Google Cloud log presenter over the given reader and request.
-func NewLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
+// newLogPresenter builds a Google Cloud log presenter over the given reader and request.
+func newLogPresenter(reader provider.Reader, req generic.LogRequest) generic.LogPresenter {
 	return &logPresenter{uc: &secret.LogUseCase{Reader: reader}, req: req}
 }
 
@@ -178,8 +178,10 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 	}
 }
 
-// LogCommand returns the Google Cloud Secret Manager log command.
-func LogCommand() *cli.Command {
+// logCommand returns the Google Cloud Secret Manager log command.
+//
+//declscope:package // command.go registers it
+func logCommand() *cli.Command {
 	return generic.LogCommand(generic.LogConfig{
 		Usage:     "Show secret version history",
 		ArgsUsage: "<name>",
@@ -247,7 +249,7 @@ EXAMPLES:
 				return nil, err
 			}
 
-			return NewLogPresenter(store, req), nil
+			return newLogPresenter(store, req), nil
 		},
 	})
 }

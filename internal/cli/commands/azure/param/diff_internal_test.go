@@ -4,10 +4,20 @@
 package param
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mpyw/suve/internal/cli/commands/generic"
+	"github.com/mpyw/suve/internal/cli/output"
+	"github.com/mpyw/suve/internal/domain"
+	"github.com/mpyw/suve/internal/provider"
+	"github.com/mpyw/suve/internal/provider/providermock"
+	"github.com/mpyw/suve/internal/version"
 )
 
 func TestParseDiffArgs(t *testing.T) {
@@ -69,4 +79,56 @@ func TestParseDiffArgs(t *testing.T) {
 		_, _, err := parseDiffArgs([]string{"a", "b", "c", "d"})
 		require.Error(t, err)
 	})
+}
+
+// TestDiffPresenter_RenderJSON drives the App Configuration diff presenter end to
+// end through the generic Runner with --output=json, covering newDiffPresenter,
+// Fetch, OldValue/NewValue, Labels, and RenderJSON. App Configuration is
+// unversioned, so diff compares two distinct keys with an empty suffix.
+func TestDiffPresenter_RenderJSON(t *testing.T) {
+	t.Parallel()
+
+	values := map[string]string{"key-a": "alpha", "key-b": "beta"}
+
+	store := &providermock.Store{
+		ResolveFunc: func(_ context.Context, _, spec string) (provider.VersionRef, error) {
+			assert.Empty(t, spec) // App Configuration is unversioned.
+
+			return provider.VersionRef{}, nil
+		},
+		GetFunc: func(_ context.Context, name string, _ provider.VersionRef) (*domain.Entry, error) {
+			return &domain.Entry{Name: name, Value: values[name]}, nil
+		},
+	}
+
+	spec1, err := version.AzureAppConfiguration.Parse("key-a")
+	require.NoError(t, err)
+	spec2, err := version.AzureAppConfiguration.Parse("key-b")
+	require.NoError(t, err)
+
+	presenter := newDiffPresenter(store, spec1, spec2)
+
+	var stdout, stderr bytes.Buffer
+
+	r := &generic.DiffRunner{
+		Presenter: presenter,
+		Options:   generic.DiffOptions{Output: output.FormatJSON},
+		Stdout:    &stdout,
+		Stderr:    &stderr,
+	}
+	require.NoError(t, r.Run(t.Context()))
+
+	var out struct {
+		OldName   string `json:"oldName"`
+		OldValue  string `json:"oldValue"`
+		NewName   string `json:"newName"`
+		NewValue  string `json:"newValue"`
+		Identical bool   `json:"identical"`
+	}
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))
+	assert.Equal(t, "key-a", out.OldName)
+	assert.Equal(t, "alpha", out.OldValue)
+	assert.Equal(t, "key-b", out.NewName)
+	assert.Equal(t, "beta", out.NewValue)
+	assert.False(t, out.Identical)
 }

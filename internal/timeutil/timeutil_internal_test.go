@@ -159,14 +159,14 @@ func TestGetLocation_Caching(t *testing.T) {
 	t.Setenv("TZ", "Asia/Tokyo")
 
 	// First call loads the location
-	loc1 := GetLocation()
+	loc1 := getLocation()
 	assert.Equal(t, "Asia/Tokyo", loc1.String())
 
 	// Change TZ - should not affect cached value
 	t.Setenv("TZ", "America/New_York")
 
 	// Second call should return cached value
-	loc2 := GetLocation()
+	loc2 := getLocation()
 	assert.Equal(t, "Asia/Tokyo", loc2.String())
 
 	// Verify they're the same pointer (cached)

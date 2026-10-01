@@ -15,6 +15,8 @@ import (
 )
 
 // ErrNotConfigured is returned by a mock method whose function field is nil.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var ErrNotConfigured = errors.New("providermock: method not configured")
 
 // Store is a configurable mock of provider.Store (Reader + Writer + Tagger).

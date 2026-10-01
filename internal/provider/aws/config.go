@@ -11,14 +11,16 @@ import (
 	"github.com/mpyw/suve/internal/debug"
 )
 
-// LoadConfig loads the default AWS configuration. When debug is enabled on the
+// loadConfig loads the default AWS configuration. When debug is enabled on the
 // context it turns on SDK request/response/retry logging plus config resolution
 // warnings, and logs a one-line summary of the effective region, profile, and
 // credentials source — the facts a user needs first when a command unexpectedly
 // returns nothing (see #306). By default the bodyless LogRequest/LogResponse
 // modes are used (metadata only, no secret values); --no-redaction switches to
 // the WithBody modes so full request/response payloads are logged too.
-func LoadConfig(ctx context.Context) (aws.Config, error) {
+//
+//declscope:package // aws.go and identity.go load the AWS config with it
+func loadConfig(ctx context.Context) (aws.Config, error) {
 	d := debug.From(ctx)
 	if !d.Enabled {
 		return config.LoadDefaultConfig(ctx)

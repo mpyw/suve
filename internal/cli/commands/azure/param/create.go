@@ -14,21 +14,23 @@ import (
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
-// CreateRunner executes the create command.
-type CreateRunner struct {
-	UseCase *param.CreateUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// createRunner executes the create command.
+type createRunner struct {
+	useCase *param.CreateUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// CreateOptions holds the options for the create command.
-type CreateOptions struct {
-	Name  string
-	Value string
+// createOptions holds the options for the create command.
+type createOptions struct {
+	name  string
+	value string
 }
 
-// CreateCommand returns the Azure App Configuration create command.
-func CreateCommand() *cli.Command {
+// createCommand returns the Azure App Configuration create command.
+//
+//declscope:package // command.go registers it
+func createCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "create",
 		Usage:     "Create a new setting",
@@ -81,27 +83,27 @@ func createAction(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	r := &CreateRunner{
-		UseCase: &param.CreateUseCase{Writer: store, ItemNoun: itemNoun()},
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &createRunner{
+		useCase: &param.CreateUseCase{Writer: store, ItemNoun: itemNoun()},
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, CreateOptions{Name: args.Get(0), Value: value})
+	return r.run(ctx, createOptions{name: args.Get(0), value: value})
 }
 
-// Run executes the create command.
-func (r *CreateRunner) Run(ctx context.Context, opts CreateOptions) error {
-	result, err := r.UseCase.Execute(ctx, param.CreateInput{
-		Name:  opts.Name,
-		Value: opts.Value,
+// run executes the create command.
+func (r *createRunner) run(ctx context.Context, opts createOptions) error {
+	result, err := r.useCase.Execute(ctx, param.CreateInput{
+		Name:  opts.name,
+		Value: opts.value,
 		Type:  domain.ValueTypePlaintext,
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Created setting %s", result.Name)
+	output.Success(r.stdout, "Created setting %s", result.Name)
 
 	return nil
 }

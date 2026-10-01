@@ -32,12 +32,16 @@ type LogRequest struct {
 
 // LogOptions holds the shared render options.
 type LogOptions struct {
-	ShowPatch      bool
-	ParseJSON      bool
-	Reverse        bool
-	NoPager        bool
-	Oneline        bool
-	Output         output.Format
+	//declscope:ignore overexported // log_test.go runs the log with the AWS presenters, which import this package
+	ShowPatch bool
+	//declscope:ignore overexported // log_test.go runs the log with the AWS presenters, which import this package
+	ParseJSON bool
+	//declscope:ignore overexported // log_test.go runs the log with the AWS presenters, which import this package
+	Reverse bool
+	noPager bool
+	Oneline bool
+	Output  output.Format
+	//declscope:ignore overexported // log_test.go runs the log with the AWS presenters, which import this package
 	MaxValueLength int
 }
 
@@ -167,7 +171,7 @@ func LogCommand(cfg LogConfig) *cli.Command {
 				ShowPatch: cmd.Bool("patch"),
 				ParseJSON: cmd.Bool("parse-json"),
 				Reverse:   cmd.Bool("reverse"),
-				NoPager:   cmd.Bool("no-pager"),
+				noPager:   cmd.Bool("no-pager"),
 				Oneline:   cmd.Bool("oneline"),
 				Output:    outputFormat,
 				// --max-value-length is declared as an Int32Flag, so it must be
@@ -230,7 +234,7 @@ func LogCommand(cfg LogConfig) *cli.Command {
 			}
 
 			// JSON output disables pager
-			noPager := opts.NoPager || opts.Output == output.FormatJSON
+			noPager := opts.noPager || opts.Output == output.FormatJSON
 
 			return internal.WithPager(cmd, noPager, func(stdout, stderr io.Writer) error {
 				r := &LogRunner{Presenter: presenter, Options: opts, Stdout: stdout, Stderr: stderr}

@@ -11,8 +11,10 @@ import (
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
-// ListCommand returns the Google Cloud Secret Manager list command.
-func ListCommand() *cli.Command {
+// listCommand returns the Google Cloud Secret Manager list command.
+//
+//declscope:package // command.go registers it
+func listCommand() *cli.Command {
 	return generic.ListCommand(generic.ListConfig{
 		Usage:     "List secrets",
 		ArgsUsage: "[filter-prefix]",

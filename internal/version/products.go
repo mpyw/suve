@@ -10,6 +10,8 @@ import (
 )
 
 // Product-specific errors.
+//
+//declscope:ignore overexported // a sentinel error stays exported with the rest of its family, for errors.Is
 var (
 	// ErrInvalidAWSSecretsManagerID is returned when # is not followed by an AWS
 	// Secrets Manager version ID.
@@ -45,24 +47,24 @@ var (
 	// AWSSecretsManager is the AWS Secrets Manager grammar: opaque version ids
 	// plus staging labels, name#VERSION / name:LABEL, then ~SHIFT.
 	AWSSecretsManager = OpaqueGrammar{
-		IsIDChar:       isAWSSecretsManagerIDChar,
-		InvalidIDError: ErrInvalidAWSSecretsManagerID,
-		Labels:         true,
-		LabelError:     ErrInvalidAWSSecretsManagerLabel,
+		isIDChar:       isAWSSecretsManagerIDChar,
+		invalidIDError: ErrInvalidAWSSecretsManagerID,
+		labels:         true,
+		labelError:     ErrInvalidAWSSecretsManagerLabel,
 	}
 
 	// GoogleCloudSecretManager is the Google Cloud Secret Manager grammar: integer
 	// versions ("latest" is the zero spec) and no staging labels, so a ':'
 	// specifier is rejected before any API call.
-	GoogleCloudSecretManager = NumericGrammar{LabelError: ErrGoogleCloudSecretManagerLabelUnsupported}
+	GoogleCloudSecretManager = NumericGrammar{labelError: ErrGoogleCloudSecretManagerLabelUnsupported}
 
 	// AzureKeyVault is the Azure Key Vault grammar: opaque 32-character hex version
 	// ids and no staging labels, so a ':' specifier is rejected before any API
 	// call.
 	AzureKeyVault = OpaqueGrammar{
-		IsIDChar:       isAzureKeyVaultIDChar,
-		InvalidIDError: ErrInvalidAzureKeyVaultID,
-		LabelError:     ErrAzureKeyVaultLabelUnsupported,
+		isIDChar:       isAzureKeyVaultIDChar,
+		invalidIDError: ErrInvalidAzureKeyVaultID,
+		labelError:     ErrAzureKeyVaultLabelUnsupported,
 	}
 
 	// AzureAppConfiguration is the Azure App Configuration grammar. The service is

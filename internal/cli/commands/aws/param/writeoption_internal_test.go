@@ -30,17 +30,17 @@ func TestBuildWriteOptions(t *testing.T) {
 	t.Run("empty values yield no options", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Empty(t, buildWriteOptions(WriteOptionFlags{}))
+		assert.Empty(t, buildWriteOptions(writeOptionFlags{}))
 	})
 
 	t.Run("set values map to typed options", func(t *testing.T) {
 		t.Parallel()
 
-		opts := buildWriteOptions(WriteOptionFlags{
-			Tier:           "Advanced",
-			DataType:       "text",
-			AllowedPattern: "^a",
-			Policies:       "[]",
+		opts := buildWriteOptions(writeOptionFlags{
+			tier:           "Advanced",
+			dataType:       "text",
+			allowedPattern: "^a",
+			policies:       "[]",
 		})
 
 		require.Len(t, opts, 4)

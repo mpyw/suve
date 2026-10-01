@@ -22,10 +22,10 @@ import (
 	"strings"
 )
 
-// NullLabelFilter is the reserved App Configuration label filter that matches
+// nullLabelFilter is the reserved App Configuration label filter that matches
 // ONLY settings with no label — the null (default) namespace. The service
 // encodes it as label=%00 (#352).
-const NullLabelFilter = "\x00"
+const nullLabelFilter = "\x00"
 
 // AllFilter is the App Configuration label filter that matches every
 // namespace (the degenerate `*` wildcard). Cross-namespace enumeration (see
@@ -45,7 +45,7 @@ const NullDisplay = "(NULL)"
 // native filter grammar (`*` wildcard, `,` OR-list, `\` escape) applies (#381).
 func Filter(raw string) string {
 	if raw == "" {
-		return NullLabelFilter
+		return nullLabelFilter
 	}
 
 	return raw

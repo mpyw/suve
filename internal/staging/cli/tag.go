@@ -11,38 +11,44 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// TagRunner executes tag staging operations using a usecase.
-type TagRunner struct {
-	UseCase *stagingusecase.TagUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// tagRunner executes tag staging operations using a usecase.
+//
+//declscope:package // command.go builds and runs it
+type tagRunner struct {
+	useCase *stagingusecase.TagUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// TagOptions holds options for the tag command.
-type TagOptions struct {
-	Name string
-	// Namespace is the App Configuration namespace of the resource (empty for the
+// tagOptions holds options for the tag command.
+//
+//declscope:package // command.go fills it from the flags
+type tagOptions struct {
+	name string
+	// namespace is the App Configuration namespace of the resource (empty for the
 	// null/default namespace and every other provider).
-	Namespace string
-	Tags      []string // key=value pairs to add
+	namespace string
+	tags      []string // key=value pairs to add
 }
 
-// Run executes the tag command.
-func (r *TagRunner) Run(ctx context.Context, opts TagOptions) error {
-	tags, err := parseTags(opts.Tags)
+// run executes the tag command.
+//
+//declscope:package // command.go runs it
+func (r *tagRunner) run(ctx context.Context, opts tagOptions) error {
+	tags, err := parseTags(opts.tags)
 	if err != nil {
 		return err
 	}
 
-	result, err := r.UseCase.Tag(ctx, stagingusecase.TagInput{
-		Key:  staging.EntryKey{Name: opts.Name, Namespace: opts.Namespace},
+	result, err := r.useCase.Tag(ctx, stagingusecase.TagInput{
+		Key:  staging.EntryKey{Name: opts.name, Namespace: opts.namespace},
 		Tags: tags,
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Staged tags for: %s", result.Name)
+	output.Success(r.stdout, "Staged tags for: %s", result.Name)
 
 	return nil
 }

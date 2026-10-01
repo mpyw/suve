@@ -33,7 +33,7 @@ func newSplitStore(t *testing.T) *Store {
 
 	t.Cleanup(func() { userHomeDirFunc = orig })
 
-	s, err := NewStore(provider.AWSScope("123456789012", "ap-northeast-1"))
+	s, err := newStore(provider.AWSScope("123456789012", "ap-northeast-1"))
 	require.NoError(t, err)
 
 	s.key = newTestKey()
@@ -333,7 +333,7 @@ func TestNewWorkingStore_EncryptionCheckError(t *testing.T) {
 
 	scope := provider.AWSScope("123456789012", "ap-northeast-1")
 
-	probe, err := NewStore(scope)
+	probe, err := newStore(scope)
 	require.NoError(t, err)
 
 	// A directory where param.json belongs makes isFileEncrypted's ReadFile fail

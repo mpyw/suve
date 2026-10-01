@@ -15,7 +15,7 @@ import (
 	"github.com/mpyw/suve/internal/debug"
 )
 
-// setConfigTestEnv points the SDK at static test credentials so LoadConfig resolves
+// setConfigTestEnv points the SDK at static test credentials so loadConfig resolves
 // offline (LoadDefaultConfig makes no network calls, and Retrieve resolves from
 // the environment).
 func setConfigTestEnv(t *testing.T) {
@@ -31,14 +31,14 @@ func setConfigTestEnv(t *testing.T) {
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", os.DevNull)
 }
 
-// TestLoadConfig_debug exercises both branches of LoadConfig.
+// TestLoadConfig_debug exercises both branches of loadConfig.
 //
 //nolint:paralleltest // subtests use t.Setenv (via setConfigTestEnv), so they cannot run in parallel
 func TestLoadConfig_debug(t *testing.T) {
 	t.Run("without debug", func(t *testing.T) {
 		setConfigTestEnv(t)
 
-		cfg, err := LoadConfig(context.Background())
+		cfg, err := loadConfig(context.Background())
 		require.NoError(t, err)
 		// No client log mode is enabled unless debug is requested.
 		assert.Zero(t, cfg.ClientLogMode)
@@ -51,7 +51,7 @@ func TestLoadConfig_debug(t *testing.T) {
 
 		ctx := debug.With(context.Background(), debug.Config{Enabled: true, Writer: &buf})
 
-		cfg, err := LoadConfig(ctx)
+		cfg, err := loadConfig(ctx)
 		require.NoError(t, err)
 		assert.NotNil(t, cfg.Logger)
 		assert.NotZero(t, cfg.ClientLogMode)
@@ -71,7 +71,7 @@ func TestLoadConfig_debug(t *testing.T) {
 
 		ctx := debug.With(context.Background(), debug.Config{Enabled: true, Writer: &buf, NoRedaction: true})
 
-		cfg, err := LoadConfig(ctx)
+		cfg, err := loadConfig(ctx)
 		require.NoError(t, err)
 		// --no-redaction switches to the WithBody modes so payloads are logged.
 		assert.True(t, cfg.ClientLogMode.IsRequestWithBody())

@@ -210,23 +210,23 @@ func NewStatusCommand(cfg CommandConfig) *cli.Command {
 				return err
 			}
 
-			opts := StatusOptions{
-				Verbose: cmd.Bool("verbose"),
+			opts := statusOptions{
+				verbose: cmd.Bool("verbose"),
 			}
 			if cmd.Args().Len() > 0 {
-				opts.Name = cmd.Args().First()
+				opts.name = cmd.Args().First()
 			}
 
-			r := &StatusRunner{
-				UseCase: &stagingusecase.StatusUseCase{
+			r := &statusRunner{
+				useCase: &stagingusecase.StatusUseCase{
 					Strategy: cfg.ParserFactory(),
 					Store:    store,
 				},
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
+				stdout: cmd.Root().Writer,
+				stderr: cmd.Root().ErrWriter,
 			}
 
-			return r.Run(ctx, opts)
+			return r.run(ctx, opts)
 		},
 	}
 }
@@ -272,10 +272,10 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 				return err
 			}
 
-			opts := DiffOptions{
-				Name:      name,
-				ParseJSON: cmd.Bool("parse-json"),
-				NoPager:   cmd.Bool("no-pager"),
+			opts := diffOptions{
+				name:      name,
+				parseJSON: cmd.Bool("parse-json"),
+				noPager:   cmd.Bool("no-pager"),
 			}
 
 			strategy, err := cfg.Factory(ctx)
@@ -283,18 +283,18 @@ func NewDiffCommand(cfg CommandConfig) *cli.Command {
 				return err
 			}
 
-			return pager.WithPagerWriter(cmd.Root().Writer, opts.NoPager, func(w io.Writer) error {
-				r := &DiffRunner{
-					UseCase: &stagingusecase.DiffUseCase{
+			return pager.WithPagerWriter(cmd.Root().Writer, opts.noPager, func(w io.Writer) error {
+				r := &diffRunner{
+					useCase: &stagingusecase.DiffUseCase{
 						Strategy:    strategy,
 						Store:       store,
 						StrategyFor: diffStrategyFor(ctx, cfg.StrategyForNamespace),
 					},
-					Stdout: w,
-					Stderr: cmd.Root().ErrWriter,
+					stdout: w,
+					stderr: cmd.Root().ErrWriter,
 				}
 
-				return r.Run(ctx, opts)
+				return r.run(ctx, opts)
 			})
 		},
 	}
@@ -337,24 +337,24 @@ func NewAddCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("failed to initialize strategy: %w", err)
 			}
 
-			r := &AddRunner{
-				UseCase: &stagingusecase.AddUseCase{
+			r := &addRunner{
+				useCase: &stagingusecase.AddUseCase{
 					Strategy: strategy,
 					Store:    store,
 				},
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
-				Stdin:  valueinput.ValueStdin(cmd),
+				stdout: cmd.Root().Writer,
+				stderr: cmd.Root().ErrWriter,
+				stdin:  valueinput.ValueStdin(cmd),
 			}
 
-			return r.Run(ctx, AddOptions{
-				Name:           name,
-				Value:          value,
-				HasValue:       hasValue,
-				ValueFromStdin: cmd.Bool(valueinput.FlagValueStdin),
-				Description:    cfg.description(cmd),
-				Namespace:      cfg.namespaceFor(ctx),
-				ValueType:      valueType,
+			return r.run(ctx, addOptions{
+				name:           name,
+				value:          value,
+				hasValue:       hasValue,
+				valueFromStdin: cmd.Bool(valueinput.FlagValueStdin),
+				description:    cfg.description(cmd),
+				namespace:      cfg.namespaceFor(ctx),
+				valueType:      valueType,
 			})
 		},
 	}
@@ -397,25 +397,25 @@ func NewEditCommand(cfg CommandConfig) *cli.Command {
 				return err
 			}
 
-			r := &EditRunner{
-				UseCase: &stagingusecase.EditUseCase{
+			r := &editRunner{
+				useCase: &stagingusecase.EditUseCase{
 					Strategy: strategy,
 					Store:    store,
 				},
-				ProviderLabel: cfg.ProviderLabel,
-				Stdout:        cmd.Root().Writer,
-				Stderr:        cmd.Root().ErrWriter,
-				Stdin:         valueinput.ValueStdin(cmd),
+				providerLabel: cfg.ProviderLabel,
+				stdout:        cmd.Root().Writer,
+				stderr:        cmd.Root().ErrWriter,
+				stdin:         valueinput.ValueStdin(cmd),
 			}
 
-			return r.Run(ctx, EditOptions{
-				Name:           name,
-				Value:          value,
-				HasValue:       hasValue,
-				ValueFromStdin: cmd.Bool(valueinput.FlagValueStdin),
-				Description:    cfg.description(cmd),
-				Namespace:      cfg.namespaceFor(ctx),
-				ValueType:      valueType,
+			return r.run(ctx, editOptions{
+				name:           name,
+				value:          value,
+				hasValue:       hasValue,
+				valueFromStdin: cmd.Bool(valueinput.FlagValueStdin),
+				description:    cfg.description(cmd),
+				namespace:      cfg.namespaceFor(ctx),
+				valueType:      valueType,
 			})
 		},
 	}
@@ -445,11 +445,11 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 				return err
 			}
 
-			opts := ApplyOptions{
-				IgnoreConflicts: cmd.Bool("ignore-conflicts"),
+			opts := applyOptions{
+				ignoreConflicts: cmd.Bool("ignore-conflicts"),
 			}
 			if cmd.Args().Len() > 0 {
-				opts.Name = cmd.Args().First()
+				opts.name = cmd.Args().First()
 			}
 
 			strategy, err := cfg.Factory(ctx)
@@ -464,22 +464,22 @@ func NewApplyCommand(cfg CommandConfig) *cli.Command {
 				Target: resolved.Target.String(),
 			}
 
-			r := &ApplyRunner{
-				UseCase: &stagingusecase.ApplyUseCase{
+			r := &applyRunner{
+				useCase: &stagingusecase.ApplyUseCase{
 					Strategy:    strategy,
 					Store:       store,
 					StrategyFor: applyStrategyFor(ctx, cfg.StrategyForNamespace),
 				},
-				Store:         store,
-				Parser:        cfg.ParserFactory(),
-				ProviderLabel: cfg.ProviderLabel,
-				Confirmer:     prompter,
-				SkipConfirm:   cmd.Bool(flagYes),
-				Stdout:        cmd.Root().Writer,
-				Stderr:        cmd.Root().ErrWriter,
+				store:         store,
+				parser:        cfg.ParserFactory(),
+				providerLabel: cfg.ProviderLabel,
+				confirmer:     prompter,
+				skipConfirm:   cmd.Bool(flagYes),
+				stdout:        cmd.Root().Writer,
+				stderr:        cmd.Root().ErrWriter,
 			}
 
-			return r.RunInteractive(ctx, opts)
+			return r.runInteractive(ctx, opts)
 		},
 	}
 }
@@ -504,13 +504,13 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 				return fmt.Errorf("usage: %s reset <spec> or %s reset --all", cfg.CommandPath, cfg.CommandPath)
 			}
 
-			opts := ResetOptions{
-				All:       resetAll,
-				Namespace: cfg.namespaceFor(ctx),
+			opts := resetOptions{
+				all:       resetAll,
+				namespace: cfg.namespaceFor(ctx),
 			}
 
 			if !resetAll {
-				opts.Spec = cmd.Args().First()
+				opts.spec = cmd.Args().First()
 			}
 
 			parser := cfg.ParserFactory()
@@ -519,10 +519,10 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 			// to restore the value from the remote store.
 			var hasVersion bool
 
-			if !resetAll && opts.Spec != "" {
+			if !resetAll && opts.spec != "" {
 				var err error
 
-				_, hasVersion, err = parser.ParseSpec(opts.Spec)
+				_, hasVersion, err = parser.ParseSpec(opts.spec)
 				if err != nil {
 					return err
 				}
@@ -544,17 +544,17 @@ func NewResetCommand(cfg CommandConfig) *cli.Command {
 				fetcher = strategy
 			}
 
-			r := &ResetRunner{
-				UseCase: &stagingusecase.ResetUseCase{
+			r := &resetRunner{
+				useCase: &stagingusecase.ResetUseCase{
 					Parser:  parser,
 					Fetcher: fetcher,
 					Store:   store,
 				},
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
+				stdout: cmd.Root().Writer,
+				stderr: cmd.Root().ErrWriter,
 			}
 
-			return r.Run(ctx, opts)
+			return r.run(ctx, opts)
 		},
 	}
 }
@@ -606,20 +606,20 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 			force := cmd.Bool("force")
 			recoveryWindow := cmd.Int("recovery-window")
 
-			r := &DeleteRunner{
-				UseCase: &stagingusecase.DeleteUseCase{
+			r := &deleteRunner{
+				useCase: &stagingusecase.DeleteUseCase{
 					Strategy: strategy,
 					Store:    store,
 				},
-				Stdout: cmd.Root().Writer,
-				Stderr: cmd.Root().ErrWriter,
+				stdout: cmd.Root().Writer,
+				stderr: cmd.Root().ErrWriter,
 			}
 
-			return r.Run(ctx, DeleteOptions{
-				Name:           name,
-				Force:          force,
-				RecoveryWindow: recoveryWindow,
-				Namespace:      cfg.namespaceFor(ctx),
+			return r.run(ctx, deleteOptions{
+				name:           name,
+				force:          force,
+				recoveryWindow: recoveryWindow,
+				namespace:      cfg.namespaceFor(ctx),
 			})
 		},
 	}
@@ -672,13 +672,13 @@ func NewTagCommand(cfg CommandConfig) *cli.Command {
 		name string,
 		tags []string,
 	) error {
-		r := &TagRunner{
-			UseCase: useCase,
-			Stdout:  stdout,
-			Stderr:  stderr,
+		r := &tagRunner{
+			useCase: useCase,
+			stdout:  stdout,
+			stderr:  stderr,
 		}
 
-		return r.Run(ctx, TagOptions{Name: name, Namespace: cfg.namespaceFor(ctx), Tags: tags})
+		return r.run(ctx, tagOptions{name: name, namespace: cfg.namespaceFor(ctx), tags: tags})
 	}
 
 	return &cli.Command{
@@ -699,13 +699,13 @@ func NewUntagCommand(cfg CommandConfig) *cli.Command {
 		name string,
 		keys []string,
 	) error {
-		r := &UntagRunner{
-			UseCase: useCase,
-			Stdout:  stdout,
-			Stderr:  stderr,
+		r := &untagRunner{
+			useCase: useCase,
+			stdout:  stdout,
+			stderr:  stderr,
 		}
 
-		return r.Run(ctx, UntagOptions{Name: name, Namespace: cfg.namespaceFor(ctx), Keys: keys})
+		return r.run(ctx, untagOptions{name: name, namespace: cfg.namespaceFor(ctx), keys: keys})
 	}
 
 	return &cli.Command{

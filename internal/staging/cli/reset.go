@@ -8,28 +8,34 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// ResetRunner executes reset operations using a usecase.
-type ResetRunner struct {
-	UseCase *stagingusecase.ResetUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// resetRunner executes reset operations using a usecase.
+//
+//declscope:package // command.go builds and runs it
+type resetRunner struct {
+	useCase *stagingusecase.ResetUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// ResetOptions holds options for the reset command.
-type ResetOptions struct {
-	Spec string // Name with optional version spec
-	All  bool   // Reset all staged items for this service
-	// Namespace is the App Configuration namespace of the entry to reset (empty
+// resetOptions holds options for the reset command.
+//
+//declscope:package // command.go fills it from the flags
+type resetOptions struct {
+	spec string // Name with optional version spec
+	all  bool   // Reset all staged items for this service
+	// namespace is the App Configuration namespace of the entry to reset (empty
 	// for the null/default namespace and every other provider; ignored with All).
-	Namespace string
+	namespace string
 }
 
-// Run executes the reset command.
-func (r *ResetRunner) Run(ctx context.Context, opts ResetOptions) error {
-	result, err := r.UseCase.Execute(ctx, stagingusecase.ResetInput{
-		Spec:      opts.Spec,
-		All:       opts.All,
-		Namespace: opts.Namespace,
+// run executes the reset command.
+//
+//declscope:package // command.go runs it
+func (r *resetRunner) run(ctx context.Context, opts resetOptions) error {
+	result, err := r.useCase.Execute(ctx, stagingusecase.ResetInput{
+		Spec:      opts.spec,
+		All:       opts.all,
+		Namespace: opts.namespace,
 	})
 	if err != nil {
 		return err
@@ -37,19 +43,19 @@ func (r *ResetRunner) Run(ctx context.Context, opts ResetOptions) error {
 
 	switch result.Type {
 	case stagingusecase.ResetResultNothingStaged:
-		output.Info(r.Stdout, "No %s changes staged.", result.ServiceName)
+		output.Info(r.stdout, "No %s changes staged.", result.ServiceName)
 	case stagingusecase.ResetResultUnstagedAll:
-		output.Success(r.Stdout, "Unstaged all %s %ss (%d)", result.ServiceName, result.ItemName, result.Count)
+		output.Success(r.stdout, "Unstaged all %s %ss (%d)", result.ServiceName, result.ItemName, result.Count)
 	case stagingusecase.ResetResultNotStaged:
-		output.Warn(r.Stdout, "%s is not staged", result.Name)
+		output.Warn(r.stdout, "%s is not staged", result.Name)
 	case stagingusecase.ResetResultUnstaged:
-		output.Success(r.Stdout, "Unstaged %s", result.Name)
+		output.Success(r.stdout, "Unstaged %s", result.Name)
 	case stagingusecase.ResetResultUnstagedTag:
-		output.Success(r.Stdout, "Unstaged tag changes for %s", result.Name)
+		output.Success(r.stdout, "Unstaged tag changes for %s", result.Name)
 	case stagingusecase.ResetResultRestored:
-		output.Success(r.Stdout, "Restored %s (staged from version %s)", result.Name, result.VersionLabel)
+		output.Success(r.stdout, "Restored %s (staged from version %s)", result.Name, result.VersionLabel)
 	case stagingusecase.ResetResultSkipped:
-		output.Warn(r.Stdout, "Skipped %s (version %s matches current value)", result.Name, result.VersionLabel)
+		output.Warn(r.stdout, "Skipped %s (version %s matches current value)", result.Name, result.VersionLabel)
 	}
 
 	return nil

@@ -14,18 +14,18 @@ import (
 	"github.com/mpyw/suve/internal/usecase/secret"
 )
 
-// UpdateRunner executes the update command.
-type UpdateRunner struct {
-	UseCase *secret.UpdateUseCase
-	Stdout  io.Writer
-	Stderr  io.Writer
+// updateRunner executes the update command.
+type updateRunner struct {
+	useCase *secret.UpdateUseCase
+	stdout  io.Writer
+	stderr  io.Writer
 }
 
-// UpdateOptions holds the options for the update command.
-type UpdateOptions struct {
-	Name        string
-	Value       string
-	Description string
+// updateOptions holds the options for the update command.
+type updateOptions struct {
+	name        string
+	value       string
+	description string
 }
 
 // UpdateCommand returns the update command.
@@ -130,31 +130,31 @@ func updateAction(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	r := &UpdateRunner{
-		UseCase: uc,
-		Stdout:  cmd.Root().Writer,
-		Stderr:  cmd.Root().ErrWriter,
+	r := &updateRunner{
+		useCase: uc,
+		stdout:  cmd.Root().Writer,
+		stderr:  cmd.Root().ErrWriter,
 	}
 
-	return r.Run(ctx, UpdateOptions{
-		Name:        name,
-		Value:       newValue,
-		Description: cmd.String("description"),
+	return r.run(ctx, updateOptions{
+		name:        name,
+		value:       newValue,
+		description: cmd.String("description"),
 	})
 }
 
-// Run executes the update command.
-func (r *UpdateRunner) Run(ctx context.Context, opts UpdateOptions) error {
-	result, err := r.UseCase.Execute(ctx, secret.UpdateInput{
-		Name:        opts.Name,
-		Value:       opts.Value,
-		Description: opts.Description,
+// run executes the update command.
+func (r *updateRunner) run(ctx context.Context, opts updateOptions) error {
+	result, err := r.useCase.Execute(ctx, secret.UpdateInput{
+		Name:        opts.name,
+		Value:       opts.value,
+		Description: opts.description,
 	})
 	if err != nil {
 		return err
 	}
 
-	output.Success(r.Stdout, "Updated secret %s (version: %s)", result.Name, result.Version)
+	output.Success(r.stdout, "Updated secret %s (version: %s)", result.Name, result.Version)
 
 	return nil
 }
