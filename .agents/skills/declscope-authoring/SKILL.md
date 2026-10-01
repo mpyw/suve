@@ -3,14 +3,14 @@ name: declscope-authoring
 description: "Write or change Go code in a repository that runs declscope, which shows as a .declscope.y*ml or baseline file, //declscope: comments, or declscope in CI. Read this before adding, naming or moving a declaration, a helper that several files use, or a test. Read it too before splitting a file, writing a //declscope: directive, or acting on a declscope diagnostic. Covers where code belongs, naming it accurately, and fixes that hide a problem."
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.16.0
-x-embedded-at: "2026-09-30T20:14:37Z"
-x-embedded-digest: "sha256:3331d4ddbf6018dbeeb6dd46240caddefe7ad562258eae2cbc8212191cc6ee92"
+x-embedded-version: 0.17.0
+x-embedded-at: "2026-10-01T00:59:55Z"
+x-embedded-digest: "sha256:cd99dd2a1478d591535b3870236c77d65089f83310a0d59da5f21bed56a12f5a"
 ---
 
 # Writing code under declscope
 
-Written against **declscope 0.16.0**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.17.0**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
 
 This skill is for everyday work in a repository that already runs declscope. Introducing it, choosing its configuration, and clearing a baseline are in [declscope-adoption](../declscope-adoption/SKILL.md), installed beside this one. What each directive and config key means is in [the README](https://github.com/mpyw/declscope#readme).
 
@@ -223,6 +223,7 @@ Keep that type and its fields private. Expose small package-scoped functions tha
 | `... uses it` and nothing more | The fix is offered. Apply it with `declscope shrink -fix <that package>` |
 | `... (no fix: <reason>)` | A use may exist that `shrink` cannot prove, or the rename is unsafe. **Do not unexport it by hand.** Read the reason first |
 | `... only the external tests of <pkg> use it` | Keep it exported. Add `//declscope:ignore overexported // <why>` when the tests use it on purpose |
+| `... (no fix: a build-excluded file of another package may use it)`, where that file uses it under another build tag | Keep it exported. Add `//declscope:ignore overexported // <file, behind which tag>`. One ignore passes every configuration |
 | `declscope shrink: not judged: <pkg>: <reason>` on stderr | That package was not checked. It is not clean |
 | `declscope shrink: warning: "<pattern>" matched no packages` on stderr | The pattern checked nothing. Fix the pattern, as you would for `go vet` |
 | `declscope shrink: not judged: <n> package(s) outside the main module` on stderr | The patterns named packages `shrink` never judges, such as `std`. Nothing to do |

@@ -56,8 +56,12 @@ type ImportOutput struct {
 	// working state.
 	Merged bool
 	// EntryCount is the number of entries in the final working state.
+	//
+	//declscope:ignore overexported // internal/gui/staging_transfer.go reads it behind production || dev
 	EntryCount int
 	// TagCount is the number of tag entries in the final working state.
+	//
+	//declscope:ignore overexported // internal/gui/staging_transfer.go reads it behind production || dev
 	TagCount int
 	// Warnings holds non-fatal diagnostics produced during import, e.g. an item
 	// left unanchored because its LastModified could not be fetched from the
