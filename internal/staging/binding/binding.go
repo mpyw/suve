@@ -51,7 +51,6 @@ type Binding struct {
 	// and the default-build dead-code gate cannot see that caller.
 	//
 	//declscope:ignore overexported // internal/gui/spec.go calls it behind production || dev
-	//declscope:ignore unused // the GUI build passes Binding to an interface, which 0.17.0 counts in every configuration
 	SplitSpec func(input string) (name, suffix string, err error)
 
 	parser   staging.ParserFactory

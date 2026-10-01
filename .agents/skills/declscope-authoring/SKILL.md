@@ -3,14 +3,14 @@ name: declscope-authoring
 description: "Write or change Go code in a repository that runs declscope, which shows as a .declscope.y*ml or baseline file, //declscope: comments, or declscope in CI. Read this before adding, naming or moving a declaration, a helper that several files use, or a test. Read it too before splitting a file, writing a //declscope: directive, or acting on a declscope diagnostic. Covers where code belongs, naming it accurately, and fixes that hide a problem."
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.17.0
-x-embedded-at: "2026-10-01T00:59:55Z"
-x-embedded-digest: "sha256:cd99dd2a1478d591535b3870236c77d65089f83310a0d59da5f21bed56a12f5a"
+x-embedded-version: 0.17.1
+x-embedded-at: "2026-10-01T02:00:24Z"
+x-embedded-digest: "sha256:c91faedd556950c275897002c022ccf0a7a8e54c0923580d79a8c506f13150af"
 ---
 
 # Writing code under declscope
 
-Written against **declscope 0.17.0**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.17.1**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
 
 This skill is for everyday work in a repository that already runs declscope. Introducing it, choosing its configuration, and clearing a baseline are in [declscope-adoption](../declscope-adoption/SKILL.md), installed beside this one. What each directive and config key means is in [the README](https://github.com/mpyw/declscope#readme).
 
