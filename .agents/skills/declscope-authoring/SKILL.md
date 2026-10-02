@@ -3,14 +3,14 @@ name: declscope-authoring
 description: "Write or change Go code in a repository that runs declscope, which shows as a .declscope.y*ml or baseline file, //declscope: comments, or declscope in CI. Read this before adding, naming or moving a declaration, a helper that several files use, or a test. Read it too before splitting a file, writing a //declscope: directive, or acting on a declscope diagnostic. Covers where code belongs, naming it accurately, and fixes that hide a problem."
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.17.2
-x-embedded-at: "2026-10-02T01:21:24Z"
-x-embedded-digest: "sha256:68acd52510b43fda022b6eb976c99715b19a3e075d72dd32308e233d1fac6344"
+x-embedded-version: 0.18.0
+x-embedded-at: "2026-10-02T08:32:33Z"
+x-embedded-digest: "sha256:be7a78454a35ca0730a6660b682ae60e6598696804afedc1e9da0192fd63460c"
 ---
 
 # Writing code under declscope
 
-Written against **declscope 0.17.2**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.18.0**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
 
 This skill is for everyday work in a repository that already runs declscope. Introducing it, choosing its configuration, and clearing a baseline are in [declscope-adoption](../declscope-adoption/SKILL.md), installed beside this one. What each directive and config key means is in [the README](https://github.com/mpyw/declscope#readme).
 
@@ -260,6 +260,8 @@ Keep that type and its fields private. Expose small package-scoped functions tha
 - under an `internal/` that a nested module's path extends, when that module fails to load or reads this one from elsewhere, such as a published version.
 
 The exit status ignores those packages.
+
+**The values of an enum are judged as one set.** A `const` block of 2 or more constants, all of one exported type of the package, is a set. While the type is not reported, or another package uses any of its values, no value is reported. Otherwise every value is reported with the type, and is fixed only where all of them are. A constant of the type outside such a block, such as a lone default, is judged on its own. To keep it with the set, put it in the block. A report on a block that mixes in another constant says to split the block. Do not add an ignore per value.
 
 A bare `//declscope:ignore` does not reach `overexported`. Name the rule. Names written as strings, such as a template field or `reflect.Value.MethodByName`, are outside what `shrink` can see. When no interface carries the value there, add the ignore with the reason.
 
