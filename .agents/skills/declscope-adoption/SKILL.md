@@ -3,14 +3,14 @@ name: declscope-adoption
 description: Adopt declscope on an existing Go codebase and drive its diagnostics to zero. Read this when introducing declscope to a repository, when choosing its configuration, when running declscope shrink for the first time, or when clearing a declscope baseline. Covers sizing each rule before enabling it, reading the diagnostics as structure, the remedy for each shape, and the measurement traps that produce false confidence. For writing new code in a repository that already runs declscope, use declscope-authoring.
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.17.1
-x-embedded-at: "2026-10-01T02:00:24Z"
-x-embedded-digest: "sha256:14781decfa4294942dc712b659bcfa0954f1bdf9e36a9f9734c37278d0be92a2"
+x-embedded-version: 0.17.2
+x-embedded-at: "2026-10-02T01:21:24Z"
+x-embedded-digest: "sha256:92c84a4cbb055840f839c9b3e85344f19c9fc9b0bb6aeaa763b7a918c4444983"
 ---
 
 # Adopting declscope
 
-Written against **declscope 0.17.1**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.17.2**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
 
 **Read [the README](https://github.com/mpyw/declscope#readme) before the first decision.** This skill covers what to do about the diagnostics. What each directive means, and what the config accepts, is there.
 
@@ -95,6 +95,8 @@ for q in never ondemand always; do
   printf '%-9s %s\n' "$q" "$(declscope survey -config /tmp/q.yaml -format=json ./... | jq .totals.qualify.found)"
 done
 ```
+
+Some reports will be names that spell the namespace in another form, such as `traceValue` in `tracing.go`. The message names a `rules.naming.vocabulary` key for those. Propose the entries in the same question as the naming rule, and do not count them as renames. When to list a word and when to move code instead is in [When the name spells the namespace in another form](../declscope-authoring/SKILL.md#when-the-name-spells-the-namespace-in-another-form).
 
 Every count in the rest of this skill assumes `qualify: ondemand` with `exported: true`. That is what the numbers were taken under, not a recommendation.
 

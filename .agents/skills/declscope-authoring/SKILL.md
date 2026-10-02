@@ -3,14 +3,14 @@ name: declscope-authoring
 description: "Write or change Go code in a repository that runs declscope, which shows as a .declscope.y*ml or baseline file, //declscope: comments, or declscope in CI. Read this before adding, naming or moving a declaration, a helper that several files use, or a test. Read it too before splitting a file, writing a //declscope: directive, or acting on a declscope diagnostic. Covers where code belongs, naming it accurately, and fixes that hide a problem."
 license: MIT
 x-embedded-by: declscope
-x-embedded-version: 0.17.1
-x-embedded-at: "2026-10-01T02:00:24Z"
-x-embedded-digest: "sha256:c91faedd556950c275897002c022ccf0a7a8e54c0923580d79a8c506f13150af"
+x-embedded-version: 0.17.2
+x-embedded-at: "2026-10-02T01:21:24Z"
+x-embedded-digest: "sha256:68acd52510b43fda022b6eb976c99715b19a3e075d72dd32308e233d1fac6344"
 ---
 
 # Writing code under declscope
 
-Written against **declscope 0.17.1**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
+Written against **declscope 0.17.2**. Check the version first with `declscope -V=full`: this describes how that release behaves, not how an older one does.
 
 This skill is for everyday work in a repository that already runs declscope. Introducing it, choosing its configuration, and clearing a baseline are in [declscope-adoption](../declscope-adoption/SKILL.md), installed beside this one. What each directive and config key means is in [the README](https://github.com/mpyw/declscope#readme).
 
@@ -122,16 +122,41 @@ The namespace does not follow the subject's `//declscope:namespace`. If `user_ex
 
 **Uses only in `_test.go` files mean the test is misplaced.** Move the test. Never widen production code for a test, and never let `-fix` insert `//declscope:package` for one.
 
-### Inflected file names
+### When the name spells the namespace in another form
 
-When the file name is an inflected form, the stem is not derived from it. Inflections are generated only in the lengthening direction ([#64](https://github.com/mpyw/declscope/issues/64)), so `tracing.go` is not carried by `trace*`. A vocabulary entry covers it. It is a config change, so ask first:
+Only the namespace's own spelling and two generated forms carry it: a final `e` dropped before `ing` (`store` → `storing`) and `y` turned to `i` (`apply` → `applies`, `applied`). Generation only makes the namespace longer. Nothing else is guessed:
+
+| File | Name | Carried | Why |
+| --- | --- | --- | --- |
+| `store.go` | `storingKeys` | Yes | A generated form |
+| `tracing.go` | `traceValue`, `tracerType` | No | The stem of an inflected file name is not derived |
+| `walking.go` | `walkSpeed` | No | Same |
+| `index.go` | `indicesSorted` | No | An irregular form |
+
+**Prefer the base form of a word for a new file name.** It is a recommendation, not a requirement. `trace.go` is carried by `traceValue`, `tracerType` and `tracingStart`. `tracing.go` is carried only by the last. Generated forms and the free right edge both run from the namespace to longer words, so the base form reaches every form the inflected file name reaches, and more. The same holds for `entry.go` over `entries.go`, `walk.go` over `walking.go`, and `user.go` over `users.go`. An inflected file name is allowed. It only fits declscope worse, so choose it when it reads clearly better.
+
+For an existing file, renaming it to the base form keeps every name that carried the old namespace. It still changes the namespace, so it is not free: rename its test files too, and update any `//declscope:namespace` that names it, baseline entries keyed by it, and each `// reason` that names the file. Do not rename an existing file only for this. Mention the rename as an option. When it is too wide, or the owner prefers the current name, a vocabulary entry is the smaller change.
+
+`rules.naming.vocabulary` lists extra words that carry a namespace. A listed word goes through the same test as the namespace, so `trace` also covers `tracer`. When the namespace looks inflected, the diagnostic names the key: `list that form under rules.naming.vocabulary.tracing`.
 
 ```yaml
 rules:
   naming:
     vocabulary:
       tracing: [trace]
+      index: [indices]
 ```
+
+Use it for a word that names what the namespace names: another form of it, or the domain's word for part of it (`mouse: [wheel]`). For those, the rename the message offers would stutter (`tracingTraceValue`).
+
+| The name | Do this |
+| --- | --- |
+| Spells the base form of an inflected file name | Propose a vocabulary entry, and mention renaming the file to the base form as an option |
+| Spells the namespace in another form the base form cannot reach (`indices`), or the domain's word for part of it | Propose a vocabulary entry |
+| Spells a different word, which describes the thing better | The file may be named wrong, or the declaration may be in the wrong file. See [An ill-fitting prefix](#an-ill-fitting-prefix-means-the-declaration-is-in-the-wrong-file) |
+| Would need a long list of words | Split the file. A long list means the file declares things it is not about |
+
+A vocabulary entry is a config change, so ask first. List the word the name actually spells. Do not list a stem you guessed: `trac` would also carry `track`.
 
 ## Directives
 
