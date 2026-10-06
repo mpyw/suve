@@ -35,7 +35,7 @@ func launchGUI(ctx context.Context, initial provider.Scope, service string) (con
 // registerGUIFlag registers --gui through commands.RegisterLaunchMode, the
 // registration `suve --tui` shares.
 //
-//declscope:package // called from main.go
+//declscope:shared // called from main.go
 func registerGUIFlag() {
 	commands.RegisterLaunchMode(commands.LaunchMode{
 		Flag:       guiFlagName,
@@ -54,7 +54,7 @@ func registerGUIFlag() {
 
 // registerGUIDescription marks the root usage as CLI/GUI.
 //
-//declscope:package // called from main.go
+//declscope:shared // called from main.go
 func registerGUIDescription() {
 	commands.App.Usage = strings.Replace(commands.App.Usage, "CLI", "CLI/GUI", 1)
 }

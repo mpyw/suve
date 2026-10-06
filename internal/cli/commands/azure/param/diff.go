@@ -83,7 +83,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // diffCommand returns the Azure App Configuration diff command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func diffCommand() *cli.Command {
 	return generic.DiffCommand(generic.DiffConfig[*version.BareSpec]{
 		Usage:     "Show diff between two settings",

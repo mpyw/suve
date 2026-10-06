@@ -21,7 +21,7 @@ type confirmResult int
 
 // The delete/entry/tag dialogs switch on these results, so they are shared.
 //
-//declscope:package
+//declscope:shared
 const (
 	// confirmNone: the key changed the selection or was ignored — stay open.
 	confirmNone confirmResult = iota
@@ -38,7 +38,7 @@ const (
 // Update while it is open, and renders View in place of its form/controls (the app
 // shell frames and centers it, so it reads as a compact popup).
 //
-//declscope:package
+//declscope:shared
 type modeConfirm struct {
 	staged bool
 	//declscope:private
@@ -48,7 +48,7 @@ type modeConfirm struct {
 // newModeConfirm builds the popup seeded with the dialog's title and current mode
 // (staged by default when the service supports staging).
 //
-//declscope:package
+//declscope:shared
 func newModeConfirm(title string, staged bool) modeConfirm {
 	return modeConfirm{title: title, staged: staged}
 }

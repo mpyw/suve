@@ -85,7 +85,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // diffCommand returns the Azure Key Vault diff command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func diffCommand() *cli.Command {
 	return generic.DiffCommand(generic.DiffConfig[*version.OpaqueSpec]{
 		Usage:     "Show diff between two versions",

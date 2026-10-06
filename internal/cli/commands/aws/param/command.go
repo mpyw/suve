@@ -37,7 +37,7 @@ func Command() *cli.Command {
 // itemNoun names one Parameter Store item ("parameter") in the shared use
 // cases' error messages, from the capability matrix.
 //
-//declscope:package // create, update and delete pass it to their use cases
+//declscope:shared // create, update and delete pass it to their use cases
 func itemNoun() string {
 	sc, _ := capability.Service(provider.ProviderAWS, string(provider.KindParam))
 

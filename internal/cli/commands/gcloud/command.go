@@ -69,7 +69,7 @@ func FlatSecretCommand(name string) *cli.Command {
 // projectFlags returns the shared --project flag (a fresh slice per call so
 // each command owns its flag instance).
 //
-//declscope:package // stage.go builds the --project flag with it too
+//declscope:shared // stage.go builds the --project flag with it too
 func projectFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -82,7 +82,7 @@ func projectFlags() []cli.Flag {
 // resolveProject stashes the resolved project id (from --project or
 // GOOGLE_CLOUD_PROJECT) into the context for the subcommands.
 //
-//declscope:package // stage.go uses it as the Before hook that resolves the project
+//declscope:shared // stage.go uses it as the Before hook that resolves the project
 func resolveProject(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 	project := cmd.String("project")
 	if project == "" {

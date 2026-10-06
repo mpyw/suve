@@ -244,7 +244,7 @@ func (r *listRunner) runNamespaced(ctx context.Context, opts listOptions) error 
 // until `--namespace "*"` (or a specific/OR filter) widens it. `--hide-namespace`
 // drops the column and falls back to the neutral key-only listing.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func listCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "list",

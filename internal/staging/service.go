@@ -24,7 +24,7 @@ const (
 // strategies (AWS Secrets Manager, Google Cloud Secret Manager, Azure Key
 // Vault). Centralizing it avoids repeating the literal across strategies.
 //
-//declscope:package // shared by design across the per-provider secret strategy files
+//declscope:shared // shared by design across the per-provider secret strategy files
 const secretServiceItemName = "secret"
 
 // ServiceStrategy defines the common interface for service-specific operations.

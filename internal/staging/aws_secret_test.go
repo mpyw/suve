@@ -18,7 +18,7 @@ import (
 	"github.com/mpyw/suve/internal/staging"
 )
 
-//declscope:package // shared "not found" error builder used by the azure app config param tests too
+//declscope:shared // shared "not found" error builder used by the azure app config param tests too
 func secretNotFound(name string) error {
 	return fmt.Errorf("%w: %s", provider.ErrNotFound, name)
 }

@@ -1,5 +1,5 @@
 //declscope:core
-//declscope:package
+//declscope:shared
 //
 // This file is, by design, the package's shared render vocabulary: every
 // declaration is a small helper consumed by several widgets. It joins the core

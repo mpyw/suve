@@ -10,7 +10,7 @@ import (
 
 // resetRunner executes reset operations using a usecase.
 //
-//declscope:package // command.go builds and runs it
+//declscope:shared // command.go builds and runs it
 type resetRunner struct {
 	useCase *stagingusecase.ResetUseCase
 	stdout  io.Writer
@@ -19,7 +19,7 @@ type resetRunner struct {
 
 // resetOptions holds options for the reset command.
 //
-//declscope:package // command.go fills it from the flags
+//declscope:shared // command.go fills it from the flags
 type resetOptions struct {
 	spec string // Name with optional version spec
 	all  bool   // Reset all staged items for this service
@@ -30,7 +30,7 @@ type resetOptions struct {
 
 // run executes the reset command.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *resetRunner) run(ctx context.Context, opts resetOptions) error {
 	result, err := r.useCase.Execute(ctx, stagingusecase.ResetInput{
 		Spec:      opts.spec,

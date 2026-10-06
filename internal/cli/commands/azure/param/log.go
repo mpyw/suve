@@ -55,7 +55,7 @@ func (p *logPresenter) RenderPatch(_, _ io.Writer, _ int, _, _ bool) {}
 // Configuration is unversioned, running it produces a clear error (it never
 // crashes).
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func logCommand() *cli.Command {
 	return generic.LogCommand(generic.LogConfig{
 		Usage:     "Show setting version history (unsupported)",

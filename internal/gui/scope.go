@@ -26,7 +26,7 @@ var errScopeIncomplete = stringError("scope is incomplete")
 // flag-supplied value wins, an unset one falls back to env. An unknown provider
 // fails with errInvalidProvider.
 //
-//declscope:package // NewApp hydrates the launch scope with it
+//declscope:shared // NewApp hydrates the launch scope with it
 func hydrateScope(s provider.Scope) (provider.Scope, error) {
 	hydrated, err := detect.HydrateScope(detect.OSEnvironment(), s)
 	if err != nil {
@@ -142,7 +142,7 @@ func scopeFromSelection(sel ScopeSelection) (provider.Scope, error) {
 
 // currentScope returns the active read/write scope.
 //
-//declscope:package // shared with the capability, param, secret, spec and staging namespaces
+//declscope:shared // shared with the capability, param, secret, spec and staging namespaces
 func (a *App) currentScope() provider.Scope {
 	a.scopeMu.RLock()
 	defer a.scopeMu.RUnlock()
@@ -195,7 +195,7 @@ func selectionFromScope(s provider.Scope) *ScopeSelection {
 // the STS caller identity (account/region), and Google Cloud by the project. An
 // unknown (or unselected) provider is errInvalidProvider.
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) stagingScopeForKind(kind provider.Kind) (provider.Scope, error) {
 	return a.stagingScopeForKindScoped(a.currentScope(), kind)
 }
@@ -205,7 +205,7 @@ func (a *App) stagingScopeForKind(kind provider.Kind) (provider.Scope, error) {
 // strategy against the SAME scope even if SelectScope lands between the two
 // resolutions (#560).
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) stagingScopeForKindScoped(sc provider.Scope, kind provider.Kind) (provider.Scope, error) {
 	resolved, err := binding.StagingScope(a.ctx, sc, kind, nil)
 	if errors.Is(err, binding.ErrUnknownProvider) {

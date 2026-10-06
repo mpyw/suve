@@ -28,19 +28,19 @@ import (
 // so the GUI can browse any backend once a scope is selected.
 //
 //nolint:gochecknoglobals // process-wide provider registry, built once
-//declscope:package // shared with the param, secret and staging namespaces
+//declscope:shared // shared with the param, secret and staging namespaces
 var registry = builtin.NewRegistry()
 
 // errInvalidProvider is returned when SelectScope is given an unknown provider.
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 var errInvalidProvider = stringError("invalid provider: must be 'aws', 'googlecloud', or 'azure'")
 
 // App struct holds application state and dependencies.
 //
 //nolint:containedctx // Wails apps require storing context from Startup
 type App struct {
-	//declscope:package // shared with the param, secret and staging namespaces
+	//declscope:shared // shared with the param, secret and staging namespaces
 	ctx context.Context
 
 	// initialProvider is the provider the GUI was launched with (from
@@ -48,7 +48,7 @@ type App struct {
 	// `suve --gui`). Empty means no explicit choice. Surfaced to the frontend
 	// via InitialProvider for the initial selection.
 	//
-	//declscope:package // shared with the detect namespace
+	//declscope:shared // shared with the detect namespace
 	initialProvider provider.Provider
 
 	// initialService is the service the GUI was launched with ("param" or
@@ -62,18 +62,18 @@ type App struct {
 	// frontend via SelectScope. It is the zero Scope (no provider) until a
 	// provider is chosen. Guarded by scopeMu.
 	//
-	//declscope:package // shared with the param, secret and staging namespaces
+	//declscope:shared // shared with the param, secret and staging namespaces
 	scope provider.Scope
 	// scopeMu guards scope.
 	//
-	//declscope:package // SelectScope and currentScope in scope.go take it
+	//declscope:shared // SelectScope and currentScope in scope.go take it
 	scopeMu sync.RWMutex
 
 	// stagingStore, when non-nil, is returned by getStagingStore verbatim,
 	// bypassing scope resolution. It is a test seam (tests inject an in-memory
 	// store); production leaves it nil and uses stagingStores.
 	//
-	//declscope:package // shared with the staging namespace
+	//declscope:shared // shared with the staging namespace
 	stagingStore store.ReadWriteOperator
 
 	// stagingStores holds the working staging areas (backed by
@@ -92,7 +92,7 @@ type App struct {
 // unknown provider is an error. service is the launch service
 // ("param"/"secret", or "" for none) surfaced via InitialService.
 //
-//declscope:package // run.go builds the app with it
+//declscope:shared // run.go builds the app with it
 func newApp(initial provider.Scope, service string) (*App, error) {
 	scope := initial
 	if initial.Provider != "" {
@@ -131,16 +131,16 @@ func (a *App) Startup(ctx context.Context) {
 
 // errInvalidService is returned when an invalid service is specified.
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 var errInvalidService = stringError("invalid service: must be 'param' or 'secret'")
 
 // errUnsupportedService is returned when the selected provider (or no provider)
 // does not offer the requested service.
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 var errUnsupportedService = stringError("service is not offered by the selected provider")
 
-//declscope:package // shared with the secret and staging namespaces
+//declscope:shared // shared with the secret and staging namespaces
 type stringError string
 
 func (e stringError) Error() string { return string(e) }
@@ -148,7 +148,7 @@ func (e stringError) Error() string { return string(e) }
 // paramStore resolves a provider.Store for the parameter service via the
 // registry for the current scope.
 //
-//declscope:package // shared with the param namespace
+//declscope:shared // shared with the param namespace
 func (a *App) paramStore() (provider.Store, error) {
 	return a.paramStoreScoped(a.currentScope())
 }
@@ -161,7 +161,7 @@ func (a *App) paramStoreScoped(sc provider.Scope) (provider.Store, error) {
 // secretStore resolves a provider.Store for the secret service via the
 // registry for the current scope.
 //
-//declscope:package // shared with the secret namespace
+//declscope:shared // shared with the secret namespace
 func (a *App) secretStore() (provider.Store, error) {
 	return a.secretStoreScoped(a.currentScope())
 }
@@ -176,7 +176,7 @@ func (a *App) secretStoreScoped(sc provider.Scope) (provider.Store, error) {
 // concrete (key, namespace) without mutating the shared read scope. The binding
 // applies it only to a service with a namespace axis (App Configuration).
 //
-//declscope:package // shared with the param and staging namespaces
+//declscope:shared // shared with the param and staging namespaces
 func (a *App) effectiveParamScopeScoped(sc provider.Scope, ns string) provider.Scope {
 	b, err := binding.Lookup(sc.Provider, provider.KindParam)
 	if err != nil {
@@ -191,7 +191,7 @@ func (a *App) effectiveParamScopeScoped(sc provider.Scope, ns string) provider.S
 // exactly one (key, namespace). It is a no-op for non-App-Configuration scopes
 // and for the null/default namespace. Returns the decoded literal namespace.
 //
-//declscope:package // shared with the param namespace
+//declscope:shared // shared with the param namespace
 func (a *App) validateParamNamespace(ns string) (string, error) {
 	return a.validateParamNamespaceScoped(a.currentScope(), ns)
 }
@@ -199,7 +199,7 @@ func (a *App) validateParamNamespace(ns string) (string, error) {
 // validateParamNamespaceScoped is validateParamNamespace resolved from an
 // already-snapshotted scope (#560).
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) validateParamNamespaceScoped(sc provider.Scope, ns string) (string, error) {
 	if !hasParamNamespaces(sc) {
 		return ns, nil
@@ -211,7 +211,7 @@ func (a *App) validateParamNamespaceScoped(sc provider.Scope, ns string) (string
 // paramStoreForNamespace resolves a param provider.Store scoped to the given App
 // Configuration namespace (no-op namespace for other providers).
 //
-//declscope:package // shared with the param namespace
+//declscope:shared // shared with the param namespace
 func (a *App) paramStoreForNamespace(ns string) (provider.Store, error) {
 	return a.paramStoreForNamespaceScoped(a.currentScope(), ns)
 }
@@ -227,7 +227,7 @@ func (a *App) paramStoreForNamespaceScoped(sc provider.Scope, ns string) (provid
 // against its own namespace (the per-namespace resolver #431 threads into the
 // apply/diff use cases). Resolved from an already-snapshotted scope (#560).
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) paramStrategyForNamespaceScoped(sc provider.Scope, ns string) (staging.FullStrategy, error) {
 	b, err := a.stagingBinding(sc, string(staging.ServiceParam))
 	if err != nil {
@@ -245,7 +245,7 @@ func (a *App) paramStrategyForNamespaceScoped(sc provider.Scope, ns string) (sta
 // hasParamNamespaces reports whether an already-snapshotted scope's param
 // service has a namespace axis (Azure App Configuration) (#560).
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func hasParamNamespaces(sc provider.Scope) bool {
 	b, err := binding.Lookup(sc.Provider, provider.KindParam)
 
@@ -256,7 +256,7 @@ func hasParamNamespaces(sc provider.Scope) bool {
 // resolve the (service-specific) staging scope. An unrecognized service is
 // treated as param; getService validates the string separately.
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func kindForService(service string) provider.Kind {
 	if service == string(staging.ServiceSecret) {
 		return provider.KindSecret
@@ -265,7 +265,7 @@ func kindForService(service string) provider.Kind {
 	return provider.KindParam
 }
 
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) getStagingStore(kind provider.Kind) (store.ReadWriteOperator, error) {
 	return a.getStagingStoreScoped(a.currentScope(), kind)
 }
@@ -273,7 +273,7 @@ func (a *App) getStagingStore(kind provider.Kind) (store.ReadWriteOperator, erro
 // getStagingStoreScoped is getStagingStore resolved from an already-snapshotted
 // scope, so a binding pairs its store and strategy against the SAME scope (#560).
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) getStagingStoreScoped(sc provider.Scope, kind provider.Kind) (store.ReadWriteOperator, error) {
 	// Test seam: an injected store bypasses scope resolution (and any STS call).
 	a.stagingStoreMu.Lock()
@@ -312,7 +312,7 @@ func (a *App) getStagingStoreScoped(sc provider.Scope, kind provider.Kind) (stor
 	return s, nil
 }
 
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) getService(service string) (staging.Service, error) {
 	switch service {
 	case string(staging.ServiceParam):
@@ -328,7 +328,7 @@ func (a *App) getService(service string) (staging.Service, error) {
 // frontend service string. An unknown provider, or one that does not offer the
 // service, is errUnsupportedService.
 //
-//declscope:package // shared with the spec namespace
+//declscope:shared // shared with the spec namespace
 func (a *App) stagingBinding(sc provider.Scope, service string) (binding.Binding, error) {
 	if _, err := a.getService(service); err != nil {
 		return binding.Binding{}, err
@@ -349,7 +349,7 @@ func (a *App) stagingBinding(sc provider.Scope, service string) (binding.Binding
 // "setting", no delete options). A provider that does not offer the service is
 // an error.
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) getParserScoped(sc provider.Scope, service string) (staging.Parser, error) {
 	b, err := a.stagingBinding(sc, service)
 	if err != nil {
@@ -366,7 +366,7 @@ func (a *App) getParserScoped(sc provider.Scope, service string) (staging.Parser
 // it as needed. It shares the scope with the binding's store, so a staged entry
 // can only ever apply to the provider it was staged against (#560).
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.FullStrategy, error) {
 	b, err := a.stagingBinding(sc, service)
 	if err != nil {
@@ -393,7 +393,7 @@ func (a *App) serviceStrategyScoped(sc provider.Scope, service string) (staging.
 //
 //	strategy, err := a.strategyAsScoped[staging.EditStrategy](sc, service)
 //
-//declscope:package // shared with the staging namespace
+//declscope:shared // shared with the staging namespace
 func (a *App) strategyAsScoped[T any](sc provider.Scope, service string) (T, error) {
 	var zero T
 

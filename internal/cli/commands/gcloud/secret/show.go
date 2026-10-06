@@ -119,7 +119,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // showCommand returns the Google Cloud Secret Manager show command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func showCommand() *cli.Command {
 	return generic.ShowCommand(generic.ShowConfig[*version.NumericSpec]{
 		Usage:     "Show secret value with metadata",

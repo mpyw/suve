@@ -26,7 +26,7 @@ import (
 // project id. The endpoint env var itself is provided by the CI job / make
 // target and read by the provider adapter's emulator seam.
 //
-//declscope:package // shared with the TUI suite
+//declscope:shared // shared with the TUI suite
 func setupGoogleCloud(t *testing.T) {
 	t.Helper()
 
@@ -41,7 +41,7 @@ func setupGoogleCloud(t *testing.T) {
 // group (whose Before hook resolves the project from GOOGLE_CLOUD_PROJECT) and
 // returns stdout.
 //
-//declscope:package // shared with the TUI suite
+//declscope:shared // shared with the TUI suite
 func runGcloud(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 

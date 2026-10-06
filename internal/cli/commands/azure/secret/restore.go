@@ -27,7 +27,7 @@ type restoreOptions struct {
 
 // restoreCommand returns the Azure Key Vault restore command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func restoreCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "restore",

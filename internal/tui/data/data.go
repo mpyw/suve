@@ -36,7 +36,7 @@ import (
 // front-ends bound the same surface identically; without it a secret with many
 // versions would fetch every version's value on each selection change (#747).
 //
-//declscope:package // shared by the param and secret sources
+//declscope:shared // shared by the param and secret sources
 const historyLimit int32 = 10
 
 // ListParams are the list inputs a browser header collects.
@@ -176,7 +176,7 @@ type StoreResolver func(ctx context.Context, namespace string) (provider.Store, 
 // type-asserts on the resolved store to list entries across ALL namespaces,
 // mirroring the GUI (#425). Only the Azure App Configuration store implements it.
 //
-//declscope:package // used by the param source
+//declscope:shared // used by the param source
 type appConfigNamespaceLister interface {
 	ListWithNamespaces(ctx context.Context) ([]appconfig.KeyNamespace, error)
 }
@@ -184,7 +184,7 @@ type appConfigNamespaceLister interface {
 // compileFilter compiles a regex filter, treating an empty pattern as "no
 // filter" (nil).
 //
-//declscope:package // used by the param source
+//declscope:shared // used by the param source
 func compileFilter(pattern string) (*regexp.Regexp, error) {
 	if pattern == "" {
 		return nil, nil //nolint:nilnil // nil regex is the documented "no filter" sentinel
@@ -197,7 +197,7 @@ func compileFilter(pattern string) (*regexp.Regexp, error) {
 // filter: "*" matches every namespace, and an empty/other filter matches an
 // exactly-equal namespace (empty being the null namespace).
 //
-//declscope:package // used by the param source
+//declscope:shared // used by the param source
 func namespaceMatches(filter, entry string) bool {
 	if filter == namespaces.AllFilter {
 		return true
@@ -209,7 +209,7 @@ func namespaceMatches(filter, entry string) bool {
 // namespaceDisplay renders a namespace for the UI, showing the null namespace as
 // namespaces.NullDisplay ("(NULL)").
 //
-//declscope:package // used by the param source
+//declscope:shared // used by the param source
 func namespaceDisplay(namespace string) string {
 	if namespace == "" {
 		return namespaces.NullDisplay
@@ -221,7 +221,7 @@ func namespaceDisplay(namespace string) string {
 // typeLabel renders a value type, returning "" when the type is unknown (a
 // name-only listing) so the UI omits it.
 //
-//declscope:package // used by the param source
+//declscope:shared // used by the param source
 func typeLabel(t domain.ValueType, known bool) string {
 	if !known || t == "" {
 		return ""
@@ -232,7 +232,7 @@ func typeLabel(t domain.ValueType, known bool) string {
 
 // currentVersionLabel annotates a param version number as the current one.
 //
-//declscope:package // used by the param source
+//declscope:shared // used by the param source
 func currentVersionLabel(version string) string {
 	return version + " (current)"
 }
@@ -240,7 +240,7 @@ func currentVersionLabel(version string) string {
 // versionSuffix addresses a history row's raw version id for Resolve; an empty
 // id is the current version (no suffix).
 //
-//declscope:package // shared by the param and secret sources
+//declscope:shared // shared by the param and secret sources
 func versionSuffix(version string) string {
 	if version == "" {
 		return ""
@@ -252,7 +252,7 @@ func versionSuffix(version string) string {
 // shortID shortens a long opaque version id for compact history/diff labels,
 // keeping short ids (e.g. numeric) intact.
 //
-//declscope:package // shared by the param and secret sources
+//declscope:shared // shared by the param and secret sources
 func shortID(id string) string {
 	const keep = 8
 	if len(id) <= keep {
@@ -264,7 +264,7 @@ func shortID(id string) string {
 
 // formatDate renders an optional timestamp as a YYYY-MM-DD date, "" when unset.
 //
-//declscope:package // shared by the param and secret sources
+//declscope:shared // shared by the param and secret sources
 func formatDate(t *time.Time) string {
 	if t == nil {
 		return ""

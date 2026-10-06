@@ -23,7 +23,7 @@ import (
 
 // nounSecret is the command name / noun used across the Google Cloud secret commands.
 //
-//declscope:package // tag.go and untag.go name their commands with it
+//declscope:shared // tag.go and untag.go name their commands with it
 const nounSecret = "secret"
 
 // Command returns the "gcloud secret" subcommand group.

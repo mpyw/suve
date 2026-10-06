@@ -30,7 +30,7 @@ type updateOptions struct {
 
 // updateCommand returns the Azure App Configuration update command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func updateCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "update",

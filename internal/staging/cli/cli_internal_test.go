@@ -32,7 +32,7 @@ import (
 
 // fullMockStrategy implements all staging interfaces for testing.
 //
-//declscope:package // package-wide mock shared with the per-command test files (tag_test.go, ...)
+//declscope:shared // package-wide mock shared with the per-command test files (tag_test.go, ...)
 type cliFullMockStrategy struct {
 	service         staging.Service
 	fetchCurrentErr error

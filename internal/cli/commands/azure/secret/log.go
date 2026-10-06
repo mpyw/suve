@@ -199,7 +199,7 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 
 // logCommand returns the Azure Key Vault log command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func logCommand() *cli.Command {
 	return generic.LogCommand(generic.LogConfig{
 		Usage:     "Show secret version history",

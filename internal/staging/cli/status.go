@@ -16,7 +16,7 @@ import (
 
 // statusRunner executes status operations using a usecase.
 //
-//declscope:package // command.go and global_status.go build and run it
+//declscope:shared // command.go and global_status.go build and run it
 type statusRunner struct {
 	useCase *stagingusecase.StatusUseCase
 	stdout  io.Writer
@@ -25,7 +25,7 @@ type statusRunner struct {
 
 // statusOptions holds options for the status command.
 //
-//declscope:package // command.go fills it from the flags
+//declscope:shared // command.go fills it from the flags
 type statusOptions struct {
 	name    string
 	verbose bool
@@ -33,7 +33,7 @@ type statusOptions struct {
 
 // run executes the status command.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *statusRunner) run(ctx context.Context, opts statusOptions) error {
 	result, err := r.useCase.Execute(ctx, stagingusecase.StatusInput{
 		Name: opts.name,
@@ -72,7 +72,7 @@ func (r *statusRunner) run(ctx context.Context, opts statusOptions) error {
 // printService prints one service's staged changes under a
 // "Staged <service> changes (N):" header.
 //
-//declscope:package // the all-service status (global_status.go) renders through it
+//declscope:shared // the all-service status (global_status.go) renders through it
 func (r *statusRunner) printService(result *stagingusecase.StatusOutput, verbose bool) {
 	output.Printf(r.stdout, "%s (%d):\n",
 		colors.For(r.stdout).Warning(fmt.Sprintf("Staged %s changes", result.ServiceName)),

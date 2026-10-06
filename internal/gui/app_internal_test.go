@@ -31,7 +31,7 @@ func TestErrInvalidService(t *testing.T) {
 // fakeFactory returns a fixed store for any scope/kind, so a test can inject a
 // providermock into the GUI's package-global registry.
 //
-//declscope:package // shared by the param, secret and staging binding tests
+//declscope:shared // shared by the param, secret and staging binding tests
 type fakeFactory struct{ store provider.Store }
 
 func (f fakeFactory) Store(context.Context, provider.Scope, provider.Kind) (provider.Store, error) {
@@ -40,7 +40,7 @@ func (f fakeFactory) Store(context.Context, provider.Scope, provider.Kind) (prov
 
 // appWithProvider builds a bare App whose current scope is provider p.
 //
-//declscope:package // shared by the spec and capability tests
+//declscope:shared // shared by the spec and capability tests
 func appWithProvider(p provider.Provider) *App {
 	return &App{scope: provider.Scope{Provider: p}}
 }
@@ -48,7 +48,7 @@ func appWithProvider(p provider.Provider) *App {
 // newTestApp builds an App for a known launch scope, failing the test if newApp
 // rejects it.
 //
-//declscope:package // shared with the staging binding tests
+//declscope:shared // shared with the staging binding tests
 func newTestApp(t *testing.T, initial provider.Scope, service string) *App {
 	t.Helper()
 

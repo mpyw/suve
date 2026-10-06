@@ -29,7 +29,7 @@ import (
 // adapter's emulator seam; the store name is required by the CLI but ignored by
 // the emulator (the endpoint is embedded in the connection string).
 //
-//declscope:package // shared with the TUI suite
+//declscope:shared // shared with the TUI suite
 func setupAzureAppConfig(t *testing.T) {
 	t.Helper()
 
@@ -44,7 +44,7 @@ func setupAzureAppConfig(t *testing.T) {
 // command group (whose Before hooks resolve the store from AZURE_APPCONFIG_NAME)
 // and returns stdout.
 //
-//declscope:package // shared with the TUI suite
+//declscope:shared // shared with the TUI suite
 func runAzureParam(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 

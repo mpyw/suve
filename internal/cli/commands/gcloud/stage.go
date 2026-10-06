@@ -70,7 +70,7 @@ func stageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
 
 // stageCommand returns the "gcloud stage" subcommand group.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func stageCommand() *cli.Command {
 	return &cli.Command{
 		Name:            "stage",

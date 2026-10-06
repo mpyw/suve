@@ -14,14 +14,14 @@ import (
 // writes tags via a GET-merge-PUT with an ETag precondition (azappconfig/v2), so
 // the value and any other tags are preserved.
 //
-//declscope:package // untag.go's UntagCommand builds the same Tagger
+//declscope:shared // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return azureinternal.AppConfigStore(ctx)
 }
 
 // tagCommand returns the Azure App Configuration tag command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func tagCommand() *cli.Command {
 	return generic.TagCommand(generic.TagConfig{
 		Usage:     "Add or update tags on a setting",

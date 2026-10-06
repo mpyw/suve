@@ -23,7 +23,7 @@ type applyConfirmer interface {
 // (empty-check, name validation, and interactive confirmation) that the
 // `stage <service> apply` command performs before applying.
 //
-//declscope:package // command.go builds and runs it
+//declscope:shared // command.go builds and runs it
 type applyRunner struct {
 	useCase *stagingusecase.ApplyUseCase
 	store   store.ReadWriteOperator
@@ -39,7 +39,7 @@ type applyRunner struct {
 
 // applyOptions holds options for the apply command.
 //
-//declscope:package // command.go fills it from the flags
+//declscope:shared // command.go fills it from the flags
 type applyOptions struct {
 	name            string // Optional: apply only this item, otherwise apply all
 	ignoreConflicts bool   // Skip conflict detection and force apply
@@ -50,7 +50,7 @@ type applyOptions struct {
 // name, asks for confirmation, and then delegates to Run. Interactive
 // confirmation lives here (presentation layer) rather than in the usecase.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *applyRunner) runInteractive(ctx context.Context, opts applyOptions) error {
 	service := r.parser.Service()
 
@@ -126,7 +126,7 @@ func (r *applyRunner) runInteractive(ctx context.Context, opts applyOptions) err
 
 // run applies the staged changes via the usecase and reports the results.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *applyRunner) run(ctx context.Context, opts applyOptions) error {
 	result, err := r.useCase.Execute(ctx, stagingusecase.ApplyInput{
 		Name:            opts.name,
@@ -206,7 +206,7 @@ func (r *applyRunner) run(ctx context.Context, opts applyOptions) error {
 
 // formatTagApplySummary formats a tag apply result as a summary string.
 //
-//declscope:package // global_apply.go summarizes tag results with it
+//declscope:shared // global_apply.go summarizes tag results with it
 func formatTagApplySummary(tag stagingusecase.ApplyTagResult) string {
 	var parts []string
 	if len(tag.AddTags) > 0 {

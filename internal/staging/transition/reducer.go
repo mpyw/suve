@@ -60,7 +60,7 @@ func ReduceEntry(state EntryState, action EntryAction) EntryTransitionResult {
 
 // reduceTagAction applies a tag action to produce new staged tags.
 //
-//declscope:package // executor.go applies tag actions with it
+//declscope:shared // executor.go applies tag actions with it
 func reduceTagAction(entryState EntryState, stagedTags StagedTags, action TagAction) TagTransitionResult {
 	var result TagTransitionResult
 

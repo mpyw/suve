@@ -19,7 +19,7 @@ import (
 // modes are used (metadata only, no secret values); --no-redaction switches to
 // the WithBody modes so full request/response payloads are logged too.
 //
-//declscope:package // aws.go and identity.go load the AWS config with it
+//declscope:shared // aws.go and identity.go load the AWS config with it
 func loadConfig(ctx context.Context) (aws.Config, error) {
 	d := debug.From(ctx)
 	if !d.Enabled {

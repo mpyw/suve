@@ -13,7 +13,7 @@ import (
 // profile from ~/.aws/config: several profiles can share one account, and the
 // account and region already identify the target.
 //
-//declscope:package // identity.go names the caller's profile with it
+//declscope:shared // identity.go names the caller's profile with it
 func activeProfile() string {
 	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
 		return ""

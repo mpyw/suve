@@ -83,7 +83,7 @@ func (p *diffPresenter) Hints(stderr io.Writer) {
 
 // diffCommand returns the Google Cloud Secret Manager diff command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func diffCommand() *cli.Command {
 	return generic.DiffCommand(generic.DiffConfig[*version.NumericSpec]{
 		Usage:     "Show diff between two versions",

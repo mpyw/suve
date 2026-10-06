@@ -21,7 +21,7 @@ import (
 
 // diffRunner executes diff operations using a usecase.
 //
-//declscope:package // command.go and global_diff.go build and run it
+//declscope:shared // command.go and global_diff.go build and run it
 type diffRunner struct {
 	useCase *stagingusecase.DiffUseCase
 	stdout  io.Writer
@@ -52,7 +52,7 @@ func (r *diffRunner) remoteLabel() string {
 
 // diffOptions holds options for the diff command.
 //
-//declscope:package // command.go and global_diff.go fill it
+//declscope:shared // command.go and global_diff.go fill it
 type diffOptions struct {
 	name      string // Optional: diff only this item, otherwise diff all
 	parseJSON bool
@@ -61,7 +61,7 @@ type diffOptions struct {
 
 // run executes the diff command.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *diffRunner) run(ctx context.Context, opts diffOptions) error {
 	result, err := r.useCase.Execute(ctx, stagingusecase.DiffInput{
 		Name: opts.name,
@@ -89,7 +89,7 @@ func (r *diffRunner) run(ctx context.Context, opts diffOptions) error {
 // entries, so each is printed (deduping by name would drop all but one,
 // order-dependently). first tracks whether a blank separator line is due.
 //
-//declscope:package // the all-service diff (global_diff.go) renders through it
+//declscope:shared // the all-service diff (global_diff.go) renders through it
 func (r *diffRunner) outputEntries(opts diffOptions, entries []stagingusecase.DiffEntry, first *bool) {
 	entries = slices.Clone(entries)
 	slices.SortFunc(entries, func(a, b stagingusecase.DiffEntry) int {
@@ -124,7 +124,7 @@ func (r *diffRunner) outputEntries(opts diffOptions, entries []stagingusecase.Di
 // per tagged item (like entries, a key tagged under several App Configuration
 // namespaces is several distinct items).
 //
-//declscope:package // the all-service diff (global_diff.go) renders through it
+//declscope:shared // the all-service diff (global_diff.go) renders through it
 func (r *diffRunner) outputTagEntries(tagEntries []stagingusecase.DiffTagEntry, first *bool) {
 	tagEntries = slices.Clone(tagEntries)
 	slices.SortFunc(tagEntries, func(a, b stagingusecase.DiffTagEntry) int {

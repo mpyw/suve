@@ -647,7 +647,7 @@ func (s *Store) writeFile(path string, state *staging.State) error {
 // read and feed the error-swallowing overwrite paths. The file is owner-only
 // (0600), matching os.CreateTemp's default.
 //
-//declscope:package // the envelope writer shares the store's atomic-write helper
+//declscope:shared // the envelope writer shares the store's atomic-write helper
 func writeFileAtomic(path string, data []byte) error {
 	dir := filepath.Dir(path)
 

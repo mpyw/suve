@@ -81,7 +81,7 @@ same shape.
   `internal/cli/commands/generic` package (`generic.ShowCommand`,
   `generic.LogCommand`, `generic.DiffCommand`, `generic.ListCommand`,
   `generic.TagCommand`, `generic.UntagCommand`). Do not add a subpackage per
-  subcommand: declscope already scopes each file, and `//declscope:package`
+  subcommand: declscope already scopes each file, and `//declscope:shared`
   marks what sibling files share.
 - Add the provider's scope flag plus its environment-variable fallback
   (`detect.HydrateScope` for the TUI/GUI launch, `launchScope` in

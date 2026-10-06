@@ -14,7 +14,7 @@ import (
 
 // addRunner executes add operations using a usecase.
 //
-//declscope:package // command.go builds and runs it
+//declscope:shared // command.go builds and runs it
 type addRunner struct {
 	useCase *stagingusecase.AddUseCase
 	stdout  io.Writer
@@ -28,7 +28,7 @@ type addRunner struct {
 
 // addOptions holds options for the add command.
 //
-//declscope:package // command.go fills it from the flags
+//declscope:shared // command.go fills it from the flags
 type addOptions struct {
 	name string
 	// value is the explicit value; it is used only when hasValue is set.
@@ -48,7 +48,7 @@ type addOptions struct {
 
 // run executes the add command.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *addRunner) run(ctx context.Context, opts addOptions) error {
 	// Get draft (existing staged create value) for re-editing
 	draft, err := r.useCase.Draft(ctx, stagingusecase.DraftInput{Key: staging.EntryKey{Name: opts.name, Namespace: opts.namespace}})

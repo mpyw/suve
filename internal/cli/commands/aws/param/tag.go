@@ -12,7 +12,7 @@ import (
 
 // newTagger builds the SSM Parameter Store provider.Tagger.
 //
-//declscope:package // untag.go's UntagCommand builds the same Tagger
+//declscope:shared // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return awsinternal.ParamStore(ctx)
 }
