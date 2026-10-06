@@ -13,7 +13,7 @@ import (
 
 // tagRunner executes tag staging operations using a usecase.
 //
-//declscope:package // command.go builds and runs it
+//declscope:shared // command.go builds and runs it
 type tagRunner struct {
 	useCase *stagingusecase.TagUseCase
 	stdout  io.Writer
@@ -22,7 +22,7 @@ type tagRunner struct {
 
 // tagOptions holds options for the tag command.
 //
-//declscope:package // command.go fills it from the flags
+//declscope:shared // command.go fills it from the flags
 type tagOptions struct {
 	name string
 	// namespace is the App Configuration namespace of the resource (empty for the
@@ -33,7 +33,7 @@ type tagOptions struct {
 
 // run executes the tag command.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *tagRunner) run(ctx context.Context, opts tagOptions) error {
 	tags, err := parseTags(opts.tags)
 	if err != nil {

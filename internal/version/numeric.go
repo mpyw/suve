@@ -35,7 +35,7 @@ type NumericGrammar struct {
 	// whose names never contain ':' and that has no staging labels. When nil,
 	// ':' is part of the name.
 	//
-	//declscope:package // products.go defines each product's grammar with it
+	//declscope:shared // products.go defines each product's grammar with it
 	labelError error
 }
 

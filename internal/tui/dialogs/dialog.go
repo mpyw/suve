@@ -1,4 +1,4 @@
-//declscope:package
+//declscope:shared
 //
 // Every dialog embeds dialogLayout and draws inside the shell's dialog frame,
 // so the size model and its frame metrics here are shared package-wide on

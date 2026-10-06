@@ -15,7 +15,7 @@ import (
 // versionedTraits are the fixed, provider-specific strings and flags of a
 // versioned staging strategy.
 //
-//declscope:package // each versioned provider's hooks type fills it in
+//declscope:shared // each versioned provider's hooks type fills it in
 type versionedTraits struct {
 	// service is the staging service the strategy serves.
 	service Service
@@ -56,7 +56,7 @@ type versionedHooks interface {
 // SDK dependency. A nil store yields a parser-only strategy
 // (ParseName/ParseSpec).
 //
-//declscope:package // embedded by each versioned provider's exported strategy type
+//declscope:shared // embedded by each versioned provider's exported strategy type
 type versionedStrategy[H versionedHooks] struct {
 	store provider.Store
 	//declscope:private
@@ -249,7 +249,7 @@ func (s *versionedStrategy[H]) FetchVersion(ctx context.Context, input string) (
 // options, and create/update write the value as a new secret version. A
 // provider's hooks type embeds it and overrides what differs.
 //
-//declscope:package // embedded by each versioned secret provider's hooks type
+//declscope:shared // embedded by each versioned secret provider's hooks type
 type versionedSecretHooks struct{}
 
 func (versionedSecretHooks) versionLabel(id string) string { return "#" + id }
@@ -268,7 +268,7 @@ func (versionedSecretHooks) create(ctx context.Context, store provider.Store, na
 
 // update writes the value as a new secret version.
 //
-//declscope:package // AWS Secrets Manager's hooks wrap it with a binary-overwrite guard
+//declscope:shared // AWS Secrets Manager's hooks wrap it with a binary-overwrite guard
 func (versionedSecretHooks) update(ctx context.Context, store provider.Store, name string, entry Entry) error {
 	if entry.Value == nil {
 		return nil

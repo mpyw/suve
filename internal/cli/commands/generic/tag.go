@@ -37,7 +37,7 @@ type TagConfig struct {
 
 // tagRunner executes the tag/untag commands over a provider.Tagger.
 //
-//declscope:package // untag.go builds it and adds runUntag
+//declscope:shared // untag.go builds it and adds runUntag
 type tagRunner struct {
 	tagger provider.Tagger
 	noun   string

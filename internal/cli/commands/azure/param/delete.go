@@ -28,7 +28,7 @@ type deleteOptions struct {
 
 // deleteCommand returns the Azure App Configuration delete command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func deleteCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "delete",

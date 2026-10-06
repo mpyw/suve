@@ -29,20 +29,20 @@ type OpaqueSpec = Spec[OpaqueAbsolute]
 type OpaqueGrammar struct {
 	// isIDChar reports whether c is valid within a version id.
 	//
-	//declscope:package // products.go defines each product's grammar with it
+	//declscope:shared // products.go defines each product's grammar with it
 	isIDChar func(c byte) bool
 	// invalidIDError is returned when # is not followed by a version id.
 	//
-	//declscope:package // products.go defines each product's grammar with it
+	//declscope:shared // products.go defines each product's grammar with it
 	invalidIDError error
 	// labels accepts a :LABEL specifier.
 	//
-	//declscope:package // products.go defines each product's grammar with it
+	//declscope:shared // products.go defines each product's grammar with it
 	labels bool
 	// labelError is returned when ':' does not start a valid label. Without
 	// labels, every ':' is rejected with it.
 	//
-	//declscope:package // products.go defines each product's grammar with it
+	//declscope:shared // products.go defines each product's grammar with it
 	labelError error
 }
 

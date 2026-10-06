@@ -12,14 +12,14 @@ import (
 
 // newTagger builds the Google Cloud Secret Manager provider.Tagger.
 //
-//declscope:package // untag.go's UntagCommand builds the same Tagger
+//declscope:shared // untag.go's UntagCommand builds the same Tagger
 func newTagger(ctx context.Context) (provider.Tagger, error) {
 	return gcloudinternal.SecretStore(ctx)
 }
 
 // tagCommand returns the Google Cloud Secret Manager tag command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func tagCommand() *cli.Command {
 	return generic.TagCommand(generic.TagConfig{
 		Usage:     `Add or update tags on a secret (Google Cloud calls these "labels")`,

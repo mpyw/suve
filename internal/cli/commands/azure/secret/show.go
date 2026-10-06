@@ -113,7 +113,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // showCommand returns the Azure Key Vault show command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func showCommand() *cli.Command {
 	return generic.ShowCommand(generic.ShowConfig[*version.OpaqueSpec]{
 		Usage:     "Show secret value with metadata",

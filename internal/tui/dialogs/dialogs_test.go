@@ -1,4 +1,4 @@
-//declscope:package
+//declscope:shared
 //
 // The core test file is the dialog tests' shared vocabulary: the mutator and
 // staging fakes, capability fixtures, key constructors, and drivers below are

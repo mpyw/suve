@@ -14,7 +14,7 @@
 // namespace prefix and its declarations are shared package-wide.
 //
 //declscope:core
-//declscope:package
+//declscope:shared
 package dialogs
 
 import (

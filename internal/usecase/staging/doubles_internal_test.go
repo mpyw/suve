@@ -4,7 +4,7 @@
 // Shared test doubles for the staging use-case tests: the strategy mocks
 // (service/parser/apply/edit) and the stageEntry helper below are consumed by
 // several test files, so the whole file is declared package-wide.
-//declscope:package // consumed by the add/apply/edit/status/export/import use-case tests
+//declscope:shared // consumed by the add/apply/edit/status/export/import use-case tests
 
 package staging
 

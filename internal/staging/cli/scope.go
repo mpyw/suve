@@ -16,7 +16,7 @@ var errNoScopeResolver = errors.New("staging scope resolver is not configured")
 // resolveScope runs the resolver. A nil resolver is a wiring bug and fails with
 // errNoScopeResolver rather than falling back to any provider.
 //
-//declscope:package // export.go resolves the scope without opening the working store
+//declscope:shared // export.go resolves the scope without opening the working store
 func resolveScope(ctx context.Context, resolver staging.ScopeResolver) (staging.ResolvedScope, error) {
 	if resolver == nil {
 		return staging.ResolvedScope{}, errNoScopeResolver
@@ -28,7 +28,7 @@ func resolveScope(ctx context.Context, resolver staging.ScopeResolver) (staging.
 // openScopedWorkingStore resolves the staging scope via the resolver and
 // opens the working store keyed by that scope.
 //
-//declscope:package // global.go opens each service's own working store for the all-service commands
+//declscope:shared // global.go opens each service's own working store for the all-service commands
 func openScopedWorkingStore(ctx context.Context, resolver staging.ScopeResolver) (*file.Store, staging.ResolvedScope, error) {
 	resolved, err := resolveScope(ctx, resolver)
 	if err != nil {
@@ -86,7 +86,7 @@ func SharedScopeResolver(resolver staging.ScopeResolver) staging.ScopeResolver {
 // SharedScopeResolver resolvers, so each one runs once in that context. The
 // memo is not safe for concurrent use: the services are resolved in turn.
 //
-//declscope:package // global.go resolves every service of an all-service command under one memo
+//declscope:shared // global.go resolves every service of an all-service command under one memo
 func withSharedScopeMemo(ctx context.Context) context.Context {
 	return context.WithValue(ctx, sharedScopeMemoKey{}, map[*sharedScopeID]sharedScopeResult{})
 }

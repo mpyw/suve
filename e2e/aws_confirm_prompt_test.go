@@ -38,7 +38,7 @@ import (
 // runs fn, then restores the original os.Stdin. Used for the delete actions,
 // whose confirmation prompter reads os.Stdin directly.
 //
-//declscope:package // shared with the Google Cloud and Azure delete-prompt tests
+//declscope:shared // shared with the Google Cloud and Azure delete-prompt tests
 func withOSStdin(t *testing.T, input string, fn func()) {
 	t.Helper()
 

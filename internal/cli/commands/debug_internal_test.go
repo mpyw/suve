@@ -20,7 +20,7 @@ import (
 // appName is the CLI binary name used to build probe apps in these tests. It is
 // a constant so the literal is not repeated across each Run invocation.
 //
-//declscope:package // completion_test.go builds the same argument list
+//declscope:shared // completion_test.go builds the same argument list
 const appName = "suve"
 
 // runProbe assembles a minimal app wired exactly like the root (debugFlag +

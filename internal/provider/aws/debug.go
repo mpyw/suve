@@ -74,7 +74,7 @@ func redactDebugDump(dump string) string {
 // only). Header values are allowlisted before anything is written, mirroring
 // azcore's log-policy behavior on the Azure side.
 //
-//declscope:package // config.go installs it as the SDK logger
+//declscope:shared // config.go installs it as the SDK logger
 type debugLogger struct {
 	cfg debug.Config
 }

@@ -8,7 +8,7 @@ import (
 
 // untagCommand returns the Azure App Configuration untag command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func untagCommand() *cli.Command {
 	return generic.UntagCommand(generic.TagConfig{
 		Usage:     "Remove tags from a setting",

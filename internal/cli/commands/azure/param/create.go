@@ -29,7 +29,7 @@ type createOptions struct {
 
 // createCommand returns the Azure App Configuration create command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func createCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "create",

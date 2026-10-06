@@ -25,7 +25,7 @@ import (
 // Secrets Manager is the service that carries force-delete, recovery-window,
 // and restore, so it exercises every secret-mutator branch.
 //
-//declscope:package // capability fixture shared with stage_test.go
+//declscope:shared // capability fixture shared with stage_test.go
 func mutatorAwsSecretCap(t *testing.T) capability.ServiceCapability {
 	t.Helper()
 

@@ -13,7 +13,7 @@ import (
 
 // listCommand returns the Google Cloud Secret Manager list command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func listCommand() *cli.Command {
 	return generic.ListCommand(generic.ListConfig{
 		Usage:     "List secrets",

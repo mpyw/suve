@@ -225,7 +225,7 @@ func stageGlobalConfig(paramCfg, secretCfg stgcli.CommandConfig) stgcli.GlobalCo
 // param (App Configuration) staging subgroups plus the provider-wide global
 // commands (status / diff / apply / reset) spanning both services.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func stageCommand() *cli.Command {
 	gcfg := stageGlobalConfig(appConfigStageConfig(), keyVaultStageConfig())
 

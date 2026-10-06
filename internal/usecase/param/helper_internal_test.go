@@ -7,7 +7,7 @@ import "errors"
 
 // Test sentinel errors for consistent error testing.
 //
-//declscope:package // a fixture the use-case test files share
+//declscope:shared // a fixture the use-case test files share
 var (
 	errHelperAWS            = errors.New("aws error")
 	errHelperGetParameter   = errors.New("get parameter error")

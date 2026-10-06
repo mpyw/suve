@@ -19,7 +19,7 @@ import (
 //
 // Shared with the viewport-scrolling dialogs (apply results, error dialog).
 //
-//declscope:package
+//declscope:shared
 func scrollViewport(vp *viewport.Model, msg tea.Msg) tea.Cmd {
 	before := vp.YOffset()
 
@@ -54,7 +54,7 @@ var formScrollKeys = key.NewBinding(key.WithKeys("tab", "shift+tab", "up", "down
 //
 // Shared with the huh-form dialogs (entry/tag/restore).
 //
-//declscope:package
+//declscope:shared
 func repaintFormScroll(form *huh.Form, msg tea.Msg, cmd tea.Cmd) tea.Cmd {
 	kp, ok := msg.(tea.KeyPressMsg)
 	if !ok || !termquirk.ScrollNeedsFullRepaint() || !formKeyMayScroll(form, kp) {

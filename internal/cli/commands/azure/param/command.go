@@ -27,7 +27,7 @@ import (
 
 // argsUsageKey is the ArgsUsage string shared by the single-key commands.
 //
-//declscope:package // delete, show and log use it for a single-key command's ArgsUsage
+//declscope:shared // delete, show and log use it for a single-key command's ArgsUsage
 const argsUsageKey = "<key>"
 
 // Command returns the "azure param" subcommand group.
@@ -88,7 +88,7 @@ variable.`,
 // itemNoun names one App Configuration item ("setting") in the shared use
 // cases' error messages, from the capability matrix.
 //
-//declscope:package // create, update and delete pass it to their use cases
+//declscope:shared // create, update and delete pass it to their use cases
 func itemNoun() string {
 	sc, _ := capability.Service(provider.ProviderAzure, string(provider.KindParam))
 

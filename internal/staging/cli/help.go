@@ -1,7 +1,7 @@
 // help.go holds the stage subcommands' long help texts. command.go builds each
 // subcommand from them, and export.go and import.go render theirs with
 // renderHelp, so the whole file is package-wide.
-//declscope:package
+//declscope:shared
 
 package cli
 

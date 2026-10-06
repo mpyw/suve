@@ -24,7 +24,7 @@ import (
 // Flag names, flag usages, command names, and arg-usage strings shared across
 // sibling stage command builders.
 //
-//declscope:package // shared by design with the per-command files (export.go, import.go, ...)
+//declscope:shared // shared by design with the per-command files (export.go, import.go, ...)
 const (
 	flagYes                = "yes"
 	usageSkipConfirm       = "Skip confirmation prompt"
@@ -102,7 +102,7 @@ type CommandConfig struct {
 
 // remoteName is the provider label used in messages, or "remote" when unset.
 //
-//declscope:package // shared by design with the apply/edit runners
+//declscope:shared // shared by design with the apply/edit runners
 func remoteName(providerLabel string) string {
 	if providerLabel == "" {
 		return "remote"
@@ -161,7 +161,7 @@ func (c CommandConfig) namespaceFor(ctx context.Context) string {
 // resolver, or nil when the service has no namespace axis (the single strategy
 // handles all).
 //
-//declscope:package // shared with the all-service diff (global_diff.go)
+//declscope:shared // shared with the all-service diff (global_diff.go)
 func diffStrategyFor(
 	ctx context.Context, forNamespace func(context.Context, string) (staging.FullStrategy, error),
 ) func(string) (staging.DiffStrategy, error) {
@@ -177,7 +177,7 @@ func diffStrategyFor(
 // applyStrategyFor adapts a StrategyForNamespace builder to the ApplyUseCase
 // resolver, or nil when the service has no namespace axis.
 //
-//declscope:package // shared with the all-service apply (global_apply.go)
+//declscope:shared // shared with the all-service apply (global_apply.go)
 func applyStrategyFor(
 	ctx context.Context, forNamespace func(context.Context, string) (staging.FullStrategy, error),
 ) func(string) (staging.ApplyStrategy, error) {

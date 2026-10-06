@@ -14,7 +14,7 @@ import (
 
 // editRunner executes edit operations using a usecase.
 //
-//declscope:package // command.go builds and runs it
+//declscope:shared // command.go builds and runs it
 type editRunner struct {
 	useCase *stagingusecase.EditUseCase
 	// providerLabel names the remote store in messages (e.g. "AWS"); empty
@@ -30,7 +30,7 @@ type editRunner struct {
 
 // editOptions holds options for the edit command.
 //
-//declscope:package // command.go fills it from the flags
+//declscope:shared // command.go fills it from the flags
 type editOptions struct {
 	name string
 	// value is the explicit value; it is used only when hasValue is set.
@@ -50,7 +50,7 @@ type editOptions struct {
 
 // run executes the edit command.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *editRunner) run(ctx context.Context, opts editOptions) error {
 	src := valueinput.ValueSource{
 		FromStdin:  opts.valueFromStdin,

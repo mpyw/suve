@@ -16,7 +16,7 @@ var (
 // errItemNoun returns the noun that names one item in error messages: the
 // caller's ItemNoun ("parameter", "setting"), or the neutral "entry" when unset.
 //
-//declscope:package // create, update and delete word their errors with it
+//declscope:shared // create, update and delete word their errors with it
 func errItemNoun(noun string) string {
 	return lo.CoalesceOrEmpty(noun, "entry")
 }

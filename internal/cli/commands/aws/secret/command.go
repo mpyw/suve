@@ -14,12 +14,12 @@ import (
 
 // nounSecret is the command name / noun used across the Secrets Manager commands.
 //
-//declscope:package // tag.go and untag.go name their commands with it
+//declscope:shared // tag.go and untag.go name their commands with it
 const nounSecret = "secret"
 
 // argsUsageName is the ArgsUsage string shared by the single-name commands.
 //
-//declscope:package // delete, restore and log use it for a single-name command's ArgsUsage
+//declscope:shared // delete, restore and log use it for a single-name command's ArgsUsage
 const argsUsageName = "<name>"
 
 // Command returns the secret command with all subcommands.

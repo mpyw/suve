@@ -10,10 +10,10 @@ package main
 
 // registerGUIFlag is a no-op when GUI is not available.
 //
-//declscope:package // called from main.go
+//declscope:shared // called from main.go
 func registerGUIFlag() {}
 
 // registerGUIDescription is a no-op when GUI is not available.
 //
-//declscope:package // called from main.go
+//declscope:shared // called from main.go
 func registerGUIDescription() {}

@@ -25,12 +25,12 @@ import (
 
 // nounSecret is the command name / noun used across the Key Vault secret commands.
 //
-//declscope:package // tag.go and untag.go name their commands with it
+//declscope:shared // tag.go and untag.go name their commands with it
 const nounSecret = "secret"
 
 // argsUsageName is the shared ArgsUsage for single-secret commands.
 //
-//declscope:package // delete, restore and log use it for a single-secret command's ArgsUsage
+//declscope:shared // delete, restore and log use it for a single-secret command's ArgsUsage
 const argsUsageName = "<name>"
 
 // Command returns the "azure secret" subcommand group.

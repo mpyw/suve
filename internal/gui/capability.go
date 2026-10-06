@@ -16,7 +16,7 @@ import (
 // feature the service does not have. An unknown service or provider has no
 // capabilities.
 //
-//declscope:package // the param and secret bindings gate description, value type and recovery window on it
+//declscope:shared // the param and secret bindings gate description, value type and recovery window on it
 func (a *App) serviceCapability(kind provider.Kind) capability.ServiceCapability {
 	sc, _ := capability.Service(a.currentScope().Provider, string(kind))
 

@@ -24,7 +24,7 @@ var (
 // an OpaqueGrammar with labels has two parsers for "#" (version ID) and ":"
 // (label).
 //
-//declscope:package // numeric.go and opaque.go build their parsers from it
+//declscope:shared // numeric.go and opaque.go build their parsers from it
 type specifierParser[A any] struct {
 	// prefixChar is the character that starts this specifier (e.g., '#', ':').
 	prefixChar byte
@@ -53,7 +53,7 @@ type specifierParser[A any] struct {
 // absoluteParser holds the configuration for parsing absolute specifiers.
 // Each grammar builds its own absoluteParser.
 //
-//declscope:package // numeric.go and opaque.go hand it to parseSpec
+//declscope:shared // numeric.go and opaque.go hand it to parseSpec
 type absoluteParser[A any] struct {
 	// parsers is the list of specifier parsers to try, in order.
 	parsers []specifierParser[A]
@@ -76,7 +76,7 @@ type absoluteParser[A any] struct {
 //   - Invalid specifier syntax (e.g., "#" at end, ambiguous "~")
 //   - Conflicting specifiers (e.g., both #id and :label)
 //
-//declscope:package // numeric.go and opaque.go run their Parse through it
+//declscope:shared // numeric.go and opaque.go run their Parse through it
 func parseSpec[A any](input string, parser absoluteParser[A]) (*Spec[A], error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
@@ -223,7 +223,7 @@ func matchParser[A any](ch byte, parsers []specifierParser[A]) (specifierParser[
 // in the name triggers err rather than being folded into the name, and a ':'
 // after an absolute specifier fails in apply.
 //
-//declscope:package // numeric.go and opaque.go reject ':' with it
+//declscope:shared // numeric.go and opaque.go reject ':' with it
 func rejectingLabelParser[A any](err error) specifierParser[A] {
 	return specifierParser[A]{
 		prefixChar:        ':',

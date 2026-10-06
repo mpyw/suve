@@ -9,5 +9,5 @@ import (
 // assets contains the embedded frontend build artifacts.
 //
 //go:embed all:frontend/dist
-//declscope:package // run.go serves it
+//declscope:shared // run.go serves it
 var assets embed.FS

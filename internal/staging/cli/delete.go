@@ -11,7 +11,7 @@ import (
 
 // deleteRunner executes delete operations using a usecase.
 //
-//declscope:package // command.go builds and runs it
+//declscope:shared // command.go builds and runs it
 type deleteRunner struct {
 	useCase *stagingusecase.DeleteUseCase
 	stdout  io.Writer
@@ -20,7 +20,7 @@ type deleteRunner struct {
 
 // deleteOptions holds options for the delete command.
 //
-//declscope:package // command.go fills it from the flags
+//declscope:shared // command.go fills it from the flags
 type deleteOptions struct {
 	name           string
 	force          bool // For Secrets Manager: force immediate deletion
@@ -32,7 +32,7 @@ type deleteOptions struct {
 
 // run executes the delete command.
 //
-//declscope:package // command.go runs it
+//declscope:shared // command.go runs it
 func (r *deleteRunner) run(ctx context.Context, opts deleteOptions) error {
 	result, err := r.useCase.Execute(ctx, stagingusecase.DeleteInput{
 		Key:            staging.EntryKey{Name: opts.name, Namespace: opts.namespace},

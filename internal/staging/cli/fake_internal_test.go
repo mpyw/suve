@@ -1,7 +1,7 @@
 // Shared test doubles for the in-package tests (TTY fakes, an erroring reader,
 // a generic leaf-command runner). They belong to no single command file.
 //declscope:namespace fake
-//declscope:package // consumed by the export and import in-package tests
+//declscope:shared // consumed by the export and import in-package tests
 
 package cli
 

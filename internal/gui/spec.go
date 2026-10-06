@@ -16,7 +16,7 @@ import (
 // name+version, and Google Cloud and Key Vault reject a ':LABEL' spec that AWS
 // Secrets Manager accepts.
 //
-//declscope:package // shared with the param and secret namespaces
+//declscope:shared // shared with the param and secret namespaces
 func (a *App) parseSpec(kind provider.Kind, specStr string) (name, suffix string, err error) {
 	b, err := a.stagingBinding(a.currentScope(), string(kind))
 	if err != nil {

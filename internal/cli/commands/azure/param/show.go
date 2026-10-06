@@ -103,7 +103,7 @@ func (p *showPresenter) RenderJSON(stdout io.Writer, value string) error {
 
 // showCommand returns the Azure App Configuration show command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func showCommand() *cli.Command {
 	return generic.ShowCommand(generic.ShowConfig[*version.BareSpec]{
 		Usage:     "Show setting value with metadata",

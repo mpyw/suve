@@ -27,7 +27,7 @@ import (
 // same "suve-e2e" value: it is what ties the store to a scope, and hardcoding it
 // here would hide that seam from the tests that document it.
 //
-//declscope:package // shared with the TUI suite
+//declscope:shared // shared with the TUI suite
 func newGoogleCloudStore(project string) *file.Store { //nolint:unparam // scope seam, see above
 	s, err := file.NewWorkingStore(provider.GoogleCloudScope(project))
 	if err != nil {

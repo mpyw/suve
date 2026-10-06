@@ -29,7 +29,7 @@ type createOptions struct {
 
 // createCommand returns the Google Cloud Secret Manager create command.
 //
-//declscope:package // command.go registers it
+//declscope:shared // command.go registers it
 func createCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "create",

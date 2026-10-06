@@ -22,7 +22,7 @@ const (
 // validateWriteOptionTier reports an error if tier is a non-empty,
 // unrecognized value. An empty tier is valid (it means "leave the tier unset").
 //
-//declscope:package // create.go and update.go validate --tier with it
+//declscope:shared // create.go and update.go validate --tier with it
 func validateWriteOptionTier(tier string) error {
 	validTiers := []string{writeOptionTierStandard, writeOptionTierAdvanced, writeOptionTierIntelligentTiering}
 	if tier == "" || slices.Contains(validTiers, tier) {
@@ -35,7 +35,7 @@ func validateWriteOptionTier(tier string) error {
 
 // writeOptionFlags holds the raw flag values for the provider-specific param options.
 //
-//declscope:package // create.go and update.go fill it from the flags
+//declscope:shared // create.go and update.go fill it from the flags
 type writeOptionFlags struct {
 	tier           string
 	dataType       string
@@ -48,7 +48,7 @@ type writeOptionFlags struct {
 // all-empty writeOptionFlags yields nil and preserves the exact behavior of the
 // command when no flags are set.
 //
-//declscope:package // create.go and update.go build their write options with it
+//declscope:shared // create.go and update.go build their write options with it
 func buildWriteOptions(v writeOptionFlags) []provider.WriteOption {
 	var opts []provider.WriteOption
 

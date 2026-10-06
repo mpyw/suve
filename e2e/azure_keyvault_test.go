@@ -31,7 +31,7 @@ import (
 // name is required by the CLI but ignored by the emulator (a single default
 // vault is served at the endpoint).
 //
-//declscope:package // shared with the TUI suite
+//declscope:shared // shared with the TUI suite
 func setupAzureKeyVault(t *testing.T) {
 	t.Helper()
 
@@ -46,7 +46,7 @@ func setupAzureKeyVault(t *testing.T) {
 // command group (whose Before hooks resolve the vault from AZURE_KEYVAULT_NAME)
 // and returns stdout.
 //
-//declscope:package // shared with the TUI suite
+//declscope:shared // shared with the TUI suite
 func runAzureSecret(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
@@ -71,7 +71,7 @@ func runAzureSecret(t *testing.T, args ...string) (string, error) {
 // interactive macOS prompt). Any valid base64-standard 32-byte value works; it
 // only has to be stable within the test.
 //
-//declscope:package // shared with the TUI suite
+//declscope:shared // shared with the TUI suite
 func setAzureKeyVaultStagingKey(t *testing.T) {
 	t.Helper()
 	// envStagingKey ("SUVE_STAGING_KEY") is defined in an internal keyprovider
