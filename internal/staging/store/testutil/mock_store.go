@@ -13,9 +13,6 @@ import (
 // MockStore implements store.ReadWriteOperator for testing.
 // It stores state in memory and can be configured to return errors.
 type MockStore struct {
-	entries map[staging.Service]map[staging.EntryKey]staging.Entry
-	tags    map[staging.Service]map[staging.EntryKey]staging.TagEntry
-
 	// Error injection for testing error paths
 	GetEntryErr     error
 	GetTagErr       error
@@ -34,6 +31,9 @@ type MockStore struct {
 	// DrainErrOnCall specifies which call number (1-indexed) should return DrainErr
 	// If 0, DrainErr applies to all calls. If >0, DrainErr only applies to that call number.
 	DrainErrOnCall int
+
+	entries map[staging.Service]map[staging.EntryKey]staging.Entry
+	tags    map[staging.Service]map[staging.EntryKey]staging.TagEntry
 }
 
 // NewMockStore creates a new MockStore with initialized maps.

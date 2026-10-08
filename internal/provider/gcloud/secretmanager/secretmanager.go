@@ -101,22 +101,6 @@ func New(client Client, project string) *Store {
 	return &Store{client: client, project: project}
 }
 
-// parent returns the project resource path "projects/{project}".
-func (s *Store) parent() string {
-	return "projects/" + s.project
-}
-
-// secretPath returns the secret resource path "projects/{project}/secrets/{name}".
-func (s *Store) secretPath(name string) string {
-	return fmt.Sprintf("projects/%s/secrets/%s", s.project, name)
-}
-
-// versionPath returns the version resource path
-// "projects/{project}/secrets/{name}/versions/{version}" ("latest" is a valid version alias).
-func (s *Store) versionPath(name, version string) string {
-	return fmt.Sprintf("projects/%s/secrets/%s/versions/%s", s.project, name, version)
-}
-
 // Resolve parses the version spec (generic) and resolves it to an opaque
 // VersionRef holding the integer version string (or "" for latest). A ~shift is
 // applied by walking ALL versions (any state) newest-first — the same anchor a
@@ -512,6 +496,22 @@ func (s *Store) updateLabels(ctx context.Context, name string, labels map[string
 	}
 
 	return nil
+}
+
+// parent returns the project resource path "projects/{project}".
+func (s *Store) parent() string {
+	return "projects/" + s.project
+}
+
+// secretPath returns the secret resource path "projects/{project}/secrets/{name}".
+func (s *Store) secretPath(name string) string {
+	return fmt.Sprintf("projects/%s/secrets/%s", s.project, name)
+}
+
+// versionPath returns the version resource path
+// "projects/{project}/secrets/{name}/versions/{version}" ("latest" is a valid version alias).
+func (s *Store) versionPath(name, version string) string {
+	return fmt.Sprintf("projects/%s/secrets/%s/versions/%s", s.project, name, version)
 }
 
 // mapError maps a gRPC NOT_FOUND to provider.ErrNotFound and otherwise wraps the

@@ -294,6 +294,72 @@ type importReAnchorSpec struct {
 	strategyForNamespace func(ctx context.Context, namespace string) (staging.FullStrategy, error)
 }
 
+// NewGlobalImportCommand creates the global `stage import <dir>` command. It
+// reads <dir>/param.json and <dir>/secret.json (missing files are skipped; an
+// error only when neither exists) into the working staging area. The config's
+// ScopeResolver determines the provider staging scope; its
+// per-service factories re-anchor conflict-detection timestamps on a cross-scope
+// import.
+func NewGlobalImportCommand(gcfg GlobalConfig) *cli.Command {
+	resolver := gcfg.ScopeResolver
+
+	return &cli.Command{
+		Name:      "import",
+		Usage:     "Import staged changes from a directory (one file per service)",
+		ArgsUsage: "<dir>",
+		Description: strings.ReplaceAll(`Import staged changes from a directory into the working staging area.
+
+Reads one file per service:
+   <dir>/param.json    staged parameter changes
+   <dir>/secret.json   staged secret changes
+
+Missing files are skipped; it is an error only when neither exists. Each file's
+scope is validated against the current scope (override with
+--allow-scope-mismatch). A Merge / Overwrite prompt appears only when the
+working staging area already
+holds changes; use --merge / --overwrite to choose non-interactively.
+
+EXAMPLES:
+   {path} import ./backup                       Import staged changes from ./backup
+   {path} import ./backup --overwrite           Replace the working staging area
+   echo "secret" | {path} import ./backup --passphrase-stdin   Decrypt with passphrase from stdin`, "{path}", gcfg.CommandPath),
+		Flags:                  importFlags(),
+		MutuallyExclusiveFlags: importMutuallyExclusiveFlags(),
+		Action:                 importAction("", resolver, globalImportReAnchorSpecs(gcfg)),
+	}
+}
+
+// NewImportCommand creates a service-specific `stage <svc> import <file>`
+// command that reads the single service from <file>. A service mismatch (the
+// file holds another service) is a hard error.
+func NewImportCommand(cfg CommandConfig) *cli.Command {
+	parser := cfg.ParserFactory()
+	service := parser.Service()
+
+	return &cli.Command{
+		Name:      "import",
+		Usage:     fmt.Sprintf("Import staged %s changes from a file", cfg.ItemName),
+		ArgsUsage: "<file>",
+		Description: renderHelp(cfg, `Import staged {item} changes from a file into the working staging area.
+
+The file's service must match ({name}); importing another service's file is a hard
+error. The file's scope is validated against the current scope (override with
+--allow-scope-mismatch). A Merge / Overwrite prompt appears only when the working
+staging area already holds changes; use --merge / --overwrite to choose
+non-interactively.
+
+EXAMPLES:
+   {path} import ./{name}.json                     Import staged {item} changes
+   {path} import ./{name}.json --overwrite         Replace the working staging area
+   echo "secret" | {path} import ./{name}.json --passphrase-stdin   Decrypt with passphrase from stdin`),
+		Flags:                  importFlags(),
+		MutuallyExclusiveFlags: importMutuallyExclusiveFlags(),
+		Action: importAction(service, cfg.ScopeResolver, map[staging.Service]importReAnchorSpec{
+			service: {factory: cfg.Factory, strategyForNamespace: cfg.StrategyForNamespace},
+		}),
+	}
+}
+
 // newImportReAnchorResolver adapts per-service strategy plumbing to the import use
 // case's ReAnchorResolver. The single non-namespaced strategy is built once and
 // cached (re-anchoring runs sequentially, so no locking is needed); namespaced
@@ -507,70 +573,4 @@ func globalImportReAnchorSpecs(gcfg GlobalConfig) map[staging.Service]importReAn
 	}
 
 	return specs
-}
-
-// NewGlobalImportCommand creates the global `stage import <dir>` command. It
-// reads <dir>/param.json and <dir>/secret.json (missing files are skipped; an
-// error only when neither exists) into the working staging area. The config's
-// ScopeResolver determines the provider staging scope; its
-// per-service factories re-anchor conflict-detection timestamps on a cross-scope
-// import.
-func NewGlobalImportCommand(gcfg GlobalConfig) *cli.Command {
-	resolver := gcfg.ScopeResolver
-
-	return &cli.Command{
-		Name:      "import",
-		Usage:     "Import staged changes from a directory (one file per service)",
-		ArgsUsage: "<dir>",
-		Description: strings.ReplaceAll(`Import staged changes from a directory into the working staging area.
-
-Reads one file per service:
-   <dir>/param.json    staged parameter changes
-   <dir>/secret.json   staged secret changes
-
-Missing files are skipped; it is an error only when neither exists. Each file's
-scope is validated against the current scope (override with
---allow-scope-mismatch). A Merge / Overwrite prompt appears only when the
-working staging area already
-holds changes; use --merge / --overwrite to choose non-interactively.
-
-EXAMPLES:
-   {path} import ./backup                       Import staged changes from ./backup
-   {path} import ./backup --overwrite           Replace the working staging area
-   echo "secret" | {path} import ./backup --passphrase-stdin   Decrypt with passphrase from stdin`, "{path}", gcfg.CommandPath),
-		Flags:                  importFlags(),
-		MutuallyExclusiveFlags: importMutuallyExclusiveFlags(),
-		Action:                 importAction("", resolver, globalImportReAnchorSpecs(gcfg)),
-	}
-}
-
-// NewImportCommand creates a service-specific `stage <svc> import <file>`
-// command that reads the single service from <file>. A service mismatch (the
-// file holds another service) is a hard error.
-func NewImportCommand(cfg CommandConfig) *cli.Command {
-	parser := cfg.ParserFactory()
-	service := parser.Service()
-
-	return &cli.Command{
-		Name:      "import",
-		Usage:     fmt.Sprintf("Import staged %s changes from a file", cfg.ItemName),
-		ArgsUsage: "<file>",
-		Description: renderHelp(cfg, `Import staged {item} changes from a file into the working staging area.
-
-The file's service must match ({name}); importing another service's file is a hard
-error. The file's scope is validated against the current scope (override with
---allow-scope-mismatch). A Merge / Overwrite prompt appears only when the working
-staging area already holds changes; use --merge / --overwrite to choose
-non-interactively.
-
-EXAMPLES:
-   {path} import ./{name}.json                     Import staged {item} changes
-   {path} import ./{name}.json --overwrite         Replace the working staging area
-   echo "secret" | {path} import ./{name}.json --passphrase-stdin   Decrypt with passphrase from stdin`),
-		Flags:                  importFlags(),
-		MutuallyExclusiveFlags: importMutuallyExclusiveFlags(),
-		Action: importAction(service, cfg.ScopeResolver, map[staging.Service]importReAnchorSpec{
-			service: {factory: cfg.Factory, strategyForNamespace: cfg.StrategyForNamespace},
-		}),
-	}
 }

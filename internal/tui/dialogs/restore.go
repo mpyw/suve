@@ -12,6 +12,16 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
+// RestoreInput configures a restore dialog.
+type RestoreInput struct {
+	Ctx     context.Context //nolint:containedctx // Run context threaded into the mutation command; mirrors the browser
+	Mutator data.Mutator
+	Service string
+	Styles  styles.Styles
+	// Name seeds the name input (the browser's selected entry, when any).
+	Name string
+}
+
 // restoreForm is the restore dialog: a single name input for a soft-deleted
 // secret. Restore is immediate only (there is no staged restore), so it carries
 // no mode toggle; it is offered only when the service HasRestore.
@@ -30,16 +40,6 @@ type restoreForm struct {
 	err  string
 }
 
-// RestoreInput configures a restore dialog.
-type RestoreInput struct {
-	Ctx     context.Context //nolint:containedctx // Run context threaded into the mutation command; mirrors the browser
-	Mutator data.Mutator
-	Service string
-	Styles  styles.Styles
-	// Name seeds the name input (the browser's selected entry, when any).
-	Name string
-}
-
 // NewRestore builds a restore dialog.
 func NewRestore(in RestoreInput) (Model, tea.Cmd) {
 	d := &restoreForm{
@@ -53,43 +53,6 @@ func NewRestore(in RestoreInput) (Model, tea.Cmd) {
 	cmd := d.rebuildForm()
 
 	return d, cmd
-}
-
-func (d *restoreForm) rebuildForm() tea.Cmd {
-	d.form = huh.NewForm(huh.NewGroup(
-		huh.NewInput().Key("name").Title("Name").Value(&d.name).Validate(requiredField("name")),
-	)).
-		WithWidth(dialogContentWidth).
-		WithShowHelp(false).
-		WithShowErrors(true)
-
-	// Init the (re)built form, then cap its body to the known terminal size so a
-	// retry after an error never renders at full natural height off-screen.
-	return tea.Batch(d.form.Init(), d.syncFormSize())
-}
-
-// syncFormSize re-caps the embedded form's scrollable body to the current
-// terminal size and footer (see the entry form for the full rationale).
-func (d *restoreForm) syncFormSize() tea.Cmd {
-	if d.form == nil || !d.sized() {
-		return nil
-	}
-
-	form, cmd := d.form.Update(tea.WindowSizeMsg{Width: dialogContentWidth, Height: d.formBodyHeight()})
-	if f, ok := form.(*huh.Form); ok {
-		d.form = f
-	}
-
-	return cmd
-}
-
-// formBodyHeight is the height budget for the form body: the frame's inner
-// height less the title, its blank spacer, and the footer (any active error plus
-// the hint).
-func (d *restoreForm) formBodyHeight() int {
-	around := lipgloss.Height(d.header()) + titleSpacerRows + lipgloss.Height(d.footer())
-
-	return max(d.availHeight()-around, minFormBody)
 }
 
 func (d *restoreForm) Busy() bool { return d.busy }
@@ -168,6 +131,43 @@ func (d *restoreForm) View() string {
 	b.WriteString(d.footer())
 
 	return b.String()
+}
+
+func (d *restoreForm) rebuildForm() tea.Cmd {
+	d.form = huh.NewForm(huh.NewGroup(
+		huh.NewInput().Key("name").Title("Name").Value(&d.name).Validate(requiredField("name")),
+	)).
+		WithWidth(dialogContentWidth).
+		WithShowHelp(false).
+		WithShowErrors(true)
+
+	// Init the (re)built form, then cap its body to the known terminal size so a
+	// retry after an error never renders at full natural height off-screen.
+	return tea.Batch(d.form.Init(), d.syncFormSize())
+}
+
+// syncFormSize re-caps the embedded form's scrollable body to the current
+// terminal size and footer (see the entry form for the full rationale).
+func (d *restoreForm) syncFormSize() tea.Cmd {
+	if d.form == nil || !d.sized() {
+		return nil
+	}
+
+	form, cmd := d.form.Update(tea.WindowSizeMsg{Width: dialogContentWidth, Height: d.formBodyHeight()})
+	if f, ok := form.(*huh.Form); ok {
+		d.form = f
+	}
+
+	return cmd
+}
+
+// formBodyHeight is the height budget for the form body: the frame's inner
+// height less the title, its blank spacer, and the footer (any active error plus
+// the hint).
+func (d *restoreForm) formBodyHeight() int {
+	around := lipgloss.Height(d.header()) + titleSpacerRows + lipgloss.Height(d.footer())
+
+	return max(d.availHeight()-around, minFormBody)
 }
 
 // header renders the dialog title.

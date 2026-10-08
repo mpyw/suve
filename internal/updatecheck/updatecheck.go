@@ -93,21 +93,6 @@ var procMemo cacheEntry
 //nolint:gochecknoglobals // process-wide fallback marker; guarded by procMemoMu
 var procMemoValid bool
 
-func readProcMemo() (cacheEntry, bool) {
-	procMemoMu.Lock()
-	defer procMemoMu.Unlock()
-
-	return procMemo, procMemoValid
-}
-
-func writeProcMemo(entry cacheEntry) {
-	procMemoMu.Lock()
-	defer procMemoMu.Unlock()
-
-	procMemo = entry
-	procMemoValid = true
-}
-
 // Notice returns a one-line update notice when a newer release of mpyw/suve is
 // available, or "" when there is nothing to report, the check is disabled, the
 // build is a dev build, or any error occurs. It is safe to call on every
@@ -132,6 +117,21 @@ func defaultChecker() *checker {
 		readMemo:  readProcMemo,
 		writeMemo: writeProcMemo,
 	}
+}
+
+func readProcMemo() (cacheEntry, bool) {
+	procMemoMu.Lock()
+	defer procMemoMu.Unlock()
+
+	return procMemo, procMemoValid
+}
+
+func writeProcMemo(entry cacheEntry) {
+	procMemoMu.Lock()
+	defer procMemoMu.Unlock()
+
+	procMemo = entry
+	procMemoValid = true
 }
 
 // notice implements the logic described on Notice. It never returns an error;

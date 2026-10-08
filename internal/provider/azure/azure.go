@@ -91,6 +91,11 @@ func (Factory) Store(ctx context.Context, scope provider.Scope, kind provider.Ki
 //nolint:gochecknoglobals // azcore's logger is inherently process-global state
 var debugLogOnce sync.Once
 
+// Register associates the Azure Factory with provider.ProviderAzure in reg.
+func Register(reg *provider.Registry) {
+	reg.Register(provider.ProviderAzure, Factory{})
+}
+
 // enableDebugLogging turns on azcore request/response logging to the debug
 // writer the first time it is called with debug active on ctx. azcore's logger
 // is process-global and must be set before clients issue requests; the default
@@ -225,9 +230,4 @@ func appConfigStore(ctx context.Context, scope provider.Scope) (provider.Store, 
 	}
 
 	return appconfig.New(appconfig.WrapClient(client), scope.AppConfigNamespace), nil
-}
-
-// Register associates the Azure Factory with provider.ProviderAzure in reg.
-func Register(reg *provider.Registry) {
-	reg.Register(provider.ProviderAzure, Factory{})
 }

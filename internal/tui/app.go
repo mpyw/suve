@@ -71,6 +71,75 @@ const (
 	minHeight = 16
 )
 
+// App is the root Bubble Tea model — the app shell.
+type App struct {
+	width  int
+	height int
+
+	scope   provider.Scope
+	service string
+
+	tabs      []components.Tab
+	activeTab int
+
+	// copyValue is the focused value the `y` key copies. The skeleton has none
+	// (real pages supply one from Step 3), so it stays empty and the copy is a
+	// no-op; it is a field so a page can set it and so the empty guard is testable.
+	copyValue string
+
+	// pages is the page stack; the top is the active page. dialogs is the modal
+	// overlay stack; the top dialog captures input while any dialog is open.
+	pages   []page
+	dialogs []dialog
+
+	// dialogHits is the last-rendered overlay hit map: one region per dialog box at
+	// its centered screen position. A click while modal is resolved against it, and
+	// the hit region's bounds give the box origin the click is translated by — so a
+	// click reaching a dialog is un-offset via the compositor's layer origin rather
+	// than by re-deriving the centering math (the #663 dialog-offset fix).
+	dialogHits *hit.Map
+
+	keys   keys.Map
+	styles styles.Styles
+	help   help.Model
+
+	// fetchTarget resolves target while target.Pending is set.
+	fetchTarget targetFetcher
+	target      provider.Target
+	// retryTarget is set when the last target lookup failed. The lookup is then
+	// retried once the next staged count is reported (#1005): a staging probe or
+	// review has just run, and on AWS it resolves the same memoized STS identity,
+	// so a transient failure at launch does not leave the target blank for the
+	// whole session. Retrying on that event rather than on a timer adds no
+	// lookups while the network stays down and nothing is being refreshed.
+	retryTarget bool
+	// stagedSinceFetch records that a staged count arrived while the target
+	// lookup was in flight, so a failure retries at once instead of waiting for a
+	// count that has already been reported.
+	stagedSinceFetch bool
+
+	// sourceFor is the injected data seam (see config); runCtx is the Run context
+	// threaded into pages.
+	sourceFor  func(service string) (data.Source, data.StagingProbe)
+	mutatorFor func(service string) data.Mutator
+	stagingFor func(service string) data.StagingService
+	runCtx     context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
+
+	// status is a transient one-line outcome (staged/applied/skipped/unstaged)
+	// shown just above the help bar; empty renders no row.
+	status string
+	// stagedCounts holds the last staged-item count each service's browser
+	// reported, totalled into the Staging tab's count badge.
+	stagedCounts map[string]int
+
+	// pageGen is a monotonic page-generation counter. Each browser and staging
+	// page built by pageForTab is stamped with the next value so a superseded
+	// prior page's in-flight response — whose per-Model seq resets and can collide
+	// with the new page's — is dropped rather than spliced into the new tab (#746,
+	// #1011).
+	pageGen int
+}
+
 // targetFetcher resolves a pending scope target (see provider.Target) for the
 // status bar and the apply confirmation. It takes no context: the launch layer
 // builds it as a closure over the Run context, so the model stays free of both a
@@ -142,75 +211,6 @@ type targetMsg struct{ target provider.Target }
 // next staged-count report (see App.retryTarget).
 type targetErrMsg struct{ err error }
 
-// App is the root Bubble Tea model — the app shell.
-type App struct {
-	width  int
-	height int
-
-	scope   provider.Scope
-	service string
-
-	tabs      []components.Tab
-	activeTab int
-
-	// copyValue is the focused value the `y` key copies. The skeleton has none
-	// (real pages supply one from Step 3), so it stays empty and the copy is a
-	// no-op; it is a field so a page can set it and so the empty guard is testable.
-	copyValue string
-
-	// pages is the page stack; the top is the active page. dialogs is the modal
-	// overlay stack; the top dialog captures input while any dialog is open.
-	pages   []page
-	dialogs []dialog
-
-	// dialogHits is the last-rendered overlay hit map: one region per dialog box at
-	// its centered screen position. A click while modal is resolved against it, and
-	// the hit region's bounds give the box origin the click is translated by — so a
-	// click reaching a dialog is un-offset via the compositor's layer origin rather
-	// than by re-deriving the centering math (the #663 dialog-offset fix).
-	dialogHits *hit.Map
-
-	keys   keys.Map
-	styles styles.Styles
-	help   help.Model
-
-	// fetchTarget resolves target while target.Pending is set.
-	fetchTarget targetFetcher
-	target      provider.Target
-	// retryTarget is set when the last target lookup failed. The lookup is then
-	// retried once the next staged count is reported (#1005): a staging probe or
-	// review has just run, and on AWS it resolves the same memoized STS identity,
-	// so a transient failure at launch does not leave the target blank for the
-	// whole session. Retrying on that event rather than on a timer adds no
-	// lookups while the network stays down and nothing is being refreshed.
-	retryTarget bool
-	// stagedSinceFetch records that a staged count arrived while the target
-	// lookup was in flight, so a failure retries at once instead of waiting for a
-	// count that has already been reported.
-	stagedSinceFetch bool
-
-	// sourceFor is the injected data seam (see config); runCtx is the Run context
-	// threaded into pages.
-	sourceFor  func(service string) (data.Source, data.StagingProbe)
-	mutatorFor func(service string) data.Mutator
-	stagingFor func(service string) data.StagingService
-	runCtx     context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
-
-	// status is a transient one-line outcome (staged/applied/skipped/unstaged)
-	// shown just above the help bar; empty renders no row.
-	status string
-	// stagedCounts holds the last staged-item count each service's browser
-	// reported, totalled into the Staging tab's count badge.
-	stagedCounts map[string]int
-
-	// pageGen is a monotonic page-generation counter. Each browser and staging
-	// page built by pageForTab is stamped with the next value so a superseded
-	// prior page's in-flight response — whose per-Model seq resets and can collide
-	// with the new page's — is dropped rather than spliced into the new tab (#746,
-	// #1011).
-	pageGen int
-}
-
 // newApp builds the root model from a launch config: it derives the tab set
 // from the capability matrix (scope-gated), preselects the launch tab, and
 // seeds the page stack with that tab's placeholder.
@@ -253,16 +253,6 @@ func newApp(cfg config) *App {
 	return m
 }
 
-// initialPageCmd returns the active page's Init command, so the initial page's
-// async loads run when the program starts (Bubble Tea calls only the root Init).
-func (m *App) initialPageCmd() tea.Cmd {
-	if len(m.pages) == 0 {
-		return nil
-	}
-
-	return initPage(m.pages[len(m.pages)-1])
-}
-
 // Init kicks off the async target fetch (when the target is pending) and the
 // initial page's own loads.
 func (m *App) Init() tea.Cmd {
@@ -281,33 +271,6 @@ func (m *App) Init() tea.Cmd {
 	}
 
 	return tea.Batch(cmds...)
-}
-
-// fetchTargetCmd runs the injected target fetcher off the update loop.
-func (m *App) fetchTargetCmd() tea.Cmd {
-	fetch := m.fetchTarget
-	m.stagedSinceFetch = false
-
-	return func() tea.Msg {
-		target, err := fetch()
-		if err != nil {
-			return targetErrMsg{err: err}
-		}
-
-		return targetMsg{target: target}
-	}
-}
-
-// retryTargetCmd re-runs a failed target lookup, once per failure (see
-// retryTarget), or returns nil when there is nothing to retry.
-func (m *App) retryTargetCmd() tea.Cmd {
-	if !m.retryTarget {
-		return nil
-	}
-
-	m.retryTarget = false
-
-	return m.fetchTargetCmd()
 }
 
 // Update dispatches messages. Input (keys, mouse) is routed dialogs-first, then
@@ -534,6 +497,43 @@ func (m *App) routeToFocused(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, pageCmd := m.updateActivePage(msg)
 
 	return m, tea.Batch(dialogCmd, pageCmd)
+}
+
+// initialPageCmd returns the active page's Init command, so the initial page's
+// async loads run when the program starts (Bubble Tea calls only the root Init).
+func (m *App) initialPageCmd() tea.Cmd {
+	if len(m.pages) == 0 {
+		return nil
+	}
+
+	return initPage(m.pages[len(m.pages)-1])
+}
+
+// fetchTargetCmd runs the injected target fetcher off the update loop.
+func (m *App) fetchTargetCmd() tea.Cmd {
+	fetch := m.fetchTarget
+	m.stagedSinceFetch = false
+
+	return func() tea.Msg {
+		target, err := fetch()
+		if err != nil {
+			return targetErrMsg{err: err}
+		}
+
+		return targetMsg{target: target}
+	}
+}
+
+// retryTargetCmd re-runs a failed target lookup, once per failure (see
+// retryTarget), or returns nil when there is nothing to retry.
+func (m *App) retryTargetCmd() tea.Cmd {
+	if !m.retryTarget {
+		return nil
+	}
+
+	m.retryTarget = false
+
+	return m.fetchTargetCmd()
 }
 
 // isUserInput reports whether msg is terminal input from the user, which only

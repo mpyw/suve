@@ -14,6 +14,31 @@ var (
 	locationOnce  sync.Once
 )
 
+// FormatRFC3339 formats the given time in RFC3339 format using the
+// timezone from TZ environment variable.
+func FormatRFC3339(t time.Time) string {
+	return t.In(getLocation()).Format(time.RFC3339)
+}
+
+// FormatDate formats the given time as a YYYY-MM-DD date using the
+// timezone from TZ environment variable.
+func FormatDate(t time.Time) string {
+	return t.In(getLocation()).Format("2006-01-02")
+}
+
+// FormatDateTime formats the given time as a YYYY-MM-DD HH:MM:SS datetime using
+// the timezone from TZ environment variable.
+func FormatDateTime(t time.Time) string {
+	return t.In(getLocation()).Format("2006-01-02 15:04:05")
+}
+
+// ResetLocationCache resets the cached location.
+// This is intended for testing purposes only.
+func ResetLocationCache() {
+	locationOnce = sync.Once{}
+	locationCache = nil
+}
+
 // loadLocation loads the timezone from TZ environment variable.
 // Falls back to UTC if TZ is invalid.
 // Uses local time if TZ is not set.
@@ -41,29 +66,4 @@ func getLocation() *time.Location {
 	})
 
 	return locationCache
-}
-
-// FormatRFC3339 formats the given time in RFC3339 format using the
-// timezone from TZ environment variable.
-func FormatRFC3339(t time.Time) string {
-	return t.In(getLocation()).Format(time.RFC3339)
-}
-
-// FormatDate formats the given time as a YYYY-MM-DD date using the
-// timezone from TZ environment variable.
-func FormatDate(t time.Time) string {
-	return t.In(getLocation()).Format("2006-01-02")
-}
-
-// FormatDateTime formats the given time as a YYYY-MM-DD HH:MM:SS datetime using
-// the timezone from TZ environment variable.
-func FormatDateTime(t time.Time) string {
-	return t.In(getLocation()).Format("2006-01-02 15:04:05")
-}
-
-// ResetLocationCache resets the cached location.
-// This is intended for testing purposes only.
-func ResetLocationCache() {
-	locationOnce = sync.Once{}
-	locationCache = nil
 }

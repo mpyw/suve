@@ -214,35 +214,6 @@ func (p *logPresenter) RenderPatch(stdout, stderr io.Writer, i int, parseJSON, r
 	}
 }
 
-// logTruncateRunes shortens s to at most maxLen runes, appending "..." only when
-// it actually trims. Counting runes rather than bytes keeps multi-byte
-// characters (e.g. Japanese text, emoji) whole (#340). A maxLen <= 0 disables
-// truncation.
-func logTruncateRunes(s string, maxLen int) string {
-	if maxLen <= 0 {
-		return s
-	}
-
-	runes := []rune(s)
-	if len(runes) <= maxLen {
-		return s
-	}
-
-	return string(runes[:maxLen]) + "..."
-}
-
-// logSanitizeControl replaces every control character (newlines, tabs, etc.) with
-// a visible ␤ so a value cannot break the one-line-per-version layout (#340).
-func logSanitizeControl(s string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
-			return '␤'
-		}
-
-		return r
-	}, s)
-}
-
 // LogCommand returns the SSM Parameter Store log command.
 func LogCommand() *cli.Command {
 	return generic.LogCommand(generic.LogConfig{
@@ -332,4 +303,33 @@ EXAMPLES:
 			return NewLogPresenter(store, req), nil
 		},
 	})
+}
+
+// logTruncateRunes shortens s to at most maxLen runes, appending "..." only when
+// it actually trims. Counting runes rather than bytes keeps multi-byte
+// characters (e.g. Japanese text, emoji) whole (#340). A maxLen <= 0 disables
+// truncation.
+func logTruncateRunes(s string, maxLen int) string {
+	if maxLen <= 0 {
+		return s
+	}
+
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+
+	return string(runes[:maxLen]) + "..."
+}
+
+// logSanitizeControl replaces every control character (newlines, tabs, etc.) with
+// a visible ␤ so a value cannot break the one-line-per-version layout (#340).
+func logSanitizeControl(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return '␤'
+		}
+
+		return r
+	}, s)
 }

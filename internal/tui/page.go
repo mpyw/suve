@@ -63,9 +63,6 @@ func (p placeholderPage) Update(tea.Msg) (page, tea.Cmd) {
 	return p, nil
 }
 
-// capturesInput is always false: the placeholder has no text input.
-func (p placeholderPage) capturesInput() bool { return false }
-
 // View centers the placeholder notice in the content area.
 func (p placeholderPage) View(width, height int) string {
 	if width <= 0 || height <= 0 {
@@ -76,6 +73,9 @@ func (p placeholderPage) View(width, height int) string {
 
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
 }
+
+// capturesInput is always false: the placeholder has no text input.
+func (p placeholderPage) capturesInput() bool { return false }
 
 // copyable is implemented by a page that supplies the `y`-copy value. Copying
 // never changes the pane's mask state — a masked secret is copied to the
@@ -99,8 +99,8 @@ func (p browserPage) Update(msg tea.Msg) (page, tea.Cmd) {
 func (p browserPage) View(width, height int) string { return p.m.View(width, height) }
 func (p browserPage) Init() tea.Cmd                 { return p.m.Init() }
 func (p browserPage) CopyText() (string, bool)      { return p.m.CopyText() }
-func (p browserPage) capturesInput() bool           { return p.m.CapturesInput() }
 func (p browserPage) HelpKeyMap() help.KeyMap       { return p.m.HelpKeyMap() }
+func (p browserPage) capturesInput() bool           { return p.m.CapturesInput() }
 
 // diffPage adapts *diff.Model to the app's page interface.
 type diffPage struct{ m *diff.Model }

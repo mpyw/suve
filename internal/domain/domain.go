@@ -82,14 +82,6 @@ type Field struct {
 	Value string
 }
 
-// tagChange describes staged tag mutations (add/update + remove-by-key).
-type tagChange struct {
-	// add holds tags to create or update, keyed by tag key.
-	add map[string]string
-	// remove holds tag keys to delete.
-	remove []string
-}
-
 // Entry is a provider-neutral retrieved parameter/secret. It carries only
 // cross-provider essentials: no ARN, no provider metadata bag.
 type Entry struct {
@@ -112,4 +104,12 @@ type Entry struct {
 	// Field values, never AWS types or an untyped any. Providers may leave it
 	// empty when they have no extra metadata to surface.
 	Extra []Field
+}
+
+// tagChange describes staged tag mutations (add/update + remove-by-key).
+type tagChange struct {
+	// add holds tags to create or update, keyed by tag key.
+	add map[string]string
+	// remove holds tag keys to delete.
+	remove []string
 }

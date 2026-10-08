@@ -92,29 +92,6 @@ func (e *Envelope) associatedData() []byte {
 	return buf.Bytes()
 }
 
-// encodeEnvelopePayload marshals a single-service state into the base64 payload. With an
-// empty passphrase the state JSON is stored as plaintext (base64 only, no
-// encryption); otherwise it is encrypted with the passphrase-based (v1) format,
-// binding aad (the canonical envelope header) to the ciphertext.
-func encodeEnvelopePayload(state *staging.State, passphrase string, aad []byte) (string, error) {
-	// staging.State implements json.Marshaler (MarshalJSON), emitting its
-	// EntryKey-keyed maps as arrays of (name, namespace) records, so the static
-	// errchkjson "unsupported map key" warning is a false positive here.
-	data, err := json.Marshal(state) //nolint:errchkjson // State has a custom MarshalJSON
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal state: %w", err)
-	}
-
-	if passphrase != "" {
-		data, err = crypt.EncryptWithAAD(data, passphrase, aad)
-		if err != nil {
-			return "", fmt.Errorf("failed to encrypt payload: %w", err)
-		}
-	}
-
-	return base64.StdEncoding.EncodeToString(data), nil
-}
-
 // WriteEnvelopeFile writes state to path as an export envelope, overwriting any
 // existing file wholesale. Only svc's entries are written: the state is scoped
 // to svc defensively so a caller passing a multi-service state can never leak
@@ -195,15 +172,27 @@ func ReadEnvelopeFile(path string) (*Envelope, error) {
 	return &env, nil
 }
 
-// decodedPayload base64-decodes the payload into its raw (possibly encrypted)
-// bytes.
-func (e *Envelope) decodedPayload() ([]byte, error) {
-	raw, err := base64.StdEncoding.DecodeString(e.Payload)
+// encodeEnvelopePayload marshals a single-service state into the base64 payload. With an
+// empty passphrase the state JSON is stored as plaintext (base64 only, no
+// encryption); otherwise it is encrypted with the passphrase-based (v1) format,
+// binding aad (the canonical envelope header) to the ciphertext.
+func encodeEnvelopePayload(state *staging.State, passphrase string, aad []byte) (string, error) {
+	// staging.State implements json.Marshaler (MarshalJSON), emitting its
+	// EntryKey-keyed maps as arrays of (name, namespace) records, so the static
+	// errchkjson "unsupported map key" warning is a false positive here.
+	data, err := json.Marshal(state) //nolint:errchkjson // State has a custom MarshalJSON
 	if err != nil {
-		return nil, fmt.Errorf("%w: corrupted payload encoding", ErrInvalidEnvelope)
+		return "", fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	return raw, nil
+	if passphrase != "" {
+		data, err = crypt.EncryptWithAAD(data, passphrase, aad)
+		if err != nil {
+			return "", fmt.Errorf("failed to encrypt payload: %w", err)
+		}
+	}
+
+	return base64.StdEncoding.EncodeToString(data), nil
 }
 
 // IsEncryptedPayload reports whether the payload is passphrase-encrypted. It
@@ -270,6 +259,17 @@ func (e *Envelope) DecodeState(passphrase string) (*staging.State, error) {
 // a namespace (label) axis.
 func (e *Envelope) namespaceAllowed() bool {
 	return e.Provider == string(provider.ProviderAzure) && e.Service == string(staging.ServiceParam)
+}
+
+// decodedPayload base64-decodes the payload into its raw (possibly encrypted)
+// bytes.
+func (e *Envelope) decodedPayload() ([]byte, error) {
+	raw, err := base64.StdEncoding.DecodeString(e.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("%w: corrupted payload encoding", ErrInvalidEnvelope)
+	}
+
+	return raw, nil
 }
 
 // envelopeFirstNamespacedKey returns the first entry or tag key in state that carries a

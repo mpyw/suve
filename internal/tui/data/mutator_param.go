@@ -53,17 +53,6 @@ func NewParamMutator(
 
 func (m *paramMutator) Capability() capability.ServiceCapability { return m.svcCap }
 
-// literalNamespace validates and decodes a namespace for the App Configuration
-// service (rejecting a `*`/`,` filter value); for every other provider it
-// returns the namespace unchanged.
-func (m *paramMutator) literalNamespace(ns string) (string, error) {
-	if !m.namespaced {
-		return ns, nil
-	}
-
-	return namespaces.Literal(ns)
-}
-
 func (m *paramMutator) Create(
 	ctx context.Context, key StagedKey, value, typeLabel, description string, staged bool,
 ) (WriteOutcome, error) {
@@ -211,6 +200,17 @@ func (m *paramMutator) RemoveTag(
 
 func (m *paramMutator) Restore(context.Context, string) (WriteOutcome, error) {
 	return WriteOutcome{}, ErrRestoreUnsupported
+}
+
+// literalNamespace validates and decodes a namespace for the App Configuration
+// service (rejecting a `*`/`,` filter value); for every other provider it
+// returns the namespace unchanged.
+func (m *paramMutator) literalNamespace(ns string) (string, error) {
+	if !m.namespaced {
+		return ns, nil
+	}
+
+	return namespaces.Literal(ns)
 }
 
 // stageStrategy resolves the staged-write strategy and store for a namespace.

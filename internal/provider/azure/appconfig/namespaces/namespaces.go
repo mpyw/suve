@@ -22,11 +22,6 @@ import (
 	"strings"
 )
 
-// nullLabelFilter is the reserved App Configuration label filter that matches
-// ONLY settings with no label — the null (default) namespace. The service
-// encodes it as label=%00 (#352).
-const nullLabelFilter = "\x00"
-
 // AllFilter is the App Configuration label filter that matches every
 // namespace (the degenerate `*` wildcard). Cross-namespace enumeration (see
 // appconfig.Store.ListWithNamespaces, #425) uses it to deliberately ignore the
@@ -38,6 +33,11 @@ const AllFilter = "*"
 // column, #430) so it is visible rather than a blank. It mirrors the GUI's
 // NS_NULL (frontend viewUtils.ts).
 const NullDisplay = "(NULL)"
+
+// nullLabelFilter is the reserved App Configuration label filter that matches
+// ONLY settings with no label — the null (default) namespace. The service
+// encodes it as label=%00 (#352).
+const nullLabelFilter = "\x00"
 
 // Filter maps a raw --namespace value to an App Configuration LabelFilter for
 // list/read enumeration. An empty value maps to the null-label filter (the

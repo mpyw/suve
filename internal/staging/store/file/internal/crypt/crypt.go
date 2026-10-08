@@ -77,11 +77,11 @@ const (
 	// authenticated by AES-GCM.
 	VersionRawKeyAAD = byte(3)
 
-	saltLen  = 32
-	nonceLen = 12 // AES-GCM standard nonce size
-
 	// RawKeyLen is the required length (in bytes) of a raw AES-256 key.
 	RawKeyLen = 32
+
+	saltLen  = 32
+	nonceLen = 12 // AES-GCM standard nonce size
 )
 
 // argonParams holds the Argon2id parameters for a passphrase-based format version.
@@ -90,18 +90,6 @@ type argonParams struct {
 	memory  uint32
 	threads uint8
 	keyLen  uint32
-}
-
-// kdfParamsByVersion maps a passphrase-format version byte to its Argon2id
-// parameters. Decrypt looks up parameters by the version byte read from the
-// file, so a future parameter change is expressed as a new version while old
-// files continue to decrypt with the parameters they were written with.
-//
-//nolint:gochecknoglobals // immutable lookup table keyed by format version.
-var kdfParamsByVersion = map[byte]argonParams{
-	// v1 uses OWASP-recommended parameters for sensitive data.
-	//nolint:mnd // Argon2id parameters (OWASP recommended); a change means a new version.
-	1: {time: 3, memory: 64 * 1024, threads: 4, keyLen: 32},
 }
 
 var (
@@ -129,26 +117,23 @@ var (
 	ErrInvalidKeyLength = errors.New("invalid key length: must be 32 bytes")
 )
 
+// kdfParamsByVersion maps a passphrase-format version byte to its Argon2id
+// parameters. Decrypt looks up parameters by the version byte read from the
+// file, so a future parameter change is expressed as a new version while old
+// files continue to decrypt with the parameters they were written with.
+//
+//nolint:gochecknoglobals // immutable lookup table keyed by format version.
+var kdfParamsByVersion = map[byte]argonParams{
+	// v1 uses OWASP-recommended parameters for sensitive data.
+	//nolint:mnd // Argon2id parameters (OWASP recommended); a change means a new version.
+	1: {time: 3, memory: 64 * 1024, threads: 4, keyLen: 32},
+}
+
 // headerLen is the total header length: magic (8) + version (1).
 const headerLen = len(MagicHeader) + 1
 
 // gcmAuthTagLen is the minimum GCM authentication tag length in bytes.
 const gcmAuthTagLen = 16
-
-// newGCM creates an AES-GCM AEAD from the given key using the (overridable) cipher hooks.
-func newGCM(key []byte) (cipher.AEAD, error) {
-	block, err := newCipherFunc(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
-	}
-
-	gcm, err := newGCMFunc(block)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GCM: %w", err)
-	}
-
-	return gcm, nil
-}
 
 // Encrypt encrypts data with the given passphrase using AES-256-GCM with Argon2id key derivation.
 // Returns encrypted data in format: magic header + version(1) + salt + nonce + ciphertext.
@@ -363,4 +348,19 @@ func IsEncrypted(data []byte) bool {
 	}
 
 	return string(data[:len(MagicHeader)]) == MagicHeader
+}
+
+// newGCM creates an AES-GCM AEAD from the given key using the (overridable) cipher hooks.
+func newGCM(key []byte) (cipher.AEAD, error) {
+	block, err := newCipherFunc(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	gcm, err := newGCMFunc(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	return gcm, nil
 }

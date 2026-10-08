@@ -25,9 +25,9 @@ import (
 //declscope:ignore overexported // show_test.go runs it with the AWS presenters, which import this package
 type ShowOptions struct {
 	ParseJSON bool
-	noPager   bool
 	Raw       bool
 	Output    output.Format
+	noPager   bool
 }
 
 // ShowPresenter renders a single show result for a specific provider. Implementations

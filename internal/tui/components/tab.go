@@ -31,21 +31,6 @@ type TabBar struct {
 	Styles styles.Styles
 }
 
-// cells renders each tab to its styled cell, active tab highlighted.
-func (b TabBar) cells() []string {
-	cells := make([]string, len(b.Tabs))
-	for i, t := range b.Tabs {
-		style := b.Styles.TabInactive
-		if i == b.Active {
-			style = b.Styles.TabActive
-		}
-
-		cells[i] = style.Render(t.Title)
-	}
-
-	return cells
-}
-
 // View renders the tab bar to a single line, truncated to width.
 func (b TabBar) View(width int) string {
 	line := strings.Repeat(" ", tabBarLeftPad) + strings.Join(b.cells(), strings.Repeat(" ", tabGap))
@@ -69,4 +54,19 @@ func (b TabBar) TabAtX(x int) (int, bool) {
 	}
 
 	return 0, false
+}
+
+// cells renders each tab to its styled cell, active tab highlighted.
+func (b TabBar) cells() []string {
+	cells := make([]string, len(b.Tabs))
+	for i, t := range b.Tabs {
+		style := b.Styles.TabInactive
+		if i == b.Active {
+			style = b.Styles.TabActive
+		}
+
+		cells[i] = style.Render(t.Title)
+	}
+
+	return cells
 }

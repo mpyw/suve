@@ -51,13 +51,6 @@ type App struct {
 	//declscope:shared // shared with the detect namespace
 	initialProvider provider.Provider
 
-	// initialService is the service the GUI was launched with ("param" or
-	// "secret"), captured from the subcommand carrying `--gui` (e.g.
-	// `suve azure param --gui`). Empty means no specific service (launched at the
-	// group level or bare). Surfaced to the frontend via InitialService so it can
-	// open the matching view.
-	initialService string
-
 	// scope is the current read/write provider scope, selected from the
 	// frontend via SelectScope. It is the zero Scope (no provider) until a
 	// provider is chosen. Guarded by scopeMu.
@@ -75,6 +68,13 @@ type App struct {
 	//
 	//declscope:shared // shared with the staging namespace
 	stagingStore store.ReadWriteOperator
+
+	// initialService is the service the GUI was launched with ("param" or
+	// "secret"), captured from the subcommand carrying `--gui` (e.g.
+	// `suve azure param --gui`). Empty means no specific service (launched at the
+	// group level or bare). Surfaced to the frontend via InitialService so it can
+	// open the matching view.
+	initialService string
 
 	// stagingStores holds the working staging areas (backed by
 	// param.json/secret.json), keyed by provider.Scope.Key() so each
@@ -216,12 +216,6 @@ func (a *App) paramStoreForNamespace(ns string) (provider.Store, error) {
 	return a.paramStoreForNamespaceScoped(a.currentScope(), ns)
 }
 
-// paramStoreForNamespaceScoped is paramStoreForNamespace resolved from an
-// already-snapshotted scope (#560).
-func (a *App) paramStoreForNamespaceScoped(sc provider.Scope, ns string) (provider.Store, error) {
-	return registry.Store(a.ctx, a.effectiveParamScopeScoped(sc, ns), provider.KindParam)
-}
-
 // paramStrategyForNamespaceScoped builds the param staging strategy over a
 // provider store scoped to ns, so a staged entry's create/diff/apply runs
 // against its own namespace (the per-namespace resolver #431 threads into the
@@ -240,6 +234,12 @@ func (a *App) paramStrategyForNamespaceScoped(sc provider.Scope, ns string) (sta
 	}
 
 	return b.Strategy(s), nil
+}
+
+// paramStoreForNamespaceScoped is paramStoreForNamespace resolved from an
+// already-snapshotted scope (#560).
+func (a *App) paramStoreForNamespaceScoped(sc provider.Scope, ns string) (provider.Store, error) {
+	return registry.Store(a.ctx, a.effectiveParamScopeScoped(sc, ns), provider.KindParam)
 }
 
 // hasParamNamespaces reports whether an already-snapshotted scope's param

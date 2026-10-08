@@ -43,11 +43,11 @@ type StatusTagEntry struct {
 
 // StatusOutput holds the result of the status use case.
 type StatusOutput struct {
-	service     staging.Service
 	ServiceName string
-	itemName    string
 	Entries     []StatusEntry
 	TagEntries  []StatusTagEntry
+	service     staging.Service
+	itemName    string
 }
 
 // StatusUseCase executes status operations.

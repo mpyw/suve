@@ -30,6 +30,18 @@ type versionedTraits struct {
 	hasDeleteOptions bool
 }
 
+// versionedStrategy implements FullStrategy for a versioned service over a
+// provider.Store, with the provider specifics supplied by H. It carries no cloud
+// SDK dependency. A nil store yields a parser-only strategy
+// (ParseName/ParseSpec).
+//
+//declscope:shared // embedded by each versioned provider's exported strategy type
+type versionedStrategy[H versionedHooks] struct {
+	store provider.Store
+	//declscope:private
+	hooks H
+}
+
 // versionedHooks is the per-provider behavior a versionedStrategy delegates to.
 // Implementations are zero-size types, so a zero-value strategy (no store) still
 // works as a parser.
@@ -49,18 +61,6 @@ type versionedHooks interface {
 	create(ctx context.Context, store provider.Store, name string, entry Entry) error
 	// update applies a staged update.
 	update(ctx context.Context, store provider.Store, name string, entry Entry) error
-}
-
-// versionedStrategy implements FullStrategy for a versioned service over a
-// provider.Store, with the provider specifics supplied by H. It carries no cloud
-// SDK dependency. A nil store yields a parser-only strategy
-// (ParseName/ParseSpec).
-//
-//declscope:shared // embedded by each versioned provider's exported strategy type
-type versionedStrategy[H versionedHooks] struct {
-	store provider.Store
-	//declscope:private
-	hooks H
 }
 
 // Service returns the service type.
@@ -252,20 +252,6 @@ func (s *versionedStrategy[H]) FetchVersion(ctx context.Context, input string) (
 //declscope:shared // embedded by each versioned secret provider's hooks type
 type versionedSecretHooks struct{}
 
-func (versionedSecretHooks) versionLabel(id string) string { return "#" + id }
-
-func (versionedSecretHooks) isSecret(*domain.Entry) bool { return true }
-
-func (versionedSecretHooks) deleteOptions(*DeleteOptions) []provider.DeleteOption { return nil }
-
-func (versionedSecretHooks) create(ctx context.Context, store provider.Store, name string, entry Entry) error {
-	if _, err := store.Create(ctx, name, lo.FromPtr(entry.Value), domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
-		return fmt.Errorf("failed to create secret: %w", err)
-	}
-
-	return nil
-}
-
 // update writes the value as a new secret version.
 //
 //declscope:shared // AWS Secrets Manager's hooks wrap it with a binary-overwrite guard
@@ -278,6 +264,20 @@ func (versionedSecretHooks) update(ctx context.Context, store provider.Store, na
 	// updates the description in the same operation.
 	if _, err := store.Put(ctx, name, *entry.Value, domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
 		return fmt.Errorf("failed to update secret: %w", err)
+	}
+
+	return nil
+}
+
+func (versionedSecretHooks) versionLabel(id string) string { return "#" + id }
+
+func (versionedSecretHooks) isSecret(*domain.Entry) bool { return true }
+
+func (versionedSecretHooks) deleteOptions(*DeleteOptions) []provider.DeleteOption { return nil }
+
+func (versionedSecretHooks) create(ctx context.Context, store provider.Store, name string, entry Entry) error {
+	if _, err := store.Create(ctx, name, lo.FromPtr(entry.Value), domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
+		return fmt.Errorf("failed to create secret: %w", err)
 	}
 
 	return nil

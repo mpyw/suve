@@ -81,25 +81,6 @@ type DiffUseCase struct {
 	RemoteLabel string
 }
 
-// remoteLabel returns RemoteLabel, or the strategy's ServiceName when unset.
-func (u *DiffUseCase) remoteLabel() string {
-	if u.RemoteLabel != "" {
-		return u.RemoteLabel
-	}
-
-	return u.Strategy.ServiceName()
-}
-
-// strategyForNamespace returns the diff strategy scoped to the given namespace,
-// falling back to the single Strategy when no resolver is configured.
-func (u *DiffUseCase) strategyForNamespace(namespace string) (staging.DiffStrategy, error) {
-	if u.StrategyFor == nil {
-		return u.Strategy, nil
-	}
-
-	return u.StrategyFor(namespace)
-}
-
 // Execute runs the diff use case.
 func (u *DiffUseCase) Execute(ctx context.Context, input DiffInput) (*DiffOutput, error) {
 	service := u.Strategy.Service()
@@ -415,4 +396,23 @@ func (u *DiffUseCase) discardVanishedTags(ctx context.Context, key staging.Entry
 		Type:      DiffEntryAutoUnstaged,
 		Warning:   "item no longer exists in " + u.remoteLabel() + "; its staged tag changes were discarded",
 	}, true, nil
+}
+
+// remoteLabel returns RemoteLabel, or the strategy's ServiceName when unset.
+func (u *DiffUseCase) remoteLabel() string {
+	if u.RemoteLabel != "" {
+		return u.RemoteLabel
+	}
+
+	return u.Strategy.ServiceName()
+}
+
+// strategyForNamespace returns the diff strategy scoped to the given namespace,
+// falling back to the single Strategy when no resolver is configured.
+func (u *DiffUseCase) strategyForNamespace(namespace string) (staging.DiffStrategy, error) {
+	if u.StrategyFor == nil {
+		return u.Strategy, nil
+	}
+
+	return u.StrategyFor(namespace)
 }

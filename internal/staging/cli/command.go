@@ -157,39 +157,6 @@ func (c CommandConfig) namespaceFor(ctx context.Context) string {
 	return c.Namespace(ctx)
 }
 
-// diffStrategyFor adapts a StrategyForNamespace builder to the DiffUseCase
-// resolver, or nil when the service has no namespace axis (the single strategy
-// handles all).
-//
-//declscope:shared // shared with the all-service diff (global_diff.go)
-func diffStrategyFor(
-	ctx context.Context, forNamespace func(context.Context, string) (staging.FullStrategy, error),
-) func(string) (staging.DiffStrategy, error) {
-	if forNamespace == nil {
-		return nil
-	}
-
-	return func(ns string) (staging.DiffStrategy, error) {
-		return forNamespace(ctx, ns)
-	}
-}
-
-// applyStrategyFor adapts a StrategyForNamespace builder to the ApplyUseCase
-// resolver, or nil when the service has no namespace axis.
-//
-//declscope:shared // shared with the all-service apply (global_apply.go)
-func applyStrategyFor(
-	ctx context.Context, forNamespace func(context.Context, string) (staging.FullStrategy, error),
-) func(string) (staging.ApplyStrategy, error) {
-	if forNamespace == nil {
-		return nil
-	}
-
-	return func(ns string) (staging.ApplyStrategy, error) {
-		return forNamespace(ctx, ns)
-	}
-}
-
 // NewStatusCommand creates a status command with the given config.
 func NewStatusCommand(cfg CommandConfig) *cli.Command {
 	return &cli.Command{
@@ -625,6 +592,39 @@ func NewDeleteCommand(cfg CommandConfig) *cli.Command {
 	}
 }
 
+// diffStrategyFor adapts a StrategyForNamespace builder to the DiffUseCase
+// resolver, or nil when the service has no namespace axis (the single strategy
+// handles all).
+//
+//declscope:shared // shared with the all-service diff (global_diff.go)
+func diffStrategyFor(
+	ctx context.Context, forNamespace func(context.Context, string) (staging.FullStrategy, error),
+) func(string) (staging.DiffStrategy, error) {
+	if forNamespace == nil {
+		return nil
+	}
+
+	return func(ns string) (staging.DiffStrategy, error) {
+		return forNamespace(ctx, ns)
+	}
+}
+
+// applyStrategyFor adapts a StrategyForNamespace builder to the ApplyUseCase
+// resolver, or nil when the service has no namespace axis.
+//
+//declscope:shared // shared with the all-service apply (global_apply.go)
+func applyStrategyFor(
+	ctx context.Context, forNamespace func(context.Context, string) (staging.FullStrategy, error),
+) func(string) (staging.ApplyStrategy, error) {
+	if forNamespace == nil {
+		return nil
+	}
+
+	return func(ns string) (staging.ApplyStrategy, error) {
+		return forNamespace(ctx, ns)
+	}
+}
+
 // tagCommandRunner is a function that runs a tag or untag command.
 type tagCommandRunner func(
 	ctx context.Context,
@@ -633,35 +633,6 @@ type tagCommandRunner func(
 	name string,
 	args []string,
 ) error
-
-// tagAction creates a common action handler for tag/untag commands.
-func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func(context.Context, *cli.Command) error {
-	return func(ctx context.Context, cmd *cli.Command) error {
-		if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and key/value
-			return fmt.Errorf("usage: %s %s", cfg.CommandPath, usageMsg)
-		}
-
-		name := cmd.Args().First()
-		args := cmd.Args().Slice()[1:]
-
-		store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
-		if err != nil {
-			return err
-		}
-
-		strategy, err := cfg.Factory(ctx)
-		if err != nil {
-			return err
-		}
-
-		useCase := &stagingusecase.TagUseCase{
-			Strategy: strategy,
-			Store:    store,
-		}
-
-		return runner(ctx, useCase, cmd.Root().Writer, cmd.Root().ErrWriter, name, args)
-	}
-}
 
 // NewTagCommand creates a tag command with the given config.
 func NewTagCommand(cfg CommandConfig) *cli.Command {
@@ -714,5 +685,34 @@ func NewUntagCommand(cfg CommandConfig) *cli.Command {
 		ArgsUsage:   "<name> <key>...",
 		Description: untagHelp(cfg),
 		Action:      tagAction(cfg, "untag <name> <key>", runner),
+	}
+}
+
+// tagAction creates a common action handler for tag/untag commands.
+func tagAction(cfg CommandConfig, usageMsg string, runner tagCommandRunner) func(context.Context, *cli.Command) error {
+	return func(ctx context.Context, cmd *cli.Command) error {
+		if cmd.Args().Len() < 2 { //nolint:mnd // minimum required args: name and key/value
+			return fmt.Errorf("usage: %s %s", cfg.CommandPath, usageMsg)
+		}
+
+		name := cmd.Args().First()
+		args := cmd.Args().Slice()[1:]
+
+		store, _, err := openScopedWorkingStore(ctx, cfg.ScopeResolver)
+		if err != nil {
+			return err
+		}
+
+		strategy, err := cfg.Factory(ctx)
+		if err != nil {
+			return err
+		}
+
+		useCase := &stagingusecase.TagUseCase{
+			Strategy: strategy,
+			Store:    store,
+		}
+
+		return runner(ctx, useCase, cmd.Root().Writer, cmd.Root().ErrWriter, name, args)
 	}
 }

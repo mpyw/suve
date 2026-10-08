@@ -140,16 +140,6 @@ func scopeFromSelection(sel ScopeSelection) (provider.Scope, error) {
 	return scope, nil
 }
 
-// currentScope returns the active read/write scope.
-//
-//declscope:shared // shared with the capability, param, secret, spec and staging namespaces
-func (a *App) currentScope() provider.Scope {
-	a.scopeMu.RLock()
-	defer a.scopeMu.RUnlock()
-
-	return a.scope
-}
-
 // GetCurrentScope returns the active read/write scope as a ScopeSelection so the
 // frontend can prefill its provider/scope forms (including the env-derived
 // initial values from GOOGLE_CLOUD_PROJECT / AZURE_*) instead of silently wiping
@@ -173,6 +163,16 @@ func (a *App) EnvScope(providerName string) (*ScopeSelection, error) {
 	}
 
 	return selectionFromScope(scope), nil
+}
+
+// currentScope returns the active read/write scope.
+//
+//declscope:shared // shared with the capability, param, secret, spec and staging namespaces
+func (a *App) currentScope() provider.Scope {
+	a.scopeMu.RLock()
+	defer a.scopeMu.RUnlock()
+
+	return a.scope
 }
 
 // selectionFromScope is the inverse of scopeFromSelection: it projects a

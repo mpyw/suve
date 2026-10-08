@@ -29,8 +29,8 @@ import (
 type DiffOptions struct {
 	//declscope:ignore overexported // diff_test.go runs the diff with the AWS presenters, which import this package
 	ParseJSON bool
-	noPager   bool
 	Output    output.Format
+	noPager   bool
 }
 
 // DiffPresenter renders a diff for a specific provider. Implementations are stateful:

@@ -51,20 +51,21 @@ EXAMPLES:
    suve gcloud stage status              View staged changes
    suve gcloud stage apply               Apply staged changes`
 
-// stageSubcommands builds the staging subcommands for the given config.
-func stageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
-	return []*cli.Command{
-		stgcli.NewAddCommand(cfg),
-		stgcli.NewEditCommand(cfg),
-		stgcli.NewDeleteCommand(cfg),
-		stgcli.NewStatusCommand(cfg),
-		stgcli.NewDiffCommand(cfg),
-		stgcli.NewApplyCommand(cfg),
-		stgcli.NewResetCommand(cfg),
-		stgcli.NewTagCommand(cfg),
-		stgcli.NewUntagCommand(cfg),
-		stgcli.NewExportCommand(cfg),
-		stgcli.NewImportCommand(cfg),
+// FlatStageCommand returns the Google Cloud stage command as a standalone
+// top-level command named `name` (e.g. "stage"). Because there is no parent
+// gcloud group to carry them, it folds in the --project flag and the
+// project-resolving Before hook. Used for the flat `suve stage` alias when
+// Google Cloud is the uniquely active staging provider.
+func FlatStageCommand(name string) *cli.Command {
+	return &cli.Command{
+		Name:            name,
+		Aliases:         []string{"stg"},
+		Usage:           "Manage staged changes for Google Cloud Secret Manager",
+		Description:     stageDescription,
+		Flags:           projectFlags(),
+		Before:          resolveProject,
+		Commands:        stageSubcommands(stageConfig()),
+		CommandNotFound: cliinternal.CommandNotFound,
 	}
 }
 
@@ -82,20 +83,19 @@ func stageCommand() *cli.Command {
 	}
 }
 
-// FlatStageCommand returns the Google Cloud stage command as a standalone
-// top-level command named `name` (e.g. "stage"). Because there is no parent
-// gcloud group to carry them, it folds in the --project flag and the
-// project-resolving Before hook. Used for the flat `suve stage` alias when
-// Google Cloud is the uniquely active staging provider.
-func FlatStageCommand(name string) *cli.Command {
-	return &cli.Command{
-		Name:            name,
-		Aliases:         []string{"stg"},
-		Usage:           "Manage staged changes for Google Cloud Secret Manager",
-		Description:     stageDescription,
-		Flags:           projectFlags(),
-		Before:          resolveProject,
-		Commands:        stageSubcommands(stageConfig()),
-		CommandNotFound: cliinternal.CommandNotFound,
+// stageSubcommands builds the staging subcommands for the given config.
+func stageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
+	return []*cli.Command{
+		stgcli.NewAddCommand(cfg),
+		stgcli.NewEditCommand(cfg),
+		stgcli.NewDeleteCommand(cfg),
+		stgcli.NewStatusCommand(cfg),
+		stgcli.NewDiffCommand(cfg),
+		stgcli.NewApplyCommand(cfg),
+		stgcli.NewResetCommand(cfg),
+		stgcli.NewTagCommand(cfg),
+		stgcli.NewUntagCommand(cfg),
+		stgcli.NewExportCommand(cfg),
+		stgcli.NewImportCommand(cfg),
 	}
 }

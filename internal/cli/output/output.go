@@ -24,10 +24,10 @@ import (
 type Format string
 
 const (
-	// formatText is the default human-readable text format.
-	formatText Format = "text"
 	// FormatJSON outputs structured JSON.
 	FormatJSON Format = "json"
+	// formatText is the default human-readable text format.
+	formatText Format = "text"
 )
 
 // ParseFormat parses an --output value into a Format. An empty value or "text"
@@ -85,26 +85,6 @@ func (o *Writer) Value(value string) {
 //
 // Warning, Warn, Info, Hint, and Error share two internal shapes (labeled and
 // prefixed) so the exact byte layout of each family stays consistent.
-
-// labeled formats a message and prints it as a single line, coloring the whole
-// "label+message" string with colorize. A label of "" colors the message alone.
-// colorize comes from the destination writer's palette, so color tracks w's own
-// TTY-ness and redirected stderr stays clean (#341).
-//
-//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
-func labeled(w io.Writer, colorize func(...any) string, label, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintln(w, colorize(label+msg))
-}
-
-// prefixed formats a message and prints it as "prefix message" on a single
-// line, where only prefix carries color and the message stays uncolored.
-//
-//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
-func prefixed(w io.Writer, prefix, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	_, _ = fmt.Fprintf(w, "%s %s\n", prefix, msg)
-}
 
 // Warning prints a warning message in yellow.
 // Used to alert users about non-critical issues that don't prevent command execution.
@@ -195,6 +175,57 @@ func DiffRaw(oldName, newName, oldContent, newContent string) string {
 	return unified.String()
 }
 
+// Print writes a message to the writer without a newline.
+func Print(w io.Writer, msg string) {
+	_, _ = fmt.Fprint(w, msg)
+}
+
+// Println writes a message to the writer with a newline.
+func Println(w io.Writer, msg string) {
+	_, _ = fmt.Fprintln(w, msg)
+}
+
+// Printf writes a formatted message to the writer.
+func Printf(w io.Writer, format string, args ...any) {
+	_, _ = fmt.Fprintf(w, format, args...)
+}
+
+// Indent adds a prefix to each line of the input string.
+func Indent(s, prefix string) string {
+	if s == "" {
+		return ""
+	}
+
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = prefix + line
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// labeled formats a message and prints it as a single line, coloring the whole
+// "label+message" string with colorize. A label of "" colors the message alone.
+// colorize comes from the destination writer's palette, so color tracks w's own
+// TTY-ness and redirected stderr stays clean (#341).
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
+func labeled(w io.Writer, colorize func(...any) string, label, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintln(w, colorize(label+msg))
+}
+
+// prefixed formats a message and prints it as "prefix message" on a single
+// line, where only prefix carries color and the message stays uncolored.
+//
+//nolint:goprintffuncname // intentionally named without 'f' suffix for cleaner API
+func prefixed(w io.Writer, prefix, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintf(w, "%s %s\n", prefix, msg)
+}
+
 // colorDiff adds ANSI colors to diff output using the given palette.
 func colorDiff(p colors.Palette, diff string) string {
 	if diff == "" {
@@ -229,35 +260,4 @@ func colorDiff(p colors.Palette, diff string) string {
 	// empty element for a "\n"-terminated diff, so appending per element added a
 	// spurious extra newline vs DiffRaw (#338).
 	return strings.Join(colored, "\n")
-}
-
-// Print writes a message to the writer without a newline.
-func Print(w io.Writer, msg string) {
-	_, _ = fmt.Fprint(w, msg)
-}
-
-// Println writes a message to the writer with a newline.
-func Println(w io.Writer, msg string) {
-	_, _ = fmt.Fprintln(w, msg)
-}
-
-// Printf writes a formatted message to the writer.
-func Printf(w io.Writer, format string, args ...any) {
-	_, _ = fmt.Fprintf(w, format, args...)
-}
-
-// Indent adds a prefix to each line of the input string.
-func Indent(s, prefix string) string {
-	if s == "" {
-		return ""
-	}
-
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		if line != "" {
-			lines[i] = prefix + line
-		}
-	}
-
-	return strings.Join(lines, "\n")
 }

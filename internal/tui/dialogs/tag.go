@@ -15,6 +15,23 @@ import (
 	"github.com/mpyw/suve/internal/tui/styles"
 )
 
+// TagInput configures a tag dialog.
+type TagInput struct {
+	Ctx       context.Context //nolint:containedctx // Run context threaded into the mutation command; mirrors the browser
+	Mutator   data.Mutator
+	Service   string
+	Styles    styles.Styles
+	Name      string
+	Namespace string
+	// Tags is the entry's current tag set, offered as the Remove action's choices
+	// (#705). Empty when the caller has none to offer, in which case the Remove
+	// action is not offered (#761).
+	Tags []data.Tag
+	// StagedOnly opens the dialog from a staged-only surface (the staging review
+	// page): the mode toggle is hidden and the tag write is forced staged.
+	StagedOnly bool
+}
+
 // tagForm is the tag add/remove dialog: an action select (Add/Remove), a key
 // input, a value input (used by Add), and a mode toggle. It embeds a huh form.
 type tagForm struct {
@@ -72,23 +89,6 @@ type tagForm struct {
 	notice string
 }
 
-// TagInput configures a tag dialog.
-type TagInput struct {
-	Ctx       context.Context //nolint:containedctx // Run context threaded into the mutation command; mirrors the browser
-	Mutator   data.Mutator
-	Service   string
-	Styles    styles.Styles
-	Name      string
-	Namespace string
-	// Tags is the entry's current tag set, offered as the Remove action's choices
-	// (#705). Empty when the caller has none to offer, in which case the Remove
-	// action is not offered (#761).
-	Tags []data.Tag
-	// StagedOnly opens the dialog from a staged-only surface (the staging review
-	// page): the mode toggle is hidden and the tag write is forced staged.
-	StagedOnly bool
-}
-
 // NewTagForm builds a tag add/remove dialog.
 func NewTagForm(in TagInput) (Model, tea.Cmd) {
 	svcCap := in.Mutator.Capability()
@@ -111,6 +111,93 @@ func NewTagForm(in TagInput) (Model, tea.Cmd) {
 	cmd := d.rebuildForm()
 
 	return d, cmd
+}
+
+func (d *tagForm) Busy() bool { return d.busy }
+
+func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		d.setSize(msg)
+
+		return d, d.syncFormSize()
+	case mutationResultMsg:
+		return d.onResult(msg)
+	case tea.KeyPressMsg:
+		if d.busy {
+			return d, nil // double-submit guard
+		}
+
+		// The Stage/Apply popup owns every key while it is open.
+		if d.confirming {
+			return d.updateConfirm(msg)
+		}
+
+		if key.Matches(msg, escKey) {
+			return d.handleEsc()
+		}
+
+		// Any other key resets the discard-armed state so a later single Esc
+		// re-arms (a stray Esc after typing does not silently discard).
+		d.disarm()
+	}
+
+	if d.busy {
+		return d, nil
+	}
+
+	form, cmd := d.form.Update(msg)
+	if f, ok := form.(*huh.Form); ok {
+		d.form = f
+	}
+
+	// The action toggled: rebuild so the key field morphs between the free-text Add
+	// input and the Remove select of existing tags. Clear any stale error first.
+	if d.remove != d.builtRemove {
+		d.err = ""
+
+		return d, d.rebuildForm()
+	}
+
+	switch d.form.State {
+	case huh.StateCompleted:
+		// Completing the huh form (Enter on the last field) opens the Stage/Apply
+		// popup (the tag form is all single-line fields, so Enter drives it).
+		return d.beginSubmit()
+	case huh.StateAborted:
+		return d, canceledCmd
+	case huh.StateNormal:
+	}
+
+	return d, repaintFormScroll(d.form, msg, cmd)
+}
+
+// InterceptEsc opts the form into the shell's discard guard (#790): the shell
+// forwards Esc into Update (see handleEsc) rather than bare-popping the dialog.
+func (*tagForm) InterceptEsc() bool { return true }
+
+func (d *tagForm) View() string {
+	// The Stage/Apply popup replaces the whole form body while it is open.
+	if d.confirming {
+		return d.confirm.View(d.styles)
+	}
+
+	var b strings.Builder
+
+	b.WriteString(d.header())
+	b.WriteString("\n\n")
+
+	if d.busy {
+		b.WriteString(d.styles.PageHint.Render("working…"))
+
+		return b.String()
+	}
+
+	b.WriteString(d.form.View())
+	b.WriteString("\n")
+	b.WriteString(d.footer())
+
+	return b.String()
 }
 
 func (d *tagForm) rebuildForm() tea.Cmd {
@@ -223,69 +310,6 @@ func (d *tagForm) formBodyHeight() int {
 	return max(d.availHeight()-around, minFormBody)
 }
 
-func (d *tagForm) Busy() bool { return d.busy }
-
-func (d *tagForm) Update(msg tea.Msg) (Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		d.setSize(msg)
-
-		return d, d.syncFormSize()
-	case mutationResultMsg:
-		return d.onResult(msg)
-	case tea.KeyPressMsg:
-		if d.busy {
-			return d, nil // double-submit guard
-		}
-
-		// The Stage/Apply popup owns every key while it is open.
-		if d.confirming {
-			return d.updateConfirm(msg)
-		}
-
-		if key.Matches(msg, escKey) {
-			return d.handleEsc()
-		}
-
-		// Any other key resets the discard-armed state so a later single Esc
-		// re-arms (a stray Esc after typing does not silently discard).
-		d.disarm()
-	}
-
-	if d.busy {
-		return d, nil
-	}
-
-	form, cmd := d.form.Update(msg)
-	if f, ok := form.(*huh.Form); ok {
-		d.form = f
-	}
-
-	// The action toggled: rebuild so the key field morphs between the free-text Add
-	// input and the Remove select of existing tags. Clear any stale error first.
-	if d.remove != d.builtRemove {
-		d.err = ""
-
-		return d, d.rebuildForm()
-	}
-
-	switch d.form.State {
-	case huh.StateCompleted:
-		// Completing the huh form (Enter on the last field) opens the Stage/Apply
-		// popup (the tag form is all single-line fields, so Enter drives it).
-		return d.beginSubmit()
-	case huh.StateAborted:
-		return d, canceledCmd
-	case huh.StateNormal:
-	}
-
-	return d, repaintFormScroll(d.form, msg, cmd)
-}
-
-// InterceptEsc opts the form into the shell's discard guard (#790): the shell
-// forwards Esc into Update (see handleEsc) rather than bare-popping the dialog.
-func (*tagForm) InterceptEsc() bool { return true }
-
 // handleEsc implements the discard guard: on a DIRTY form (a typed Add key/value)
 // the first Esc arms a confirmation (shows the notice, stays open); a second
 // consecutive Esc — or any Esc on a clean form — discards.
@@ -388,30 +412,6 @@ func (d *tagForm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 	}
 
 	return d, doneCmd(d.service, tagStatus(d.remove, d.staged), d.staged)
-}
-
-func (d *tagForm) View() string {
-	// The Stage/Apply popup replaces the whole form body while it is open.
-	if d.confirming {
-		return d.confirm.View(d.styles)
-	}
-
-	var b strings.Builder
-
-	b.WriteString(d.header())
-	b.WriteString("\n\n")
-
-	if d.busy {
-		b.WriteString(d.styles.PageHint.Render("working…"))
-
-		return b.String()
-	}
-
-	b.WriteString(d.form.View())
-	b.WriteString("\n")
-	b.WriteString(d.footer())
-
-	return b.String()
 }
 
 // header renders the dialog title, wrapping the entry name to the dialog width so

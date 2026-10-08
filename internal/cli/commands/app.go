@@ -127,6 +127,22 @@ func noRedactionFlag() cli.Flag {
 	}
 }
 
+// groupName maps a provider to its command-group name for user-facing messages.
+//
+//declscope:shared // tui.go names the group in its launch error; launch.go maps names back
+func groupName(p provider.Provider) string {
+	switch p {
+	case provider.ProviderAWS:
+		return "aws"
+	case provider.ProviderGoogleCloud:
+		return "gcloud"
+	case provider.ProviderAzure:
+		return "azure"
+	}
+
+	return string(p)
+}
+
 // envDebugEnabled reports whether SUVE_DEBUG requests debug logging. Bool-ish
 // values are honored (so SUVE_DEBUG=0/false stay off) and any other non-empty
 // value counts as enabled, consistent with SUVE_NO_UPDATE_CHECK's "any
@@ -293,22 +309,6 @@ func aliasDescription(det detect.Result) string {
 
 	return "Active top-level aliases" + via + ":\n" + strings.Join(lines, "\n") +
 		"\nThe explicit groups ('suve aws', 'suve gcloud', 'suve azure') are always available."
-}
-
-// groupName maps a provider to its command-group name for user-facing messages.
-//
-//declscope:shared // tui.go names the group in its launch error; launch.go maps names back
-func groupName(p provider.Provider) string {
-	switch p {
-	case provider.ProviderAWS:
-		return "aws"
-	case provider.ProviderGoogleCloud:
-		return "gcloud"
-	case provider.ProviderAzure:
-		return "azure"
-	}
-
-	return string(p)
 }
 
 // App is the main CLI application.

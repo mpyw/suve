@@ -193,6 +193,39 @@ func (m *Model) onStagedLoaded(msg stagedLoadedMsg) tea.Cmd {
 	return func() tea.Msg { return nav.StagedCount{Service: service, Count: count} }
 }
 
+// CapturesInput reports whether a header text input (prefix or filter) is
+// focused. While it is, the app forwards raw keystrokes here instead of applying
+// its global key map, so a `q`/`1`/`y` typed into the filter is text, not a quit
+// or tab jump.
+func (m *Model) CapturesInput() bool {
+	return m.focus == focusPrefix || m.focus == focusFilter
+}
+
+// CopyText returns the detail value pane's raw value for the clipboard WITHOUT
+// changing its mask state: a `y` copy is a clipboard write, not a reveal, so the
+// on-screen mask stays put and a copied secret never becomes a standing on-screen
+// disclosure (#689). A transient status note reports the copy (and that a masked
+// value stayed masked). The app calls this for the global `y` copy; false means
+// there is nothing to copy.
+func (m *Model) CopyText() (string, bool) {
+	if !m.detailOK {
+		return "", false
+	}
+
+	v := m.valuePane.RawValue()
+	if v == "" {
+		return "", false
+	}
+
+	if m.valuePane.Masked() {
+		m.actionStatus = "copied (value stays masked)"
+	} else {
+		m.actionStatus = "copied"
+	}
+
+	return v, true
+}
+
 // errLines returns the active error lines in a stable order — list, detail,
 // history, the staging-store/probe note, then the transient invalid-action
 // status — each owned by its own source so a transient failure clears when that
@@ -269,14 +302,6 @@ func (m *Model) selectNamespace(ns string) {
 	all := len(m.namespaces) - 1
 	m.namespaces = slices.Insert(m.namespaces, all, ns)
 	m.nsIndex = all
-}
-
-// CapturesInput reports whether a header text input (prefix or filter) is
-// focused. While it is, the app forwards raw keystrokes here instead of applying
-// its global key map, so a `q`/`1`/`y` typed into the filter is text, not a quit
-// or tab jump.
-func (m *Model) CapturesInput() bool {
-	return m.focus == focusPrefix || m.focus == focusFilter
 }
 
 // handleKey routes a key: to a focused text input when editing, else to the
@@ -706,31 +731,6 @@ func (m *Model) currentNamespace() string {
 // currentHistoryVersions returns the raw version identifiers in current display
 // order, so a picked row index maps to its version.
 func (m *Model) currentHistoryVersions() []string { return m.historyVersions }
-
-// CopyText returns the detail value pane's raw value for the clipboard WITHOUT
-// changing its mask state: a `y` copy is a clipboard write, not a reveal, so the
-// on-screen mask stays put and a copied secret never becomes a standing on-screen
-// disclosure (#689). A transient status note reports the copy (and that a masked
-// value stayed masked). The app calls this for the global `y` copy; false means
-// there is nothing to copy.
-func (m *Model) CopyText() (string, bool) {
-	if !m.detailOK {
-		return "", false
-	}
-
-	v := m.valuePane.RawValue()
-	if v == "" {
-		return "", false
-	}
-
-	if m.valuePane.Masked() {
-		m.actionStatus = "copied (value stays masked)"
-	} else {
-		m.actionStatus = "copied"
-	}
-
-	return v, true
-}
 
 // dataStagedKey builds the staged-key lookup for an item.
 func dataStagedKey(it data.Item) data.StagedKey {

@@ -49,6 +49,22 @@ const (
 	applyPhaseResults
 )
 
+// ApplyInput configures an apply dialog.
+type ApplyInput struct {
+	Ctx context.Context //nolint:containedctx // Run context threaded into the apply command; mirrors the browser
+	// Targets are the services to apply (one for per-service, all for apply-all).
+	Targets []data.StagingService
+	// TargetLine is the resolved target identity string (account/region, project,
+	// or vault/store) shown on the confirmation — parity with the CLI prompt.
+	TargetLine string
+	// Title is the dialog title (e.g. "Apply staged changes — Param" / "— all").
+	Title string
+	// EntryCount / TagCount are the staged totals across the targets.
+	EntryCount int
+	TagCount   int
+	Styles     styles.Styles
+}
+
 // applyResultsMsg carries the aggregated fan-out results back into the dialog.
 type applyResultsMsg struct {
 	results []data.StagingApplyResult
@@ -88,22 +104,6 @@ type applyDialog struct {
 	// hits maps a click on the confirm controls (ignore/apply/cancel) or the
 	// results close hint to the same action their key equivalents perform.
 	hits *hit.Map
-}
-
-// ApplyInput configures an apply dialog.
-type ApplyInput struct {
-	Ctx context.Context //nolint:containedctx // Run context threaded into the apply command; mirrors the browser
-	// Targets are the services to apply (one for per-service, all for apply-all).
-	Targets []data.StagingService
-	// TargetLine is the resolved target identity string (account/region, project,
-	// or vault/store) shown on the confirmation — parity with the CLI prompt.
-	TargetLine string
-	// Title is the dialog title (e.g. "Apply staged changes — Param" / "— all").
-	Title string
-	// EntryCount / TagCount are the staged totals across the targets.
-	EntryCount int
-	TagCount   int
-	Styles     styles.Styles
 }
 
 // NewApply builds an apply dialog.

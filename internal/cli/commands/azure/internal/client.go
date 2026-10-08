@@ -27,12 +27,6 @@ type scopeCtx struct {
 	appConfigNamespace string
 }
 
-func scopeFromContext(ctx context.Context) scopeCtx {
-	sc, _ := ctx.Value(scopeContextKey{}).(scopeCtx)
-
-	return sc
-}
-
 // WithVaultName returns a context carrying the resolved Azure Key Vault name,
 // merged onto any base scope already present. The azure secret group's and the
 // azure stage command's Before hooks set it (from --vault-name or its env
@@ -71,15 +65,6 @@ func WithAppConfigNamespace(ctx context.Context, namespace string) context.Conte
 // into ctx by WithAppConfigNamespace (empty = the null/default namespace).
 func AppConfigNamespace(ctx context.Context) string {
 	return scopeFromContext(ctx).appConfigNamespace
-}
-
-// appConfigScope builds the App Configuration scope for the context's store
-// name and namespace.
-func appConfigScope(sc scopeCtx) provider.Scope {
-	scope := provider.AzureAppConfigScope(sc.storeName)
-	scope.AppConfigNamespace = sc.appConfigNamespace
-
-	return scope
 }
 
 // KeyVaultStore resolves a provider.Store for the Azure Key Vault (secret)
@@ -160,4 +145,19 @@ func AppConfigStagingScopeResolver(ctx context.Context) (staging.ResolvedScope, 
 	}
 
 	return binding.StagingScope(ctx, appConfigScope(sc), provider.KindParam, nil)
+}
+
+func scopeFromContext(ctx context.Context) scopeCtx {
+	sc, _ := ctx.Value(scopeContextKey{}).(scopeCtx)
+
+	return sc
+}
+
+// appConfigScope builds the App Configuration scope for the context's store
+// name and namespace.
+func appConfigScope(sc scopeCtx) provider.Scope {
+	scope := provider.AzureAppConfigScope(sc.storeName)
+	scope.AppConfigNamespace = sc.appConfigNamespace
+
+	return scope
 }

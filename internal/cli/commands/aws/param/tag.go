@@ -10,13 +10,6 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 )
 
-// newTagger builds the SSM Parameter Store provider.Tagger.
-//
-//declscope:shared // untag.go's UntagCommand builds the same Tagger
-func newTagger(ctx context.Context) (provider.Tagger, error) {
-	return awsinternal.ParamStore(ctx)
-}
-
 // TagCommand returns the SSM Parameter Store tag command.
 func TagCommand() *cli.Command {
 	return generic.TagCommand(generic.TagConfig{
@@ -35,4 +28,11 @@ EXAMPLES:
 		UsageError: "usage: suve aws param tag <name> <key=value> [key=value]",
 		NewTagger:  newTagger,
 	})
+}
+
+// newTagger builds the SSM Parameter Store provider.Tagger.
+//
+//declscope:shared // untag.go's UntagCommand builds the same Tagger
+func newTagger(ctx context.Context) (provider.Tagger, error) {
+	return awsinternal.ParamStore(ctx)
 }

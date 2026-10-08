@@ -12,12 +12,6 @@ import (
 	stagingusecase "github.com/mpyw/suve/internal/usecase/staging"
 )
 
-// applyConfirmer prompts the user to confirm an action. *confirm.Prompter satisfies
-// this interface; it is kept small so the apply flow stays testable.
-type applyConfirmer interface {
-	Confirm(message string, skip bool) (bool, error)
-}
-
 // applyRunner applies staged changes via the ApplyUseCase and reports the
 // results. runInteractive wraps Run with the presentation-layer orchestration
 // (empty-check, name validation, and interactive confirmation) that the
@@ -43,6 +37,12 @@ type applyRunner struct {
 type applyOptions struct {
 	name            string // Optional: apply only this item, otherwise apply all
 	ignoreConflicts bool   // Skip conflict detection and force apply
+}
+
+// applyConfirmer prompts the user to confirm an action. *confirm.Prompter satisfies
+// this interface; it is kept small so the apply flow stays testable.
+type applyConfirmer interface {
+	Confirm(message string, skip bool) (bool, error)
 }
 
 // runInteractive performs the command-level apply flow: it lists staged

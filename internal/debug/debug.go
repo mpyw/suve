@@ -16,9 +16,6 @@ import (
 	"time"
 )
 
-// ctxKey is the unexported context key under which Config is stored.
-type ctxKey struct{}
-
 // Config describes the active debug settings pulled from a context.
 type Config struct {
 	// Enabled reports whether verbose debug logging was requested.
@@ -33,6 +30,9 @@ type Config struct {
 	// safe, redacted default.
 	NoRedaction bool
 }
+
+// ctxKey is the unexported context key under which Config is stored.
+type ctxKey struct{}
 
 // With returns a child context carrying cfg.
 func With(ctx context.Context, cfg Config) context.Context {
