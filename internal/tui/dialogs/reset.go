@@ -31,6 +31,15 @@ const (
 	resetRegionCancel = "reset-cancel"
 )
 
+// ResetInput configures a reset dialog.
+type ResetInput struct {
+	Ctx     context.Context //nolint:containedctx // Run context threaded into the reset command; mirrors the browser
+	Targets []data.StagingService
+	// Title is the dialog title (e.g. "Reset staged changes — Secret" / "— all").
+	Title  string
+	Styles styles.Styles
+}
+
 // resetResultsMsg carries the aggregated fan-out reset results back.
 type resetResultsMsg struct {
 	results []data.StagingResetResult
@@ -53,15 +62,6 @@ type resetDialog struct {
 	// hits maps a click on the Reset/Cancel button to focusing and activating it —
 	// the same reduction navigating to it and pressing enter performs.
 	hits *hit.Map
-}
-
-// ResetInput configures a reset dialog.
-type ResetInput struct {
-	Ctx     context.Context //nolint:containedctx // Run context threaded into the reset command; mirrors the browser
-	Targets []data.StagingService
-	// Title is the dialog title (e.g. "Reset staged changes — Secret" / "— all").
-	Title  string
-	Styles styles.Styles
 }
 
 // NewReset builds a reset dialog. Focus starts on Cancel so an accidental

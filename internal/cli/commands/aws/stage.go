@@ -21,97 +21,6 @@ const stageNounSecret = "secret"
 // stageProviderLabel names AWS in staging prompts and messages.
 const stageProviderLabel = "AWS"
 
-// parameterStoreStageConfig is the staging config for SSM Parameter Store. It
-// adds the --type / --secure value-type flags to stage add/edit.
-func parameterStoreStageConfig() stgcli.CommandConfig {
-	return stgcli.CommandConfig{
-		CommandName:      "param",
-		ItemName:         "parameter",
-		ProviderLabel:    stageProviderLabel,
-		CommandPath:      "suve aws stage param",
-		Factory:          cliinternal.StrategyFactory(provider.ProviderAWS, provider.KindParam, awsinternal.ParamStore),
-		ParserFactory:    cliinternal.ParserFactory(provider.ProviderAWS, provider.KindParam),
-		ScopeResolver:    awsinternal.StagingScopeResolver,
-		HasDescription:   true,
-		ValueTypeFlags:   stageParamValueTypeFlags(),
-		ValueTypeFromCmd: resolveStageParamValueType,
-	}
-}
-
-// secretsManagerStageConfig is the staging config for Secrets Manager.
-func secretsManagerStageConfig() stgcli.CommandConfig {
-	return stgcli.CommandConfig{
-		CommandName:    stageNounSecret,
-		ItemName:       stageNounSecret,
-		ProviderLabel:  stageProviderLabel,
-		CommandPath:    "suve aws stage secret",
-		Factory:        cliinternal.StrategyFactory(provider.ProviderAWS, provider.KindSecret, awsinternal.SecretStore),
-		ParserFactory:  cliinternal.ParserFactory(provider.ProviderAWS, provider.KindSecret),
-		ScopeResolver:  awsinternal.StagingScopeResolver,
-		HasDescription: true,
-	}
-}
-
-// stageParamValueTypeFlags returns the SSM Parameter Store type flags for stage add/edit,
-// matching the immediate `param create`/`param update` commands. --type carries
-// no default so an unset flag stays "not specified" (create then applies String,
-// edit preserves the existing type).
-func stageParamValueTypeFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.StringFlag{
-			Name:  "type",
-			Usage: "Parameter type (String, StringList, SecureString)",
-		},
-		&cli.BoolFlag{
-			Name:  "secure",
-			Usage: "Shorthand for --type SecureString",
-		},
-	}
-}
-
-// resolveStageParamValueType maps the --type/--secure flags to a domain.ValueType, using
-// the same mutual-exclusion and validation as immediate `param create`. It
-// returns an empty value type when neither flag is set, meaning "not specified".
-func resolveStageParamValueType(cmd *cli.Command) (domain.ValueType, error) {
-	secure := cmd.Bool("secure")
-	typeSet := cmd.IsSet("type")
-
-	if secure && typeSet {
-		return "", errors.New("cannot use --secure with --type; use one or the other")
-	}
-
-	switch {
-	case secure:
-		return domain.ValueTypeSecret, nil
-	case typeSet:
-		paramType := cmd.String("type")
-		if err := paramtype.Validate(paramType); err != nil {
-			return "", err
-		}
-
-		return paramtype.Parse(paramType), nil
-	default:
-		return "", nil
-	}
-}
-
-// stageSubcommands are the full staging subcommands for one AWS service.
-func stageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
-	return []*cli.Command{
-		stgcli.NewAddCommand(cfg),
-		stgcli.NewEditCommand(cfg),
-		stgcli.NewDeleteCommand(cfg),
-		stgcli.NewStatusCommand(cfg),
-		stgcli.NewDiffCommand(cfg),
-		stgcli.NewApplyCommand(cfg),
-		stgcli.NewResetCommand(cfg),
-		stgcli.NewTagCommand(cfg),
-		stgcli.NewUntagCommand(cfg),
-		stgcli.NewExportCommand(cfg),
-		stgcli.NewImportCommand(cfg),
-	}
-}
-
 // StageParamCommand returns the "param" staging subgroup (SSM Parameter Store).
 func StageParamCommand() *cli.Command {
 	return &cli.Command{
@@ -234,4 +143,95 @@ func FlatStageCommand(name string) *cli.Command {
 	c.Name = name
 
 	return c
+}
+
+// parameterStoreStageConfig is the staging config for SSM Parameter Store. It
+// adds the --type / --secure value-type flags to stage add/edit.
+func parameterStoreStageConfig() stgcli.CommandConfig {
+	return stgcli.CommandConfig{
+		CommandName:      "param",
+		ItemName:         "parameter",
+		ProviderLabel:    stageProviderLabel,
+		CommandPath:      "suve aws stage param",
+		Factory:          cliinternal.StrategyFactory(provider.ProviderAWS, provider.KindParam, awsinternal.ParamStore),
+		ParserFactory:    cliinternal.ParserFactory(provider.ProviderAWS, provider.KindParam),
+		ScopeResolver:    awsinternal.StagingScopeResolver,
+		HasDescription:   true,
+		ValueTypeFlags:   stageParamValueTypeFlags(),
+		ValueTypeFromCmd: resolveStageParamValueType,
+	}
+}
+
+// secretsManagerStageConfig is the staging config for Secrets Manager.
+func secretsManagerStageConfig() stgcli.CommandConfig {
+	return stgcli.CommandConfig{
+		CommandName:    stageNounSecret,
+		ItemName:       stageNounSecret,
+		ProviderLabel:  stageProviderLabel,
+		CommandPath:    "suve aws stage secret",
+		Factory:        cliinternal.StrategyFactory(provider.ProviderAWS, provider.KindSecret, awsinternal.SecretStore),
+		ParserFactory:  cliinternal.ParserFactory(provider.ProviderAWS, provider.KindSecret),
+		ScopeResolver:  awsinternal.StagingScopeResolver,
+		HasDescription: true,
+	}
+}
+
+// stageParamValueTypeFlags returns the SSM Parameter Store type flags for stage add/edit,
+// matching the immediate `param create`/`param update` commands. --type carries
+// no default so an unset flag stays "not specified" (create then applies String,
+// edit preserves the existing type).
+func stageParamValueTypeFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:  "type",
+			Usage: "Parameter type (String, StringList, SecureString)",
+		},
+		&cli.BoolFlag{
+			Name:  "secure",
+			Usage: "Shorthand for --type SecureString",
+		},
+	}
+}
+
+// resolveStageParamValueType maps the --type/--secure flags to a domain.ValueType, using
+// the same mutual-exclusion and validation as immediate `param create`. It
+// returns an empty value type when neither flag is set, meaning "not specified".
+func resolveStageParamValueType(cmd *cli.Command) (domain.ValueType, error) {
+	secure := cmd.Bool("secure")
+	typeSet := cmd.IsSet("type")
+
+	if secure && typeSet {
+		return "", errors.New("cannot use --secure with --type; use one or the other")
+	}
+
+	switch {
+	case secure:
+		return domain.ValueTypeSecret, nil
+	case typeSet:
+		paramType := cmd.String("type")
+		if err := paramtype.Validate(paramType); err != nil {
+			return "", err
+		}
+
+		return paramtype.Parse(paramType), nil
+	default:
+		return "", nil
+	}
+}
+
+// stageSubcommands are the full staging subcommands for one AWS service.
+func stageSubcommands(cfg stgcli.CommandConfig) []*cli.Command {
+	return []*cli.Command{
+		stgcli.NewAddCommand(cfg),
+		stgcli.NewEditCommand(cfg),
+		stgcli.NewDeleteCommand(cfg),
+		stgcli.NewStatusCommand(cfg),
+		stgcli.NewDiffCommand(cfg),
+		stgcli.NewApplyCommand(cfg),
+		stgcli.NewResetCommand(cfg),
+		stgcli.NewTagCommand(cfg),
+		stgcli.NewUntagCommand(cfg),
+		stgcli.NewExportCommand(cfg),
+		stgcli.NewImportCommand(cfg),
+	}
 }

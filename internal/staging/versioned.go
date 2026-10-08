@@ -30,27 +30,6 @@ type versionedTraits struct {
 	hasDeleteOptions bool
 }
 
-// versionedHooks is the per-provider behavior a versionedStrategy delegates to.
-// Implementations are zero-size types, so a zero-value strategy (no store) still
-// works as a parser.
-type versionedHooks interface {
-	// traits returns the provider's fixed strings and flags.
-	traits() versionedTraits
-	// parse splits input into the name and the version suffix that
-	// provider.Reader.Resolve expects ("" when no version is given).
-	parse(input string) (name, suffix string, err error)
-	// versionLabel renders a version id for diff and reset output.
-	versionLabel(id string) string
-	// isSecret reports whether the current value is secret material.
-	isSecret(entry *domain.Entry) bool
-	// deleteOptions translates staged delete options into provider options.
-	deleteOptions(o *DeleteOptions) []provider.DeleteOption
-	// create applies a staged create.
-	create(ctx context.Context, store provider.Store, name string, entry Entry) error
-	// update applies a staged update.
-	update(ctx context.Context, store provider.Store, name string, entry Entry) error
-}
-
 // versionedStrategy implements FullStrategy for a versioned service over a
 // provider.Store, with the provider specifics supplied by H. It carries no cloud
 // SDK dependency. A nil store yields a parser-only strategy
@@ -252,20 +231,6 @@ func (s *versionedStrategy[H]) FetchVersion(ctx context.Context, input string) (
 //declscope:shared // embedded by each versioned secret provider's hooks type
 type versionedSecretHooks struct{}
 
-func (versionedSecretHooks) versionLabel(id string) string { return "#" + id }
-
-func (versionedSecretHooks) isSecret(*domain.Entry) bool { return true }
-
-func (versionedSecretHooks) deleteOptions(*DeleteOptions) []provider.DeleteOption { return nil }
-
-func (versionedSecretHooks) create(ctx context.Context, store provider.Store, name string, entry Entry) error {
-	if _, err := store.Create(ctx, name, lo.FromPtr(entry.Value), domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
-		return fmt.Errorf("failed to create secret: %w", err)
-	}
-
-	return nil
-}
-
 // update writes the value as a new secret version.
 //
 //declscope:shared // AWS Secrets Manager's hooks wrap it with a binary-overwrite guard
@@ -281,4 +246,39 @@ func (versionedSecretHooks) update(ctx context.Context, store provider.Store, na
 	}
 
 	return nil
+}
+
+func (versionedSecretHooks) versionLabel(id string) string { return "#" + id }
+
+func (versionedSecretHooks) isSecret(*domain.Entry) bool { return true }
+
+func (versionedSecretHooks) deleteOptions(*DeleteOptions) []provider.DeleteOption { return nil }
+
+func (versionedSecretHooks) create(ctx context.Context, store provider.Store, name string, entry Entry) error {
+	if _, err := store.Create(ctx, name, lo.FromPtr(entry.Value), domain.ValueTypeSecret, lo.FromPtr(entry.Description)); err != nil {
+		return fmt.Errorf("failed to create secret: %w", err)
+	}
+
+	return nil
+}
+
+// versionedHooks is the per-provider behavior a versionedStrategy delegates to.
+// Implementations are zero-size types, so a zero-value strategy (no store) still
+// works as a parser.
+type versionedHooks interface {
+	// traits returns the provider's fixed strings and flags.
+	traits() versionedTraits
+	// parse splits input into the name and the version suffix that
+	// provider.Reader.Resolve expects ("" when no version is given).
+	parse(input string) (name, suffix string, err error)
+	// versionLabel renders a version id for diff and reset output.
+	versionLabel(id string) string
+	// isSecret reports whether the current value is secret material.
+	isSecret(entry *domain.Entry) bool
+	// deleteOptions translates staged delete options into provider options.
+	deleteOptions(o *DeleteOptions) []provider.DeleteOption
+	// create applies a staged create.
+	create(ctx context.Context, store provider.Store, name string, entry Entry) error
+	// update applies a staged update.
+	update(ctx context.Context, store provider.Store, name string, entry Entry) error
 }

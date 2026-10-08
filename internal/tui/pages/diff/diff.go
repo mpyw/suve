@@ -62,12 +62,6 @@ const (
 	sideColumns   = 2
 )
 
-// loadedMsg carries the fetched two-version contents back to the model.
-type loadedMsg struct {
-	content data.DiffContent
-	err     error
-}
-
 // Model is the diff page: it fetches two versions' values once, then renders (and
 // re-renders, for parse-json) their unified diff.
 type Model struct {
@@ -184,6 +178,38 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 	}
 }
 
+// HelpKeyMap reports the diff page's context-aware bindings for the help bar:
+// scroll always, the layout toggle (`s`, side-by-side ⇄ unified) on a loaded
+// diff, the mask toggle only on a loaded secret diff (`x` is a no-op on a
+// non-secret diff, so it is hidden there), then back. The help bar makes
+// `s`/`x`/esc discoverable — previously undocumented (#681, #674).
+func (m *Model) HelpKeyMap() help.KeyMap {
+	bindings := []key.Binding{scrollKey}
+
+	if m.loaded {
+		bindings = append(bindings, m.layoutBinding())
+	}
+
+	if m.loaded && m.content.Secret {
+		bindings = append(bindings, maskKey)
+	}
+
+	bindings = append(bindings, m.keys.Back)
+
+	return keys.Bindings{Short: bindings, Full: [][]key.Binding{bindings}}
+}
+
+// layoutBinding names the layout the `s` press switches TO, so the help bar reads
+// "s side-by-side" while unified and "s unified" while side-by-side.
+func (m *Model) layoutBinding() key.Binding {
+	next := "side-by-side"
+	if m.sideBySide {
+		next = "unified"
+	}
+
+	return key.NewBinding(key.WithKeys("s"), key.WithHelp("s", next))
+}
+
 // scrollViewport forwards msg to the diff viewport and, when the viewport's
 // scroll offset actually changes on a terminal that mishandles Bubble Tea's
 // scroll-region optimization (CloudShell), forces a full repaint so the scroll
@@ -217,38 +243,6 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 	}
 
 	return m, m.scrollViewport(msg)
-}
-
-// HelpKeyMap reports the diff page's context-aware bindings for the help bar:
-// scroll always, the layout toggle (`s`, side-by-side ⇄ unified) on a loaded
-// diff, the mask toggle only on a loaded secret diff (`x` is a no-op on a
-// non-secret diff, so it is hidden there), then back. The help bar makes
-// `s`/`x`/esc discoverable — previously undocumented (#681, #674).
-func (m *Model) HelpKeyMap() help.KeyMap {
-	bindings := []key.Binding{scrollKey}
-
-	if m.loaded {
-		bindings = append(bindings, m.layoutBinding())
-	}
-
-	if m.loaded && m.content.Secret {
-		bindings = append(bindings, maskKey)
-	}
-
-	bindings = append(bindings, m.keys.Back)
-
-	return keys.Bindings{Short: bindings, Full: [][]key.Binding{bindings}}
-}
-
-// layoutBinding names the layout the `s` press switches TO, so the help bar reads
-// "s side-by-side" while unified and "s unified" while side-by-side.
-func (m *Model) layoutBinding() key.Binding {
-	next := "side-by-side"
-	if m.sideBySide {
-		next = "unified"
-	}
-
-	return key.NewBinding(key.WithKeys("s"), key.WithHelp("s", next))
 }
 
 // resizeViewport sizes the inner viewport to the page area minus the pane border
@@ -424,6 +418,12 @@ func (m *Model) sideRow(left, right string) string {
 	return left + sideGutter + right
 }
 
+// loadedMsg carries the fetched two-version contents back to the model.
+type loadedMsg struct {
+	content data.DiffContent
+	err     error
+}
+
 // lineContent strips a udiff line's trailing newline for cell rendering.
 func lineContent(s string) string { return strings.TrimSuffix(s, "\n") }
 
@@ -440,34 +440,6 @@ func sideCell(s string, width int) string {
 	default:
 		return s
 	}
-}
-
-// colorize styles each diff line by class (header / hunk / added / removed),
-// mirroring the CLI's colorDiff so a `+`/`-` inside a hunk is not misread as a
-// file header.
-func (m *Model) colorize(diff string) string {
-	if diff == "" {
-		return m.styles.PageHint.Render("(no differences)")
-	}
-
-	lines := strings.Split(diff, "\n")
-	inHunk := false
-
-	for i, line := range lines {
-		switch {
-		case !inHunk && (strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++")):
-			lines[i] = m.styles.DiffHeader.Render(line)
-		case strings.HasPrefix(line, "@@"):
-			inHunk = true
-			lines[i] = m.styles.DiffHunk.Render(line)
-		case strings.HasPrefix(line, "-"):
-			lines[i] = m.styles.DiffRemoved.Render(line)
-		case strings.HasPrefix(line, "+"):
-			lines[i] = m.styles.DiffAdded.Render(line)
-		}
-	}
-
-	return strings.Join(lines, "\n")
 }
 
 // View renders the diff page into the given content area.
@@ -519,6 +491,34 @@ func (m *Model) vpWidth() int {
 	w, _ := components.PaneInner(m.width, m.height)
 
 	return w
+}
+
+// colorize styles each diff line by class (header / hunk / added / removed),
+// mirroring the CLI's colorDiff so a `+`/`-` inside a hunk is not misread as a
+// file header.
+func (m *Model) colorize(diff string) string {
+	if diff == "" {
+		return m.styles.PageHint.Render("(no differences)")
+	}
+
+	lines := strings.Split(diff, "\n")
+	inHunk := false
+
+	for i, line := range lines {
+		switch {
+		case !inHunk && (strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++")):
+			lines[i] = m.styles.DiffHeader.Render(line)
+		case strings.HasPrefix(line, "@@"):
+			inHunk = true
+			lines[i] = m.styles.DiffHunk.Render(line)
+		case strings.HasPrefix(line, "-"):
+			lines[i] = m.styles.DiffRemoved.Render(line)
+		case strings.HasPrefix(line, "+"):
+			lines[i] = m.styles.DiffAdded.Render(line)
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // truncateLine clamps s to width columns.

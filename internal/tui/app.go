@@ -71,77 +71,6 @@ const (
 	minHeight = 16
 )
 
-// targetFetcher resolves a pending scope target (see provider.Target) for the
-// status bar and the apply confirmation. It takes no context: the launch layer
-// builds it as a closure over the Run context, so the model stays free of both a
-// stored context and any provider package.
-type targetFetcher func() (provider.Target, error)
-
-// config is the constructor input for the root model.
-type config struct {
-	// scope is the fixed provider scope the TUI was launched with.
-	scope provider.Scope
-	// service preselects the initial tab ("param"/"secret", or "").
-	service string
-	// fetchTarget, when non-nil, is run asynchronously on Init when the scope's
-	// target is pending (AWS: the STS caller identity).
-	fetchTarget targetFetcher
-	// target, when non-nil, seeds the resolved target directly (used by tests and
-	// any already-resolved launch), bypassing the async fetch.
-	target *provider.Target
-	// sourceFor builds the read source and staging probe for a service tab. It is
-	// the data seam: production wires it to the registry-backed sourceFactory,
-	// tests to a providermock-backed one. When nil (an uninitialized shell and
-	// the staging tab), a tab shows its placeholder.
-	sourceFor func(service string) (data.Source, data.StagingProbe)
-	// mutatorFor builds the write-path Mutator for a service tab (the mutation
-	// dialogs' seam). Production wires it to the registry-backed sourceFactory,
-	// tests to a providermock-backed one; nil disables the write dialogs.
-	mutatorFor func(service string) data.Mutator
-	// stagingFor builds the review/apply/reset seam for a service, backing the
-	// staging page's sections and the apply/reset dialogs. Production wires it to
-	// the registry-backed sourceFactory, tests to a providermock-backed one; nil
-	// leaves the Staging tab a placeholder.
-	stagingFor func(service string) data.StagingService
-	// runCtx is the Run context threaded into pages so their fetch commands are
-	// cancelled when the program exits. Tests may leave it nil (newApp defaults it
-	// to context.Background()).
-	runCtx context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
-}
-
-// dialog is a modal overlay in the app shell's dialog stack. While any dialog
-// is open it consumes input first (modality); Esc closes the top one unless it
-// is busy (a mutation is in flight — GUI "Modal busy" parity). Concrete dialogs
-// live in internal/tui/dialogs and are adapted to this interface by
-// dialogs_wire.go.
-type dialog interface {
-	// Update handles a forwarded message and returns the (possibly replaced)
-	// dialog plus any command.
-	Update(tea.Msg) (dialog, tea.Cmd)
-	// View renders the dialog box content (the app frames and centers it).
-	View() string
-	// busy reports whether the dialog is mid-operation, so the shell suppresses
-	// dismissal.
-	busy() bool
-}
-
-// escInterceptor is a dialog that wants to own the Back (Esc) key rather than be
-// bare-popped — the create/edit/tag forms' discard guard (#790). The shell
-// forwards Esc into such a dialog's Update when interceptEsc reports true; the
-// dialog then arms a discard confirmation (dirty) or emits CanceledMsg (clean).
-// dialogAdapter forwards this to the wrapped dialogs.EscInterceptor.
-type escInterceptor interface {
-	interceptEsc() bool
-}
-
-// targetMsg carries a resolved scope target back to the model.
-type targetMsg struct{ target provider.Target }
-
-// targetErrMsg reports that the target lookup failed; the status bar simply
-// stops showing the loading placeholder, and the lookup is retried after the
-// next staged-count report (see App.retryTarget).
-type targetErrMsg struct{ err error }
-
 // App is the root Bubble Tea model — the app shell.
 type App struct {
 	width  int
@@ -253,16 +182,6 @@ func newApp(cfg config) *App {
 	return m
 }
 
-// initialPageCmd returns the active page's Init command, so the initial page's
-// async loads run when the program starts (Bubble Tea calls only the root Init).
-func (m *App) initialPageCmd() tea.Cmd {
-	if len(m.pages) == 0 {
-		return nil
-	}
-
-	return initPage(m.pages[len(m.pages)-1])
-}
-
 // Init kicks off the async target fetch (when the target is pending) and the
 // initial page's own loads.
 func (m *App) Init() tea.Cmd {
@@ -281,33 +200,6 @@ func (m *App) Init() tea.Cmd {
 	}
 
 	return tea.Batch(cmds...)
-}
-
-// fetchTargetCmd runs the injected target fetcher off the update loop.
-func (m *App) fetchTargetCmd() tea.Cmd {
-	fetch := m.fetchTarget
-	m.stagedSinceFetch = false
-
-	return func() tea.Msg {
-		target, err := fetch()
-		if err != nil {
-			return targetErrMsg{err: err}
-		}
-
-		return targetMsg{target: target}
-	}
-}
-
-// retryTargetCmd re-runs a failed target lookup, once per failure (see
-// retryTarget), or returns nil when there is nothing to retry.
-func (m *App) retryTargetCmd() tea.Cmd {
-	if !m.retryTarget {
-		return nil
-	}
-
-	m.retryTarget = false
-
-	return m.fetchTargetCmd()
 }
 
 // Update dispatches messages. Input (keys, mouse) is routed dialogs-first, then
@@ -535,6 +427,114 @@ func (m *App) routeToFocused(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	return m, tea.Batch(dialogCmd, pageCmd)
 }
+
+// initialPageCmd returns the active page's Init command, so the initial page's
+// async loads run when the program starts (Bubble Tea calls only the root Init).
+func (m *App) initialPageCmd() tea.Cmd {
+	if len(m.pages) == 0 {
+		return nil
+	}
+
+	return initPage(m.pages[len(m.pages)-1])
+}
+
+// fetchTargetCmd runs the injected target fetcher off the update loop.
+func (m *App) fetchTargetCmd() tea.Cmd {
+	fetch := m.fetchTarget
+	m.stagedSinceFetch = false
+
+	return func() tea.Msg {
+		target, err := fetch()
+		if err != nil {
+			return targetErrMsg{err: err}
+		}
+
+		return targetMsg{target: target}
+	}
+}
+
+// retryTargetCmd re-runs a failed target lookup, once per failure (see
+// retryTarget), or returns nil when there is nothing to retry.
+func (m *App) retryTargetCmd() tea.Cmd {
+	if !m.retryTarget {
+		return nil
+	}
+
+	m.retryTarget = false
+
+	return m.fetchTargetCmd()
+}
+
+// targetFetcher resolves a pending scope target (see provider.Target) for the
+// status bar and the apply confirmation. It takes no context: the launch layer
+// builds it as a closure over the Run context, so the model stays free of both a
+// stored context and any provider package.
+type targetFetcher func() (provider.Target, error)
+
+// config is the constructor input for the root model.
+type config struct {
+	// scope is the fixed provider scope the TUI was launched with.
+	scope provider.Scope
+	// service preselects the initial tab ("param"/"secret", or "").
+	service string
+	// fetchTarget, when non-nil, is run asynchronously on Init when the scope's
+	// target is pending (AWS: the STS caller identity).
+	fetchTarget targetFetcher
+	// target, when non-nil, seeds the resolved target directly (used by tests and
+	// any already-resolved launch), bypassing the async fetch.
+	target *provider.Target
+	// sourceFor builds the read source and staging probe for a service tab. It is
+	// the data seam: production wires it to the registry-backed sourceFactory,
+	// tests to a providermock-backed one. When nil (an uninitialized shell and
+	// the staging tab), a tab shows its placeholder.
+	sourceFor func(service string) (data.Source, data.StagingProbe)
+	// mutatorFor builds the write-path Mutator for a service tab (the mutation
+	// dialogs' seam). Production wires it to the registry-backed sourceFactory,
+	// tests to a providermock-backed one; nil disables the write dialogs.
+	mutatorFor func(service string) data.Mutator
+	// stagingFor builds the review/apply/reset seam for a service, backing the
+	// staging page's sections and the apply/reset dialogs. Production wires it to
+	// the registry-backed sourceFactory, tests to a providermock-backed one; nil
+	// leaves the Staging tab a placeholder.
+	stagingFor func(service string) data.StagingService
+	// runCtx is the Run context threaded into pages so their fetch commands are
+	// cancelled when the program exits. Tests may leave it nil (newApp defaults it
+	// to context.Background()).
+	runCtx context.Context //nolint:containedctx // threaded into page fetch commands; mirrors the GUI
+}
+
+// dialog is a modal overlay in the app shell's dialog stack. While any dialog
+// is open it consumes input first (modality); Esc closes the top one unless it
+// is busy (a mutation is in flight — GUI "Modal busy" parity). Concrete dialogs
+// live in internal/tui/dialogs and are adapted to this interface by
+// dialogs_wire.go.
+type dialog interface {
+	// Update handles a forwarded message and returns the (possibly replaced)
+	// dialog plus any command.
+	Update(tea.Msg) (dialog, tea.Cmd)
+	// View renders the dialog box content (the app frames and centers it).
+	View() string
+	// busy reports whether the dialog is mid-operation, so the shell suppresses
+	// dismissal.
+	busy() bool
+}
+
+// escInterceptor is a dialog that wants to own the Back (Esc) key rather than be
+// bare-popped — the create/edit/tag forms' discard guard (#790). The shell
+// forwards Esc into such a dialog's Update when interceptEsc reports true; the
+// dialog then arms a discard confirmation (dirty) or emits CanceledMsg (clean).
+// dialogAdapter forwards this to the wrapped dialogs.EscInterceptor.
+type escInterceptor interface {
+	interceptEsc() bool
+}
+
+// targetMsg carries a resolved scope target back to the model.
+type targetMsg struct{ target provider.Target }
+
+// targetErrMsg reports that the target lookup failed; the status bar simply
+// stops showing the loading placeholder, and the lookup is retried after the
+// next staged-count report (see App.retryTarget).
+type targetErrMsg struct{ err error }
 
 // isUserInput reports whether msg is terminal input from the user, which only
 // the top dialog may receive while one is open.

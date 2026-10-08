@@ -41,71 +41,6 @@ type tagContext struct {
 	baseModifiedAt *time.Time
 }
 
-// loadTagContext loads common context needed for both Tag and Untag operations.
-func (u *TagUseCase) loadTagContext(ctx context.Context, inputName, namespace string) (*tagContext, error) {
-	service := u.Strategy.Service()
-
-	// Parse and validate name
-	name, err := u.Strategy.ParseName(inputName)
-	if err != nil {
-		return nil, err
-	}
-
-	key := staging.EntryKey{Name: name, Namespace: namespace}
-
-	// Fetch the remote resource to check existence and get base modified time
-	currentValue, remoteBaseModifiedAt, err := u.fetchRemoteCurrentValue(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-
-	// Load current entry state with CurrentValue for existence check in reducer.
-	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
-	if err != nil {
-		return nil, err
-	}
-
-	// Load current staged tags
-	stagedTags, baseModifiedAt, err := transition.LoadStagedTags(ctx, u.Store, service, key)
-	if err != nil {
-		return nil, err
-	}
-
-	// Use the remote base modified time if we don't have one yet
-	if baseModifiedAt == nil {
-		baseModifiedAt = remoteBaseModifiedAt
-	}
-
-	return &tagContext{
-		service:        service,
-		key:            key,
-		entryState:     entryState,
-		stagedTags:     stagedTags,
-		baseModifiedAt: baseModifiedAt,
-	}, nil
-}
-
-// fetchRemoteCurrentValue fetches the current value from the remote store.
-// Returns (value, lastModified, nil) if resource exists, (nil, nil, nil) if not found.
-func (u *TagUseCase) fetchRemoteCurrentValue(ctx context.Context, name string) (*string, *time.Time, error) {
-	result, err := u.Strategy.FetchCurrentValue(ctx, name)
-	if err != nil {
-		// If resource doesn't exist, return nil
-		if notFoundErr := (*staging.ResourceNotFoundError)(nil); errors.As(err, &notFoundErr) {
-			return nil, nil, nil
-		}
-
-		return nil, nil, err
-	}
-
-	var baseModifiedAt *time.Time
-	if !result.LastModified.IsZero() {
-		baseModifiedAt = &result.LastModified
-	}
-
-	return &result.Value, baseModifiedAt, nil
-}
-
 // Tag adds or updates tags on a staged resource.
 func (u *TagUseCase) Tag(ctx context.Context, input TagInput) (*TagOutput, error) {
 	if len(input.Tags) == 0 {
@@ -169,4 +104,69 @@ func (u *TagUseCase) Untag(ctx context.Context, input UntagInput) (*UntagOutput,
 	}
 
 	return &UntagOutput{Name: tc.key.Name}, nil
+}
+
+// loadTagContext loads common context needed for both Tag and Untag operations.
+func (u *TagUseCase) loadTagContext(ctx context.Context, inputName, namespace string) (*tagContext, error) {
+	service := u.Strategy.Service()
+
+	// Parse and validate name
+	name, err := u.Strategy.ParseName(inputName)
+	if err != nil {
+		return nil, err
+	}
+
+	key := staging.EntryKey{Name: name, Namespace: namespace}
+
+	// Fetch the remote resource to check existence and get base modified time
+	currentValue, remoteBaseModifiedAt, err := u.fetchRemoteCurrentValue(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load current entry state with CurrentValue for existence check in reducer.
+	entryState, err := transition.LoadEntryState(ctx, u.Store, service, key, currentValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load current staged tags
+	stagedTags, baseModifiedAt, err := transition.LoadStagedTags(ctx, u.Store, service, key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use the remote base modified time if we don't have one yet
+	if baseModifiedAt == nil {
+		baseModifiedAt = remoteBaseModifiedAt
+	}
+
+	return &tagContext{
+		service:        service,
+		key:            key,
+		entryState:     entryState,
+		stagedTags:     stagedTags,
+		baseModifiedAt: baseModifiedAt,
+	}, nil
+}
+
+// fetchRemoteCurrentValue fetches the current value from the remote store.
+// Returns (value, lastModified, nil) if resource exists, (nil, nil, nil) if not found.
+func (u *TagUseCase) fetchRemoteCurrentValue(ctx context.Context, name string) (*string, *time.Time, error) {
+	result, err := u.Strategy.FetchCurrentValue(ctx, name)
+	if err != nil {
+		// If resource doesn't exist, return nil
+		if notFoundErr := (*staging.ResourceNotFoundError)(nil); errors.As(err, &notFoundErr) {
+			return nil, nil, nil
+		}
+
+		return nil, nil, err
+	}
+
+	var baseModifiedAt *time.Time
+	if !result.LastModified.IsZero() {
+		baseModifiedAt = &result.LastModified
+	}
+
+	return &result.Value, baseModifiedAt, nil
 }

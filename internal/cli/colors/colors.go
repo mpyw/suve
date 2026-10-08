@@ -30,22 +30,6 @@ func For(w io.Writer) Palette {
 	return Palette{enabled: os.Getenv("NO_COLOR") == "" && terminal.IsTerminalWriter(w)}
 }
 
-// sprint colorizes the operands with attrs when the palette is enabled, and
-// returns them unformatted otherwise. A fresh color.Color with a forced
-// per-instance setting is used, so palettes for different destinations never
-// race on (or get overridden by) the process-global color.NoColor.
-func (p Palette) sprint(a []any, attrs ...color.Attribute) string {
-	c := color.New(attrs...)
-
-	if p.enabled {
-		c.EnableColor()
-	} else {
-		c.DisableColor()
-	}
-
-	return c.Sprint(a...)
-}
-
 // Warning formats text in yellow for warning messages.
 func (p Palette) Warning(a ...any) string { return p.sprint(a, color.FgYellow) }
 
@@ -90,3 +74,19 @@ func (p Palette) OpModify(a ...any) string { return p.sprint(a, color.FgGreen) }
 
 // OpDelete formats the delete operation indicator (D) in red.
 func (p Palette) OpDelete(a ...any) string { return p.sprint(a, color.FgRed) }
+
+// sprint colorizes the operands with attrs when the palette is enabled, and
+// returns them unformatted otherwise. A fresh color.Color with a forced
+// per-instance setting is used, so palettes for different destinations never
+// race on (or get overridden by) the process-global color.NoColor.
+func (p Palette) sprint(a []any, attrs ...color.Attribute) string {
+	c := color.New(attrs...)
+
+	if p.enabled {
+		c.EnableColor()
+	} else {
+		c.DisableColor()
+	}
+
+	return c.Sprint(a...)
+}

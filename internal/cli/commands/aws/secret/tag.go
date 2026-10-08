@@ -10,13 +10,6 @@ import (
 	"github.com/mpyw/suve/internal/provider"
 )
 
-// newTagger builds the Secrets Manager provider.Tagger.
-//
-//declscope:shared // untag.go's UntagCommand builds the same Tagger
-func newTagger(ctx context.Context) (provider.Tagger, error) {
-	return awsinternal.SecretStore(ctx)
-}
-
 // TagCommand returns the Secrets Manager tag command.
 func TagCommand() *cli.Command {
 	return generic.TagCommand(generic.TagConfig{
@@ -35,4 +28,11 @@ EXAMPLES:
 		UsageError: "usage: suve aws secret tag <name> <key=value> [key=value]",
 		NewTagger:  newTagger,
 	})
+}
+
+// newTagger builds the Secrets Manager provider.Tagger.
+//
+//declscope:shared // untag.go's UntagCommand builds the same Tagger
+func newTagger(ctx context.Context) (provider.Tagger, error) {
+	return awsinternal.SecretStore(ctx)
 }

@@ -171,22 +171,6 @@ func scopeDir(scope provider.Scope) (string, error) {
 	return filepath.Join(homeDir, baseDirName, stagingDir, scope.Key()), nil
 }
 
-// newStore creates a new split (working) file Store for the given scope.
-// State is stored under ~/.suve/staging/{scope.Key()}/ split into
-// param.json and secret.json. No encryption key is configured; use
-// NewWorkingStore for the encrypted working store.
-func newStore(scope provider.Scope) (*Store, error) {
-	dir, err := scopeDir(scope)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Store{
-		stateDir: dir,
-		scope:    scope,
-	}, nil
-}
-
 // NewWorkingStore creates the working staging-area Store (split param.json /
 // secret.json under the scope directory) with its encryption key resolved via
 // the key provider fallback chain:
@@ -289,6 +273,22 @@ func NewWorkingStore(scope provider.Scope) (*Store, error) {
 	s.key = key
 
 	return s, nil
+}
+
+// newStore creates a new split (working) file Store for the given scope.
+// State is stored under ~/.suve/staging/{scope.Key()}/ split into
+// param.json and secret.json. No encryption key is configured; use
+// NewWorkingStore for the encrypted working store.
+func newStore(scope provider.Scope) (*Store, error) {
+	dir, err := scopeDir(scope)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Store{
+		stateDir: dir,
+		scope:    scope,
+	}, nil
 }
 
 // guardKeyLossWithEncryptedState reports whether the working store must hard-fail
@@ -762,6 +762,15 @@ func (s *Store) Drain(_ context.Context, service staging.Service, keep bool) (*s
 	return s.drainLocked(service, keep)
 }
 
+// WriteState saves the state to file(s).
+// This implements StateWriter for file-based storage.
+// If service is empty, writes all supported services; otherwise writes only the specified service.
+func (s *Store) WriteState(_ context.Context, service staging.Service, state *staging.State) error {
+	defer s.lock()()
+
+	return s.writeStateLocked(service, state)
+}
+
 // drainLocked is the lock-free core of Drain. It must be called with the store
 // lock held (see Drain and Update).
 func (s *Store) drainLocked(service staging.Service, keep bool) (*staging.State, error) {
@@ -826,15 +835,6 @@ func (s *Store) drainServiceFile(service staging.Service, keep bool) (*staging.S
 	}
 
 	return state.ExtractService(service), nil
-}
-
-// WriteState saves the state to file(s).
-// This implements StateWriter for file-based storage.
-// If service is empty, writes all supported services; otherwise writes only the specified service.
-func (s *Store) WriteState(_ context.Context, service staging.Service, state *staging.State) error {
-	defer s.lock()()
-
-	return s.writeStateLocked(service, state)
 }
 
 // writeStateLocked is the lock-free core of WriteState. It must be called with
@@ -968,17 +968,6 @@ func (s *Store) ListTags(_ context.Context, service staging.Service) (map[stagin
 	return result, nil
 }
 
-// writeServiceState persists state to the file backing the given service.
-// In split mode only that service's slice is written; in single-file mode the
-// whole state is written.
-func (s *Store) writeServiceState(service staging.Service, state *staging.State) error {
-	if s.isSplit() {
-		return s.writeFile(s.servicePath(service), state.ExtractService(service))
-	}
-
-	return s.writeFile(s.stateFilePath, state)
-}
-
 // StageEntry adds or updates the staged entry identified by key. The stored
 // Entry's Namespace is aligned to the key so it never drifts. App Configuration
 // settings with the same name under different namespaces are distinct entries.
@@ -1075,6 +1064,17 @@ func (s *Store) UnstageAll(_ context.Context, service staging.Service) error {
 	}
 
 	return nil
+}
+
+// writeServiceState persists state to the file backing the given service.
+// In split mode only that service's slice is written; in single-file mode the
+// whole state is written.
+func (s *Store) writeServiceState(service staging.Service, state *staging.State) error {
+	if s.isSplit() {
+		return s.writeFile(s.servicePath(service), state.ExtractService(service))
+	}
+
+	return s.writeFile(s.stateFilePath, state)
 }
 
 // initializeStateMaps ensures all nested maps are initialized.

@@ -49,6 +49,30 @@ const (
 //nolint:gochecknoglobals // immutable dialog-local binding
 var entryEditorKey = key.NewBinding(key.WithKeys("ctrl+o"))
 
+// EntryFormInput configures a create/edit dialog.
+type EntryFormInput struct {
+	Ctx     context.Context //nolint:containedctx // Run context threaded into the mutation command; mirrors the browser
+	Mutator data.Mutator
+	Service string
+	Styles  styles.Styles
+	// Edit switches the dialog to edit mode (name is fixed, not entered).
+	Edit bool
+	// Name/Namespace/Value/TypeLabel/Description seed the fields. For create,
+	// Namespace seeds the App Configuration namespace default (the viewing one).
+	Name      string
+	Namespace string
+	Value     string
+	TypeLabel string
+	// StagedOnly opens the dialog from a staged-only surface (the staging review
+	// page): the mode toggle is hidden and the write is forced staged, so a staged
+	// review can never launch an immediate write that bypasses the staging store.
+	StagedOnly  bool
+	Description string
+	// DeleteStagedKeys lets a create dialog reject a name already staged for
+	// deletion with an inline validation error (#692). Unset for an edit.
+	DeleteStagedKeys map[data.StagedKey]struct{}
+}
+
 // entryForm is the create/edit dialog. It embeds a huh form (name, type,
 // namespace, value, description, mode) as a model and adds a $EDITOR handoff on
 // the value field.
@@ -114,30 +138,6 @@ type entryForm struct {
 	busy   bool
 	err    string
 	notice string
-}
-
-// EntryFormInput configures a create/edit dialog.
-type EntryFormInput struct {
-	Ctx     context.Context //nolint:containedctx // Run context threaded into the mutation command; mirrors the browser
-	Mutator data.Mutator
-	Service string
-	Styles  styles.Styles
-	// Edit switches the dialog to edit mode (name is fixed, not entered).
-	Edit bool
-	// Name/Namespace/Value/TypeLabel/Description seed the fields. For create,
-	// Namespace seeds the App Configuration namespace default (the viewing one).
-	Name      string
-	Namespace string
-	Value     string
-	TypeLabel string
-	// StagedOnly opens the dialog from a staged-only surface (the staging review
-	// page): the mode toggle is hidden and the write is forced staged, so a staged
-	// review can never launch an immediate write that bypasses the staging store.
-	StagedOnly  bool
-	Description string
-	// DeleteStagedKeys lets a create dialog reject a name already staged for
-	// deletion with an inline validation error (#692). Unset for an edit.
-	DeleteStagedKeys map[data.StagedKey]struct{}
 }
 
 // NewEntryForm builds a create/edit dialog. It returns the dialog and its Init
@@ -304,50 +304,6 @@ func entryFormTheme() huh.Theme {
 	})
 }
 
-// syncFormSize re-caps the embedded form's scrollable body to the current
-// terminal size and footer. It forwards a height-reduced WindowSizeMsg so huh
-// caps the group at min(naturalHeight, budget): a form that fits renders whole,
-// a taller one scrolls with the focused field kept in view, so the submit
-// control and the pinned hint never clip off the bottom at the minimum size. It
-// returns any redraw command the resize produces, and is a no-op (nil) until the
-// form exists and a WindowSizeMsg has arrived.
-func (d *entryForm) syncFormSize() tea.Cmd {
-	if d.form == nil || !d.sized() {
-		return nil
-	}
-
-	form, cmd := d.form.Update(tea.WindowSizeMsg{Width: dialogContentWidth, Height: d.formBodyHeight()})
-	if f, ok := form.(*huh.Form); ok {
-		d.form = f
-	}
-
-	return cmd
-}
-
-// formBodyHeight is the height budget the embedded form's scrollable body gets:
-// the frame's inner height less the fixed rows this View pins around the form
-// (the title and its blank spacer above, the footer — any active error/notice
-// plus the hint — below).
-func (d *entryForm) formBodyHeight() int {
-	around := lipgloss.Height(d.header()) + titleSpacerRows + lipgloss.Height(d.footer())
-
-	return max(d.availHeight()-around, minFormBody)
-}
-
-// namespaceField builds the App Configuration namespace field. On CREATE it is an
-// editable input (seeded with the viewing namespace). On EDIT it is a read-only
-// note: a write targets one concrete namespace, so editing the namespace of an
-// existing entry would silently retarget a DIFFERENT namespace — the field is
-// disabled just as the name field is omitted on edit.
-func (d *entryForm) namespaceField() huh.Field {
-	if d.edit {
-		return huh.NewNote().Title("Namespace").Description(entryNamespaceDisplay(d.namespace))
-	}
-
-	return huh.NewInput().Key("namespace").Title("Namespace").
-		Placeholder("(default)").Value(&d.namespace)
-}
-
 func (d *entryForm) Busy() bool { return d.busy }
 
 func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -394,6 +350,75 @@ func (d *entryForm) Update(msg tea.Msg) (Model, tea.Cmd) {
 // InterceptEsc opts the form into the shell's discard guard (#790): the shell
 // forwards Esc into Update (see handleEsc) rather than bare-popping the dialog.
 func (*entryForm) InterceptEsc() bool { return true }
+
+func (d *entryForm) View() string {
+	// The Stage/Apply popup replaces the whole form body while it is open (the app
+	// shell frames and centers it as a compact box).
+	if d.confirming {
+		return d.confirm.View(d.styles)
+	}
+
+	var b strings.Builder
+
+	b.WriteString(d.header())
+	b.WriteString("\n\n")
+
+	if d.busy {
+		b.WriteString(d.styles.PageHint.Render("working…"))
+
+		return b.String()
+	}
+
+	b.WriteString(d.form.View())
+	b.WriteString("\n")
+	b.WriteString(d.footer())
+
+	return b.String()
+}
+
+// syncFormSize re-caps the embedded form's scrollable body to the current
+// terminal size and footer. It forwards a height-reduced WindowSizeMsg so huh
+// caps the group at min(naturalHeight, budget): a form that fits renders whole,
+// a taller one scrolls with the focused field kept in view, so the submit
+// control and the pinned hint never clip off the bottom at the minimum size. It
+// returns any redraw command the resize produces, and is a no-op (nil) until the
+// form exists and a WindowSizeMsg has arrived.
+func (d *entryForm) syncFormSize() tea.Cmd {
+	if d.form == nil || !d.sized() {
+		return nil
+	}
+
+	form, cmd := d.form.Update(tea.WindowSizeMsg{Width: dialogContentWidth, Height: d.formBodyHeight()})
+	if f, ok := form.(*huh.Form); ok {
+		d.form = f
+	}
+
+	return cmd
+}
+
+// formBodyHeight is the height budget the embedded form's scrollable body gets:
+// the frame's inner height less the fixed rows this View pins around the form
+// (the title and its blank spacer above, the footer — any active error/notice
+// plus the hint — below).
+func (d *entryForm) formBodyHeight() int {
+	around := lipgloss.Height(d.header()) + titleSpacerRows + lipgloss.Height(d.footer())
+
+	return max(d.availHeight()-around, minFormBody)
+}
+
+// namespaceField builds the App Configuration namespace field. On CREATE it is an
+// editable input (seeded with the viewing namespace). On EDIT it is a read-only
+// note: a write targets one concrete namespace, so editing the namespace of an
+// existing entry would silently retarget a DIFFERENT namespace — the field is
+// disabled just as the name field is omitted on edit.
+func (d *entryForm) namespaceField() huh.Field {
+	if d.edit {
+		return huh.NewNote().Title("Namespace").Description(entryNamespaceDisplay(d.namespace))
+	}
+
+	return huh.NewInput().Key("namespace").Title("Namespace").
+		Placeholder("(default)").Value(&d.namespace)
+}
 
 // handleEsc implements the discard guard: on a DIRTY form the first Esc arms a
 // confirmation (shows the notice, stays open); a second consecutive Esc — or any
@@ -653,31 +678,6 @@ func (d *entryForm) onEditorFinished(msg entryEditorFinishedMsg) (Model, tea.Cmd
 	// Rebuild so the huh textarea re-binds to the edited field (consistent with
 	// every other value-changing path; avoids a stale textarea buffer).
 	return d, d.rebuildForm()
-}
-
-func (d *entryForm) View() string {
-	// The Stage/Apply popup replaces the whole form body while it is open (the app
-	// shell frames and centers it as a compact box).
-	if d.confirming {
-		return d.confirm.View(d.styles)
-	}
-
-	var b strings.Builder
-
-	b.WriteString(d.header())
-	b.WriteString("\n\n")
-
-	if d.busy {
-		b.WriteString(d.styles.PageHint.Render("working…"))
-
-		return b.String()
-	}
-
-	b.WriteString(d.form.View())
-	b.WriteString("\n")
-	b.WriteString(d.footer())
-
-	return b.String()
 }
 
 // header renders the dialog title, wrapped to the dialog width so a long edited

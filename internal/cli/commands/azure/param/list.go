@@ -17,6 +17,12 @@ import (
 	"github.com/mpyw/suve/internal/usecase/param"
 )
 
+// NamespaceListSource is the App Configuration store's namespace-scoped
+// listing, an App-Config-specific extension reached by type-asserting the store.
+type NamespaceListSource interface {
+	ListWithNamespacesScoped(ctx context.Context) ([]appconfig.KeyNamespace, error)
+}
+
 // namespaceListJSONItem is one row of `--output=json` for the namespace-aware
 // listing. Namespace is the raw label ("" for the null namespace, matching the
 // GUI's per-entry namespace), NOT the "(NULL)" display form used in text.
@@ -24,12 +30,6 @@ type namespaceListJSONItem struct {
 	Namespace string  `json:"namespace"`
 	Name      string  `json:"name"`
 	Value     *string `json:"value,omitempty"`
-}
-
-// NamespaceListSource is the App Configuration store's namespace-scoped
-// listing, an App-Config-specific extension reached by type-asserting the store.
-type NamespaceListSource interface {
-	ListWithNamespacesScoped(ctx context.Context) ([]appconfig.KeyNamespace, error)
 }
 
 // newNamespaceLister adapts an App Configuration namespace listing to the use

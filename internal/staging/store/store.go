@@ -23,6 +23,29 @@ type ReadOperator interface {
 	ListTags(ctx context.Context, service staging.Service) (map[staging.Service]map[staging.EntryKey]staging.TagEntry, error)
 }
 
+// ReadWriteOperator combines read and write access to staging entries.
+type ReadWriteOperator interface {
+	ReadOperator
+	writeOperator
+}
+
+// FileStore combines drain and write operations for file storage.
+type FileStore interface {
+	drainer
+	writer
+}
+
+// WorkingStore is the working-area surface the export and import use cases rely
+// on: a bulk Drain for the export snapshot, per-key writes to clear exactly the
+// exported keys (each re-read under its own lock), and the atomic Update
+// read-modify-write used to reconcile an import without clobbering a concurrent
+// stage.
+type WorkingStore interface {
+	drainer
+	writeOperator
+	updater
+}
+
 // writeOperator provides write access to individual staging entries.
 type writeOperator interface {
 	// StageEntry adds or updates the staged entry identified by key.
@@ -35,12 +58,6 @@ type writeOperator interface {
 	UnstageTag(ctx context.Context, service staging.Service, key staging.EntryKey) error
 	// UnstageAll removes all staged changes for a service.
 	UnstageAll(ctx context.Context, service staging.Service) error
-}
-
-// ReadWriteOperator combines read and write access to staging entries.
-type ReadWriteOperator interface {
-	ReadOperator
-	writeOperator
 }
 
 // drainer provides bulk read access to staging state (for drain command).
@@ -67,21 +84,4 @@ type writer interface {
 // not call back into the store (the lock is not reentrant).
 type updater interface {
 	Update(ctx context.Context, service staging.Service, fn func(*staging.State) error) error
-}
-
-// FileStore combines drain and write operations for file storage.
-type FileStore interface {
-	drainer
-	writer
-}
-
-// WorkingStore is the working-area surface the export and import use cases rely
-// on: a bulk Drain for the export snapshot, per-key writes to clear exactly the
-// exported keys (each re-read under its own lock), and the atomic Update
-// read-modify-write used to reconcile an import without clobbering a concurrent
-// stage.
-type WorkingStore interface {
-	drainer
-	writeOperator
-	updater
 }

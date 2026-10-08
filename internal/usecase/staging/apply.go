@@ -89,16 +89,6 @@ type ApplyUseCase struct {
 	StrategyFor func(namespace string) (staging.ApplyStrategy, error)
 }
 
-// strategyForNamespace returns the apply strategy scoped to the given namespace,
-// falling back to the single Strategy when no resolver is configured.
-func (u *ApplyUseCase) strategyForNamespace(namespace string) (staging.ApplyStrategy, error) {
-	if u.StrategyFor == nil {
-		return u.Strategy, nil
-	}
-
-	return u.StrategyFor(namespace)
-}
-
 // Execute runs the apply use case.
 func (u *ApplyUseCase) Execute(ctx context.Context, input ApplyInput) (*ApplyOutput, error) {
 	service := u.Strategy.Service()
@@ -205,6 +195,16 @@ func (u *ApplyUseCase) conflicts(
 	}
 
 	return staging.SortedEntryKeys(conflicts), nil
+}
+
+// strategyForNamespace returns the apply strategy scoped to the given namespace,
+// falling back to the single Strategy when no resolver is configured.
+func (u *ApplyUseCase) strategyForNamespace(namespace string) (staging.ApplyStrategy, error) {
+	if u.StrategyFor == nil {
+		return u.Strategy, nil
+	}
+
+	return u.StrategyFor(namespace)
 }
 
 // applyConflictCheckError wraps a failed conflict check into the apply rejection

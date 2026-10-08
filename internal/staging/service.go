@@ -52,18 +52,6 @@ type ServiceStrategy interface {
 // staged state, since staging is keyed by the resource name.
 var ErrServiceNotConfigured = errors.New("staging service not configured")
 
-// kindToService maps a provider Kind to the equivalent staging Service.
-func kindToService(k provider.Kind) Service {
-	switch k {
-	case provider.KindParam:
-		return ServiceParam
-	case provider.KindSecret:
-		return ServiceSecret
-	default:
-		return Service(k)
-	}
-}
-
 // SupportedServices returns the staging Services supported by the given scope,
 // in the scope's stable kind order. This is the registry-driven iteration
 // source that replaces hardcoded {ServiceParam, ServiceSecret} loops.
@@ -75,4 +63,16 @@ func SupportedServices(scope provider.Scope) []Service {
 	})
 
 	return services
+}
+
+// kindToService maps a provider Kind to the equivalent staging Service.
+func kindToService(k provider.Kind) Service {
+	switch k {
+	case provider.KindParam:
+		return ServiceParam
+	case provider.KindSecret:
+		return ServiceSecret
+	default:
+		return Service(k)
+	}
 }

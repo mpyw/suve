@@ -31,35 +31,6 @@ type Prompter struct {
 	Target string
 }
 
-// printTargetInfo prints the target information before a prompt, if available.
-func (p *Prompter) printTargetInfo() {
-	if p.Target != "" {
-		output.Printf(p.Stderr, "%s Target: %s\n", colors.For(p.Stderr).Info("i"), p.Target)
-	}
-}
-
-// reader returns the shared buffered reader when one was injected, otherwise a
-// per-call reader over Stdin.
-func (p *Prompter) reader() *bufio.Reader {
-	if p.BufReader != nil {
-		return p.BufReader
-	}
-
-	return bufio.NewReader(p.Stdin)
-}
-
-// readYesNo reads a yes/no response from stdin.
-func (p *Prompter) readYesNo() (bool, error) {
-	response, err := p.reader().ReadString('\n')
-	if err != nil {
-		return false, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-
-	return response == "y" || response == "yes", nil
-}
-
 // Confirm displays a confirmation prompt and returns true if the user confirms.
 // If skipConfirm is true, returns true without prompting.
 func (p *Prompter) Confirm(message string, skipConfirm bool) (bool, error) {
@@ -106,6 +77,35 @@ func (p *Prompter) ConfirmRecoverableDelete(target, recovery string, skipConfirm
 	output.Printf(p.Stderr, "%s Continue? [y/N]: ", colors.For(p.Stderr).Warning("?"))
 
 	return p.readYesNo()
+}
+
+// printTargetInfo prints the target information before a prompt, if available.
+func (p *Prompter) printTargetInfo() {
+	if p.Target != "" {
+		output.Printf(p.Stderr, "%s Target: %s\n", colors.For(p.Stderr).Info("i"), p.Target)
+	}
+}
+
+// reader returns the shared buffered reader when one was injected, otherwise a
+// per-call reader over Stdin.
+func (p *Prompter) reader() *bufio.Reader {
+	if p.BufReader != nil {
+		return p.BufReader
+	}
+
+	return bufio.NewReader(p.Stdin)
+}
+
+// readYesNo reads a yes/no response from stdin.
+func (p *Prompter) readYesNo() (bool, error) {
+	response, err := p.reader().ReadString('\n')
+	if err != nil {
+		return false, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+
+	return response == "y" || response == "yes", nil
 }
 
 // Choice represents an option in a multiple choice prompt.

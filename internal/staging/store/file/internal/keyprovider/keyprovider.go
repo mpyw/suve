@@ -50,17 +50,6 @@ const (
 	keyLen = 32
 )
 
-// Hooks for testing - these allow tests to override environment and keychain
-// access without touching the real environment or OS keychain.
-//
-//nolint:gochecknoglobals // test hooks for dependency injection.
-var (
-	lookupEnvFunc  = os.LookupEnv
-	keyringGetFunc = keyring.Get
-	keyringSetFunc = keyring.Set
-	randReader     = rand.Reader
-)
-
 // ErrKeychainKeyNotFound signals that the OS keychain is reachable but holds no
 // stored staging data key. It is the cause reported when a lost keychain entry
 // is detected alongside encrypted working state.
@@ -73,6 +62,17 @@ var ErrKeychainKeyNotFound = errors.New(
 // fallback collides with existing encrypted working state.
 var ErrNoKeyAvailable = errors.New(
 	"no staging encryption key is available on this platform; set SUVE_STAGING_KEY")
+
+// Hooks for testing - these allow tests to override environment and keychain
+// access without touching the real environment or OS keychain.
+//
+//nolint:gochecknoglobals // test hooks for dependency injection.
+var (
+	lookupEnvFunc  = os.LookupEnv
+	keyringGetFunc = keyring.Get
+	keyringSetFunc = keyring.Set
+	randReader     = rand.Reader
+)
 
 // KeychainUnavailableError wraps a hard OS-keychain failure — a locked
 // keychain, an unreachable dbus, a corrupted stored key, or a failed store.

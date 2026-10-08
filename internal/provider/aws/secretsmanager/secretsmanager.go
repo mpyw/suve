@@ -458,21 +458,6 @@ func pendingDeletionError(name string, err error) error {
 	return fmt.Errorf("%w: %s (run `secret restore` to recover it): %w", provider.ErrPendingDeletion, name, err)
 }
 
-// applyRotation issues a RotateSecret request when a RotationRules option with a
-// non-zero interval was provided; otherwise it is a no-op.
-func (s *Store) applyRotation(ctx context.Context, name string, opts []provider.WriteOption) error {
-	rules, ok := rotationOption(opts)
-	if !ok {
-		return nil
-	}
-
-	if _, err := s.client.RotateSecret(ctx, rotationInput(name, rules)); err != nil {
-		return fmt.Errorf("failed to configure secret rotation: %w", err)
-	}
-
-	return nil
-}
-
 // Delete schedules a secret for deletion. DeleteOptions select immediate
 // deletion (ForceDelete) or a custom recovery window (RecoveryWindow); with no
 // options the AWS default recovery window applies.
@@ -548,6 +533,21 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to remove tags: %w", err)
+	}
+
+	return nil
+}
+
+// applyRotation issues a RotateSecret request when a RotationRules option with a
+// non-zero interval was provided; otherwise it is a no-op.
+func (s *Store) applyRotation(ctx context.Context, name string, opts []provider.WriteOption) error {
+	rules, ok := rotationOption(opts)
+	if !ok {
+		return nil
+	}
+
+	if _, err := s.client.RotateSecret(ctx, rotationInput(name, rules)); err != nil {
+		return fmt.Errorf("failed to configure secret rotation: %w", err)
 	}
 
 	return nil

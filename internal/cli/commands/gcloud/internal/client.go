@@ -31,12 +31,6 @@ func WithProject(ctx context.Context, project string) context.Context {
 	return context.WithValue(ctx, projectContextKey{}, project)
 }
 
-func projectFromContext(ctx context.Context) string {
-	project, _ := ctx.Value(projectContextKey{}).(string)
-
-	return project
-}
-
 // SecretStore resolves a provider.Store for the Google Cloud Secret Manager
 // service. The project id is read from the context (see WithProject); it
 // returns a clear error when no project could be resolved.
@@ -71,4 +65,10 @@ func StagingScopeResolver(ctx context.Context) (staging.ResolvedScope, error) {
 	}
 
 	return binding.StagingScope(ctx, provider.GoogleCloudScope(project), provider.KindSecret, nil)
+}
+
+func projectFromContext(ctx context.Context) string {
+	project, _ := ctx.Value(projectContextKey{}).(string)
+
+	return project
 }

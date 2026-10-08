@@ -66,6 +66,65 @@ var errExportEmptyPassphrase = errors.New(
 	"empty passphrase read from stdin; omit --passphrase-stdin to export as plain text",
 )
 
+// NewGlobalExportCommand creates the global `stage export <dir>` command. It
+// writes <dir>/param.json and <dir>/secret.json, one file per service that has
+// staged changes (empty services are skipped). The resolver determines the
+// provider staging scope; its CommandPath renders the help examples.
+func NewGlobalExportCommand(gcfg GlobalConfig) *cli.Command {
+	return &cli.Command{
+		Name:      "export",
+		Usage:     "Export staged changes to a directory (one file per service)",
+		ArgsUsage: "<dir>",
+		Description: strings.ReplaceAll(`Export staged changes from the working staging area to a directory.
+
+Writes one file per service that has staged changes:
+   <dir>/param.json    staged parameter changes
+   <dir>/secret.json   staged secret changes
+
+Only services with staged changes are written. The directory is created if
+needed. Each file is a plaintext JSON envelope whose payload is encrypted when
+a passphrase is supplied (empty passphrase = plaintext).
+
+By default the working staging area is cleared after exporting; use --keep to
+retain it.
+
+EXAMPLES:
+   {path} export ./backup                       Export all staged changes to ./backup
+   {path} export ./backup --keep                Export but keep the working staging area
+   echo "secret" | {path} export ./backup --passphrase-stdin   Encrypt with passphrase from stdin`, "{path}", gcfg.CommandPath),
+		Flags:  exportFlags(),
+		Action: exportAction("", gcfg.ScopeResolver),
+	}
+}
+
+// NewExportCommand creates a service-specific `stage <svc> export <file>`
+// command that writes the single service to <file>.
+func NewExportCommand(cfg CommandConfig) *cli.Command {
+	parser := cfg.ParserFactory()
+	service := parser.Service()
+
+	return &cli.Command{
+		Name:      "export",
+		Usage:     fmt.Sprintf("Export staged %s changes to a file", cfg.ItemName),
+		ArgsUsage: "<file>",
+		Description: renderHelp(cfg, `Export staged {item} changes from the working staging area to a file.
+
+The file is a plaintext JSON envelope whose payload is encrypted when a
+passphrase is supplied (empty passphrase = plaintext). The parent directory is
+created if needed.
+
+By default the {item} entries are cleared from the working staging area after
+exporting; use --keep to retain them.
+
+EXAMPLES:
+   {path} export ./{name}.json                     Export staged {item} changes
+   {path} export ./{name}.json --keep              Export but keep the working staging area
+   echo "secret" | {path} export ./{name}.json --passphrase-stdin   Encrypt with passphrase from stdin`),
+		Flags:  exportFlags(),
+		Action: exportAction(service, cfg.ScopeResolver),
+	}
+}
+
 // exportPassphrase prompts for the encryption passphrase once per command.
 // It returns the passphrase (empty means plaintext), whether the user cancelled,
 // and any error. --passphrase-stdin reads from stdin and rejects an empty
@@ -307,64 +366,5 @@ func exportAction(service staging.Service, resolver staging.ScopeResolver) func(
 		}
 
 		return nil
-	}
-}
-
-// NewGlobalExportCommand creates the global `stage export <dir>` command. It
-// writes <dir>/param.json and <dir>/secret.json, one file per service that has
-// staged changes (empty services are skipped). The resolver determines the
-// provider staging scope; its CommandPath renders the help examples.
-func NewGlobalExportCommand(gcfg GlobalConfig) *cli.Command {
-	return &cli.Command{
-		Name:      "export",
-		Usage:     "Export staged changes to a directory (one file per service)",
-		ArgsUsage: "<dir>",
-		Description: strings.ReplaceAll(`Export staged changes from the working staging area to a directory.
-
-Writes one file per service that has staged changes:
-   <dir>/param.json    staged parameter changes
-   <dir>/secret.json   staged secret changes
-
-Only services with staged changes are written. The directory is created if
-needed. Each file is a plaintext JSON envelope whose payload is encrypted when
-a passphrase is supplied (empty passphrase = plaintext).
-
-By default the working staging area is cleared after exporting; use --keep to
-retain it.
-
-EXAMPLES:
-   {path} export ./backup                       Export all staged changes to ./backup
-   {path} export ./backup --keep                Export but keep the working staging area
-   echo "secret" | {path} export ./backup --passphrase-stdin   Encrypt with passphrase from stdin`, "{path}", gcfg.CommandPath),
-		Flags:  exportFlags(),
-		Action: exportAction("", gcfg.ScopeResolver),
-	}
-}
-
-// NewExportCommand creates a service-specific `stage <svc> export <file>`
-// command that writes the single service to <file>.
-func NewExportCommand(cfg CommandConfig) *cli.Command {
-	parser := cfg.ParserFactory()
-	service := parser.Service()
-
-	return &cli.Command{
-		Name:      "export",
-		Usage:     fmt.Sprintf("Export staged %s changes to a file", cfg.ItemName),
-		ArgsUsage: "<file>",
-		Description: renderHelp(cfg, `Export staged {item} changes from the working staging area to a file.
-
-The file is a plaintext JSON envelope whose payload is encrypted when a
-passphrase is supplied (empty passphrase = plaintext). The parent directory is
-created if needed.
-
-By default the {item} entries are cleared from the working staging area after
-exporting; use --keep to retain them.
-
-EXAMPLES:
-   {path} export ./{name}.json                     Export staged {item} changes
-   {path} export ./{name}.json --keep              Export but keep the working staging area
-   echo "secret" | {path} export ./{name}.json --passphrase-stdin   Encrypt with passphrase from stdin`),
-		Flags:  exportFlags(),
-		Action: exportAction(service, cfg.ScopeResolver),
 	}
 }

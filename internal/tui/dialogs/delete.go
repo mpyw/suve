@@ -114,34 +114,6 @@ func NewDeleteConfirm(in DeleteInput) Model {
 
 func (d *deleteConfirm) Busy() bool { return d.busy }
 
-// controls returns the focusable rows in order, gated by capability. The recovery
-// row shows whenever the service has a recovery window and force is off (it applies
-// to a staged delete and is ignored for an immediate one — GUI parity); it is
-// hidden while forcing (mutual exclusion), so navigation and hit-testing follow
-// what is drawn.
-func (d *deleteConfirm) controls() []deleteControl {
-	var out []deleteControl
-
-	if d.svcCap.HasForceDelete {
-		out = append(out, deleteCtrlForce)
-	}
-
-	if d.svcCap.HasRecoveryWindow && !d.force {
-		out = append(out, deleteCtrlRecovery)
-	}
-
-	return append(out, deleteCtrlDelete, deleteCtrlCancel)
-}
-
-func (d *deleteConfirm) focused() deleteControl {
-	controls := d.controls()
-	if d.focus < 0 || d.focus >= len(controls) {
-		return deleteCtrlDelete
-	}
-
-	return controls[d.focus]
-}
-
 func (d *deleteConfirm) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -175,6 +147,110 @@ func (d *deleteConfirm) Update(msg tea.Msg) (Model, tea.Cmd) {
 // Esc: while the Stage/Apply popup is open, Esc returns to the delete controls; on
 // the controls it cancels the dialog (the same bare-dismiss the shell did before).
 func (*deleteConfirm) InterceptEsc() bool { return true }
+
+func (d *deleteConfirm) View() string {
+	// The Stage/Apply popup replaces the whole dialog body while it is open; disable
+	// hit-testing so a stray click cannot activate a control drawn on the last frame.
+	if d.confirming {
+		d.hits = hit.New()
+
+		return d.confirm.View(d.styles)
+	}
+
+	var b strings.Builder
+
+	// Header + wrapped target name. Wrapping the name to the dialog width keeps an
+	// unwrapped long name (or sibling paths differing only in suffix) from clipping
+	// at the screen edge, which would leave an ambiguous delete target — a safety
+	// concern.
+	header := d.fit(d.styles.PaneTitle.Render("Delete " + d.svcCap.ItemNoun))
+	name := d.fit(clipName(d.name, d.namespace))
+
+	b.WriteString(header)
+	b.WriteString("\n\n")
+	b.WriteString(name)
+	b.WriteString("\n\n")
+
+	if d.busy {
+		d.hits = hit.New() // no controls while working
+		b.WriteString(d.styles.PageHint.Render("working…"))
+
+		return b.String()
+	}
+
+	// Controls begin below the header, its blank line, the name, and its blank
+	// line; each is one row except the recovery row (its "recoverable until" hint
+	// adds a second). Record a hit region per control at its drawn rows.
+	firstControl := lipgloss.Height(header) + 1 + lipgloss.Height(name) + 1
+	ctrlWidth := max(d.contentWidth(), 1)
+
+	var (
+		controls strings.Builder
+		regions  []*lipgloss.Layer
+		line     = firstControl
+	)
+
+	for _, c := range d.controls() {
+		rc := d.renderControl(c)
+		h := lipgloss.Height(rc)
+		regions = append(regions, hit.Region(deleteControlID(c), 0, line, ctrlWidth, h))
+		line += h
+
+		controls.WriteString(rc)
+		controls.WriteString("\n")
+	}
+
+	d.hits = hit.New(regions...)
+
+	// Wrap the hint too: it is the widest fixed line and would otherwise push the
+	// box past a 60-column terminal, clipping "esc: cancel" off the edge.
+	hint := d.fit(d.styles.PageHint.Render("↑↓: move · space/enter: toggle/submit · ←→: window · esc: cancel"))
+
+	b.WriteString(controls.String())
+
+	if d.err != "" {
+		// The delete confirm cannot scroll (its controls need focus), so a long
+		// provider error is wrapped and capped to whatever rows remain after the
+		// name, controls, and hint — the controls and close hint always stay
+		// on-screen rather than being pushed off the bottom by a tall error.
+		fixed := lipgloss.Height(header) + deleteNameSpacerRows + lipgloss.Height(name) +
+			lipgloss.Height(strings.TrimRight(controls.String(), "\n")) + lipgloss.Height(hint)
+		b.WriteString(d.wrapCapped(d.styles.ErrorText.Render(d.err), d.errBudget(fixed)))
+		b.WriteString("\n")
+	}
+
+	b.WriteString(hint)
+
+	return b.String()
+}
+
+// controls returns the focusable rows in order, gated by capability. The recovery
+// row shows whenever the service has a recovery window and force is off (it applies
+// to a staged delete and is ignored for an immediate one — GUI parity); it is
+// hidden while forcing (mutual exclusion), so navigation and hit-testing follow
+// what is drawn.
+func (d *deleteConfirm) controls() []deleteControl {
+	var out []deleteControl
+
+	if d.svcCap.HasForceDelete {
+		out = append(out, deleteCtrlForce)
+	}
+
+	if d.svcCap.HasRecoveryWindow && !d.force {
+		out = append(out, deleteCtrlRecovery)
+	}
+
+	return append(out, deleteCtrlDelete, deleteCtrlCancel)
+}
+
+func (d *deleteConfirm) focused() deleteControl {
+	controls := d.controls()
+	if d.focus < 0 || d.focus >= len(controls) {
+		return deleteCtrlDelete
+	}
+
+	return controls[d.focus]
+}
 
 // updateConfirm folds a key press into the open Stage/Apply popup: enter runs the
 // delete with the chosen mode, esc returns to the controls.
@@ -345,82 +421,6 @@ func (d *deleteConfirm) onResult(msg mutationResultMsg) (Model, tea.Cmd) {
 	}
 
 	return d, doneCmd(d.service, deleteStatus(d.staged, msg.outcome), d.staged)
-}
-
-func (d *deleteConfirm) View() string {
-	// The Stage/Apply popup replaces the whole dialog body while it is open; disable
-	// hit-testing so a stray click cannot activate a control drawn on the last frame.
-	if d.confirming {
-		d.hits = hit.New()
-
-		return d.confirm.View(d.styles)
-	}
-
-	var b strings.Builder
-
-	// Header + wrapped target name. Wrapping the name to the dialog width keeps an
-	// unwrapped long name (or sibling paths differing only in suffix) from clipping
-	// at the screen edge, which would leave an ambiguous delete target — a safety
-	// concern.
-	header := d.fit(d.styles.PaneTitle.Render("Delete " + d.svcCap.ItemNoun))
-	name := d.fit(clipName(d.name, d.namespace))
-
-	b.WriteString(header)
-	b.WriteString("\n\n")
-	b.WriteString(name)
-	b.WriteString("\n\n")
-
-	if d.busy {
-		d.hits = hit.New() // no controls while working
-		b.WriteString(d.styles.PageHint.Render("working…"))
-
-		return b.String()
-	}
-
-	// Controls begin below the header, its blank line, the name, and its blank
-	// line; each is one row except the recovery row (its "recoverable until" hint
-	// adds a second). Record a hit region per control at its drawn rows.
-	firstControl := lipgloss.Height(header) + 1 + lipgloss.Height(name) + 1
-	ctrlWidth := max(d.contentWidth(), 1)
-
-	var (
-		controls strings.Builder
-		regions  []*lipgloss.Layer
-		line     = firstControl
-	)
-
-	for _, c := range d.controls() {
-		rc := d.renderControl(c)
-		h := lipgloss.Height(rc)
-		regions = append(regions, hit.Region(deleteControlID(c), 0, line, ctrlWidth, h))
-		line += h
-
-		controls.WriteString(rc)
-		controls.WriteString("\n")
-	}
-
-	d.hits = hit.New(regions...)
-
-	// Wrap the hint too: it is the widest fixed line and would otherwise push the
-	// box past a 60-column terminal, clipping "esc: cancel" off the edge.
-	hint := d.fit(d.styles.PageHint.Render("↑↓: move · space/enter: toggle/submit · ←→: window · esc: cancel"))
-
-	b.WriteString(controls.String())
-
-	if d.err != "" {
-		// The delete confirm cannot scroll (its controls need focus), so a long
-		// provider error is wrapped and capped to whatever rows remain after the
-		// name, controls, and hint — the controls and close hint always stay
-		// on-screen rather than being pushed off the bottom by a tall error.
-		fixed := lipgloss.Height(header) + deleteNameSpacerRows + lipgloss.Height(name) +
-			lipgloss.Height(strings.TrimRight(controls.String(), "\n")) + lipgloss.Height(hint)
-		b.WriteString(d.wrapCapped(d.styles.ErrorText.Render(d.err), d.errBudget(fixed)))
-		b.WriteString("\n")
-	}
-
-	b.WriteString(hint)
-
-	return b.String()
 }
 
 // deleteNameSpacerRows is the two blank lines the delete confirm pins around its

@@ -38,11 +38,11 @@ type LogOptions struct {
 	ParseJSON bool
 	//declscope:ignore overexported // log_test.go runs the log with the AWS presenters, which import this package
 	Reverse bool
-	noPager bool
 	Oneline bool
 	Output  output.Format
 	//declscope:ignore overexported // log_test.go runs the log with the AWS presenters, which import this package
 	MaxValueLength int
+	noPager        bool
 }
 
 // LogPresenter renders version history for a specific provider. Implementations are

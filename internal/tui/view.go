@@ -23,30 +23,6 @@ import (
 	"github.com/mpyw/suve/internal/tui/keys"
 )
 
-// tabBarRow is the terminal row the tab bar renders on (0-based), used to
-// hit-test tab clicks. It sits directly under the single-line status bar.
-func (m *App) tabBarRow() int {
-	return statusBarHeight
-}
-
-// statusBar builds the status-bar component for the current state.
-func (m *App) statusBar() components.StatusBar {
-	return components.StatusBar{
-		Scope:  m.scope,
-		Styles: m.styles,
-		Target: m.target,
-	}
-}
-
-// tabBar builds the tab-bar component for the current state.
-func (m *App) tabBar() components.TabBar {
-	return components.TabBar{
-		Tabs:   m.tabs,
-		Active: m.activeTab,
-		Styles: m.styles,
-	}
-}
-
 // View composes the shell and returns a tea.View that also carries the
 // program-level toggles (alt-screen and mouse capture) Bubble Tea v2 reads from
 // the returned view each frame.
@@ -142,6 +118,30 @@ func (m *App) statusLineHeight() int {
 	}
 
 	return 1
+}
+
+// tabBarRow is the terminal row the tab bar renders on (0-based), used to
+// hit-test tab clicks. It sits directly under the single-line status bar.
+func (m *App) tabBarRow() int {
+	return statusBarHeight
+}
+
+// statusBar builds the status-bar component for the current state.
+func (m *App) statusBar() components.StatusBar {
+	return components.StatusBar{
+		Scope:  m.scope,
+		Styles: m.styles,
+		Target: m.target,
+	}
+}
+
+// tabBar builds the tab-bar component for the current state.
+func (m *App) tabBar() components.TabBar {
+	return components.TabBar{
+		Tabs:   m.tabs,
+		Active: m.activeTab,
+		Styles: m.styles,
+	}
 }
 
 // clipStatus clamps the status text to the terminal width.

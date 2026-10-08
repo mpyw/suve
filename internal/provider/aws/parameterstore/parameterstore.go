@@ -202,46 +202,6 @@ func (s *Store) History(ctx context.Context, name string) ([]domain.Version, err
 	return versions, nil
 }
 
-// getFullHistory returns the parameter's complete version history (oldest
-// first, as AWS returns it), paging through NextToken. GetParameterHistory caps
-// each page at 50 items while SSM retains up to 100 versions, so a single
-// unpaged call would treat page 1 as the whole history — making index 0 look
-// like the latest version and silently mis-resolving ~N / #N~M / log. The
-// returned values stay encrypted: Get decrypts the one version it reads.
-func (s *Store) getFullHistory(ctx context.Context, name string) ([]types.ParameterHistory, error) {
-	var (
-		all   []types.ParameterHistory
-		token *string
-	)
-
-	for {
-		out, err := s.client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
-			Name: aws.String(name),
-			// No decryption: history callers read only version metadata, and
-			// decrypting would require kms:Decrypt on every historical key.
-			WithDecryption: aws.Bool(false),
-			NextToken:      token,
-		})
-		if err != nil {
-			if _, ok := errors.AsType[*types.ParameterNotFound](err); ok {
-				return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
-			}
-
-			return nil, err
-		}
-
-		all = append(all, out.Parameters...)
-
-		if aws.ToString(out.NextToken) == "" {
-			break
-		}
-
-		token = out.NextToken
-	}
-
-	return all, nil
-}
-
 // List returns the names of all parameters, paging through DescribeParameters.
 func (s *Store) List(ctx context.Context) ([]string, error) {
 	d := debug.From(ctx)
@@ -391,6 +351,46 @@ func (s *Store) Untag(ctx context.Context, name string, keys []string) error {
 	}
 
 	return nil
+}
+
+// getFullHistory returns the parameter's complete version history (oldest
+// first, as AWS returns it), paging through NextToken. GetParameterHistory caps
+// each page at 50 items while SSM retains up to 100 versions, so a single
+// unpaged call would treat page 1 as the whole history — making index 0 look
+// like the latest version and silently mis-resolving ~N / #N~M / log. The
+// returned values stay encrypted: Get decrypts the one version it reads.
+func (s *Store) getFullHistory(ctx context.Context, name string) ([]types.ParameterHistory, error) {
+	var (
+		all   []types.ParameterHistory
+		token *string
+	)
+
+	for {
+		out, err := s.client.GetParameterHistory(ctx, &ssm.GetParameterHistoryInput{
+			Name: aws.String(name),
+			// No decryption: history callers read only version metadata, and
+			// decrypting would require kms:Decrypt on every historical key.
+			WithDecryption: aws.Bool(false),
+			NextToken:      token,
+		})
+		if err != nil {
+			if _, ok := errors.AsType[*types.ParameterNotFound](err); ok {
+				return nil, fmt.Errorf("%w: %s", provider.ErrNotFound, name)
+			}
+
+			return nil, err
+		}
+
+		all = append(all, out.Parameters...)
+
+		if aws.ToString(out.NextToken) == "" {
+			break
+		}
+
+		token = out.NextToken
+	}
+
+	return all, nil
 }
 
 // mapTypeToDomain maps an SSM parameter type to the provider-neutral ValueType.

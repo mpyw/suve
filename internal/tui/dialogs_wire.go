@@ -28,7 +28,6 @@ func (a dialogAdapter) Update(msg tea.Msg) (dialog, tea.Cmd) {
 }
 
 func (a dialogAdapter) View() string { return a.m.View() }
-func (a dialogAdapter) busy() bool   { return a.m.Busy() }
 
 // DismissCmd forwards the optional dialogs.DismissReloader seam through the
 // adapter, mirroring how page.go's copyable seam forwards CopyText. The
@@ -45,6 +44,8 @@ func (a dialogAdapter) DismissCmd() tea.Cmd {
 
 	return nil
 }
+
+func (a dialogAdapter) busy() bool { return a.m.Busy() }
 
 // interceptEsc forwards the optional dialogs.EscInterceptor seam through the
 // adapter (mirroring DismissCmd): the app stores every dialog as a dialogAdapter,

@@ -17,21 +17,6 @@ import (
 // provider group, and the service and stage subgroups (see RegisterLaunchMode).
 const guiFlagName = "gui"
 
-// launchGUI runs the GUI with the given initial scope + service and exits. It
-// is the short-circuit used by the --gui flags' Before hooks. service is the
-// launched service ("param"/"secret", or "" when launched at the group level or
-// bare), so the GUI can open on the matching view. The GUI hydrates empty
-// resource fields from the environment (flag wins over env).
-func launchGUI(ctx context.Context, initial provider.Scope, service string) (context.Context, error) {
-	if err := gui.Run(initial, service); err != nil {
-		return ctx, err
-	}
-
-	os.Exit(0)
-
-	return ctx, nil
-}
-
 // registerGUIFlag registers --gui through commands.RegisterLaunchMode, the
 // registration `suve --tui` shares.
 //
@@ -57,4 +42,19 @@ func registerGUIFlag() {
 //declscope:shared // called from main.go
 func registerGUIDescription() {
 	commands.App.Usage = strings.Replace(commands.App.Usage, "CLI", "CLI/GUI", 1)
+}
+
+// launchGUI runs the GUI with the given initial scope + service and exits. It
+// is the short-circuit used by the --gui flags' Before hooks. service is the
+// launched service ("param"/"secret", or "" when launched at the group level or
+// bare), so the GUI can open on the matching view. The GUI hydrates empty
+// resource fields from the environment (flag wins over env).
+func launchGUI(ctx context.Context, initial provider.Scope, service string) (context.Context, error) {
+	if err := gui.Run(initial, service); err != nil {
+		return ctx, err
+	}
+
+	os.Exit(0)
+
+	return ctx, nil
 }

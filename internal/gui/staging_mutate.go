@@ -58,33 +58,6 @@ func (a *App) StagingAdd(service, name, value, namespace string) (*StagingAddRes
 	return &StagingAddResult{Name: result.Name}, nil
 }
 
-// stagingEditStrategyForNamespace returns the edit strategy for a staged entry and the
-// validated namespace. For the App Configuration param service the strategy is
-// scoped to the target namespace (rejecting a `*`/`,` filter value); for every
-// other service the base strategy is returned and the namespace is empty.
-func (a *App) stagingEditStrategyForNamespace(sc provider.Scope, service, namespace string) (staging.EditStrategy, string, error) {
-	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
-		literal, err := a.validateParamNamespaceScoped(sc, namespace)
-		if err != nil {
-			return nil, "", err
-		}
-
-		strategy, err := a.paramStrategyForNamespaceScoped(sc, literal)
-		if err != nil {
-			return nil, "", err
-		}
-
-		return strategy, literal, nil
-	}
-
-	strategy, err := a.strategyAsScoped[staging.EditStrategy](sc, service)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return strategy, "", nil
-}
-
 // StagingEdit stages an update operation for an existing item. namespace selects
 // the Azure App Configuration namespace of the setting (empty for the
 // null/default namespace and every other provider).
@@ -331,4 +304,31 @@ func (a *App) StagingCancelRemoveTag(service, name, key, namespace string) (*Sta
 	}
 
 	return &StagingCancelRemoveTagResult{Name: name}, nil
+}
+
+// stagingEditStrategyForNamespace returns the edit strategy for a staged entry and the
+// validated namespace. For the App Configuration param service the strategy is
+// scoped to the target namespace (rejecting a `*`/`,` filter value); for every
+// other service the base strategy is returned and the namespace is empty.
+func (a *App) stagingEditStrategyForNamespace(sc provider.Scope, service, namespace string) (staging.EditStrategy, string, error) {
+	if service == string(staging.ServiceParam) && hasParamNamespaces(sc) {
+		literal, err := a.validateParamNamespaceScoped(sc, namespace)
+		if err != nil {
+			return nil, "", err
+		}
+
+		strategy, err := a.paramStrategyForNamespaceScoped(sc, literal)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return strategy, literal, nil
+	}
+
+	strategy, err := a.strategyAsScoped[staging.EditStrategy](sc, service)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return strategy, "", nil
 }
