@@ -65,33 +65,6 @@ var (
 	detailKey = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "detail"))
 )
 
-// section is one service's staged review plus its load/error state.
-type section struct {
-	svc     data.StagingService
-	service string // "param" / "secret"
-	label   string
-	secret  bool
-
-	review  data.StagingReview
-	loaded  bool
-	err     string
-	loadSeq int
-}
-
-// entryRows returns the section's still-staged entry rows (auto-unstaged rows are
-// excluded — they moved to the dismissible notice).
-func (s *section) entryRows() []data.StagedDiffRow {
-	rows := make([]data.StagedDiffRow, 0, len(s.review.Entries))
-
-	for _, e := range s.review.Entries {
-		if e.Type != data.StagedDiffAutoUnstaged {
-			rows = append(rows, e)
-		}
-	}
-
-	return rows
-}
-
 // Model is the staging page.
 type Model struct {
 	// ctx is the Run context threaded through every staged read/write command, so
@@ -151,6 +124,33 @@ type Model struct {
 	// so a mouse coordinate is hit-tested against the layers rather than a
 	// hand-maintained geometry.
 	hits *hit.Map
+}
+
+// section is one service's staged review plus its load/error state.
+type section struct {
+	svc     data.StagingService
+	service string // "param" / "secret"
+	label   string
+	secret  bool
+
+	review  data.StagingReview
+	loaded  bool
+	err     string
+	loadSeq int
+}
+
+// entryRows returns the section's still-staged entry rows (auto-unstaged rows are
+// excluded — they moved to the dismissible notice).
+func (s *section) entryRows() []data.StagedDiffRow {
+	rows := make([]data.StagedDiffRow, 0, len(s.review.Entries))
+
+	for _, e := range s.review.Entries {
+		if e.Type != data.StagedDiffAutoUnstaged {
+			rows = append(rows, e)
+		}
+	}
+
+	return rows
 }
 
 // secApplyID / secResetID / rowID build the suffixed region IDs for a section's

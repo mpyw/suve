@@ -93,12 +93,6 @@ type Model struct {
 	err        string
 }
 
-// loadedMsg carries the fetched two-version contents back to the model.
-type loadedMsg struct {
-	content data.DiffContent
-	err     error
-}
-
 // New builds a diff page from a navigation request. ctx is the Run context
 // threaded through the fetch. It does not fetch yet; Init dispatches the load.
 func New(ctx context.Context, req nav.OpenDiff, st styles.Styles, km keys.Map) *Model {
@@ -422,6 +416,12 @@ func (m *Model) changeRows(dels, inss []string, colW int) []string {
 // sideRow joins a left and right column cell with the gutter.
 func (m *Model) sideRow(left, right string) string {
 	return left + sideGutter + right
+}
+
+// loadedMsg carries the fetched two-version contents back to the model.
+type loadedMsg struct {
+	content data.DiffContent
+	err     error
 }
 
 // lineContent strips a udiff line's trailing newline for cell rendering.

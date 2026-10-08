@@ -42,27 +42,6 @@ type versionedStrategy[H versionedHooks] struct {
 	hooks H
 }
 
-// versionedHooks is the per-provider behavior a versionedStrategy delegates to.
-// Implementations are zero-size types, so a zero-value strategy (no store) still
-// works as a parser.
-type versionedHooks interface {
-	// traits returns the provider's fixed strings and flags.
-	traits() versionedTraits
-	// parse splits input into the name and the version suffix that
-	// provider.Reader.Resolve expects ("" when no version is given).
-	parse(input string) (name, suffix string, err error)
-	// versionLabel renders a version id for diff and reset output.
-	versionLabel(id string) string
-	// isSecret reports whether the current value is secret material.
-	isSecret(entry *domain.Entry) bool
-	// deleteOptions translates staged delete options into provider options.
-	deleteOptions(o *DeleteOptions) []provider.DeleteOption
-	// create applies a staged create.
-	create(ctx context.Context, store provider.Store, name string, entry Entry) error
-	// update applies a staged update.
-	update(ctx context.Context, store provider.Store, name string, entry Entry) error
-}
-
 // Service returns the service type.
 func (s *versionedStrategy[H]) Service() Service {
 	return s.hooks.traits().service
@@ -281,4 +260,25 @@ func (versionedSecretHooks) create(ctx context.Context, store provider.Store, na
 	}
 
 	return nil
+}
+
+// versionedHooks is the per-provider behavior a versionedStrategy delegates to.
+// Implementations are zero-size types, so a zero-value strategy (no store) still
+// works as a parser.
+type versionedHooks interface {
+	// traits returns the provider's fixed strings and flags.
+	traits() versionedTraits
+	// parse splits input into the name and the version suffix that
+	// provider.Reader.Resolve expects ("" when no version is given).
+	parse(input string) (name, suffix string, err error)
+	// versionLabel renders a version id for diff and reset output.
+	versionLabel(id string) string
+	// isSecret reports whether the current value is secret material.
+	isSecret(entry *domain.Entry) bool
+	// deleteOptions translates staged delete options into provider options.
+	deleteOptions(o *DeleteOptions) []provider.DeleteOption
+	// create applies a staged create.
+	create(ctx context.Context, store provider.Store, name string, entry Entry) error
+	// update applies a staged update.
+	update(ctx context.Context, store provider.Store, name string, entry Entry) error
 }
