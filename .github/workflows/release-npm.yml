@@ -9,7 +9,8 @@ run-name: "${{ inputs.check_only && 'npm check via Release npm' || format('Relea
 #
 # npm trusted publishing (OIDC) matches the top-level workflow filename, not
 # this file when it is called. Each npm package therefore has three trusted
-# publishers: tag_and_release.yml, release.yml and release-npm.yml. Adding a
+# publishers: tag_and_release.yml, release.yml and release-npm.yml, each with
+# the `release` environment. Adding a
 # new entry point means adding it on npmjs.com too. Dispatch an entry point
 # with check_only to check its registration without publishing.
 on:
@@ -83,6 +84,9 @@ jobs:
   publish-npm:
     needs: [validate]
     runs-on: ubuntu-latest
+    # The npm trusted publishers name this environment. A token exchange
+    # from any other environment is refused.
+    environment: release
     permissions:
       contents: read
       id-token: write # npm provenance / OIDC trusted publishing
