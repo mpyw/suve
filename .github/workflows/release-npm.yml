@@ -1,7 +1,7 @@
 name: Release npm
 
 # Show the target version in the run title, e.g. "Release npm v1.2.3".
-run-name: "Release npm ${{ inputs.version }}"
+run-name: "${{ inputs.check_only && 'npm check via Release npm' || format('Release npm {0}', inputs.version) }}"
 
 # Normally called by release.yml after the GitHub Release exists. Dispatch it
 # directly to retry a failed npm publish. npm-publish.sh skips packages that are
@@ -10,14 +10,19 @@ run-name: "Release npm ${{ inputs.version }}"
 # npm trusted publishing (OIDC) matches the top-level workflow filename, not
 # this file when it is called. Each npm package therefore has three trusted
 # publishers: tag_and_release.yml, release.yml and release-npm.yml. Adding a
-# new entry point means adding it on npmjs.com too.
+# new entry point means adding it on npmjs.com too. Dispatch an entry point
+# with check_only to check its registration without publishing.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish to npm (e.g., v1.2.3) - GitHub release must already exist"
-        required: true
+        description: "Version to publish to npm (e.g., v1.2.3) - GitHub release must already exist. Leave empty with check_only."
+        required: false
         type: string
+      check_only:
+        description: "Only check npm trusted publishing. Tag, build and publish nothing."
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       version:
@@ -30,9 +35,21 @@ permissions:
 
 jobs:
   # ===========================================================================
-  # Validate that the tag exists before publishing
+  # check_only: check npm trusted publishing for this entry point, and stop
+  # ===========================================================================
+  npm-check:
+    if: inputs.check_only
+    uses: ./.github/workflows/npm-check.yml
+    permissions:
+      contents: read
+      id-token: write
+
+  # ===========================================================================
+  # Validate that the tag exists before publishing. publish-npm needs it, so
+  # skipping it with check_only skips the publish.
   # ===========================================================================
   validate:
+    if: ${{ !inputs.check_only }}
     runs-on: ubuntu-latest
     steps:
       - name: Validate version format
@@ -82,6 +99,17 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6.0.0
         with:
           node-version: "22"
+
+      # npm-publish.sh publishes seven packages one by one. A wrong trusted
+      # publisher would stop it halfway, so check every package first.
+      - name: List npm packages
+        id: packages
+        run: echo "names=$(jq -r .name .github/npm/*/package.json | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm trusted publishing
+        uses: mpyw/npm-oidc-check-action@14e783b7a6c7678a725bf255cbbd4e1516b13fa3 # v1.0.0
+        with:
+          packages: ${{ steps.packages.outputs.names }}
 
       - name: Download released archives for the tag
         env:

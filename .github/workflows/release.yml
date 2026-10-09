@@ -1,7 +1,7 @@
 name: Release
 
 # Show the target version in the run title, e.g. "Release v1.2.3".
-run-name: "Release ${{ inputs.version }}"
+run-name: "${{ inputs.check_only && 'npm check via Release' || format('Release {0}', inputs.version) }}"
 
 # The GitHub Release is the canonical artifact. Homebrew, Scoop and npm are
 # mirrors of it, so they run after it. npm lives in release-npm.yml, called
@@ -11,13 +11,19 @@ run-name: "Release ${{ inputs.version }}"
 # the reusable workflow that runs `npm publish`. Every entry point that can
 # reach release-npm.yml is therefore registered as a trusted publisher on each
 # npm package: tag_and_release.yml, release.yml and release-npm.yml.
+#
+# Dispatch with check_only to check that registration without a release.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g., v1.2.3) - tag must already exist"
-        required: true
+        description: "Version to release (e.g., v1.2.3) - tag must already exist. Leave empty with check_only."
+        required: false
         type: string
+      check_only:
+        description: "Only check npm trusted publishing. Tag, build and publish nothing."
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       version:
@@ -36,9 +42,21 @@ env:
 
 jobs:
   # ===========================================================================
-  # Validate that tag exists before any builds
+  # check_only: check npm trusted publishing for this entry point, and stop
+  # ===========================================================================
+  npm-check:
+    if: inputs.check_only
+    uses: ./.github/workflows/npm-check.yml
+    permissions:
+      contents: read
+      id-token: write
+
+  # ===========================================================================
+  # Validate that tag exists before any builds. Every later job needs it, so
+  # skipping it with check_only skips the whole release.
   # ===========================================================================
   validate:
+    if: ${{ !inputs.check_only }}
     runs-on: ubuntu-latest
     steps:
       - name: Validate version format
