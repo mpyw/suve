@@ -3,13 +3,22 @@ name: Release npm
 # Show the target version in the run title, e.g. "Release npm v1.2.3".
 run-name: "Release npm ${{ inputs.version }}"
 
-# npm trusted publishing (OIDC) matches on the workflow filename of the OIDC
-# token's workflow claim. This workflow must therefore only ever run directly
-# via workflow_dispatch — never as a reusable workflow_call — so the claim is
-# always release-npm.yml, the filename configured as the trusted publisher on
-# npmjs.com.
+# Normally called by release.yml after the GitHub Release exists. Dispatch it
+# directly to retry a failed npm publish. npm-publish.sh skips packages that are
+# already published, so a retry completes the set.
+#
+# npm trusted publishing (OIDC) matches the top-level workflow filename, not
+# this file when it is called. Each npm package therefore has three trusted
+# publishers: tag_and_release.yml, release.yml and release-npm.yml. Adding a
+# new entry point means adding it on npmjs.com too.
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish to npm (e.g., v1.2.3) - GitHub release must already exist"
+        required: true
+        type: string
+  workflow_call:
     inputs:
       version:
         description: "Version to publish to npm (e.g., v1.2.3) - GitHub release must already exist"

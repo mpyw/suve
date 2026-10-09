@@ -13,6 +13,9 @@ on:
 
 permissions:
   contents: write
+  # Passed down to the npm publish in release.yml. A called workflow cannot ask
+  # for more than its caller was given.
+  id-token: write
 
 jobs:
   tag:
