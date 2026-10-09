@@ -3,10 +3,14 @@ name: Release
 # Show the target version in the run title, e.g. "Release v1.2.3".
 run-name: "Release ${{ inputs.version }}"
 
-# npm publishing lives in release-npm.yml (dispatch-only): npm trusted
-# publishing (OIDC) matches on the top-level workflow filename, and this
-# workflow is also called as a reusable workflow by tag_and_release.yml —
-# in that path the OIDC claim would be tag_and_release.yml, not release.yml.
+# The GitHub Release is the canonical artifact. Homebrew, Scoop and npm are
+# mirrors of it, so they run after it. npm lives in release-npm.yml, called
+# from the `npm` job below.
+#
+# npm trusted publishing (OIDC) matches the top-level workflow filename, not
+# the reusable workflow that runs `npm publish`. Every entry point that can
+# reach release-npm.yml is therefore registered as a trusted publisher on each
+# npm package: tag_and_release.yml, release.yml and release-npm.yml.
 on:
   workflow_dispatch:
     inputs:
@@ -705,3 +709,17 @@ jobs:
           git add suve.json
           git commit -m "Update suve to ${VERSION}"
           git push
+
+  # ===========================================================================
+  # npm: publish the released binaries as npm packages
+  # ===========================================================================
+  npm:
+    needs: [release]
+    uses: ./.github/workflows/release-npm.yml
+    with:
+      version: ${{ inputs.version }}
+    # release-npm.yml asks for id-token: write in its publish job. A called
+    # workflow cannot ask for more than this job gives it.
+    permissions:
+      contents: read
+      id-token: write
