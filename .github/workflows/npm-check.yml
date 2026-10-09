@@ -15,6 +15,9 @@ permissions:
 jobs:
   npm-check:
     runs-on: ubuntu-latest
+    # The npm trusted publishers name this environment. A token exchange
+    # from any other environment is refused.
+    environment: release
     permissions:
       contents: read
       id-token: write
