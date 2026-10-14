@@ -18,15 +18,15 @@
     "test:headed": "playwright test --headed"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
+    "@biomejs/biome": "2.5.15",
     "@playwright/test": "^1.63.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tsconfig/svelte": "^5.0.4",
-    "monocart-coverage-reports": "^2.13.0",
-    "svelte": "^5.57.1",
+    "monocart-coverage-reports": "^2.13.2",
+    "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
     "tslib": "^2.6.3",
     "typescript": "^6.0.3",
-    "vite": "^8.3.1"
+    "vite": "^8.3.3"
   }
 }
