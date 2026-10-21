@@ -80,7 +80,7 @@ services:
     # skip (their endpoint env unset) unless that provider's task set them.
     # Must match the go directive in go.mod (checked by
     # .github/scripts/check-go-version.sh, run by `mise tidy-check`).
-    image: golang:1.27.0
+    image: golang:1.27.3
     working_dir: /app
     volumes:
       # Source is READ-ONLY: the suite writes nothing into the repo (TestMain
