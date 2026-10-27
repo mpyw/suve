@@ -9,12 +9,12 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	cloud.google.com/go/secretmanager v1.22.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
 	github.com/Azure/azure-sdk-for-go/sdk/data/azappconfig/v2 v2.3.0
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets v1.5.0
 	github.com/aws/aws-sdk-go-v2 v1.47.3
 	github.com/aws/aws-sdk-go-v2/config v1.33.9
-	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.4
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.50.5
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.79.3
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4
 	github.com/aws/smithy-go v1.28.5
@@ -29,13 +29,13 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.14.0
 	github.com/wailsapp/wails/v2 v2.16.0
-	github.com/walles/moor/v2 v2.19.4
+	github.com/walles/moor/v2 v2.19.5
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.58.0
 	golang.org/x/mod v0.42.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/term v0.47.0
-	google.golang.org/api v0.302.0
+	google.golang.org/api v0.305.0
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 )
@@ -48,7 +48,7 @@ require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.13.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.2.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.8.0 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.10.1 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/alecthomas/chroma/v2 v2.22.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
