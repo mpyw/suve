@@ -19,12 +19,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
-    "@playwright/test": "^1.64.0",
+    "@playwright/test": "^1.64.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tsconfig/svelte": "^5.0.4",
     "monocart-coverage-reports": "^3.0.0",
     "svelte": "^5.57.2",
-    "svelte-check": "^4.7.6",
+    "svelte-check": "^4.7.7",
     "tslib": "^2.6.3",
     "typescript": "^6.0.3",
     "vite": "^8.3.4"
