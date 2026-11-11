@@ -1675,13 +1675,45 @@ export async function setupWailsMocks(page: Page, customState?: Partial<MockStat
       },
     };
 
+    // window.go.gui.App is the mock binding table. recordBindingArgs wraps its
+    // methods in place, so the transport looks each method up per call.
     (window as any).go = { gui: { App: mockApp } };
-    (window as any).runtime = {
-      EventsOn: () => {},
-      EventsOff: () => {},
-      EventsEmit: () => {},
-      WindowSetTitle: () => {},
-      BrowserOpenURL: () => {},
+
+    // The app's main.ts installs this as the @wailsio/runtime transport on the
+    // Vite dev server. A binding call arrives as object 0 (Call), method 0
+    // (CallBinding) with args { methodID, args }. Wails derives methodID as the
+    // 32-bit FNV-1a hash of 'github.com/mpyw/suve/internal/gui.App.<Method>'
+    // (pkg/application/bindings.go), so the transport hashes each mock method
+    // name the same way. A by-name call ({ methodName }) resolves directly.
+    // A Go error reaches the frontend as an Error whose message is err.Error(),
+    // so a mock that rejects with a string is wrapped the same way.
+    const bindingPrefix = 'github.com/mpyw/suve/internal/gui.App.';
+    const fnv1a32 = (s: string) => {
+      let h = 0x811c9dc5;
+      for (const b of new TextEncoder().encode(s)) {
+        h = Math.imul(h ^ b, 0x01000193) >>> 0;
+      }
+      return h;
+    };
+    (window as any).__suveMockTransport = {
+      async call(objectID: number, method: number, _windowName: string, payload: any) {
+        if (objectID !== 0 || method !== 0) {
+          throw new Error(`unmocked Wails runtime call: object ${objectID}, method ${method}`);
+        }
+        const app = (window as any).go.gui.App;
+        const name = payload?.methodName
+          ? String(payload.methodName).slice(bindingPrefix.length)
+          : Object.keys(app).find((k) => fnv1a32(bindingPrefix + k) === payload?.methodID);
+        const fn = name ? app[name] : undefined;
+        if (typeof fn !== 'function') {
+          throw new Error(`unmocked binding: ${payload?.methodName ?? payload?.methodID}`);
+        }
+        try {
+          return await fn(...(payload?.args ?? []));
+        } catch (e) {
+          throw typeof e === 'string' ? new Error(e) : e;
+        }
+      },
     };
   }, state);
 }

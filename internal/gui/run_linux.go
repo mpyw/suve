@@ -5,8 +5,7 @@ package gui
 import (
 	_ "embed"
 
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/linux"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // runWindowIcon is the embedded application icon. Only the Linux backend sets a
@@ -15,8 +14,6 @@ import (
 //go:embed appicon.png
 var runWindowIcon []byte
 
-func applyPlatformRunOptions(opts *options.App) {
-	opts.Linux = &linux.Options{
-		Icon: runWindowIcon,
-	}
+func applyPlatformRunOptions(opts *application.Options) {
+	opts.Icon = runWindowIcon
 }

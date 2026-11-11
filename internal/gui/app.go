@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/wailsapp/wails/v3/pkg/application"
+
 	"github.com/mpyw/suve/internal/provider"
 	"github.com/mpyw/suve/internal/provider/azure/appconfig/namespaces"
 	"github.com/mpyw/suve/internal/provider/builtin"
@@ -38,7 +40,7 @@ var errInvalidProvider = stringError("invalid provider: must be 'aws', 'googlecl
 
 // App struct holds application state and dependencies.
 //
-//nolint:containedctx // Wails apps require storing context from Startup
+//nolint:containedctx // the Wails service lifetime context, stored by ServiceStartup
 type App struct {
 	//declscope:shared // shared with the param, secret and staging namespaces
 	ctx context.Context
@@ -82,6 +84,12 @@ type App struct {
 	// ~/.suve/staging/{scope.Key()} layout).
 	stagingStores  map[string]store.ReadWriteOperator
 	stagingStoreMu sync.Mutex // protects stagingStore + stagingStores
+
+	// dialogs shows the native file pickers for staging export and import.
+	// newApp installs stagingWailsFileDialogs; tests substitute a fake.
+	//
+	//declscope:shared // the staging namespace's pickers use it
+	dialogs stagingFileDialogs
 }
 
 // newApp creates a new App with the given initial launch scope and service.
@@ -108,6 +116,7 @@ func newApp(initial provider.Scope, service string) (*App, error) {
 		initialProvider: initial.Provider,
 		initialService:  service,
 		scope:           scope,
+		dialogs:         stagingWailsFileDialogs{},
 	}, nil
 }
 
@@ -124,9 +133,12 @@ func (a *App) InitialService() string {
 	return a.initialService
 }
 
-// Startup is called when the app starts.
-func (a *App) Startup(ctx context.Context) {
+// ServiceStartup is called by Wails when the application starts. ctx lives as
+// long as the application, so the bindings run their provider calls under it.
+func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	a.ctx = ctx
+
+	return nil
 }
 
 // errInvalidService is returned when an invalid service is specified.

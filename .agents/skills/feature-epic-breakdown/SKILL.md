@@ -26,7 +26,7 @@ Slice by layer, in dependency order:
 1. **Storage** (schema, serialization; delete the thing being replaced).
 2. **Usecase** (business logic).
 3. **CLI + e2e** (commands, wiring, e2e coverage).
-4. **GUI** (Go DTO/API, regenerated wailsjs bindings, Svelte view, Playwright).
+4. **GUI** (Go DTO/API, regenerated Wails bindings, Svelte view, Playwright).
 5. **Docs + breaking-change note** (reference docs current-state-only; migration to release notes).
 6. **Final integration & comprehensive review** — its own last sub-issue (#457).
 

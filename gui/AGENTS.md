@@ -10,32 +10,31 @@ parent: ../AGENTS.md
 
 ## Overview
 
-Wails entry point for GUI development and standalone builds. This is a thin wrapper that calls `internal/gui.Run()`. Required by Wails toolchain for `wails dev` and `wails build` commands.
+Standalone entry point for the GUI. It is a thin wrapper that calls `internal/gui.Run()`, the same function `suve --gui` calls. `mise gui-dev` runs it for frontend hot reload, and declscope checks it as its own build configuration.
 
 ## Why This Directory Exists
 
-Wails expects a specific directory structure with `main.go` at the project root of the GUI app. This directory serves as that entry point while the actual implementation lives in `internal/gui/`.
+`suve --gui` needs CLI flags to choose the provider and scope. This module starts the GUI with no CLI layer, the scope coming from the environment as for a bare `suve --gui`, so a GUI-only dev build stays small and fast to rebuild. The actual implementation lives in `internal/gui/`.
 
 ## Files
 
 ```yaml
 main.go: Entry point, calls internal/gui.Run()
-wails.json: Wails configuration
-go.mod: Separate module for Wails tooling
-build/: Build assets (icons, Info.plist, etc.)
+go.mod: Separate module for the GUI entry point
+build/appicon.png: The application icon (also used by the README and the docs site)
 ```
 
 ## Development Commands
 
 ```bash
-# Start Wails dev server (hot reload at http://localhost:34115)
+# Run the GUI with frontend hot reload (Vite dev server + a dev build of this module)
 mise gui-dev
 
-# Build standalone GUI binary
-mise gui-build
+# Build the single CLI+GUI binary (bin/suve)
+mise build-gui
 
 # Regenerate TypeScript bindings after changing Go backend
-mise gui-bindings
+mise generate-gui-bindings
 ```
 
 ## Relationship to internal/gui
@@ -44,19 +43,19 @@ mise gui-bindings
 gui/main.go ──calls──> internal/gui.Run()
                               │
                               ▼
-                       internal/gui/app.go (Wails app definition)
+                       internal/gui/run.go (Wails v3 application and window)
+                       internal/gui/app.go (the App service)
                               │
                               ▼
-                       internal/gui/frontend/ (Svelte app)
+                       internal/gui/frontend/ (Svelte app, bindings/)
 ```
 
-- `gui/`: Wails toolchain entry point only
+- `gui/`: Standalone GUI entry point only
 - `internal/gui/`: Actual Go backend implementation
 - `internal/gui/frontend/`: Svelte frontend
 
 ## Notes
 
-- Do NOT delete this directory - Wails toolchain requires it
-- The `go.mod` here is separate from the root module to isolate Wails dependencies
+- The `go.mod` here is separate from the root module
 - It replaces `github.com/mpyw/suve` with `../`, so re-run `go mod tidy` here after a root dependency change. `mise tidy-check` (part of `mise lint` and CI) fails when it is not tidy
-- Build tags `production` or `dev` are required (see `//go:build` in main.go)
+- Build tags `production` or `dev` are required (see `//go:build` in main.go). `dev` keeps the Wails devtools and makes the app load the frontend from `FRONTEND_DEVSERVER_URL`

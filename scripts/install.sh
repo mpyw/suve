@@ -15,7 +15,7 @@
 # Environment variables:
 #   VERSION           Version to install, e.g. "0.5.3" or "v0.5.3". Default: latest release.
 #   SUVE_INSTALL_DIR  Bare-binary target dir. Default: /usr/local/bin -> ~/.local/bin.
-#   SUVE_WEBKIT       GUI WebKit2GTK ABI: "4.1" or "4.0". Default: auto-detected.
+#   SUVE_WEBKIT       GUI WebKitGTK ABI: "6.0" or "4.1" ("4.0" before v1.11.0). Default: auto-detected.
 #
 # Flags:
 #   Packaging (Linux only; macOS is always a bare, self-contained binary):
@@ -23,9 +23,9 @@
 #     --deb       Install the .deb via apt (Debian/Ubuntu).
 #     --rpm       Install the .rpm via dnf/yum (Fedora/RHEL).
 #   Build variant (Linux only):
-#     (default)   Auto: GUI when WebKit2GTK is already present, else CLI/TUI-only.
+#     (default)   Auto: GUI when WebKitGTK is already present, else CLI/TUI-only.
 #     --cli       Force the dependency-free CLI/TUI-only build.
-#     --gui       Force the GUI build (GTK3 + WebKit2GTK).
+#     --gui       Force the GUI build (GTK + WebKitGTK).
 #   -h, --help    Show this help.
 #
 # Security: HTTPS-only downloads from GitHub Releases, each verified by SHA-256
@@ -41,6 +41,10 @@ set -eu
 
 REPO="mpyw/suve"
 BASE_URL="https://github.com/${REPO}/releases/download"
+# From this release the plain Linux GUI asset is built on GTK4 + webkitgtk-6.0
+# (Wails v3); earlier releases built it on GTK3 + webkit2gtk-4.0. The
+# *_webkit2_41 asset is GTK3 + webkit2gtk-4.1 in both.
+GTK4_SINCE="1.11.0"
 
 # --- log ---------------------------------------------------------------------
 log_info() { printf 'suve-install: %s\n' "$*" >&2; }
@@ -68,7 +72,7 @@ Pass flags through the pipe with `sh -s --`:
 Environment variables:
   VERSION           Version to install, e.g. "0.5.3" or "v0.5.3". Default: latest release.
   SUVE_INSTALL_DIR  Bare-binary target dir. Default: /usr/local/bin -> ~/.local/bin.
-  SUVE_WEBKIT       GUI WebKit2GTK ABI: "4.1" or "4.0". Default: auto-detected.
+  SUVE_WEBKIT       GUI WebKitGTK ABI: "6.0" or "4.1" ("4.0" before v1.11.0). Default: auto-detected.
 
 Flags:
   Packaging (Linux only; macOS is always a bare, self-contained binary):
@@ -76,9 +80,9 @@ Flags:
     --deb       Install the .deb via apt (Debian/Ubuntu).
     --rpm       Install the .rpm via dnf/yum (Fedora/RHEL).
   Build variant (Linux only):
-    (default)   Auto: GUI when WebKit2GTK is already present, else CLI/TUI-only.
+    (default)   Auto: GUI when WebKitGTK is already present, else CLI/TUI-only.
     --cli       Force the dependency-free CLI/TUI-only build.
-    --gui       Force the GUI build (GTK3 + WebKit2GTK).
+    --gui       Force the GUI build (GTK + WebKitGTK).
   -h, --help    Show this help.
 EOF
 }
@@ -162,6 +166,22 @@ version_resolve() {
 	printf '%s' "${_tag#v}"
 }
 
+# True if version $1 >= version $2. Compares MAJOR.MINOR.PATCH numerically and
+# ignores a pre-release or build suffix (POSIX sh; BusyBox sort lacks -V).
+version_ge() {
+	_a="${1%%[-+]*}"
+	_b="${2%%[-+]*}"
+	for _i in 1 2 3; do
+		_x="$(printf '%s' "$_a" | cut -d. -f"$_i")"
+		_y="$(printf '%s' "$_b" | cut -d. -f"$_i")"
+		_x="${_x:-0}"
+		_y="${_y:-0}"
+		[ "$_x" -gt "$_y" ] && return 0
+		[ "$_x" -lt "$_y" ] && return 1
+	done
+	return 0
+}
+
 # --- checksum ----------------------------------------------------------------
 checksum_sha256() {
 	if command -v sha256sum >/dev/null 2>&1; then
@@ -222,11 +242,37 @@ webkit_ldconfig() {
 	fi
 }
 
-# True if the WebKit2GTK $1 (e.g. "4.1") runtime is already installed — i.e. the
+# The WebKitGTK ABI of the plain (unsuffixed) Linux GUI asset of release $ver.
+webkit_plain_abi() {
+	if version_ge "$ver" "$GTK4_SINCE"; then
+		echo 6.0
+	else
+		echo 4.0
+	fi
+}
+
+# The ABIs release $ver ships a GUI asset for, most preferred first.
+webkit_abis() {
+	if [ "$(webkit_plain_abi)" = "6.0" ]; then
+		echo "6.0 4.1"
+	else
+		echo "4.1 4.0"
+	fi
+}
+
+# The shared-library name prefix of WebKitGTK ABI $1.
+webkit_lib() {
+	case "$1" in
+		6.0) echo libwebkitgtk-6.0 ;;
+		*) echo "libwebkit2gtk-$1" ;;
+	esac
+}
+
+# True if the WebKitGTK $1 (e.g. "4.1") runtime is already installed — i.e. the
 # GUI build is viable right now without pulling a large dependency tree.
 webkit_installed() {
-	_v="$1"
-	webkit_ldconfig | grep -q "libwebkit2gtk-${_v}" && return 0
+	_lib="$(webkit_lib "$1")"
+	webkit_ldconfig | grep -q "$_lib" && return 0
 	# ldconfig-less fallback. Scan only the host's own multiarch dir, never the
 	# blanket /usr/lib/* — on a multiarch box that would match a foreign-arch
 	# library the GUI build could not actually load.
@@ -235,41 +281,57 @@ webkit_installed() {
 		x86_64 | amd64) _triplet=x86_64-linux-gnu ;;
 		aarch64 | arm64) _triplet=aarch64-linux-gnu ;;
 	esac
-	for _f in /usr/lib/libwebkit2gtk-"${_v}".so* \
-		/usr/lib64/libwebkit2gtk-"${_v}".so* \
-		/usr/lib/"${_triplet:-_none_}"/libwebkit2gtk-"${_v}".so*; do
+	for _f in /usr/lib/"$_lib".so* \
+		/usr/lib64/"$_lib".so* \
+		/usr/lib/"${_triplet:-_none_}"/"$_lib".so*; do
 		[ -e "$_f" ] && return 0
 	done
 	return 1
 }
 
+# True if any WebKitGTK ABI that release $ver ships a GUI asset for is installed.
+webkit_any_installed() {
+	for _abi in $(webkit_abis); do
+		webkit_installed "$_abi" && return 0
+	done
+	return 1
+}
+
+# The runtime package name of WebKitGTK ABI $2 for package format $1 (deb|rpm).
+webkit_pkg() {
+	case "$1:$2" in
+		deb:6.0) echo libwebkitgtk-6.0-4 ;;
+		deb:4.1) echo libwebkit2gtk-4.1-0 ;;
+		deb:4.0) echo libwebkit2gtk-4.0-37 ;;
+		rpm:6.0) echo webkitgtk6.0 ;;
+		rpm:4.1) echo webkit2gtk4.1 ;;
+		rpm:4.0) echo webkit2gtk4.0 ;;
+	esac
+}
+
 # For a GUI install, choose the ABI: explicit SUVE_WEBKIT, else an already-
 # installed runtime, else (for --deb/--rpm) whatever the package manager can
-# install, preferring the newer 4.1. $1 is the format (binary|deb|rpm).
+# install, in the order webkit_abis prefers. $1 is the format (binary|deb|rpm).
 webkit_pick() {
 	if [ -n "${SUVE_WEBKIT:-}" ]; then
 		echo "$SUVE_WEBKIT"
 		return
 	fi
-	webkit_installed 4.1 && {
-		echo 4.1
-		return
-	}
-	webkit_installed 4.0 && {
-		echo 4.0
-		return
-	}
+	for _abi in $(webkit_abis); do
+		webkit_installed "$_abi" && {
+			echo "$_abi"
+			return
+		}
+	done
 	case "$1" in
 		deb)
 			if command -v apt-cache >/dev/null 2>&1; then
-				if apt-cache show libwebkit2gtk-4.1-0 >/dev/null 2>&1; then
-					echo 4.1
-					return
-				fi
-				if apt-cache show libwebkit2gtk-4.0-37 >/dev/null 2>&1; then
-					echo 4.0
-					return
-				fi
+				for _abi in $(webkit_abis); do
+					if apt-cache show "$(webkit_pkg deb "$_abi")" >/dev/null 2>&1; then
+						echo "$_abi"
+						return
+					fi
+				done
 			fi
 			;;
 		rpm)
@@ -277,18 +339,29 @@ webkit_pick() {
 			command -v dnf >/dev/null 2>&1 && _pm=dnf
 			[ -z "$_pm" ] && command -v yum >/dev/null 2>&1 && _pm=yum
 			if [ -n "$_pm" ]; then
-				if "$_pm" -q list webkit2gtk4.1 >/dev/null 2>&1; then
-					echo 4.1
-					return
-				fi
-				if "$_pm" -q list webkit2gtk4.0 >/dev/null 2>&1; then
-					echo 4.0
-					return
-				fi
+				for _abi in $(webkit_abis); do
+					if "$_pm" -q list "$(webkit_pkg rpm "$_abi")" >/dev/null 2>&1; then
+						echo "$_abi"
+						return
+					fi
+				done
 			fi
 			;;
 	esac
-	echo 4.1
+	webkit_abis | cut -d' ' -f1
+}
+
+# The asset-name suffix for a GUI build of WebKitGTK ABI $1 in release $ver:
+# "_webkit2_41" for 4.1, "" for the plain asset. Errors on an ABI the release
+# does not ship.
+webkit_suffix() {
+	if [ "$1" = "4.1" ]; then
+		echo _webkit2_41
+	elif [ "$1" = "$(webkit_plain_abi)" ]; then
+		echo ""
+	else
+		log_error "release v${ver} has no GUI build for WebKitGTK $1 (available: $(webkit_abis | sed 's/ / or /'))"
+	fi
 }
 
 # --- bin (bare-binary install) -----------------------------------------------
@@ -370,12 +443,9 @@ bin_run() {
 		asset="suve-cli_${ver}_linux_${arch}.tar.gz"
 	else
 		wk="$(webkit_pick binary)"
-		if [ "$wk" = "4.1" ]; then
-			asset="suve_${ver}_linux_${arch}_webkit2_41.tar.gz"
-		else
-			asset="suve_${ver}_linux_${arch}.tar.gz"
-		fi
-		log_info "GUI build, WebKit2GTK ${wk} (override with SUVE_WEBKIT=4.0|4.1)"
+		sfx="$(webkit_suffix "$wk")"
+		asset="suve_${ver}_linux_${arch}${sfx}.tar.gz"
+		log_info "GUI build, WebKitGTK ${wk} (override with SUVE_WEBKIT=$(webkit_abis | sed 's/ /|/'))"
 	fi
 
 	log_info "downloading ${asset} (${tag})"
@@ -412,12 +482,9 @@ pkg_deb_run() {
 		asset="suve-cli_${ver}-1_${arch}.deb"
 	else
 		wk="$(webkit_pick deb)"
-		case "$wk" in
-			4.1) asset="suve_webkit2_41_${ver}-1_${arch}.deb" ;;
-			4.0) asset="suve_${ver}-1_${arch}.deb" ;;
-			*) log_error "invalid SUVE_WEBKIT: ${wk} (expected 4.1 or 4.0)" ;;
-		esac
-		log_info "GUI build, WebKit2GTK ${wk} (override with SUVE_WEBKIT=4.0|4.1)"
+		sfx="$(webkit_suffix "$wk")"
+		asset="suve${sfx}_${ver}-1_${arch}.deb"
+		log_info "GUI build, WebKitGTK ${wk} (override with SUVE_WEBKIT=$(webkit_abis | sed 's/ /|/'))"
 	fi
 
 	log_info "downloading ${asset} (${tag})"
@@ -427,7 +494,7 @@ pkg_deb_run() {
 	log_info "installing ${asset}"
 	_f="${tmpdir}/${asset}"
 	if command -v apt-get >/dev/null 2>&1; then
-		# apt-get resolves the package's declared GTK3/WebKit dependencies.
+		# apt-get resolves the package's declared GTK/WebKitGTK dependencies.
 		if ! pkg_run_as_root apt-get install -y "$_f"; then
 			log_info "retrying via dpkg + apt-get -f install"
 			pkg_run_as_root dpkg -i "$_f" || true
@@ -448,12 +515,9 @@ pkg_rpm_run() {
 		asset="suve-cli-${ver}-1.${_rarch}.rpm"
 	else
 		wk="$(webkit_pick rpm)"
-		case "$wk" in
-			4.1) asset="suve_webkit2_41-${ver}-1.${_rarch}.rpm" ;;
-			4.0) asset="suve-${ver}-1.${_rarch}.rpm" ;;
-			*) log_error "invalid SUVE_WEBKIT: ${wk} (expected 4.1 or 4.0)" ;;
-		esac
-		log_info "GUI build, WebKit2GTK ${wk} (override with SUVE_WEBKIT=4.0|4.1)"
+		sfx="$(webkit_suffix "$wk")"
+		asset="suve${sfx}-${ver}-1.${_rarch}.rpm"
+		log_info "GUI build, WebKitGTK ${wk} (override with SUVE_WEBKIT=$(webkit_abis | sed 's/ /|/'))"
 	fi
 
 	log_info "downloading ${asset} (${tag})"
@@ -501,11 +565,12 @@ main() {
 		esac
 	done
 
-	# Validate SUVE_WEBKIT once, centrally, so every path (binary/deb/rpm) rejects
-	# a bad value instead of silently defaulting to 4.0.
+	# Validate SUVE_WEBKIT's syntax once, centrally, so every path (binary/deb/
+	# rpm) rejects a bad value instead of silently picking an asset. Whether the
+	# chosen release ships that ABI is checked by webkit_suffix.
 	case "${SUVE_WEBKIT:-}" in
-		"" | 4.1 | 4.0) ;;
-		*) log_error "invalid SUVE_WEBKIT: ${SUVE_WEBKIT} (expected 4.1 or 4.0)" ;;
+		"" | 6.0 | 4.1 | 4.0) ;;
+		*) log_error "invalid SUVE_WEBKIT: ${SUVE_WEBKIT} (expected 6.0, 4.1 or 4.0)" ;;
 	esac
 
 	http_init
@@ -526,12 +591,12 @@ main() {
 		[ "$variant" != "auto" ] && log_info "macOS ships only the self-contained build; ignoring --${variant}"
 		variant="darwin"
 	elif [ "$variant" = "auto" ]; then
-		if webkit_installed 4.1 || webkit_installed 4.0; then
+		if webkit_any_installed; then
 			variant="gui"
-			log_info "detected WebKit2GTK; selecting the GUI build (pass --cli to override)"
+			log_info "detected WebKitGTK; selecting the GUI build (pass --cli to override)"
 		else
 			variant="cli"
-			log_info "no WebKit2GTK detected; selecting the CLI/TUI-only build (pass --gui to override)"
+			log_info "no WebKitGTK detected; selecting the CLI/TUI-only build (pass --gui to override)"
 		fi
 	fi
 

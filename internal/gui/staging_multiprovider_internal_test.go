@@ -117,7 +117,7 @@ func TestApp_getStagingStore_ScopeKeyed(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	app := newTestApp(t, provider.Scope{Provider: provider.ProviderGoogleCloud}, "")
-	app.Startup(t.Context())
+	mustServiceStartup(t, app)
 	app.scope = provider.GoogleCloudScope("proj-a")
 
 	s1, err := app.getStagingStore(provider.KindSecret)

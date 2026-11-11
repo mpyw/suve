@@ -3,7 +3,8 @@
 // service names the field it needs (ServiceCapability.scopeField). The table
 // below maps a field name to the ScopeSelection property that holds it and to
 // how its input is drawn, so no component switches on the provider.
-import type { capability, gui } from '../../wailsjs/go/models';
+import type * as capability from '../../bindings/github.com/mpyw/suve/internal/capability/models';
+import type * as gui from '../../bindings/github.com/mpyw/suve/internal/gui/models';
 
 export interface ScopeFieldSpec {
   // key is the ScopeSelection property that holds the field.

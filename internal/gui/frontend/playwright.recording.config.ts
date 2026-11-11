@@ -35,10 +35,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // Note: No webServer config - wails dev starts the Vite server
-  // The server should be running before running this test
+  // demo/gui-record.sh starts the Wails server build before this runs; the
+  // webServer entry only waits for it.
   webServer: {
-    command: 'echo "Waiting for wails dev..."',
+    command: 'echo "Waiting for the GUI server..."',
     url: BASE_URL,
     reuseExistingServer: true,
     timeout: 60000,

@@ -3,9 +3,7 @@
 package gui
 
 import (
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/mpyw/suve/internal/provider"
 )
@@ -16,25 +14,35 @@ import (
 // it. service ("param"/"secret", or "" for none) is the launched service the
 // frontend opens on.
 func Run(initial provider.Scope, service string) error {
-	app, err := newApp(initial, service)
+	svc, err := newApp(initial, service)
 	if err != nil {
 		return err
 	}
 
-	opts := &options.App{
-		Title:  "suve",
-		Width:  1024, //nolint:mnd
-		Height: 768,  //nolint:mnd
-		AssetServer: &assetserver.Options{
-			Assets: assets,
+	opts := application.Options{
+		Name: "suve",
+		Services: []application.Service{
+			application.NewService(svc),
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1}, //nolint:mnd
-		OnStartup:        app.Startup,
-		Bind: []any{
-			app,
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets),
+		},
+		// Quit when the window closes, as Wails v2 did. v3 keeps a macOS app
+		// running without windows unless this is set.
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	}
-	applyPlatformRunOptions(opts)
+	applyPlatformRunOptions(&opts)
 
-	return wails.Run(opts)
+	app := application.New(opts)
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title:            "suve",
+		Width:            1024,                           //nolint:mnd
+		Height:           768,                            //nolint:mnd
+		BackgroundColour: application.NewRGB(27, 38, 54), //nolint:mnd
+		URL:              "/",
+	})
+
+	return app.Run()
 }

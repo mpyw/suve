@@ -4,9 +4,10 @@
 # file). Keep the versions here in sync with what the project actually targets:
 #   - `go` matches the directive in go.mod / gui/go.mod (Go 1.27).
 #   - `golangci-lint` matches the version pinned by the lint jobs.
-#   - the wails CLI is pinned to the same release as the wailsapp/wails/v2
-#     library in gui/go.mod, so the bindings it regenerates (via `wails dev` in
-#     the generate-gui-bindings task) match the library.
+#   - the wails3 CLI is pinned to the same release as the wailsapp/wails/v3
+#     library in go.mod, so the bindings it generates (`wails3 generate
+#     bindings` in the generate-gui-bindings task) match the library and the
+#     @wailsio/runtime npm package, which has the same version number.
 [tools]
 "github:mpyw/declscope" = "0.25.0"
 # Pinned to the exact go.mod directive so CI's carve-out jobs (which read the
@@ -20,7 +21,10 @@ golangci-lint = "2.14.0"
 # with GORELEASER_VERSION there.
 goreleaser = "2.17.1"
 nfpm = "2.41.1"
-"go:github.com/wailsapp/wails/v2/cmd/wails" = "2.16.0"
+# Built without cgo: with cgo, the wails3 CLI links GTK4/webkitgtk-6.0 on
+# Linux, so `mise install` would need those dev packages on every machine and
+# CI job. Its bindings generator is static analysis and needs no cgo.
+"go:github.com/wailsapp/wails/v3/cmd/wails3" = { version = "3.1.0", install_env = { CGO_ENABLED = "0" } }
 # Reports production dead code; run via the `deadcode` task (deadcode lint gate).
 "go:golang.org/x/tools/cmd/deadcode" = "0.49.0"
 
@@ -28,7 +32,7 @@ nfpm = "2.41.1"
 # Tasks (run with `mise run <task>`, or `mise <task>` — no name collides with a
 # mise subcommand). List them with `mise tasks`.
 #
-# GUI tasks call wails / npm / go directly: mise puts the pinned versions on
+# GUI tasks call wails3 / npm / go directly: mise puts the pinned versions on
 # PATH for the task, so builds and bindings are reproducible regardless of the
 # ambient shell.
 # =============================================================================
@@ -45,8 +49,8 @@ run = "bash .github/scripts/check-deadcode.sh"
 description = "Build the single CLI+GUI binary (bin/suve), embedding a freshly-built frontend"
 # A bare `go build -tags production ./cmd/suve` embeds internal/gui/frontend/dist
 # as-is, so without this frontend build the binary aborts at `suve --gui` with
-# 'no index.html could be found'. Linux/webkit2gtk-4.1 needs webkit2_41 — override
-# with SUVE_GUI_TAGS=production,webkit2_41.
+# 'no index.html could be found'. Linux builds GTK4/webkitgtk-6.0 by default; for
+# GTK3/webkit2gtk-4.1 override with SUVE_GUI_TAGS=production,gtk3.
 run = '''
 echo "Building the GUI frontend (embedded into the binary)…"
 (cd internal/gui/frontend && npm install && npm run build)
@@ -56,16 +60,35 @@ CGO_ENABLED=1 go build -tags "$tags" -o bin/suve ./cmd/suve
 echo "Built bin/suve — run 'suve --gui'."
 '''
 
-[tasks.generate-gui-bindings]
-description = "Regenerate the GUI wailsjs bindings"
+[tasks.gui-dev]
+description = "Run the GUI with frontend hot reload (Vite dev server + a dev build of gui/)"
+# A non-production Wails v3 build serves the frontend from
+# FRONTEND_DEVSERVER_URL instead of the embedded dist, so Svelte edits reload
+# live. Go edits need a restart. The embed still needs frontend/dist to exist.
+# On Linux, SUVE_GUI_DEV_TAGS=dev,gtk3 selects GTK3 + webkit2gtk-4.1.
 run = '''
-echo "Temporarily removing build constraints..."
-find gui internal/gui -name '*.go' -exec sed -i.bak 's|^//go:build.*||' {} \;
-echo "Generating bindings..."
-(cd gui && timeout 30 wails dev -tags dev 2>&1 | head -30) || true
-echo "Restoring build constraints..."
-find gui internal/gui -name '*.go.bak' -exec sh -c 'mv "$1" "${1%.bak}"' _ {} \;
-echo "Done. Check internal/gui/frontend/wailsjs/go/ for updated bindings."
+port="${SUVE_GUI_DEV_PORT:-5173}"
+dist=internal/gui/frontend/dist
+created=""
+[ -f "$dist/index.html" ] || { mkdir -p "$dist"; : > "$dist/index.html"; created=1; }
+(cd internal/gui/frontend && npm install && exec npx vite --port "$port" --strictPort) &
+vite_pid=$!
+trap 'kill "$vite_pid" 2>/dev/null; [ -z "$created" ] || rm -f "$dist/index.html"' EXIT
+until curl -fs "http://localhost:$port" >/dev/null; do
+  kill -0 "$vite_pid" 2>/dev/null || { echo "vite exited" >&2; exit 1; }
+  sleep 0.5
+done
+cd gui && FRONTEND_DEVSERVER_URL="http://localhost:$port" CGO_ENABLED=1 go run -tags "${SUVE_GUI_DEV_TAGS:-dev}" .
+'''
+
+[tasks.generate-gui-bindings]
+description = "Regenerate the GUI TypeScript bindings (internal/gui/frontend/bindings)"
+# Static analysis from the cmd/suve main package: the generator follows
+# gui.Run's application.NewService call, so it needs the production tag that
+# compiles internal/gui in. Calls go by method ID (the generator default),
+# which the Playwright mock transport resolves (tests/fixtures/wails-mock.ts).
+run = '''
+wails3 generate bindings -clean -ts -f '-tags production' -d internal/gui/frontend/bindings ./cmd/suve
 '''
 
 [tasks.test]
@@ -415,12 +438,12 @@ description = "Allow local X11 connections for the Linux GUI containers"
 run = "xhost +localhost 2>/dev/null || true"
 
 [tasks.ubuntu-22]
-description = "Start the Ubuntu 22.04 desktop (webkit2gtk-4.0, requires XQuartz)"
+description = "Start the Ubuntu 22.04 desktop (GTK3 + webkit2gtk-4.1, the gtk3 build; requires XQuartz)"
 depends = ["x11-setup"]
 run = "HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-22 run --rm ubuntu-22"
 
 [tasks.ubuntu-24]
-description = "Start the Ubuntu 24.04 desktop (webkit2gtk-4.1, requires XQuartz)"
+description = "Start the Ubuntu 24.04 desktop (GTK4 + webkitgtk-6.0, the default build; requires XQuartz)"
 depends = ["x11-setup"]
 run = "HOST_DISPLAY=host.docker.internal:0 docker compose --profile ubuntu-24 run --rm ubuntu-24"
 

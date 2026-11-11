@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingAddTag, StagingApply, StagingApplyAll, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingInspectImportFile, StagingPickExportPath, StagingPickImportPath, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
-  import { capability, gui } from '../../wailsjs/go/models';
+  import * as capability from '../../bindings/github.com/mpyw/suve/internal/capability/models';
+  import { StagingAddTag, StagingApply, StagingApplyAll, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingInspectImportFile, StagingPickExportPath, StagingPickImportPath, StagingReset, StagingUnstage } from '../../bindings/github.com/mpyw/suve/internal/gui/app';
+  import * as gui from '../../bindings/github.com/mpyw/suve/internal/gui/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
   import StagingSection from './StagingSection.svelte';
-  import { parseError } from './viewUtils';
+  import { parseError, requireResult } from './viewUtils';
   import './common.css';
 
   interface Props {
@@ -154,9 +155,12 @@
       // same all-service use case as the CLI: every service is conflict-checked
       // before any is applied, so a conflict in one service applies nothing
       // (#982). Per-section apply passes a concrete service.
-      const r = applyService === 'all'
-        ? await StagingApplyAll(ignoreConflicts)
-        : await StagingApply(applyService, ignoreConflicts);
+      const r = requireResult(
+        applyService === 'all'
+          ? await StagingApplyAll(ignoreConflicts)
+          : await StagingApply(applyService, ignoreConflicts),
+        'StagingApply',
+      );
       // The backend marshals empty slices as null, so normalize the lists.
       applyResult = new gui.StagingApplyResult({
         ...r,
@@ -396,7 +400,7 @@
       if (!path) return; // dialog cancelled
       importPath = path;
 
-      const info = await StagingInspectImportFile(path);
+      const info = requireResult(await StagingInspectImportFile(path), 'StagingInspectImportFile');
       importInfo = info;
 
       if (info.service !== service) {

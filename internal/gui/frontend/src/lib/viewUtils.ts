@@ -92,6 +92,27 @@ export function createDebouncer(delayMs: number = 300): Debouncer {
 }
 
 /**
+ * Return a binding's result, or throw when it is null. The generated bindings
+ * type a Go pointer result as `T | null`, but a binding returns nil only with
+ * an error, and the error rejects the call instead.
+ */
+export function requireResult<T>(result: T | null, binding: string): T {
+  if (result === null) {
+    throw new Error(`${binding} returned no result`);
+  }
+  return result;
+}
+
+/**
+ * The [key, value] pairs of a generated-binding map, whose values are typed
+ * optional (`{ [_ in string]?: string }`) although a Go map never holds a
+ * missing value.
+ */
+export function definedEntries(m: { [key: string]: string | undefined }): [string, string][] {
+  return Object.entries(m).filter((e): e is [string, string] => e[1] !== undefined);
+}
+
+/**
  * Parse error to string message
  */
 export function parseError(e: unknown): string {

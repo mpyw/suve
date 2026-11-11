@@ -5,26 +5,40 @@ description: Use when changing the Wails/Svelte GUI in internal/gui/ — backend
 
 # Changing the GUI
 
-The GUI is Wails (Go bindings in `internal/gui/*.go`) plus a Svelte frontend
-(`internal/gui/frontend/src/`). Multi-cloud parity was tracked in #250 and
+The GUI is Wails v3 (the `App` service in `internal/gui/*.go`) plus a Svelte
+frontend (`internal/gui/frontend/src/`). The generated TypeScript bindings live
+in `internal/gui/frontend/bindings/` and are committed. Multi-cloud parity was tracked in #250 and
 landed across #273–#282.
 
 ## Bindings: regenerate, then rebuild immediately
 
 - Any backend binding change requires `mise generate-gui-bindings`, then an
-  immediate `mise build-gui`. The task runs the wails CLI pinned in `mise.toml`,
-  which must match the `wailsapp/wails/v2` version in `go.mod`/`gui/go.mod`;
-  bump both together. It needs `internal/gui/frontend/dist/index.html` to
-  exist (a placeholder is enough) and deletes it when it exits. Stale bindings make every API arity mismatch, so
-  **verification is always `mise build-gui`, never the CLI build**.
+  immediate `mise build-gui`. The task runs `wails3 generate bindings` (static
+  analysis, nothing is built or run) with the wails3 CLI pinned in `mise.toml`.
+  That pin, `wailsapp/wails/v3` in `go.mod`, and `@wailsio/runtime` in
+  `frontend/package.json` share one version number; bump all three together.
+  Stale bindings make every API arity mismatch, so **verification is always
+  `mise build-gui`, never the CLI build**.
+- Import functions from `bindings/github.com/mpyw/suve/internal/gui/app` and
+  models as namespaces (`import type * as gui from
+  '.../internal/gui/models'`, `* as capability from
+  '.../internal/capability/models'`). A Go pointer result is typed `T | null`
+  and an `omitempty` field is optional; handle both rather than casting.
+- A Go error rejects the call with an `Error` whose `message` is `err.Error()`;
+  `parseError` (`src/lib/viewUtils.ts`) reads it.
+- Playwright runs the frontend on the Vite dev server with no backend:
+  `tests/fixtures/wails-mock.ts` defines the mock methods on `window.go.gui.App`
+  and a `@wailsio/runtime` transport (`window.__suveMockTransport`, installed by
+  `src/main.ts` in dev builds only) that resolves each call's method ID back to
+  the mock method.
 
 ## Capability-driven UI
 
 - Drive control visibility from the per-provider capability descriptor
   (`capability.ProviderCapability` / `capability.ServiceCapability` from
   `internal/capability`, bound by `Capabilities` in `internal/gui/capability.go`;
-  the generated TypeScript types live in the `capability` namespace of
-  `wailsjs/go/models.ts`). Hide unsupported controls via the descriptor; never hardcode
+  the generated TypeScript types are in
+  `bindings/github.com/mpyw/suve/internal/capability/models.ts`). Hide unsupported controls via the descriptor; never hardcode
   provider conditionals in Svelte. The descriptor also carries the data a
   provider switch used to hold: `hasValueType` (the param Type dropdown),
   `hasNamespaces` (the namespace axis), `hasRecursiveList` (the Recursive

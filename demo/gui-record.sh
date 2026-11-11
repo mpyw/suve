@@ -13,16 +13,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 FRONTEND_DIR="$PROJECT_DIR/internal/gui/frontend"
-GUI_DIR="$PROJECT_DIR/gui"
 
 # Cleanup function for trap
-WAILS_PID=""
+SERVER_PID=""
 cleanup() {
     echo ""
     echo "Cleaning up..."
-    if [[ -n "$WAILS_PID" ]]; then
-        echo "Stopping wails dev..."
-        kill "$WAILS_PID" 2>/dev/null || true
+    if [[ -n "$SERVER_PID" ]]; then
+        echo "Stopping the GUI server..."
+        kill "$SERVER_PID" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT
@@ -34,8 +33,8 @@ export AWS_ENDPOINT_URL="http://localhost:${SUVE_LOCALSTACK_EXTERNAL_PORT:-4566}
 export AWS_ACCESS_KEY_ID="test"
 export AWS_SECRET_ACCESS_KEY="test"
 export AWS_DEFAULT_REGION="us-east-1"
-# Pin a deterministic staging data key so both the setup CLI and the GUI (wails
-# dev, launched below with this env inherited) share one staging store without a
+# Pin a deterministic staging data key so both the setup CLI and the GUI server
+# (launched below with this env inherited) share one staging store without a
 # macOS keychain prompt (matches `mise test` and scripts/seed.sh).
 export SUVE_STAGING_KEY="${SUVE_STAGING_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
 
@@ -49,6 +48,10 @@ echo "=== Setting up demo environment ==="
 # and API arity — a stale or CLI-only binary can drift out of sync.
 echo "Building suve (GUI)..."
 mise build-gui
+# The same app as a Wails v3 server build: it serves the embedded frontend and
+# the Go bindings over HTTP, so Playwright's browser drives the real backend.
+echo "Building the GUI server (tags: production,server)..."
+go build -tags production,server -o bin/suve-gui-server ./cmd/suve
 
 # Reset LocalStack (clean slate). --profile "*" so the profile-gated localstack
 # service is actually torn down (a bare `down` leaves profiled services running).
@@ -78,35 +81,31 @@ echo "Demo data ready:"
 ./bin/suve param ls -R /demo
 
 echo ""
-echo "=== Starting wails dev ==="
+echo "=== Starting the GUI server ==="
 
 # Clean up previous test artifacts
 rm -rf "$FRONTEND_DIR/test-results-recording" 2>/dev/null || true
 
-# Start wails dev in background (same as mise gui-dev). The GUI reads and writes
-# the staging store directly — there is no longer a background staging agent to
-# start (the daemon was removed).
-cd "$GUI_DIR"
-wails dev -skipbindings -tags dev &
-WAILS_PID=$!
-
-# Wails dev server port (exposes Go methods to browser)
+# Start the GUI server in background. The GUI reads and writes the staging
+# store directly — there is no background staging agent to start.
 WAILS_PORT="${WAILS_PORT:-34115}"
+WAILS_SERVER_PORT="$WAILS_PORT" ./bin/suve-gui-server --gui &
+SERVER_PID=$!
 
-# Wait for wails dev to be fully ready
-echo "Waiting for wails dev to start..."
+# Wait for the server to be fully ready
+echo "Waiting for the GUI server to start..."
 echo "Checking http://localhost:$WAILS_PORT ..."
 MAX_RETRIES=60
 RETRY_COUNT=0
 while ! curl -s "http://localhost:$WAILS_PORT" > /dev/null 2>&1; do
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-        echo "Error: wails dev did not start within ${MAX_RETRIES} seconds"
+        echo "Error: the GUI server did not start within ${MAX_RETRIES} seconds"
         exit 1
     fi
     sleep 1
 done
-echo "wails dev is ready!"
+echo "The GUI server is ready!"
 # Additional wait for app to be fully initialized
 sleep 3
 
@@ -123,7 +122,7 @@ fi
 
 # Run Playwright with recording config
 # - NODE_PATH: for module resolution from demo/ directory
-# - VITE_PORT: set to wails dev server port (not Vite's 5173)
+# - VITE_PORT: set to the GUI server port (not Vite's 5173)
 NODE_PATH="$FRONTEND_DIR/node_modules" VITE_PORT="$WAILS_PORT" npx playwright test gui-demo.spec.ts \
     -c playwright.recording.config.ts \
     --headed \

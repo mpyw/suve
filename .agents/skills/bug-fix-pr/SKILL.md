@@ -25,7 +25,7 @@ A feature/bug that is visible at multiple layers must be tested at each: **Go un
 
 - `mise test` and `mise lint` — always.
 - `mise e2e-aws` (and the `-gcloud` / `-azure-appconfig` / `-azure-keyvault` variants for the affected providers) when command behavior changed.
-- `mise build-gui` when GUI code or the wailsjs bindings were touched.
+- `mise build-gui` when GUI code or the generated bindings were touched.
 
 ### 5. Write the PR
 
