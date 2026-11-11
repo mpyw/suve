@@ -275,6 +275,30 @@ test.describe('Import', () => {
     await expect(page.locator('.entry-item')).toHaveCount(0);
   });
 
+  test('shows an error when the inspect binding returns no result', async ({ page }) => {
+    // The generated bindings type a Go pointer result as nullable; a null that
+    // arrives without an error surfaces as an import error, never a crash.
+    await setupWailsMocks(page, createImportFileState('/mock/param.json', {
+      service: 'param',
+      entries: [createStagedValue('/app/x', 'create', 'v')],
+    }));
+    await page.addInitScript(() => {
+      (window as any).go.gui.App.StagingInspectImportFile = async () => null;
+    });
+    await page.goto('/');
+    await navigateTo(page, 'Staging');
+    await page.getByTestId('transfer-menu').waitFor();
+
+    await openTransferMenu(page);
+    await page.getByTestId('import-param').click();
+
+    await expect(page.locator('.modal-title')).toHaveText(/Import Failed/);
+    await expect(page.getByTestId('import-error')).toHaveText('StagingInspectImportFile returned no result');
+
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('.entry-item')).toHaveCount(0);
+  });
+
   test('aborts silently when the open dialog is cancelled', async ({ page }) => {
     await setupWailsMocks(page, { openPath: '' });
     await page.goto('/');

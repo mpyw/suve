@@ -1,21 +1,30 @@
 codecov:
   require_ci_to_pass: true
+  notify:
+    # Wait for every upload before posting statuses and the comment:
+    # 2 (unit + e2e) + 3 (platform: linux, darwin, windows) + 1 (gui) + 1 (gui-frontend).
+    # after_n_builds is not a valid key under coverage.status; Codecov rejects
+    # the whole file when it is there, which also drops the ignore list below.
+    after_n_builds: 7
+
+comment:
+  after_n_builds: 7
 
 coverage:
   status:
     project:
-      default:
-        # 2 (unit + e2e) + 3 (platform: linux, darwin, windows) + 1 (gui) + 1 (gui-frontend)
-        after_n_builds: 7
+      default: {}
     patch:
-      default:
-        after_n_builds: 7
+      default: {}
 
 # Untestable runtime glue: entrypoints and desktop/window bootstrap that can only
 # run against a live terminal, a live Wails window, or the OS — no injectable seam.
-# Excluded so they don't drag the denominator. (Function-level exclusions such as
-# GUI PickExport/ImportPath, GetAWSIdentity, and the TUI run.go Run/awsIdentityFetcher
-# are not expressible here — those files also hold tested code — and are left as an
+# Excluded so they don't drag the denominator. staging_dialogs.go holds only the
+# Wails-backed file pickers (the bindings that build their options are tested
+# through a fake), and the frontend main.ts is the entry point whose dev-only
+# mock-transport hook the Playwright suite always takes. (Function-level
+# exclusions such as GetAWSIdentity and the TUI run.go Run/awsIdentityFetcher are
+# not expressible here — those files also hold tested code — and are left as an
 # optional refactor.)
 ignore:
   - "cmd/suve/main.go"
@@ -23,3 +32,5 @@ ignore:
   - "internal/gui/run_darwin.go"
   - "internal/gui/run_linux.go"
   - "internal/gui/run_windows.go"
+  - "internal/gui/staging_dialogs.go"
+  - "internal/gui/frontend/src/main.ts"

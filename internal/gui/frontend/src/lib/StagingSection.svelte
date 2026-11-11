@@ -1,7 +1,7 @@
 <script lang="ts">
   import type * as gui from '../../bindings/github.com/mpyw/suve/internal/gui/models';
   import DiffDisplay from './DiffDisplay.svelte';
-  import { maskValue } from './viewUtils';
+  import { definedEntries, maskValue } from './viewUtils';
   import './common.css';
 
   interface Props {
@@ -172,8 +172,8 @@
               {#if tagEntry?.addTags && Object.keys(tagEntry.addTags).length > 0}
                 <div class="tag-changes tag-add">
                   <span class="tag-label">+ Tags:</span>
-                  {#each Object.entries(tagEntry.addTags) as [key, value]}
-                    <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(entry.name, entry.namespace, key, value ?? '')}>
+                  {#each definedEntries(tagEntry.addTags) as [key, value]}
+                    <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(entry.name, entry.namespace, key, value)}>
                       {key}={value}
                       <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); runRowAction(`rt:${entry.namespace}:${entry.name}:${key}`, () => onremovetag(entry.name, entry.namespace, key)); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') runRowAction(`rt:${entry.namespace}:${entry.name}:${key}`, () => onremovetag(entry.name, entry.namespace, key)); }}>×</span>
                     </button>
@@ -251,8 +251,8 @@
             {#if tagEntry.addTags && Object.keys(tagEntry.addTags).length > 0}
               <div class="tag-changes tag-add">
                 <span class="tag-label">+ Tags:</span>
-                {#each Object.entries(tagEntry.addTags) as [key, value]}
-                  <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(tagEntry.name, tagEntry.namespace, key, value ?? '')}>
+                {#each definedEntries(tagEntry.addTags) as [key, value]}
+                  <button class="tag-item tag-item-editable" type="button" onclick={() => onedittag(tagEntry.name, tagEntry.namespace, key, value)}>
                     {key}={value}
                     <span class="tag-delete-btn" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); runRowAction(`rt:${tagEntry.namespace}:${tagEntry.name}:${key}`, () => onremovetag(tagEntry.name, tagEntry.namespace, key)); }} onkeydown={(e: KeyboardEvent) => { e.stopPropagation(); if (e.key === 'Enter') runRowAction(`rt:${tagEntry.namespace}:${tagEntry.name}:${key}`, () => onremovetag(tagEntry.name, tagEntry.namespace, key)); }}>×</span>
                   </button>

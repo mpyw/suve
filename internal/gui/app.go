@@ -84,6 +84,12 @@ type App struct {
 	// ~/.suve/staging/{scope.Key()} layout).
 	stagingStores  map[string]store.ReadWriteOperator
 	stagingStoreMu sync.Mutex // protects stagingStore + stagingStores
+
+	// dialogs shows the native file pickers for staging export and import.
+	// newApp installs stagingWailsFileDialogs; tests substitute a fake.
+	//
+	//declscope:shared // the staging namespace's pickers use it
+	dialogs stagingFileDialogs
 }
 
 // newApp creates a new App with the given initial launch scope and service.
@@ -110,6 +116,7 @@ func newApp(initial provider.Scope, service string) (*App, error) {
 		initialProvider: initial.Provider,
 		initialService:  service,
 		scope:           scope,
+		dialogs:         stagingWailsFileDialogs{},
 	}, nil
 }
 

@@ -123,25 +123,25 @@ func (s *stagingEnvelopeReadSource) ReadState(_ context.Context, svc staging.Ser
 // destination file, prefilled with defaultName. It returns an empty path (no
 // error) when the user cancels, which the frontend treats as an aborted flow.
 func (a *App) StagingPickExportPath(defaultName string) (string, error) {
-	return application.Get().Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
+	return a.dialogs.SaveFile(&application.SaveFileDialogOptions{
 		Title:    "Export staged changes",
 		Filename: defaultName,
 		Filters: []application.FileFilter{
 			{DisplayName: "JSON files (*.json)", Pattern: "*.json"},
 		},
-	}).PromptForSingleSelection()
+	})
 }
 
 // StagingPickImportPath opens the native Open dialog for choosing an export file to
 // import. It returns an empty path (no error) when the user cancels.
 func (a *App) StagingPickImportPath() (string, error) {
-	return application.Get().Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
+	return a.dialogs.OpenFile(&application.OpenFileDialogOptions{
 		Title:          "Import staged changes",
 		CanChooseFiles: true,
 		Filters: []application.FileFilter{
 			{DisplayName: "JSON files (*.json)", Pattern: "*.json"},
 		},
-	}).PromptForSingleSelection()
+	})
 }
 
 // StagingExport writes the working staging area for a single concrete service

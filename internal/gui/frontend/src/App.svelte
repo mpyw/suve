@@ -20,7 +20,7 @@
   import Sidebar from './lib/Sidebar.svelte';
   import StagingView from './lib/StagingView.svelte';
   import { hasRequiredScope, scopeFieldValue, selectionFor, servicesInScope } from './lib/scopeFields';
-  import { NS_ALL, NS_NULL, parseError } from './lib/viewUtils';
+  import { NS_ALL, NS_NULL, parseError, requireResult } from './lib/viewUtils';
 
   type ViewKey = 'param' | 'secret' | 'staging';
 
@@ -114,7 +114,7 @@
       let picked = await withRetry(() => InitialProvider());
       if (!picked) {
         const detected = await withRetry(() => DetectProviders());
-        picked = detected ? uniqueActiveProvider(detected) : '';
+        picked = uniqueActiveProvider(requireResult(detected, 'DetectProviders'));
       }
 
       // The launched service (from e.g. `suve azure param --gui`) selects the
