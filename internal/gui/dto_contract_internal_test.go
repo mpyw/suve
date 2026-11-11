@@ -18,13 +18,19 @@ import (
 	"github.com/mpyw/suve/internal/capability"
 )
 
-// dtoContractModelsPath is the Wails-generated (hand-maintained) TypeScript mirror of the
-// Go binding DTOs that the frontend consumes.
-const dtoContractModelsPath = "frontend/wailsjs/go/models.ts"
+// dtoContractModelsPaths are the Wails-generated TypeScript models of the Go
+// binding DTOs that the frontend consumes, one file per Go package.
+//
+//nolint:gochecknoglobals // fixed list of generated files
+var dtoContractModelsPaths = []string{
+	"frontend/bindings/github.com/mpyw/suve/internal/gui/models.ts",
+	"frontend/bindings/github.com/mpyw/suve/internal/capability/models.ts",
+}
 
 // dtoContract lists every exported binding DTO whose JSON shape the frontend
-// depends on. Adding a new binding DTO (or a field to one) requires updating
-// both the Go struct and models.ts; this test fails loudly when the two drift.
+// depends on. Adding a new binding DTO (or a field to one) requires
+// regenerating the bindings (mise generate-gui-bindings); this test fails
+// loudly when the two drift.
 //
 //nolint:exhaustruct // zero values are fine: the test only inspects field tags
 func dtoContract() []any {
@@ -84,59 +90,48 @@ func dtoContractGoFields(t reflect.Type) []string {
 	return names
 }
 
-// dtoContractTSFields parses models.ts and returns, for each exported class, the set
-// of JSON keys its constructor reads via source["key"].
+// dtoContractTSFields parses the generated models and returns, for each
+// exported class, the set of JSON keys it declares as fields ("key": type or
+// "key"?: type), read from the class body up to its constructor.
 func dtoContractTSFields(t *testing.T) map[string][]string {
 	t.Helper()
 
-	data, err := os.ReadFile(dtoContractModelsPath)
-	if err != nil {
-		t.Fatalf("read %s: %v", dtoContractModelsPath, err)
-	}
-
 	classRe := regexp.MustCompile(`export class (\w+) \{`)
-	sourceKeyRe := regexp.MustCompile(`source\["([^"]+)"\]`)
+	fieldRe := regexp.MustCompile(`(?m)^\s+"([^"]+)"\??:`)
 
 	result := make(map[string][]string)
 
-	src := string(data)
-	locs := classRe.FindAllStringSubmatchIndex(src, -1)
-
-	for i, loc := range locs {
-		name := src[loc[2]:loc[3]]
-		start := loc[1]
-
-		end := len(src)
-		if i+1 < len(locs) {
-			end = locs[i+1][0]
+	for _, path := range dtoContractModelsPaths {
+		data, err := os.ReadFile(path) //nolint:gosec // path is from the fixed dtoContractModelsPaths list
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
 		}
 
-		body := src[start:end]
+		src := string(data)
 
-		seen := make(map[string]struct{})
+		for _, loc := range classRe.FindAllStringSubmatchIndex(src, -1) {
+			name := src[loc[2]:loc[3]]
+			body := src[loc[1]:]
 
-		var keys []string
-
-		for _, m := range sourceKeyRe.FindAllStringSubmatch(body, -1) {
-			key := m[1]
-			if _, ok := seen[key]; ok {
-				continue
+			if i := strings.Index(body, "constructor("); i >= 0 {
+				body = body[:i]
 			}
 
-			seen[key] = struct{}{}
+			var keys []string
+			for _, m := range fieldRe.FindAllStringSubmatch(body, -1) {
+				keys = append(keys, m[1])
+			}
 
-			keys = append(keys, key)
+			sort.Strings(keys)
+			result[name] = keys
 		}
-
-		sort.Strings(keys)
-		result[name] = keys
 	}
 
 	return result
 }
 
 // TestDTOContract guards against Go-binding ↔ frontend DTO drift: every Go DTO
-// must have a matching TypeScript class in models.ts with the exact same set of
+// must have a matching generated TypeScript class with the exact same set of
 // JSON field names, and vice versa.
 func TestDTOContract(t *testing.T) {
 	t.Parallel()
@@ -154,7 +149,7 @@ func TestDTOContract(t *testing.T) {
 	for name, want := range goFields {
 		got, ok := tsFields[name]
 		if !ok {
-			t.Errorf("Go DTO %q has no matching class in %s", name, dtoContractModelsPath)
+			t.Errorf("Go DTO %q has no matching class in %v", name, dtoContractModelsPaths)
 
 			continue
 		}
@@ -164,11 +159,11 @@ func TestDTOContract(t *testing.T) {
 		}
 	}
 
-	// Every TS class in the gui namespace maps back to a listed Go DTO, so a
+	// Every generated TS class maps back to a listed Go DTO, so a
 	// removed/renamed Go DTO (or an untracked TS class) is caught too.
 	for name := range tsFields {
 		if _, ok := goFields[name]; !ok {
-			t.Errorf("models.ts class %q has no matching Go DTO in dtoContract()", name)
+			t.Errorf("generated class %q has no matching Go DTO in dtoContract()", name)
 		}
 	}
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import type * as capability from '../bindings/github.com/mpyw/suve/internal/capability/models';
   import {
     Capabilities,
     DetectProviders,
@@ -11,8 +12,8 @@
     ResolveScopeTarget,
     SelectScope,
     StagingStatus,
-  } from '../wailsjs/go/gui/App';
-  import type { capability, gui } from '../wailsjs/go/models';
+  } from '../bindings/github.com/mpyw/suve/internal/gui/app';
+  import type * as gui from '../bindings/github.com/mpyw/suve/internal/gui/models';
   import ParamView from './lib/ParamView.svelte';
   import { withRetry } from './lib/retry';
   import SecretView from './lib/SecretView.svelte';
@@ -113,7 +114,7 @@
       let picked = await withRetry(() => InitialProvider());
       if (!picked) {
         const detected = await withRetry(() => DetectProviders());
-        picked = uniqueActiveProvider(detected);
+        picked = detected ? uniqueActiveProvider(detected) : '';
       }
 
       // The launched service (from e.g. `suve azure param --gui`) selects the

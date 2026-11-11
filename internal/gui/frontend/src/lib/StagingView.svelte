@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { StagingAddTag, StagingApply, StagingApplyAll, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingInspectImportFile, StagingPickExportPath, StagingPickImportPath, StagingReset, StagingUnstage } from '../../wailsjs/go/gui/App';
-  import { capability, gui } from '../../wailsjs/go/models';
+  import * as capability from '../../bindings/github.com/mpyw/suve/internal/capability/models';
+  import { StagingAddTag, StagingApply, StagingApplyAll, StagingCancelAddTag, StagingCancelRemoveTag, StagingDiff, StagingEdit, StagingExport, StagingImport, StagingInspectImportFile, StagingPickExportPath, StagingPickImportPath, StagingReset, StagingUnstage } from '../../bindings/github.com/mpyw/suve/internal/gui/app';
+  import * as gui from '../../bindings/github.com/mpyw/suve/internal/gui/models';
   import Modal from './Modal.svelte';
   import PassphraseModal from './PassphraseModal.svelte';
   import StagingSection from './StagingSection.svelte';
@@ -161,9 +162,9 @@
       applyResult = new gui.StagingApplyResult({
         ...r,
         serviceName: getServiceName(applyService),
-        conflicts: r.conflicts ?? [],
-        entryResults: r.entryResults ?? [],
-        tagResults: r.tagResults ?? [],
+        conflicts: r?.conflicts ?? [],
+        entryResults: r?.entryResults ?? [],
+        tagResults: r?.tagResults ?? [],
       });
     } catch (e) {
       modalError = parseError(e);
@@ -397,6 +398,7 @@
       importPath = path;
 
       const info = await StagingInspectImportFile(path);
+      if (!info) throw new Error('the import file could not be inspected');
       importInfo = info;
 
       if (info.service !== service) {

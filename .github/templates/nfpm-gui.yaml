@@ -14,7 +14,8 @@ description: |
   for safe, reviewable changes to your AWS secrets and parameters.
   .
   This package includes GUI support via the --gui flag.
-  Requires GTK3 and WebKit2GTK runtime libraries.
+  Requires the GTK and WebKitGTK runtime libraries (GTK4 and webkitgtk-6.0;
+  GTK3 and webkit2gtk-4.1 for the suve_webkit2_41 package).
 homepage: "https://github.com/mpyw/suve"
 license: "MIT"
 
@@ -28,7 +29,7 @@ rpm:
 depends: []
 
 # GUI dependencies - recommended but not strictly required
-# Versions are detected from Wails source in CI
+# Package names are set per variant by the release workflow
 recommends:
   - ${GTK_DEB}
   - ${WEBKIT_DEB}

@@ -10,7 +10,8 @@ before:
 builds:
   # =============================================================================
   # suve: Integrated CLI + GUI
-  # macOS/Linux: CGO enabled (required for webkit2gtk)
+  # macOS/Linux: CGO enabled (Wails links Cocoa/WebKit on macOS and
+  # GTK/WebKitGTK on Linux)
   # Windows: CGO not required (Wails uses pure Go webview2loader)
   # All platforms use production tag for GUI support
   # =============================================================================
@@ -45,7 +46,8 @@ builds:
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
 
   # =============================================================================
-  # Linux GUI (webkit2gtk-4.0): Ubuntu 22.04, Debian 11/12, etc.
+  # Linux GUI (GTK4 + webkitgtk-6.0, the Wails v3 default): Ubuntu 24.04+,
+  # Debian 13+, Fedora 39+, etc.
   # =============================================================================
   - id: suve-linux-amd64
     main: ./cmd/suve
@@ -78,7 +80,8 @@ builds:
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
 
   # =============================================================================
-  # Linux GUI (webkit2gtk-4.1): Ubuntu 24.04+, Fedora 40+, etc.
+  # Linux GUI (GTK3 + webkit2gtk-4.1, Wails v3 `gtk3` tag): Ubuntu 22.04+,
+  # Debian 12+, Fedora 40+, etc.
   # =============================================================================
   - id: suve-linux-amd64-webkit2_41
     main: ./cmd/suve
@@ -91,7 +94,7 @@ builds:
       - amd64
     tags:
       - production
-      - webkit2_41
+      - gtk3
     ldflags:
       - -s -w
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}
@@ -107,7 +110,7 @@ builds:
       - arm64
     tags:
       - production
-      - webkit2_41
+      - gtk3
     ldflags:
       - -s -w
       - -X github.com/mpyw/suve/internal/cli/commands.Version={{.Version}}

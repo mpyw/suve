@@ -144,11 +144,13 @@ jobs:
           retention-days: 1
 
   # ===========================================================================
-  # Linux GUI (webkit2gtk-4.0): Ubuntu 22.04, Debian 11/12, etc.
+  # Linux GUI (GTK4 + webkitgtk-6.0, the Wails v3 default): Ubuntu 24.04+,
+  # Debian 13+, Fedora 40+, etc. Built on 24.04, the oldest runner with
+  # libwebkitgtk-6.0-dev.
   # ===========================================================================
   build-linux-amd64:
     needs: [validate]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -156,18 +158,16 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      # Ubuntu 22.04 (the only runner with libwebkit2gtk-4.0-dev) ships glibc
-      # 2.35, too old for mise's prebuilt binary — use the standard setup-go
-      # here. Go version comes from go.mod; node is the runner's system node.
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          go-version-file: go.mod
+          install_args: "go node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
 
       - name: Build frontend
         run: |
@@ -193,7 +193,7 @@ jobs:
 
   build-linux-arm64:
     needs: [validate]
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -201,18 +201,16 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      # Ubuntu 22.04 (the only runner with libwebkit2gtk-4.0-dev) ships glibc
-      # 2.35, too old for mise's prebuilt binary — use the standard setup-go
-      # here. Go version comes from go.mod; node is the runner's system node.
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Set up toolchain (mise)
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          go-version-file: go.mod
+          install_args: "go node"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
 
       - name: Build frontend
         run: |
@@ -237,11 +235,12 @@ jobs:
           retention-days: 1
 
   # ===========================================================================
-  # Linux GUI (webkit2gtk-4.1): Ubuntu 24.04+, Fedora 40+, etc.
+  # Linux GUI (GTK3 + webkit2gtk-4.1, Wails v3 `gtk3` tag): Ubuntu 22.04+,
+  # Debian 12+, Fedora 40+, etc.
   # ===========================================================================
   build-linux-amd64-webkit2_41:
     needs: [validate]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -249,11 +248,14 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up toolchain (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      # Built on Ubuntu 22.04 so the binary needs only glibc 2.35 and runs on
+      # 22.04 too. That glibc is too old for mise's prebuilt binary — use the
+      # standard setup-go here. Go version comes from go.mod; node is the
+      # runner's system node.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          install_args: "go node"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          go-version-file: go.mod
 
       - name: Install dependencies
         run: |
@@ -284,7 +286,7 @@ jobs:
 
   build-linux-arm64-webkit2_41:
     needs: [validate]
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-22.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -292,11 +294,14 @@ jobs:
           ref: ${{ inputs.version }}
           fetch-depth: 0
 
-      - name: Set up toolchain (mise)
-        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+      # Built on Ubuntu 22.04 so the binary needs only glibc 2.35 and runs on
+      # 22.04 too. That glibc is too old for mise's prebuilt binary — use the
+      # standard setup-go here. Go version comes from go.mod; node is the
+      # runner's system node.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          install_args: "go node"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          go-version-file: go.mod
 
       - name: Install dependencies
         run: |
@@ -326,7 +331,7 @@ jobs:
           retention-days: 1
 
   # ===========================================================================
-  # Linux CLI-only: No CGO, no webkit2gtk dependency, cross-compile both archs
+  # Linux CLI-only: No CGO, no GTK/WebKitGTK dependency, cross-compile both archs
   # ===========================================================================
   build-linux-cli:
     needs: [validate]
@@ -570,11 +575,11 @@ jobs:
             nfpm pkg --config .github/templates/nfpm.yaml --packager rpm --target ".github/releases/suve-cli-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve-cli
 
-            # --- GUI package (webkit2gtk-4.0) ---
-            export GTK_DEB="libgtk-3-0"
-            export GTK_RPM="gtk3"
-            export WEBKIT_DEB="libwebkit2gtk-4.0-37"
-            export WEBKIT_RPM="webkit2gtk4.0"
+            # --- GUI package (GTK4 + webkitgtk-6.0) ---
+            export GTK_DEB="libgtk-4-1"
+            export GTK_RPM="gtk4"
+            export WEBKIT_DEB="libwebkitgtk-6.0-4"
+            export WEBKIT_RPM="webkitgtk6.0"
 
             gui_dir=$(find dist -maxdepth 1 -type d -name "suve-linux-${arch}_linux_${arch}*" ! -name "*webkit2_41*" | head -1)
             if [[ -z "$gui_dir" || ! -d "$gui_dir" ]]; then
@@ -584,12 +589,14 @@ jobs:
             fi
             cp "${gui_dir}/suve" ./suve
 
-            echo "=== Generating suve packages for ${arch} (webkit2gtk-4.0) ==="
+            echo "=== Generating suve packages for ${arch} (GTK4 + webkitgtk-6.0) ==="
             nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target ".github/releases/suve_${VERSION}-1_${deb_arch}.deb"
             nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target ".github/releases/suve-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve
 
-            # --- GUI package (webkit2gtk-4.1) ---
+            # --- GUI package (GTK3 + webkit2gtk-4.1) ---
+            export GTK_DEB="libgtk-3-0"
+            export GTK_RPM="gtk3"
             export WEBKIT_DEB="libwebkit2gtk-4.1-0"
             export WEBKIT_RPM="webkit2gtk4.1"
 
@@ -601,7 +608,7 @@ jobs:
             fi
             cp "${gui41_dir}/suve" ./suve
 
-            echo "=== Generating suve_webkit2_41 packages for ${arch} (webkit2gtk-4.1) ==="
+            echo "=== Generating suve_webkit2_41 packages for ${arch} (GTK3 + webkit2gtk-4.1) ==="
             nfpm pkg --config .github/templates/nfpm-gui.yaml --packager deb --target ".github/releases/suve_webkit2_41_${VERSION}-1_${deb_arch}.deb"
             nfpm pkg --config .github/templates/nfpm-gui.yaml --packager rpm --target ".github/releases/suve_webkit2_41-${VERSION}-1.${rpm_arch}.rpm"
             rm ./suve

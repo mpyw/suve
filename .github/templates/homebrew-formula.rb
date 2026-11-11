@@ -38,7 +38,7 @@ class Suve < Formula
   def caveats
     on_linux do
       <<~EOS
-        This formula installs the GUI version which requires GTK3 and WebKit2GTK.
+        This formula installs the GUI version which requires GTK4 and webkitgtk-6.0.
         If you only need CLI functionality, install suve-cli instead:
           brew install mpyw/tap/suve-cli
       EOS

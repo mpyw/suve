@@ -10,7 +10,7 @@
 //   * entryFilter keeps only the app modules Vite serves under `/src/` — this
 //     drops the Svelte runtime (node_modules/.vite/deps/*, whose own source
 //     maps resolve to `svelte/src/**`), @vite/client, Vite chunks, clsx, the
-//     generated wailsjs bindings, and the extracted CSS — before unpacking.
+//     generated bindings (bindings/, outside src/), and the extracted CSS — before unpacking.
 //   * sourcePath rebuilds the real repo-relative path. Vite dev source maps
 //     unpack each module to a bare basename (e.g. `Modal.svelte`), losing its
 //     directory; since each dev entry is 1:1 with its source, the entry URL

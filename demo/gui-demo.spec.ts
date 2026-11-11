@@ -9,7 +9,7 @@ import {
  * GUI Demo Recording Script
  *
  * This test follows the same scenario as the CLI demo (demo/cli-demo.tape).
- * Uses real LocalStack backend via wails dev.
+ * Uses the real LocalStack backend through the Wails server build.
  *
  * Run: ./demo/gui-record.sh
  */
@@ -38,7 +38,7 @@ test.describe('GUI Demo Recording', () => {
   test('Full staging workflow demo', async ({ page }) => {
     test.setTimeout(300000);
 
-    // No mocks - using real LocalStack via wails dev
+    // No mocks - using real LocalStack through the Wails server build
     await page.goto('/');
     await waitForItemList(page);
 

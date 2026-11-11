@@ -60,8 +60,8 @@ fi
 
 host=$(go env GOHOSTOS)
 host_tags=production,e2e
-# ubuntu-latest ships webkit2gtk-4.1, which Wails selects with webkit2_41.
-[ "$host" = linux ] && host_tags=production,webkit2_41,e2e
+# On Linux the default Wails v3 backend (GTK4 + webkitgtk-6.0) is the one
+# checked; the gtk3 variant differs only inside the Wails module.
 
 # run COMMAND GOOS TAGS [DIR]
 # COMMAND is "shrink" for `declscope shrink`, or empty for the analyzer.

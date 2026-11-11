@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # gui/ is a separate module (Wails entry point) that replaces the root with
+  # gui/ is a separate module (the GUI entry point) that replaces the root with
   # ../; it must be bumped too or its go.mod falls behind and is no longer tidy.
   - package-ecosystem: gomod
     directories: ["/", "/gui"]
@@ -8,6 +8,11 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    # wails/v3, the @wailsio/runtime npm package, and the wails3 CLI pin in
+    # mise.toml share one version and the committed bindings come from that
+    # CLI, so they are bumped together by hand (see the gui-change skill).
+    ignore:
+      - dependency-name: "github.com/wailsapp/wails/v3"
     groups:
       wailsapp:
         patterns: ["github.com/wailsapp/*"]
@@ -22,6 +27,9 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    # Bumped by hand together with github.com/wailsapp/wails/v3 (see gomod above).
+    ignore:
+      - dependency-name: "@wailsio/runtime"
     groups:
       npm-minor:
         patterns: ["*"]

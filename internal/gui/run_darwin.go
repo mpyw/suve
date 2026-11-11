@@ -2,9 +2,9 @@
 
 package gui
 
-import "github.com/wailsapp/wails/v2/pkg/options"
+import "github.com/wailsapp/wails/v3/pkg/application"
 
-func applyPlatformRunOptions(_ *options.App) {
+func applyPlatformRunOptions(_ *application.Options) {
 	// macOS: No platform-specific options needed.
 	// Dock icon requires .app bundle (wails build), which is not used here.
 }

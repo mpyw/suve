@@ -23,14 +23,14 @@
 > [!TIP]
 > On first run, if Windows SmartScreen shows "Windows protected your PC", click **More info** → **Run anyway**.
 
-### Linux GUI (webkit2gtk-4.0: Ubuntu 22.04, Debian 11/12, etc.)
+### Linux GUI (GTK4 + webkitgtk-6.0: Ubuntu 24.04+, Debian 13+, Fedora 40+, etc.)
 
 | Architecture | Tarball | Debian/Ubuntu | RHEL/Fedora |
 |--------------|---------|---------------|-------------|
 | x86_64 | [suve_${VERSION}_linux_amd64.tar.gz](${BASE_URL}/suve_${VERSION}_linux_amd64.tar.gz) | [suve_${VERSION}-1_amd64.deb](${BASE_URL}/suve_${VERSION}-1_amd64.deb) | [suve-${VERSION}-1.x86_64.rpm](${BASE_URL}/suve-${VERSION}-1.x86_64.rpm) |
 | aarch64 | [suve_${VERSION}_linux_arm64.tar.gz](${BASE_URL}/suve_${VERSION}_linux_arm64.tar.gz) | [suve_${VERSION}-1_arm64.deb](${BASE_URL}/suve_${VERSION}-1_arm64.deb) | [suve-${VERSION}-1.aarch64.rpm](${BASE_URL}/suve-${VERSION}-1.aarch64.rpm) |
 
-### Linux GUI (webkit2gtk-4.1: Ubuntu 24.04+, Fedora 40+, etc.)
+### Linux GUI (GTK3 + webkit2gtk-4.1: Ubuntu 22.04+, Debian 12+, Fedora 40+, etc.)
 
 | Architecture | Tarball | Debian/Ubuntu | RHEL/Fedora |
 |--------------|---------|---------------|-------------|

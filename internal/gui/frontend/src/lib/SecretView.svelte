@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte';
-  import { SecretAddTag, SecretCreate, SecretDelete, SecretDiff, SecretList, SecretLog, SecretRemoveTag, SecretRestore, SecretShow, SecretUpdate, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../wailsjs/go/gui/App';
-  import type { capability as capabilityModel, gui } from '../../wailsjs/go/models';
+  import type * as capabilityModel from '../../bindings/github.com/mpyw/suve/internal/capability/models';
+  import { SecretAddTag, SecretCreate, SecretDelete, SecretDiff, SecretList, SecretLog, SecretRemoveTag, SecretRestore, SecretShow, SecretUpdate, StagingAdd, StagingAddTag, StagingCheckStatus, StagingDelete, StagingEdit, StagingRemoveTag } from '../../bindings/github.com/mpyw/suve/internal/gui/app';
+  import type * as gui from '../../bindings/github.com/mpyw/suve/internal/gui/models';
   import DiffDisplay from './DiffDisplay.svelte';
   import CloseIcon from './icons/CloseIcon.svelte';
   import EyeIcon from './icons/EyeIcon.svelte';

@@ -72,16 +72,20 @@ jobs:
       - name: Install Wails dependencies (CGO)
         run: |
           for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
-          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
+          # GTK4/webkitgtk-6.0 for the default build, GTK3/webkit2gtk-4.1 for the gtk3 variant.
+          for i in {1..5}; do sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
 
       - name: Create dummy frontend dist
         run: mkdir -p internal/gui/frontend/dist && touch internal/gui/frontend/dist/index.html
 
       - name: Run GUI Go tests with coverage
         run: |
-          CGO_ENABLED=1 go test -v -race -tags=production,webkit2_41 \
+          CGO_ENABLED=1 go test -v -race -tags=production \
             -coverprofile=coverage-gui.txt -covermode=atomic \
             -coverpkg=./internal/gui/... ./internal/gui/...
+
+      - name: Build the GTK3 variant (-tags gtk3)
+        run: CGO_ENABLED=1 go build -tags=production,gtk3 -o /dev/null ./cmd/suve
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
@@ -408,10 +412,10 @@ jobs:
       - name: Install Wails dependencies (CGO)
         run: |
           for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
-          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev build-essential pkg-config && break || sleep $((i * 5)); done
 
       - name: Run golangci-lint (production build)
-        run: golangci-lint run --timeout=5m --build-tags=production,webkit2_41
+        run: golangci-lint run --timeout=5m --build-tags=production
 
       - name: Run goroutinectx
         run: go run github.com/mpyw/goroutinectx/cmd/goroutinectx@v0.10.0 ./...
@@ -447,7 +451,7 @@ jobs:
         if: matrix.os == 'linux'
         run: |
           for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
-          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev build-essential pkg-config && break || sleep $((i * 5)); done
 
       - name: Run declscope shrink, then declscope, under every build configuration
         run: mise run declscope
@@ -608,13 +612,13 @@ jobs:
           '
 
   linux-gui-package:
-    name: Linux GUI Package Test (${{ matrix.arch }}, webkit2gtk-${{ matrix.webkit }})
+    name: Linux GUI Package Test (${{ matrix.arch }}, ${{ matrix.variant }})
     runs-on: ubuntu-${{ matrix.ubuntu }}${{ matrix.arch == 'arm64' && '-arm' || '' }}
     strategy:
       fail-fast: false
       matrix:
         arch: [amd64, arm64]
-        webkit: ["4.0", "4.1"]
+        variant: [gtk4, gtk3]
         include:
           - arch: amd64
             deb_arch: amd64
@@ -622,15 +626,27 @@ jobs:
           - arch: arm64
             deb_arch: arm64
             rpm_arch: aarch64
-          - webkit: "4.0"
-            ubuntu: "22.04"
-            fedora: "39"
-            webkit_deb: libwebkit2gtk-4.0-37
-            webkit_rpm: webkit2gtk4.0
-            pkg_suffix: ""
-          - webkit: "4.1"
+          # Default build: GTK4 + webkitgtk-6.0 (Ubuntu 24.04 is the oldest
+          # runner with libwebkitgtk-6.0-dev).
+          - variant: gtk4
             ubuntu: "24.04"
             fedora: "latest"
+            dev_packages: libgtk-4-dev libwebkitgtk-6.0-dev
+            tags: production
+            gtk_deb: libgtk-4-1
+            gtk_rpm: gtk4
+            webkit_deb: libwebkitgtk-6.0-4
+            webkit_rpm: webkitgtk6.0
+            pkg_suffix: ""
+          # suve_webkit2_41: GTK3 + webkit2gtk-4.1 (Wails v3 gtk3 tag), built
+          # on 22.04 like the release so it also runs there.
+          - variant: gtk3
+            ubuntu: "22.04"
+            fedora: "latest"
+            dev_packages: libgtk-3-dev libwebkit2gtk-4.1-dev
+            tags: production,gtk3
+            gtk_deb: libgtk-3-0
+            gtk_rpm: gtk3
             webkit_deb: libwebkit2gtk-4.1-0
             webkit_rpm: webkit2gtk4.1
             pkg_suffix: "_webkit2_41"
@@ -638,9 +654,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # This job's webkit-4.0 matrix leg runs on Ubuntu 22.04 (the only runner
-      # that still ships libwebkit2gtk-4.0-dev), whose glibc 2.35 is too old for
-      # mise's prebuilt binary. Use the standard setup actions here; the tool
+      # This job's gtk3 matrix leg runs on Ubuntu 22.04, whose glibc 2.35 is
+      # too old for mise's prebuilt binary. Use the standard setup actions here; the tool
       # versions are kept in sync with mise.toml.
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -657,7 +672,7 @@ jobs:
       - name: Install build dependencies
         run: |
           for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
-          for i in {1..5}; do sudo apt-get install -y libgtk-3-dev libwebkit2gtk-${{ matrix.webkit }}-dev && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y ${{ matrix.dev_packages }} && break || sleep $((i * 5)); done
 
       - name: Build frontend
         run: |
@@ -667,11 +682,7 @@ jobs:
 
       - name: Build GUI binary
         run: |
-          TAGS="production"
-          if [[ "${{ matrix.webkit }}" == "4.1" ]]; then
-            TAGS="production,webkit2_41"
-          fi
-          CGO_ENABLED=1 go build -tags "$TAGS" -o suve ./cmd/suve
+          CGO_ENABLED=1 go build -tags "${{ matrix.tags }}" -o suve ./cmd/suve
           file suve
 
       - name: Verify binary runs correctly
@@ -689,8 +700,8 @@ jobs:
         env:
           VERSION: "0.0.0-test"
           GOARCH: ${{ matrix.arch }}
-          GTK_DEB: "libgtk-3-0"
-          GTK_RPM: "gtk3"
+          GTK_DEB: ${{ matrix.gtk_deb }}
+          GTK_RPM: ${{ matrix.gtk_rpm }}
           WEBKIT_DEB: ${{ matrix.webkit_deb }}
           WEBKIT_RPM: ${{ matrix.webkit_rpm }}
         run: |
@@ -711,7 +722,7 @@ jobs:
       - name: Test .deb installation
         run: |
           for i in {1..5}; do sudo apt-get update && break || sleep $((i * 5)); done
-          for i in {1..5}; do sudo apt-get install -y libgtk-3-0 ${{ matrix.webkit_deb }} && break || sleep $((i * 5)); done
+          for i in {1..5}; do sudo apt-get install -y ${{ matrix.gtk_deb }} ${{ matrix.webkit_deb }} && break || sleep $((i * 5)); done
           sudo dpkg -i "suve${{ matrix.pkg_suffix }}_test_${{ matrix.deb_arch }}.deb"
           command -v suve
           suve --version

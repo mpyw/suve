@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/mpyw/suve/internal/provider"
 )
@@ -143,13 +144,22 @@ func mustHydrate(t *testing.T, s provider.Scope) provider.Scope {
 	return got
 }
 
-func TestApp_Startup(t *testing.T) {
+// mustServiceStartup runs the Wails service startup hook with the test's context.
+//
+//declscope:shared // shared with the staging binding tests
+func mustServiceStartup(t *testing.T, app *App) {
+	t.Helper()
+
+	require.NoError(t, app.ServiceStartup(t.Context(), application.ServiceOptions{}))
+}
+
+func TestApp_ServiceStartup(t *testing.T) {
 	t.Parallel()
 
 	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAWS}, "")
 	assert.Nil(t, app.ctx)
 
-	app.Startup(t.Context())
+	mustServiceStartup(t, app)
 	assert.Equal(t, t.Context(), app.ctx)
 }
 

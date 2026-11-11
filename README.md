@@ -31,7 +31,7 @@ A **Git-like CLI/TUI/GUI** for <a href="https://aws.amazon.com/"><img src="https
 ## Installation
 
 > [!NOTE]
-> On Linux, `suve` requires GTK3 and WebKit2GTK for GUI support. Use the CLI/TUI-only version if you don't need the desktop GUI. The keyboard-driven **TUI (`--tui`) is pure Go and ships in every build**, including the CLI/TUI-only one — only the desktop **GUI (`--gui`)** needs the GTK3/WebKit2GTK dependencies.
+> On Linux, `suve` requires GTK and WebKitGTK for GUI support: GTK4 and webkitgtk-6.0 for the default build, or GTK3 and webkit2gtk-4.1 for the `_webkit2_41` build. Use the CLI/TUI-only version if you don't need the desktop GUI. The keyboard-driven **TUI (`--tui`) is pure Go and ships in every build**, including the CLI/TUI-only one — only the desktop **GUI (`--gui`)** needs the GTK/WebKitGTK dependencies.
 
 ### <a href="https://mise.jdx.dev/"><img src="https://mise.jdx.dev/logo.svg" height="28" alt=""></a> Using [mise](https://mise.jdx.dev/) (macOS/Linux/Windows)
 
@@ -122,7 +122,7 @@ curl -fsSL "$BASE" | sh -s -- --deb                          # native .deb via a
 curl -fsSL "$BASE" | sh -s -- --rpm                          # native .rpm via dnf (Fedora/RHEL)
 ```
 
-`--deb` / `--rpm` install a **native package** instead of a bare binary — tracked by `apt`/`dnf` for clean upgrade/removal, with GUI dependencies resolved for you. They also default to auto (GUI when WebKit2GTK is already present, else CLI-only); add `--gui`/`--cli` to force a build.
+`--deb` / `--rpm` install a **native package** instead of a bare binary — tracked by `apt`/`dnf` for clean upgrade/removal, with GUI dependencies resolved for you. They also default to auto (GUI when WebKitGTK is already present, else CLI-only); add `--gui`/`--cli` to force a build.
 
 > [!TIP]
 > Prefer to read before you run? Download, inspect, then execute:
@@ -143,36 +143,39 @@ Prefer to do it by hand? The `--deb` / `--rpm` flags above are just a wrapper ar
 ```bash
 export VERSION=0.0.0
 export ARCH=amd64  # or arm64
-export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Ubuntu 24.04+
+export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Ubuntu 22.04 / Debian 12
 
 # CLI/TUI-only (recommended, no GUI dependencies)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli_${VERSION}-1_${ARCH}.deb"
 sudo apt install "./suve-cli_${VERSION}-1_${ARCH}.deb"
 
-# Full version (CLI/TUI + GUI; apt resolves GTK3 and WebKit2GTK)
+# Full version (CLI/TUI + GUI; apt resolves GTK and WebKitGTK)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
 sudo apt install "./suve${WEBKIT_SUFFIX}_${VERSION}-1_${ARCH}.deb"
 ```
 
-**Note:** Ubuntu 22.04/Debian uses webkit2gtk-4.0 (default). Ubuntu 24.04+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
+| Distribution | Build | `WEBKIT_SUFFIX` |
+|---|---|---|
+| Ubuntu 24.04+, Debian 13+ | GTK4 + webkitgtk-6.0 | `""` |
+| Ubuntu 22.04, Debian 12 | GTK3 + webkit2gtk-4.1 | `"_webkit2_41"` |
 
 **Red Hat/Fedora (.rpm):**
 
 ```bash
 export VERSION=0.0.0
 export ARCH=x86_64  # or aarch64
-export WEBKIT_SUFFIX=""  # use "_webkit2_41" for Fedora 40+
+export WEBKIT_SUFFIX=""  # use "_webkit2_41" for GTK3 + webkit2gtk-4.1
 
 # CLI/TUI-only (recommended, no GUI dependencies)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve-cli-${VERSION}-1.${ARCH}.rpm"
 sudo dnf install "./suve-cli-${VERSION}-1.${ARCH}.rpm"
 
-# Full version (CLI/TUI + GUI; dnf resolves GTK3 and WebKit2GTK)
+# Full version (CLI/TUI + GUI; dnf resolves GTK and WebKitGTK)
 curl -LO "https://github.com/mpyw/suve/releases/download/v${VERSION}/suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 sudo dnf install "./suve${WEBKIT_SUFFIX}-${VERSION}-1.${ARCH}.rpm"
 ```
 
-**Note:** Fedora 39 and earlier uses webkit2gtk-4.0 (default). Fedora 40+ uses webkit2gtk-4.1 (set `WEBKIT_SUFFIX="_webkit2_41"`).
+**Note:** Fedora 40+ ships both stacks. The default build uses GTK4 + webkitgtk-6.0; set `WEBKIT_SUFFIX="_webkit2_41"` for GTK3 + webkit2gtk-4.1.
 
 </details>
 
@@ -235,22 +238,25 @@ mise build-gui
 | Windows | [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (usually pre-installed) |
 
 <details>
-<summary>Linux build dependencies and webkit2gtk-4.1 support</summary>
+<summary>Linux build dependencies and the GTK3 build</summary>
 
-Linux requires GTK3 and WebKit2GTK:
+Linux builds use GTK4 and webkitgtk-6.0 by default:
 
 | Platform | Dependencies |
 |----------|-------------|
-| Ubuntu 22.04/Debian | `sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev` |
-| Ubuntu 24.04+ | `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev` |
-| Fedora 39 | `sudo dnf install gtk3-devel webkit2gtk4.0-devel` |
-| Fedora 40+ | `sudo dnf install gtk3-devel webkit2gtk4.1-devel` |
-| Arch Linux | `sudo pacman -S gtk3 webkit2gtk-4.1` |
+| Ubuntu 24.04+, Debian 13+ | `sudo apt install libgtk-4-dev libwebkitgtk-6.0-dev` |
+| Fedora 40+ | `sudo dnf install gtk4-devel webkitgtk6.0-devel` |
+| Arch Linux | `sudo pacman -S gtk4 webkitgtk-6.0` |
 
-For **webkit2gtk-4.1** (Ubuntu 24.04+, Fedora 40+, Arch Linux), add the `webkit2_41` build tag via `SUVE_GUI_TAGS`:
+For **GTK3 and webkit2gtk-4.1** (Ubuntu 22.04, Debian 12), install those libraries and add the `gtk3` build tag via `SUVE_GUI_TAGS`:
+
+| Platform | Dependencies |
+|----------|-------------|
+| Ubuntu 22.04+, Debian 12+ | `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev` |
+| Fedora 40+ | `sudo dnf install gtk3-devel webkit2gtk4.1-devel` |
 
 ```bash
-SUVE_GUI_TAGS=production,webkit2_41 mise build-gui
+SUVE_GUI_TAGS=production,gtk3 mise build-gui
 ```
 
 </details>

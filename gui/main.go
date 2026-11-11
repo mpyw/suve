@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	// The standalone Wails dev/build entry resolves the initial provider from
+	// The standalone GUI entry (mise gui-dev) resolves the initial provider from
 	// the environment (same as a bare `suve --gui`); it carries no explicit
 	// launch scope/service, so the GUI falls back to its env-derived default.
 	if err := gui.Run(provider.Scope{Provider: gui.DetectInitialProvider()}, ""); err != nil {

@@ -38,7 +38,7 @@ func setupStagingWriteBindingApp(t *testing.T, scope provider.Scope, store provi
 	t.Helper()
 
 	app := newTestApp(t, scope, "")
-	app.Startup(t.Context())
+	mustServiceStartup(t, app)
 	app.stagingStore = testutil.NewMockStore()
 
 	orig := registry

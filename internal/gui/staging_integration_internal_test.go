@@ -28,7 +28,7 @@ func setupStagingTestApp(t *testing.T) *App {
 	t.Helper()
 
 	app := newTestApp(t, provider.Scope{Provider: provider.ProviderAWS}, "")
-	app.Startup(t.Context())
+	mustServiceStartup(t, app)
 	app.stagingStore = testutil.NewMockStore()
 
 	return app
@@ -529,7 +529,7 @@ func newStagingTransferTestApp(t *testing.T, scope provider.Scope) *App {
 	t.Helper()
 
 	app := newTestApp(t, scope, "")
-	app.Startup(t.Context())
+	mustServiceStartup(t, app)
 	app.stagingStore = testutil.NewMockStore()
 
 	return app
