@@ -21,7 +21,10 @@ golangci-lint = "2.14.0"
 # with GORELEASER_VERSION there.
 goreleaser = "2.17.1"
 nfpm = "2.41.1"
-"go:github.com/wailsapp/wails/v3/cmd/wails3" = "3.1.0"
+# Built without cgo: with cgo, the wails3 CLI links GTK4/webkitgtk-6.0 on
+# Linux, so `mise install` would need those dev packages on every machine and
+# CI job. Its bindings generator is static analysis and needs no cgo.
+"go:github.com/wailsapp/wails/v3/cmd/wails3" = { version = "3.1.0", install_env = { CGO_ENABLED = "0" } }
 # Reports production dead code; run via the `deadcode` task (deadcode lint gate).
 "go:golang.org/x/tools/cmd/deadcode" = "0.49.0"
 
