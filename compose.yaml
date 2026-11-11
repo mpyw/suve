@@ -52,7 +52,7 @@ services:
     # SUVE_AZURE_KEYVAULT_ENDPOINT (TLS verification + token challenge disabled).
     profiles:
       - azure
-    image: nagyesta/lowkey-vault:7.3.0
+    image: nagyesta/lowkey-vault:7.4.0
     ports:
       - "127.0.0.1:${SUVE_AZURE_KEYVAULT_PORT:-8443}:8443/tcp"
 

@@ -58,7 +58,7 @@ services:
     # https://azure-keyvault:8443.
     profiles:
       - azure
-    image: nagyesta/lowkey-vault:7.3.0
+    image: nagyesta/lowkey-vault:7.4.0
     environment:
       # lowkey-vault auto-registers a vault per authority. Out of the box it only
       # serves localhost/127.0.0.1 (and the default.lowkey-vault names), which is
