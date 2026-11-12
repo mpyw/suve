@@ -288,7 +288,7 @@ jobs:
       # Azure Key Vault emulator (lowkey-vault, HTTPS :8443, self-signed cert,
       # auth present-but-ignored), offline.
       azure-keyvault:
-        image: nagyesta/lowkey-vault:7.3.0
+        image: nagyesta/lowkey-vault:7.4.0
         ports:
           - 8443:8443
     steps:
@@ -348,7 +348,7 @@ jobs:
       # Azure Key Vault emulator (lowkey-vault, HTTPS :8443, self-signed cert,
       # auth present-but-ignored), offline.
       azure-keyvault:
-        image: nagyesta/lowkey-vault:7.3.0
+        image: nagyesta/lowkey-vault:7.4.0
         ports:
           - 8443:8443
     steps:
